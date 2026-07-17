@@ -1,0 +1,551 @@
+import pathlib
+import subprocess
+import sys
+import tempfile
+import textwrap
+import unittest
+
+
+GENERATOR_DIR = pathlib.Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(GENERATOR_DIR))
+
+from kotlin_code_generator import KotlinCodeGenerator
+from swift_code_generator import SwiftCodeGenerator
+from cycle_detector import CycleDetector
+
+
+class BoxedStrictRefCycleDetector:
+    def should_box_property(self, type_name, property_name):
+        return property_name in {"child", "optionalStrict"}
+
+    def should_be_indirect(self, _type_name):
+        return False
+
+
+def strict_ref_lexicon():
+    return {
+        "lexicon": 1,
+        "id": "blue.catbird.test.strictRefUnknownKeys",
+        "defs": {
+            "main": {
+                "type": "procedure",
+                "input": {
+                    "encoding": "application/json",
+                    "schema": {
+                        "type": "object",
+                        "required": ["requiredStrict"],
+                        "properties": {
+                            "requiredStrict": {
+                                "type": "ref",
+                                "ref": "#receipt",
+                                "x-security-strict-decode": True,
+                                "description": "Required strict receipt.",
+                            },
+                            "optionalStrict": {
+                                "type": "ref",
+                                "ref": "#receipt",
+                                "x-security-strict-decode": True,
+                                "description": "Optional strict receipt.",
+                            },
+                            "ordinary": {"type": "ref", "ref": "#receipt"},
+                        },
+                    },
+                },
+            },
+            "receipt": {
+                "type": "object",
+                "required": ["sequence"],
+                "properties": {
+                    "sequence": {"type": "integer"},
+                    "note": {"type": "string"},
+                    "child": {"type": "ref", "ref": "#receipt"},
+                },
+            },
+            "envelope": {
+                "type": "object",
+                "required": ["requiredStrict"],
+                "properties": {
+                    "requiredStrict": {
+                        "type": "ref",
+                        "ref": "#receipt",
+                        "x-security-strict-decode": True,
+                    },
+                    "optionalStrict": {
+                        "type": "ref",
+                        "ref": "#receipt",
+                        "x-security-strict-decode": True,
+                    },
+                    "ordinary": {"type": "ref", "ref": "#receipt"},
+                },
+            },
+        },
+    }
+
+
+class StrictRefUnknownKeysTests(unittest.TestCase):
+    def test_record_ref_discriminator_is_optional_but_exact_when_present(self):
+        lexicon = {
+            "lexicon": 1,
+            "id": "blue.catbird.test.externalRecordStrictRef",
+            "defs": {
+                "main": {
+                    "type": "procedure",
+                    "input": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "required": ["record"],
+                            "properties": {
+                                "record": {
+                                    "type": "ref",
+                                    "ref": "blue.catbird.test.record",
+                                    "x-security-strict-decode": True,
+                                }
+                            },
+                        },
+                    },
+                }
+            },
+        }
+        registry = CycleDetector()
+        registry.add_type(
+            "blue.catbird.test.record",
+            "main",
+            {
+                "type": "record",
+                "key": "tid",
+                "record": {
+                    "type": "object",
+                    "required": ["value"],
+                    "properties": {"value": {"type": "string"}},
+                },
+            },
+        )
+
+        swift = SwiftCodeGenerator(lexicon, registry).convert()
+        kotlin = KotlinCodeGenerator(lexicon, registry).convert()
+        self.assertIn('allowedKeys: ["value"]', swift)
+        self.assertIn(
+            'expectedTypeIdentifier: "blue.catbird.test.record"', swift
+        )
+        self.assertIn("if nestedContainer.contains(discriminatorKey)", swift)
+        self.assertIn('setOf("value", "\\$type")', kotlin)
+        self.assertIn(
+            'expectedTypeIdentifier = "blue.catbird.test.record"', kotlin
+        )
+        self.assertIn('objectValue["\\$type"]?.let', kotlin)
+
+    def test_external_strict_ref_uses_corpus_registry_and_unresolved_refs_fail(self):
+        external = {
+            "lexicon": 1,
+            "id": "blue.catbird.test.externalStrictRef",
+            "defs": {
+                "main": {
+                    "type": "procedure",
+                    "input": {
+                        "encoding": "application/json",
+                        "schema": {
+                            "type": "object",
+                            "required": ["receipt"],
+                            "properties": {
+                                "receipt": {
+                                    "type": "ref",
+                                    "ref": "blue.catbird.test.receipt#main",
+                                    "x-security-strict-decode": True,
+                                }
+                            },
+                        },
+                    },
+                }
+            },
+        }
+        registry = CycleDetector()
+        registry.add_type(
+            "blue.catbird.test.receipt",
+            "main",
+            {
+                "type": "object",
+                "properties": {
+                    "sequence": {"type": "integer"},
+                    "signature": {"type": "bytes"},
+                },
+            },
+        )
+
+        swift = SwiftCodeGenerator(external, registry).convert()
+        kotlin = KotlinCodeGenerator(external, registry).convert()
+        self.assertIn('allowedKeys: ["sequence", "signature"]', swift)
+        self.assertIn(
+            'expectedTypeIdentifier: "blue.catbird.test.receipt"', swift
+        )
+        self.assertIn('setOf("sequence", "signature", "\\$type")', kotlin)
+        self.assertIn(
+            'expectedTypeIdentifier = "blue.catbird.test.receipt"', kotlin
+        )
+
+        with self.assertRaisesRegex(ValueError, "cannot be resolved"):
+            SwiftCodeGenerator(external).convert()
+        with self.assertRaisesRegex(ValueError, "cannot be resolved"):
+            KotlinCodeGenerator(external).convert()
+
+    def test_swift_strict_refs_reject_unknown_nested_keys_but_ordinary_ref_accepts(self):
+        generated = SwiftCodeGenerator(
+            strict_ref_lexicon(), BoxedStrictRefCycleDetector()
+        ).convert()
+        declarations = generated.split("extension ATProtoClient", 1)[0]
+        source = textwrap.dedent(
+            f"""
+            public protocol ATProtocolCodable: Codable {{}}
+            public protocol ATProtocolValue: Equatable, Hashable {{
+                func isEqual(to other: any ATProtocolValue) -> Bool
+                func toCBORValue() throws -> Any
+            }}
+            public struct OrderedCBORMap {{
+                public init() {{}}
+                public func adding(key: String, value: Any) -> Self {{ self }}
+            }}
+            public final class IndirectBox<T: Codable & Equatable & Hashable>:
+                Codable, Equatable, Hashable {{
+                public let value: T
+                public init(_ value: T) {{ self.value = value }}
+                public static func == (lhs: IndirectBox, rhs: IndirectBox) -> Bool {{
+                    lhs.value == rhs.value
+                }}
+                public func hash(into hasher: inout Hasher) {{ hasher.combine(value) }}
+            }}
+            public enum LogManager {{
+                public static func logError(_ message: String) {{}}
+                public static func logWarning(_ message: String) {{}}
+            }}
+            extension Int {{ public func toCBORValue() throws -> Any {{ self }} }}
+            extension String {{ public func toCBORValue() throws -> Any {{ self }} }}
+
+            {declarations}
+
+            let decoder = JSONDecoder()
+            let receipt = BlueCatbirdTestStrictRefUnknownKeys.Receipt(
+                sequence: 1,
+                note: nil,
+                child: nil
+            )
+            let strictRoundTrip = BlueCatbirdTestStrictRefUnknownKeys.Input(
+                requiredStrict: receipt,
+                optionalStrict: receipt,
+                ordinary: nil
+            )
+            let strictRoundTripData = try! JSONEncoder().encode(strictRoundTrip)
+            let strictRoundTripDecoded = try! decoder.decode(
+                BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                from: strictRoundTripData
+            )
+            precondition(strictRoundTripDecoded.requiredStrict.sequence == 1)
+            precondition(strictRoundTripDecoded.optionalStrict?.sequence == 1)
+
+            let boxedRoundTrip = BlueCatbirdTestStrictRefUnknownKeys.Envelope(
+                requiredStrict: receipt,
+                optionalStrict: receipt,
+                ordinary: nil
+            )
+            let boxedRoundTripData = try! JSONEncoder().encode(boxedRoundTrip)
+            let boxedRoundTripDecoded = try! decoder.decode(
+                BlueCatbirdTestStrictRefUnknownKeys.Envelope.self,
+                from: boxedRoundTripData
+            )
+            precondition(boxedRoundTripDecoded.optionalStrict?.sequence == 1)
+
+            let clean = Data(#"{{"requiredStrict":{{"sequence":1,"note":null}}}}"#.utf8)
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                    from: clean
+                )) != nil
+            )
+
+            let requiredInjection = Data(
+                #"{{"requiredStrict":{{"sequence":1,"extension":"attacker"}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                    from: requiredInjection
+                )) == nil
+            )
+
+            let optionalInjection = Data(
+                #"{{"requiredStrict":{{"sequence":1}},"optionalStrict":{{"sequence":2,"extension":"attacker"}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                    from: optionalInjection
+                )) == nil
+            )
+
+            let namedOptionalInjection = Data(
+                #"{{"requiredStrict":{{"sequence":1}},"optionalStrict":{{"sequence":2,"extension":"attacker"}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Envelope.self,
+                    from: namedOptionalInjection
+                )) == nil
+            )
+
+            let boxedStorageInjection = Data(
+                #"{{"requiredStrict":{{"sequence":1,"_child":null}}}}"#.utf8
+            )
+
+            let exactDiscriminator = Data(
+                #"{{"requiredStrict":{{"$type":"blue.catbird.test.strictRefUnknownKeys#receipt","sequence":1}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                    from: exactDiscriminator
+                )) != nil
+            )
+
+            let wrongDiscriminator = Data(
+                #"{{"requiredStrict":{{"$type":"blue.catbird.test.attacker#receipt","sequence":1}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                    from: wrongDiscriminator
+                )) == nil
+            )
+
+            let optionalWrongDiscriminator = Data(
+                #"{{"requiredStrict":{{"sequence":1}},"optionalStrict":{{"$type":"blue.catbird.test.attacker#receipt","sequence":2}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Envelope.self,
+                    from: optionalWrongDiscriminator
+                )) == nil
+            )
+
+            let nonStringDiscriminator = Data(
+                #"{{"requiredStrict":{{"$type":7,"sequence":1}}}}"#.utf8
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                    from: nonStringDiscriminator
+                )) == nil
+            )
+
+            let ordinaryWrongDiscriminator = Data(
+                #"{{"requiredStrict":{{"sequence":1}},"ordinary":{{"$type":"blue.catbird.test.attacker#receipt","sequence":3}}}}"#.utf8
+            )
+            let ordinaryWrongDecoded = try! decoder.decode(
+                BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                from: ordinaryWrongDiscriminator
+            )
+            precondition(ordinaryWrongDecoded.ordinary?.sequence == 3)
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                    from: boxedStorageInjection
+                )) == nil
+            )
+
+            let ordinaryExtension = Data(
+                #"{{"requiredStrict":{{"sequence":1}},"ordinary":{{"sequence":3,"extension":"compatible"}}}}"#.utf8
+            )
+            let decoded = try! decoder.decode(
+                BlueCatbirdTestStrictRefUnknownKeys.Input.self,
+                from: ordinaryExtension
+            )
+            precondition(decoded.ordinary?.sequence == 3)
+
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Envelope.self,
+                    from: requiredInjection
+                )) == nil
+            )
+            precondition(
+                (try? decoder.decode(
+                    BlueCatbirdTestStrictRefUnknownKeys.Envelope.self,
+                    from: ordinaryExtension
+                )) != nil
+            )
+            """
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            source_path = pathlib.Path(directory) / "StrictRef.swift"
+            executable_path = pathlib.Path(directory) / "StrictRef"
+            source_path.write_text(source)
+            compile_result = subprocess.run(
+                [
+                    "xcrun",
+                    "--toolchain",
+                    "XcodeDefault",
+                    "swiftc",
+                    str(source_path),
+                    "-o",
+                    str(executable_path),
+                ],
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(compile_result.returncode, 0, compile_result.stderr)
+            run_result = subprocess.run(
+                [str(executable_path)], capture_output=True, text=True
+            )
+            numbered_source = "\n".join(
+                f"{number}: {line}"
+                for number, line in enumerate(source.splitlines(), start=1)
+                if 440 <= number <= 470
+            )
+            self.assertEqual(
+                run_result.returncode, 0, run_result.stderr + "\n" + numbered_source
+            )
+
+    def test_kotlin_strict_refs_reject_unknown_nested_keys_with_production_json(self):
+        generated = KotlinCodeGenerator(strict_ref_lexicon()).convert()
+        declarations = generated.split("/**", 1)[0]
+        fixture = textwrap.dedent(
+            f'''
+            package blue.catbird.petrel.generated
+
+            import kotlinx.serialization.SerializationException
+            import kotlinx.serialization.decodeFromString
+            import kotlinx.serialization.encodeToString
+            import kotlinx.serialization.json.Json
+            import kotlin.test.Test
+            import kotlin.test.assertEquals
+            import kotlin.test.assertFailsWith
+
+            class StrictRefGeneratedFixtureTest {{
+                private val json = Json {{ ignoreUnknownKeys = true }}
+
+                @Test
+                fun strictRefsRejectUnknownNestedKeysAndOrdinaryRefAccepts() {{
+                    val receipt = BlueCatbirdTestStrictRefUnknownKeysReceipt(sequence = 1)
+                    val strictRoundTrip = BlueCatbirdTestStrictRefUnknownKeysInput(
+                        requiredStrict = receipt,
+                        optionalStrict = receipt,
+                    )
+                    val strictRoundTripDecoded = json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                        json.encodeToString(strictRoundTrip)
+                    )
+                    assertEquals(1, strictRoundTripDecoded.requiredStrict.sequence)
+                    assertEquals(1, strictRoundTripDecoded.optionalStrict?.sequence)
+
+                    val boxedRoundTrip = BlueCatbirdTestStrictRefUnknownKeysEnvelope(
+                        requiredStrict = receipt,
+                        optionalStrict = receipt,
+                    )
+                    val boxedRoundTripDecoded = json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysEnvelope>(
+                        json.encodeToString(boxedRoundTrip)
+                    )
+                    assertEquals(1, boxedRoundTripDecoded.optionalStrict?.sequence)
+
+                    val clean = json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                        """{{"requiredStrict":{{"sequence":1,"note":null}}}}"""
+                    )
+                    assertEquals(1, clean.requiredStrict.sequence)
+
+                    val exactDiscriminator = json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                        """{{"requiredStrict":{{"${{'$'}}type":"blue.catbird.test.strictRefUnknownKeys#receipt","sequence":1}}}}"""
+                    )
+                    assertEquals(1, exactDiscriminator.requiredStrict.sequence)
+
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                            """{{"requiredStrict":{{"${{'$'}}type":"blue.catbird.test.attacker#receipt","sequence":1}}}}"""
+                        )
+                    }}
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysEnvelope>(
+                            """{{"requiredStrict":{{"sequence":1}},"optionalStrict":{{"${{'$'}}type":"blue.catbird.test.attacker#receipt","sequence":2}}}}"""
+                        )
+                    }}
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                            """{{"requiredStrict":{{"${{'$'}}type":7,"sequence":1}}}}"""
+                        )
+                    }}
+
+                    val ordinaryWrongDiscriminator = json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                        """{{"requiredStrict":{{"sequence":1}},"ordinary":{{"${{'$'}}type":"blue.catbird.test.attacker#receipt","sequence":3}}}}"""
+                    )
+                    assertEquals(3, ordinaryWrongDiscriminator.ordinary?.sequence)
+
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                            """{{"requiredStrict":{{"sequence":1,"extension":"attacker"}}}}"""
+                        )
+                    }}
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysEnvelope>(
+                            """{{"requiredStrict":{{"sequence":1}},"optionalStrict":{{"sequence":2,"extension":"attacker"}}}}"""
+                        )
+                    }}
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                            """{{"requiredStrict":{{"sequence":1,"_child":null}}}}"""
+                        )
+                    }}
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                            """{{"requiredStrict":{{"sequence":1}},"optionalStrict":{{"sequence":2,"extension":"attacker"}}}}"""
+                        )
+                    }}
+
+                    val ordinary = json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysInput>(
+                        """{{"requiredStrict":{{"sequence":1}},"ordinary":{{"sequence":3,"extension":"compatible"}}}}"""
+                    )
+                    assertEquals(3, ordinary.ordinary?.sequence)
+
+                    assertFailsWith<SerializationException> {{
+                        json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysEnvelope>(
+                            """{{"requiredStrict":{{"sequence":1,"extension":"attacker"}}}}"""
+                        )
+                    }}
+                    val envelope = json.decodeFromString<BlueCatbirdTestStrictRefUnknownKeysEnvelope>(
+                        """{{"requiredStrict":{{"sequence":1}},"ordinary":{{"sequence":3,"extension":"compatible"}}}}"""
+                    )
+                    assertEquals(3, envelope.ordinary?.sequence)
+                }}
+            }}
+            '''
+        )
+
+        with tempfile.TemporaryDirectory() as directory:
+            fixture_dir = pathlib.Path(directory)
+            (fixture_dir / "GeneratedStrictRef.kt").write_text(declarations)
+            (fixture_dir / "StrictRefGeneratedFixtureTest.kt").write_text(fixture)
+            init_script = fixture_dir / "fixture.init.gradle"
+            init_script.write_text(
+                """
+                allprojects {
+                    plugins.withId('org.jetbrains.kotlin.jvm') {
+                        kotlin.sourceSets.test.kotlin.srcDir(System.getProperty('fixtureDir'))
+                    }
+                }
+                """
+            )
+            result = subprocess.run(
+                [
+                    str(GENERATOR_DIR.parent / "kotlin" / "gradlew"),
+                    "-I",
+                    str(init_script),
+                    f"-DfixtureDir={fixture_dir}",
+                    "test",
+                    "--rerun-tasks",
+                    "--tests",
+                    "blue.catbird.petrel.generated.StrictRefGeneratedFixtureTest",
+                ],
+                cwd=GENERATOR_DIR.parent / "kotlin",
+                capture_output=True,
+                text=True,
+            )
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+
+if __name__ == "__main__":
+    unittest.main()

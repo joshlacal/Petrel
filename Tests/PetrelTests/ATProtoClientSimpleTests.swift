@@ -2,6 +2,15 @@ import Foundation
 @testable import Petrel
 import Testing
 
+private final class WeakReference<Value: AnyObject>: Sendable {
+  // Keep weak actor storage out of the async test frame for Swift 6.0 runtimes.
+  nonisolated(unsafe) weak var value: Value?
+
+  init(_ value: Value?) {
+    self.value = value
+  }
+}
+
 @Suite("ATProtoClient Simple Tests")
 struct ATProtoClientSimpleTests {
   // MARK: - Test Setup
@@ -27,12 +36,9 @@ struct ATProtoClientSimpleTests {
     let client = try await ATProtoClient(oauthConfig: oauthConfig, namespace: "catbird-test")
 
     // Test API namespaces are available
-    let app = await client.app
-    #expect(app != nil, "Should have app namespace")
-    let com = await client.com
-    #expect(com != nil, "Should have com namespace")
-    let chat = await client.chat
-    #expect(chat != nil, "Should have chat namespace")
+    let _: ATProtoClient.App = await client.app
+    let _: ATProtoClient.Com = await client.com
+    let _: ATProtoClient.Chat = await client.chat
   }
 
   @Test("Client configuration validation")
@@ -43,8 +49,7 @@ struct ATProtoClientSimpleTests {
       redirectUri: "valid://callback",
       scope: "atproto transition:generic"
     )
-    let validClient = try await ATProtoClient(oauthConfig: validConfig, namespace: "test")
-    #expect(validClient != nil, "Valid configuration should create client")
+    _ = try await ATProtoClient(oauthConfig: validConfig, namespace: "test")
 
     // Test another valid configuration
     let anotherConfig = OAuthConfig(
@@ -52,8 +57,7 @@ struct ATProtoClientSimpleTests {
       redirectUri: "catbird://auth/callback",
       scope: "atproto"
     )
-    let anotherClient = try await ATProtoClient(oauthConfig: anotherConfig, namespace: "test")
-    #expect(anotherClient != nil, "Another valid configuration should create client")
+    _ = try await ATProtoClient(oauthConfig: anotherConfig, namespace: "test")
   }
 
   // MARK: - API Namespace Tests
@@ -63,28 +67,19 @@ struct ATProtoClientSimpleTests {
     let client = try await createTestClient()
 
     // Verify main namespaces exist and are properly typed
-    let app = await client.app
-    #expect(app != nil, "Should have app namespace")
-    let com = await client.com
-    #expect(com != nil, "Should have com namespace")
-    let chat = await client.chat
-    #expect(chat != nil, "Should have chat namespace")
+    let _: ATProtoClient.App = await client.app
+    let _: ATProtoClient.Com = await client.com
+    let _: ATProtoClient.Chat = await client.chat
 
     // Verify sub-namespaces exist
-    let bsky = await client.app.bsky
-    #expect(bsky != nil, "Should have app.bsky namespace")
-    let atproto = await client.com.atproto
-    #expect(atproto != nil, "Should have com.atproto namespace")
-    let chatBsky = await client.chat.bsky
-    #expect(chatBsky != nil, "Should have chat.bsky namespace")
+    let _: ATProtoClient.App.Bsky = await client.app.bsky
+    let _: ATProtoClient.Com.Atproto = await client.com.atproto
+    let _: ATProtoClient.Chat.Bsky = await client.chat.bsky
 
     // Verify specific API endpoints exist
-    let feed = await client.app.bsky.feed
-    #expect(feed != nil, "Should have feed APIs")
-    let actor = await client.app.bsky.actor
-    #expect(actor != nil, "Should have actor APIs")
-    let server = await client.com.atproto.server
-    #expect(server != nil, "Should have server APIs")
+    let _: ATProtoClient.App.Bsky.Feed = await client.app.bsky.feed
+    let _: ATProtoClient.App.Bsky.Actor = await client.app.bsky.actor
+    let _: ATProtoClient.Com.Atproto.Server = await client.com.atproto.server
   }
 
   // MARK: - Basic API Call Structure Tests
@@ -105,11 +100,9 @@ struct ATProtoClientSimpleTests {
     #expect(params.cursor == "test-cursor", "Should set cursor parameter")
 
     // Verify API method exists (won't call it, just check it compiles)
-    let _: () -> Void = {
-      Task {
-        // This tests that the method signature is correct
-        _ = try await client.app.bsky.feed.getTimeline(input: params)
-      }
+    let _: () async throws -> Void = {
+      // This tests that the method signature is correct without issuing a request.
+      _ = try await client.app.bsky.feed.getTimeline(input: params)
     }
   }
 
@@ -123,10 +116,8 @@ struct ATProtoClientSimpleTests {
     #expect(params.actor.stringValue() == "test.bsky.social", "Should set actor parameter")
 
     // Verify API method exists
-    let _: () -> Void = {
-      Task {
-        _ = try await client.app.bsky.actor.getProfile(input: params)
-      }
+    let _: () async throws -> Void = {
+      _ = try await client.app.bsky.actor.getProfile(input: params)
     }
   }
 
@@ -152,13 +143,13 @@ struct ATProtoClientSimpleTests {
   func clientDeallocation() async throws {
     var client: ATProtoClient? = try await createTestClient()
 
-    weak var weakClient = client
+    let weakClient = WeakReference(client)
     client = nil
 
     // Allow deallocation
     await Task.yield()
 
-    #expect(weakClient == nil, "Client should be deallocated when no strong references remain")
+    #expect(weakClient.value == nil, "Client should be deallocated when no strong references remain")
   }
 
   // MARK: - Thread Safety Tests
@@ -168,19 +159,25 @@ struct ATProtoClientSimpleTests {
     let client = try await createTestClient()
 
     // Create multiple concurrent tasks that access the client
-    await withTaskGroup(of: Void.self) { group in
+    let completedAccessCount = await withTaskGroup(of: Int.self) { group in
       for _ in 0 ..< 5 {
         group.addTask {
           // Just access the namespace properties concurrently
           _ = await client.app
           _ = await client.com
           _ = await client.chat
+          return 1
         }
       }
+
+      var completedAccessCount = 0
+      for await count in group {
+        completedAccessCount += count
+      }
+      return completedAccessCount
     }
 
-    // Should complete without crashing
-    #expect(true, "Client should maintain state after concurrent access")
+    #expect(completedAccessCount == 5, "Every concurrent namespace access should complete")
   }
 
   // MARK: - Parameter Validation Tests
@@ -228,8 +225,7 @@ struct ATProtoClientSimpleTests {
         redirectUri: uri,
         scope: "atproto"
       )
-      let client = try await ATProtoClient(oauthConfig: config, namespace: "test")
-      #expect(client != nil, "Should accept valid URI format: \(uri)")
+      _ = try await ATProtoClient(oauthConfig: config, namespace: "test")
     }
   }
 
@@ -250,8 +246,7 @@ struct ATProtoClientSimpleTests {
         redirectUri: "test://callback",
         scope: scope
       )
-      let client = try await ATProtoClient(oauthConfig: config, namespace: "test")
-      #expect(client != nil, "Should accept scope combination: \(scope)")
+      _ = try await ATProtoClient(oauthConfig: config, namespace: "test")
     }
   }
 
@@ -266,9 +261,9 @@ struct ATProtoClientSimpleTests {
     do {
       // This will fail in test environment, but we're testing the structure
       _ = try await client.app.bsky.feed.getTimeline(input: params)
+      Issue.record("Expected timeline request to fail in the test environment")
     } catch {
-      // Expected to fail in test environment
-      #expect(error != nil, "Should throw error when not properly configured")
+      // Reaching this branch proves the generated method propagates its failure.
     }
   }
 

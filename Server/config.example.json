@@ -1,0 +1,29 @@
+{
+  "client_id": "https://cab.example.com/oauth-client-metadata.json",
+  "public_url": "https://cab.example.com",
+  "host": "127.0.0.1",
+  "port": 8080,
+  "keys": [{ "kid": "cab-key-1", "pem_path": "keys/cab-key-1.pem" }],
+  "active_kid": "cab-key-1",
+  "allowed_origins": [],
+  "require_origin": false,
+  "aud_allowlist": null,
+  "assertion_ttl_seconds": 60,
+  "iat_window_seconds": 300,
+  "require_nonce": false,
+  "denied_jkts": [],
+  "rate_limit": { "requests_per_minute": 60 },
+  "client_metadata": {
+    "client_id": "https://cab.example.com/oauth-client-metadata.json",
+    "client_name": "My App",
+    "application_type": "web",
+    "grant_types": ["authorization_code", "refresh_token"],
+    "response_types": ["code"],
+    "redirect_uris": ["https://app.example.com/oauth/callback"],
+    "scope": "atproto transition:generic",
+    "token_endpoint_auth_method": "private_key_jwt",
+    "token_endpoint_auth_signing_alg": "ES256",
+    "jwks_uri": "https://cab.example.com/.well-known/jwks.json",
+    "dpop_bound_access_tokens": true
+  }
+}

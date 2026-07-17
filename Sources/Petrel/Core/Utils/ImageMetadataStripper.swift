@@ -9,12 +9,7 @@ import Foundation
 
 #if os(iOS) || os(macOS)
     import ImageIO
-#endif
-
-#if os(iOS)
-    import MobileCoreServices
-#elseif os(macOS)
-    import CoreServices
+    import UniformTypeIdentifiers
 #endif
 
 public class ImageMetadataStripper {
@@ -150,7 +145,7 @@ public class ImageMetadataStripper {
                     }
                 }
                 // Quality alone wasn't enough — resize
-                return resizeToFit(cgImage, imageType: kUTTypeJPEG, isLossy: true, maxSizeInBytes: maxSizeInBytes)
+                return resizeToFit(cgImage, imageType: jpegTypeIdentifier, isLossy: true, maxSizeInBytes: maxSizeInBytes)
 
             case "image/png":
                 if let pngData = encodePNG(cgImage), pngData.count <= maxSizeInBytes {
@@ -162,7 +157,7 @@ public class ImageMetadataStripper {
                         return result
                     }
                 }
-                return resizeToFit(cgImage, imageType: kUTTypeJPEG, isLossy: true, maxSizeInBytes: maxSizeInBytes)
+                return resizeToFit(cgImage, imageType: jpegTypeIdentifier, isLossy: true, maxSizeInBytes: maxSizeInBytes)
 
             default:
                 // GIF, WebP, HEIC → convert to JPEG
@@ -171,7 +166,7 @@ public class ImageMetadataStripper {
                         return result
                     }
                 }
-                return resizeToFit(cgImage, imageType: kUTTypeJPEG, isLossy: true, maxSizeInBytes: maxSizeInBytes)
+                return resizeToFit(cgImage, imageType: jpegTypeIdentifier, isLossy: true, maxSizeInBytes: maxSizeInBytes)
             }
         #else
             return data.count <= maxSizeInBytes ? data : nil
@@ -181,9 +176,17 @@ public class ImageMetadataStripper {
     // MARK: - Private Helpers
 
     #if os(iOS) || os(macOS)
+    private static var jpegTypeIdentifier: CFString {
+        UTType.jpeg.identifier as CFString
+    }
+
+    private static var pngTypeIdentifier: CFString {
+        UTType.png.identifier as CFString
+    }
+
     private static func encodeJPEG(_ image: CGImage, quality: Double) -> Data? {
         let mutableData = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(mutableData, kUTTypeJPEG, 1, nil) else {
+        guard let dest = CGImageDestinationCreateWithData(mutableData, jpegTypeIdentifier, 1, nil) else {
             return nil
         }
         let options: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: quality]
@@ -194,7 +197,7 @@ public class ImageMetadataStripper {
 
     private static func encodePNG(_ image: CGImage) -> Data? {
         let mutableData = NSMutableData()
-        guard let dest = CGImageDestinationCreateWithData(mutableData, kUTTypePNG, 1, nil) else {
+        guard let dest = CGImageDestinationCreateWithData(mutableData, pngTypeIdentifier, 1, nil) else {
             return nil
         }
         CGImageDestinationAddImage(dest, image, nil)

@@ -5,6 +5,33 @@ Format: [Keep a Changelog](https://keepachangelog.com/en/1.1.0/); versioning: [S
 
 ## [Unreleased]
 
+The changes below are the Petrel 0.2.0 release candidate. Replace this paragraph
+with a dated `0.2.0` heading only when the release tag is created.
+
+### Added
+- Exact typed AT Protocol errors for generated queries and procedures.
+- A lossless DAG-CBOR/DAG-JSON bridge for Blob, Bytes, CID, null, and integer values within the signed 64-bit range.
+- A generated-value-container decoder that preserves primitive roots, special link/byte objects, unknown fields, and re-encodable fallback values.
+- Deterministic generated-source ownership, stale-file removal, and pinned release tooling.
+- A two-overlay compiler fixture proving PetrelCatbird and PetrelBluemoji can extend one Petrel-owned `Blue` namespace.
+- A fail-closed DocC validator that treats documentation diagnostics as errors and compile-checks every Swift example in the public guides under the sealed release toolchain.
+
+### Changed
+- Generated namespace reference classes are immutable `Sendable` structs. This is an intentional pre-1.0 source compatibility break for code that named or relied on namespace class identity.
+- Petrel now owns shared overlay namespace roots; overlays add only their child namespaces.
+- Public installation documentation now targets Petrel 0.2.0 and the iOS 18/macOS 15 platform floors.
+- The 0.2.0 SPM release gate is explicitly Swift-scoped; Kotlin publication and parity remain outside this release candidate.
+- PetrelLoad rejects unsupported scenarios and invalid base URLs, propagates OAuth setup and verification failures, and exits nonzero when stress requests fail.
+
+### Fixed
+- Generated wire discriminators preserve exact lexicon fragments, including underscore-bearing Bluemoji format identifiers.
+- Declared endpoint errors use exact protocol names instead of embedding descriptions in raw values.
+- DAG-CBOR decoding rejects invalid ATProto link CIDs and malformed/out-of-range numeric values without losing valid unpadded byte values.
+- Registered typed values preserve their top-level `$type` framing across JSON and DAG-CBOR container round trips.
+- Generated endpoints receive declared terminal HTTP errors after the existing authentication and retry pipeline, allowing their typed error parsers to inspect the real response body.
+- Regeneration removes only stale files carrying Petrel's exact generated-source ownership header.
+- Authentication refresh callers now await the shared refresh task and receive its actual result or failure instead of an early success result.
+
 ## [0.1.0] - 2026-06-12
 
 ### Added

@@ -2,7 +2,12 @@
 {% if properties %}
 data class {{ class_name }}(
     {% for prop in properties %}
+    {% if prop.strict_decode %}
+    {% if prop.description %}// {{ prop.description }}{{ '\n    ' -}}{% endif %}
+    @Serializable(with = {{ prop.strict_serializer }}::class){{ '\n' -}}
+    {% else %}
     {% if prop.description %}// {{ prop.description }}{% endif %}
+    {% endif %}
     @SerialName("{{ prop.name }}")
     val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}
     {% endfor %}

@@ -32,6 +32,7 @@ private val strategies: MutableMap<ATProtoClient, ConfidentialGatewayStrategy> =
  *
  * @param gatewayBaseUrl Root URL of the confidential gateway (nest), e.g.
  *                       `https://api.catbird.blue`. Must NOT end in `/xrpc`.
+ * @param callbackUrl    Exact callback URL registered for this consumer.
  * @param storage        Persistent store for gateway session UUIDs (per-DID).
  *                       Android apps should back this with
  *                       `EncryptedSharedPreferences`.
@@ -41,6 +42,7 @@ private val strategies: MutableMap<ATProtoClient, ConfidentialGatewayStrategy> =
  */
 fun ATProtoClient.configureGateway(
     gatewayBaseUrl: String,
+    callbackUrl: String,
     storage: GatewaySessionStorage,
     currentAccount: CurrentAccount,
 ): ConfidentialGatewayStrategy {
@@ -49,6 +51,7 @@ fun ATProtoClient.configureGateway(
 
     val strategy = ConfidentialGatewayStrategy(
         gatewayBaseUrl = gatewayBaseUrl,
+        callbackUrl = callbackUrl,
         storage = storage,
         currentAccount = currentAccount,
         networkService = networkService,

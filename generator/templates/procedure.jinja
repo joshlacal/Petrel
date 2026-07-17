@@ -44,18 +44,18 @@ extension ATProtoClient.{{ template_namespace_name }} {
         if mimeType.starts(with: "image/"), let compressedData = compressImage(dataToUpload) {
             dataToUpload = compressedData
         }
-        var headers: [String: String] = [
+        {{ 'var' if output_encoding else 'let' }} headers: [String: String] = [
             "Content-Type": mimeType,
             "Content-Length": "\(dataToUpload.count)"
         ]
         {% elif is_binary_data %}
         let dataToUpload = data
-        var headers: [String: String] = [
+        {{ 'var' if output_encoding else 'let' }} headers: [String: String] = [
             "Content-Type": "{{ input_encoding }}",
             "Content-Length": "\(dataToUpload.count)"
         ]
         {% else %}
-        var headers: [String: String] = [:]
+        {{ 'var' if input_encoding or output_encoding else 'let' }} headers: [String: String] = [:]
         {% if input_encoding %}
         headers["Content-Type"] = "{{ input_encoding }}"
         {% endif %}
@@ -83,7 +83,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "{{ endpoint }}")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let ({% if output_type %}responseData, {% else %}_, {% endif %}response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let ({% if output_type or has_errors %}responseData, {% else %}_, {% endif %}response) = try await networkService.{% if has_errors %}performRequestReturningHTTPErrorResponses{% else %}performRequest{% endif %}(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
         {% if output_type %}
@@ -119,10 +119,29 @@ extension ATProtoClient.{{ template_namespace_name }} {
                 return (responseCode, nil)
             }
         } else {
-            // Don't try to decode error responses as success types
+            {% if has_errors %}// Try to parse a declared structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: {{ struct_name }}.Error.self
+            ) {
+                throw atprotoError
+            }
+            {% endif %}
+            // Don't try to decode unknown or malformed error responses as success types
             return (responseCode, nil)
         }
         {% else %}
+        {% if has_errors %}if !(200...299).contains(responseCode) {
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: {{ struct_name }}.Error.self
+            ) {
+                throw atprotoError
+            }
+        }
+        {% endif %}
         return responseCode
         {% endif %}
     }

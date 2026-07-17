@@ -1,6 +1,6 @@
 import json
 from typing import Dict, List, Any, Optional
-from utils import convert_to_camel_case, convert_ref, lowercase_first_letter
+from utils import convert_to_camel_case, lowercase_first_letter
 from templates import TemplateManager
 from enum_generator import EnumGenerator
 from type_converter import TypeConverter
@@ -24,6 +24,9 @@ class SwiftCodeGenerator:
 
         self.token_descriptions = {}
         self.generated_tokens = set()
+        self.closed_enums_by_identity = {}
+        self.closed_enum_identity_by_name = {}
+        self.input_properties = []
 
         self.template_manager = TemplateManager()
         self.enum_generator = EnumGenerator(self)
@@ -58,12 +61,31 @@ class SwiftCodeGenerator:
     def handle_subscription_type(self, main_def):
         return main_def
 
-    def generate_properties(self, properties, required_fields, current_struct_name):
+    def generate_properties(self, properties, required_fields, current_struct_name, context_identity=None):
         swift_properties = []
         for name, prop in properties.items():
-            swift_type = self.type_converter.determine_swift_type(name, prop, required_fields, current_struct_name)
+            swift_type = self.type_converter.determine_swift_type(
+                name, prop, required_fields, current_struct_name,
+                context_identity=context_identity,
+            )
             description = prop.get('description', '')
             is_optional = name not in required_fields
+            strict_decode = prop.get('x-security-strict-decode', False)
+            if strict_decode and prop.get('type') != 'ref':
+                raise ValueError(
+                    f"x-security-strict-decode is supported only on ref properties: '{name}'"
+                )
+            strict_allowed_keys_literal = None
+            strict_type_identifier_literal = None
+            if strict_decode:
+                allowed_keys, expected_type_identifier = self.resolve_strict_ref_contract(
+                    prop['ref']
+                )
+                strict_allowed_keys_literal = ", ".join(
+                    json.dumps(key)
+                    for key in allowed_keys
+                )
+                strict_type_identifier_literal = json.dumps(expected_type_identifier)
 
             # Check if this property should be boxed to break a circular reference
             should_box = False
@@ -79,9 +101,55 @@ class SwiftCodeGenerator:
                 'type': swift_type,
                 'optional': is_optional,
                 'description': description,
-                'boxed': should_box
+                'boxed': should_box,
+                'strict_decode': strict_decode,
+                # Kept for the output template's established compatibility branch.
+                'strict_optional_decode': strict_decode,
+                'strict_allowed_keys_literal': strict_allowed_keys_literal,
+                'strict_type_identifier_literal': strict_type_identifier_literal,
             })
         return swift_properties
+
+    def resolve_strict_ref_contract(self, ref: str) -> tuple[List[str], str]:
+        nsid, separator, fragment = ref.partition('#')
+        if not nsid or nsid == self.lexicon_id:
+            target_name = fragment if separator else 'main'
+            schema = self.defs.get(target_name)
+            qualified_ref = (
+                self.lexicon_id
+                if target_name == 'main'
+                else f"{self.lexicon_id}#{target_name}"
+            )
+        else:
+            qualified_ref = nsid if not separator or fragment == 'main' else ref
+            registry = getattr(self.cycle_detector, 'schemas_by_ref', None)
+            schema = registry.get(qualified_ref) if registry is not None else None
+
+        if not isinstance(schema, dict):
+            raise ValueError(
+                f"strict reference '{ref}' cannot be resolved to a canonical schema"
+            )
+
+        schema_type = schema.get('type')
+        if schema_type == 'record':
+            object_schema = schema.get('record')
+        elif schema_type == 'object':
+            object_schema = schema
+        else:
+            raise ValueError(
+                f"strict reference '{qualified_ref}' must target an object or record schema"
+            )
+
+        properties = (
+            object_schema.get('properties')
+            if isinstance(object_schema, dict)
+            else None
+        )
+        if not isinstance(properties, dict):
+            raise ValueError(
+                f"strict reference '{qualified_ref}' has no canonical object properties"
+            )
+        return sorted(properties.keys()), qualified_ref
 
     def generate_query_parameters(self, parameters: Optional[Dict[str, Any]]) -> str:
         if not parameters:
@@ -111,10 +179,11 @@ class SwiftCodeGenerator:
         if encoding != '' and encoding != 'application/json':
             properties = [{"name": "data", "type": "Data", "optional": False}]
         elif input_schema.get('type') == 'ref':
-            ref_type = convert_ref(input_schema['ref'])
+            ref_type = self.type_converter.convert_ref(input_schema['ref'])
             properties = [{"name": "data", "type": ref_type, "optional": False}]
         else:
             properties = self.generate_properties(input_schema.get('properties', {}), input_schema.get('required', []), "Input")
+            self.input_properties = properties
 
         return self.template_manager.input_struct_template.render(properties=properties, conformance=conformance)
 
@@ -124,6 +193,16 @@ class SwiftCodeGenerator:
 
         encoding = output_obj.get('encoding', '')
         output_schema = output_obj.get('schema', {})
+        if not isinstance(output_schema, dict):
+            output_schema = {}
+        output_properties = output_schema.get('properties', {})
+        if not isinstance(output_properties, dict):
+            output_properties = {}
+        output_properties = {
+            name: schema for name, schema in output_properties.items()
+            if isinstance(schema, dict)
+        }
+        output_schema = {**output_schema, 'properties': output_properties}
 
         context = {
             'conformance': ": ATProtocolCodable" if encoding == "application/json" else "",
@@ -134,7 +213,7 @@ class SwiftCodeGenerator:
 
         if output_schema.get('type') == 'ref':
             context['is_type_alias'] = True
-            context['type_alias_target'] = convert_ref(output_schema['ref'])
+            context['type_alias_target'] = self.type_converter.convert_ref(output_schema['ref'])
         elif encoding == "*/*":
             context['properties'] = [{"name": "data", "type": "Data", "optional": False}]
         elif not output_schema or (not output_schema.get('properties') and output_schema.get('type') != 'object'):
@@ -148,6 +227,32 @@ class SwiftCodeGenerator:
             context['properties'] = self.generate_properties(output_schema.get('properties', {}), output_schema.get('required', []), "Output")
 
         return self.template_manager.output_struct_template.render(**context)
+
+    def validate_output_local_refs(self) -> None:
+        """Reject references to missing local definitions in every output shape."""
+        output = self.main_def.get('output')
+        if not isinstance(output, dict):
+            return
+        schema = output.get('schema')
+        if not isinstance(schema, dict):
+            return
+
+        def validate(node: Any, path: str) -> None:
+            if not isinstance(node, dict):
+                return
+            if node.get('type') == 'ref':
+                ref = node.get('ref', '')
+                if isinstance(ref, str) and ref.startswith('#') and ref[1:] not in self.defs:
+                    raise ValueError(
+                        f"output {path} references missing local definition '{ref}'"
+                    )
+            properties = node.get('properties')
+            if isinstance(properties, dict):
+                for name, property_schema in properties.items():
+                    validate(property_schema, f"property '{name}'")
+            validate(node.get('items'), f"{path} array item")
+
+        validate(schema, "schema")
 
     def generate_errors_enum(self, errors: Optional[List[Dict[str, str]]]) -> str:
         if not errors:
@@ -170,12 +275,11 @@ class SwiftCodeGenerator:
             if ref.startswith('#'):
                 # Local reference
                 ref_name = ref[1:]
-                type_name = convert_to_camel_case(ref_name)
                 type_id = f"{self.lexicon_id}#{ref_name}"
             else:
                 # External reference
-                type_name = convert_ref(ref)
                 type_id = ref
+            type_name = self.type_converter.convert_ref(ref)
             
             # Create a case name from the type
             case_name = type_name.split('.')[-1]
@@ -203,7 +307,10 @@ class SwiftCodeGenerator:
                 continue
             if name != 'main' and def_schema.get('type', "") == "object":
                 conformance = ": ATProtocolCodable, ATProtocolValue"
-                properties = self.generate_properties(def_schema.get('properties', {}), def_schema.get('required', []), current_struct_name)
+                properties = self.generate_properties(
+                    def_schema.get('properties', {}), def_schema.get('required', []),
+                    current_struct_name, context_identity=("definition", name),
+                )
                 
                 sub_structs = {}
                 for key, value in def_schema.items():
@@ -211,13 +318,20 @@ class SwiftCodeGenerator:
                         # Only process if value is a dictionary (sub-object schema)
                         if isinstance(value, dict) and 'properties' in value:
                             sub_conformance = ": ATProtocolCodable, ATProtocolValue"
-                            sub_properties = self.generate_properties(value.get('properties', {}), value.get('required', []), convert_to_camel_case(key))
+                            sub_properties = self.generate_properties(
+                                value.get('properties', {}), value.get('required', []),
+                                convert_to_camel_case(key),
+                                context_identity=("definition", name, "sub", key),
+                            )
                             sub_structs[convert_to_camel_case(key)] = {
+                                'wire_fragment': key,
                                 'properties': sub_properties, 
                                 'conformance': sub_conformance
                             }
                 
-                lex_definitions[convert_to_camel_case(name)] = {
+                swift_name = convert_to_camel_case(name)
+                lex_definitions[swift_name] = {
+                    'wire_fragment': name,
                     'properties': properties, 
                     'conformance': conformance,
                     'sub_structs': sub_structs
@@ -232,10 +346,15 @@ class SwiftCodeGenerator:
                     'optional': False
                 }]
                 lex_definitions[union_array_name] = {
+                    'wire_fragment': name,
                     'properties': properties,
                     'conformance': ': ATProtocolCodable, ATProtocolValue',
                     'sub_structs': {}
                 }
+            elif def_schema.get('type', "") == "string" and 'enum' in def_schema:
+                enum_name = f"Defs{convert_to_camel_case(name)}"
+                identity = ("definition", self.lexicon_id, name)
+                self.enum_generator.generate_closed_string_enum(enum_name, def_schema['enum'], identity)
             elif def_schema.get('type', "") == "string" and 'knownValues' in def_schema:
                 enum_name = f"{convert_to_camel_case(name)}"
                 if enum_name not in self.generated_tokens:
@@ -263,16 +382,19 @@ class SwiftCodeGenerator:
         for prop_name, prop_schema in properties.items():
             if prop_schema.get('type') == 'union':
                 union_name = convert_to_camel_case(prop_name)
-                refs = [convert_ref(r) for r in prop_schema['refs']]
+                refs = [self.type_converter.convert_ref(r) for r in prop_schema['refs']]
                 self.enum_generator.generate_enum_for_union(current_struct_name, union_name, refs)
             elif prop_schema.get('type') == 'array':
                 item_schema = prop_schema.get('items', {})
                 if item_schema.get('type') == 'union':
                     union_name = f"{current_struct_name}{convert_to_camel_case(prop_name)}Union"
-                    refs = [convert_ref(r) for r in item_schema['refs']]
+                    refs = [self.type_converter.convert_ref(r) for r in item_schema['refs']]
                     self.enum_generator.generate_enum_for_union_array(current_struct_name, prop_name, refs)
 
     def convert(self) -> str:
+        # Security-bearing local output references must fail the generation
+        # command instead of being serialized into a traceback-shaped source file.
+        self.validate_output_local_refs()
         try:
             query_parameters = ""
             input_struct = ""
@@ -342,9 +464,8 @@ class SwiftCodeGenerator:
             )
             
             return self.post_process_swift_code(swift_code)
-        except Exception as e:
-            import traceback
-            return f"An error occurred during the Swift code generation: {str(e)}\n{traceback.format_exc()}"
+        except Exception:
+            raise
 
     @staticmethod
     def post_process_swift_code(code: str) -> str:
@@ -392,7 +513,9 @@ class SwiftCodeGenerator:
             output_type=output_type,
             endpoint=endpoint,
             description=self.description,
-            output_encoding=output_encoding  # Pass the output encoding to the template
+            output_encoding=output_encoding,  # Pass the output encoding to the template
+            has_errors=bool(main_def.get('errors')),
+            struct_name=self.struct_name,
         )
 
     def generate_procedure_function(self, lexicon_id, main_def):
@@ -418,10 +541,9 @@ class SwiftCodeGenerator:
 
         if 'input' in main_def and 'schema' in main_def['input']:
             input_params = main_def['input']['schema'].get('properties', {})
-            current_struct_name = convert_to_camel_case(lexicon_id)
-
+            generated_types = {prop['name']: prop['type'] for prop in self.input_properties}
             input_parameters = ', '.join([
-                f"{param}: {self.type_converter.determine_swift_type(param, details, main_def['input'].get('required', []), current_struct_name)}"
+                f"{param}: {generated_types[param]}"
                 for param, details in input_params.items()
             ])
             input_values = ', '.join([f"{param}: {param}" for param in input_params.keys()])
@@ -449,7 +571,9 @@ class SwiftCodeGenerator:
             input_encoding=input_encoding,    # Pass the input encoding to the template
             output_encoding=output_encoding,  # Pass the output encoding to the template
             has_parameters=has_parameters,
-            parameters_struct_name=parameters_struct_name
+            parameters_struct_name=parameters_struct_name,
+            has_errors=bool(main_def.get('errors')),
+            struct_name=self.struct_name,
         )
 
     def generate_subscription_function(self, lexicon_id, main_def):

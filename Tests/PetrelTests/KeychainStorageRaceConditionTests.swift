@@ -5,7 +5,6 @@
 //  Created by Claude on September 20, 2025.
 //
 
-import CryptoKit
 @testable import Petrel
 import XCTest
 
@@ -61,7 +60,6 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
 
     func testSessionValidationDetectsInconsistentState() async throws {
         let account = createTestAccount()
-        let session = createTestSession()
 
         // Simulate race condition: save account but not session
         try await keychainStorage.saveAccount(account, for: testDID)
@@ -187,6 +185,7 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         XCTAssertNotNil(retrievedAccount)
     }
 
+    @available(*, deprecated, message: "Exercises the legacy gateway-session migration surface")
     func testLegacyGatewaySessionMigration() async throws {
         let account = createTestAccount()
 

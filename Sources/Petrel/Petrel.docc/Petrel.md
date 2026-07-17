@@ -12,7 +12,6 @@ Petrel provides a complete Swift implementation of the AT Protocol APIs, enablin
 
 - <doc:GettingStarted>
 - <doc:Authentication>
-- <doc:BasicUsage>
 
 ### Core Components
 
@@ -21,23 +20,7 @@ Petrel provides a complete Swift implementation of the AT Protocol APIs, enablin
 The client encapsulates authentication, networking, and account management. You typically do not interact with
 the internal services directly.
 
-### Authentication & Security
+### Identifier and Record Utilities
 
-- <doc:OAuthFlow>
-- <doc:TokenManagement>
-- ``TokenRefreshCoordinator``
-- ``KeychainManager``
-
-### Working with Records
-
-- <doc:CreatingRecords>
-- <doc:QueryingData>
-- ``RichText``
 - ``TIDGenerator``
-
-### Advanced Topics
-
-- <doc:ErrorHandling>
-- <doc:Concurrency>
-- ``DIDDocHandler``
 - ``CID``

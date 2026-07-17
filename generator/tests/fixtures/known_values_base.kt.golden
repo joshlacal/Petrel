@@ -1,0 +1,25 @@
+// Lexicon: 1, ID: blue.catbird.golden.defs
+
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object BlueCatbirdGoldenDefsDefs {
+    const val TYPE_IDENTIFIER = "blue.catbird.golden.defs"
+}
+
+@Serializable
+enum class BlueCatbirdGoldenDefsMode {
+    @SerialName("alpha")
+    ALPHA,
+    @SerialName("beta-value")
+    BETA_VALUE,
+    @SerialName("app.bsky.test#token")
+    APP_BSKY_TEST_TOKEN}

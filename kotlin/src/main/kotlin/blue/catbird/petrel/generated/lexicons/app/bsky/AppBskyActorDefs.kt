@@ -1009,7 +1009,8 @@ enum class AppBskyActorDefsMutedWordTarget {
     @Serializable
     data class AppBskyActorDefsBskyAppStatePref(
         @SerialName("activeProgressGuide")
-        val activeProgressGuide: AppBskyActorDefsBskyAppProgressGuide? = null,/** An array of tokens which identify nudges (modals, popups, tours, highlight dots) that should be shown to the user. */        @SerialName("queuedNudges")
+        val activeProgressGuide: AppBskyActorDefsBskyAppProgressGuide? = null,/** Indicates if the user is participating in the beta features program. */        @SerialName("isBetaUser")
+        val isBetaUser: Boolean? = null,/** An array of tokens which identify nudges (modals, popups, tours, highlight dots) that should be shown to the user. */        @SerialName("queuedNudges")
         val queuedNudges: List<String>? = null,/** Storage for NUXs the user has encountered. */        @SerialName("nuxs")
         val nuxs: List<AppBskyActorDefsNux>? = null    ) {
         companion object {

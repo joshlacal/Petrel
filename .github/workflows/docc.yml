@@ -1,70 +1,49 @@
-name: Build and Deploy DocC Documentation
+name: Validate DocC Documentation
 
-on:
+'on':
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
-  workflow_run:
-    workflows: ["Generate Swift Code"]
-    types:
-      - completed
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
-  group: "pages"
-  cancel-in-progress: false
+  group: docc-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build-docs:
-    runs-on: macos-latest
-    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name != 'workflow_run' }}
-    
+  validate-docs:
+    name: Validate documentation (read-only)
+    runs-on: macos-15
     steps:
-    - name: Checkout
-      uses: actions/checkout@v4
-      
-    - name: Setup Swift
-      uses: swift-actions/setup-swift@v2.3.0
-      with:
-        swift-version: "6.0.3"
-        
-    - name: Clean Package Cache
-      run: |
-        swift package clean
-        
-    - name: Build Documentation
-      run: |
-        swift package generate-documentation \
-          --target Petrel \
-          --transform-for-static-hosting \
-          --hosting-base-path Petrel \
-          --output-path docs-new \
-          -Xswiftc -strict-concurrency=targeted
-          
-    - name: Update docs directory
-      run: |
-        rm -rf docs/*
-        cp -r docs-new/* docs/
-        rm -rf docs-new
-        
-    - name: Commit documentation updates
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add docs/
-        if git diff --staged --quiet; then
-          echo "No documentation changes to commit"
-        else
-          git commit -m "Update DocC documentation
-
-          🤖 Generated with [Claude Code](https://claude.ai/code)
-          
-          Co-Authored-By: Claude <noreply@anthropic.com>"
-          git push
-        fi
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Select and verify minimum stable Xcode
+        shell: bash
+        run: |
+          set -euo pipefail
+          export RELEASE_TOOLCHAIN_LANE=minimum
+          export RELEASE_TOOLCHAIN_SELECTION=pinned-minimum
+          export RELEASE_EVIDENCE_CLASS=stable-release
+          export RELEASE_DEVELOPER_DIR=/Applications/Xcode_16.3.app/Contents/Developer
+          export RELEASE_XCODE_VERSION=16.3
+          export RELEASE_XCODE_BUILD='16E140'
+          export RELEASE_IOS_RUNTIME=18.4
+          export RELEASE_WATCHOS_RUNTIME=11.4
+          export RELEASE_TVOS_RUNTIME=18.4
+          export RELEASE_VISIONOS_RUNTIME=2.4
+          source Scripts/activate-release-toolchain.sh
+          for name in RELEASE_TOOLCHAIN_LANE RELEASE_TOOLCHAIN_SELECTION RELEASE_EVIDENCE_CLASS \
+            RELEASE_DEVELOPER_DIR RELEASE_XCODE_VERSION RELEASE_XCODE_BUILD RELEASE_IOS_RUNTIME \
+            RELEASE_WATCHOS_RUNTIME RELEASE_TVOS_RUNTIME RELEASE_VISIONOS_RUNTIME DEVELOPER_DIR \
+            RELEASE_SWIFT RELEASE_XCODEBUILD RELEASE_XCRUN; do
+            printf '%s=%s\n' "$name" "${!name}" >> "$GITHUB_ENV"
+          done
+      - name: Validate documentation with warnings as errors
+        shell: bash
+        run: Scripts/validate-documentation.sh

@@ -183,12 +183,7 @@ actor DIDResolutionService: DIDResolving {
         request.httpMethod = "GET"
 
         do {
-            let (data, response) = try await networkService.performRequest(request)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                logger.warning("Invalid response type from well-known endpoint")
-                return nil
-            }
+            let (data, httpResponse) = try await networkService.performRequest(request)
 
             guard httpResponse.statusCode == 200 else {
                 logger.warning("Non-200 response from well-known endpoint: \(httpResponse.statusCode)")
@@ -236,11 +231,7 @@ actor DIDResolutionService: DIDResolving {
             queryItems: queryItems
         )
 
-        let (responseData, response) = try await networkService.performRequest(urlRequest)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw NetworkError.invalidResponse(description: "Response is not HTTPURLResponse")
-        }
+        let (responseData, httpResponse) = try await networkService.performRequest(urlRequest)
 
         let responseCode = httpResponse.statusCode
 
@@ -359,13 +350,7 @@ actor DIDResolutionService: DIDResolving {
             queryItems: nil
         )
 
-        let (data, response) = try await networkService.performRequest(request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DIDResolutionError.networkError(
-                NSError(domain: "DIDResolution", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"])
-            )
-        }
+        let (data, httpResponse) = try await networkService.performRequest(request)
 
         guard httpResponse.statusCode == 200 else {
             throw DIDResolutionError.networkError(
@@ -409,13 +394,7 @@ actor DIDResolutionService: DIDResolving {
             queryItems: nil
         )
 
-        let (data, response) = try await networkService.performRequest(request)
-
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw DIDResolutionError.networkError(
-                NSError(domain: "DIDResolution", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid response type"])
-            )
-        }
+        let (data, httpResponse) = try await networkService.performRequest(request)
 
         guard httpResponse.statusCode == 200 else {
             throw DIDResolutionError.networkError(

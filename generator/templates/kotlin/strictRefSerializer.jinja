@@ -1,0 +1,55 @@
+@OptIn(ExperimentalSerializationApi::class)
+private object {{ serializer_name }} : KSerializer<{{ target_type }}{% if nullable %}?{% endif %}> {
+    private val delegate = {{ target_type }}.serializer()
+    private const val expectedTypeIdentifier = {{ expected_type_identifier_literal }}
+    override val descriptor = delegate.descriptor
+
+    override fun serialize(
+        encoder: kotlinx.serialization.encoding.Encoder,
+        value: {{ target_type }}{% if nullable %}?{% endif %},
+    ) {
+        {% if nullable %}
+        if (value == null) {
+            val jsonEncoder = encoder as? JsonEncoder
+                ?: throw SerializationException("Strict reference requires JSON encoding")
+            jsonEncoder.encodeJsonElement(JsonNull)
+        } else {
+            delegate.serialize(encoder, value)
+        }
+        {% else %}
+        delegate.serialize(encoder, value)
+        {% endif %}
+    }
+
+    override fun deserialize(
+        decoder: kotlinx.serialization.encoding.Decoder,
+    ): {{ target_type }}{% if nullable %}?{% endif %} {
+        val jsonDecoder = decoder as? JsonDecoder
+            ?: throw SerializationException("Strict reference requires JSON decoding")
+        val element = jsonDecoder.decodeJsonElement()
+        {% if nullable %}
+        if (element is JsonNull) return null
+        {% endif %}
+        val objectValue = element as? JsonObject
+            ?: throw SerializationException("Strict reference must be a JSON object")
+        val allowedKeys = setOf({{ allowed_keys_literal }}, "\$type")
+        val unknownKeys = objectValue.keys - allowedKeys
+        if (unknownKeys.isNotEmpty()) {
+            throw SerializationException(
+                "Strict reference contains unknown keys: ${unknownKeys.sorted()}"
+            )
+        }
+        objectValue["\$type"]?.let { discriminator ->
+            val actualTypeIdentifier = (discriminator as? JsonPrimitive)
+                ?.takeIf(JsonPrimitive::isString)
+                ?.content
+                ?: throw SerializationException(
+                    "Strict reference discriminator must be a string"
+                )
+            if (actualTypeIdentifier != expectedTypeIdentifier) {
+                throw SerializationException("Strict reference discriminator mismatch")
+            }
+        }
+        return jsonDecoder.json.decodeFromJsonElement(delegate, element)
+    }
+}

@@ -3,11 +3,14 @@ import sys
 import os
 import asyncio
 import aiofiles
+import re
+from collections.abc import Sequence
 from swift_code_generator import SwiftCodeGenerator, convert_json_to_swift
 from kotlin_code_generator import KotlinCodeGenerator
 from kotlin_type_converter import convert_to_pascal_case
 from utils import convert_to_camel_case
 from cycle_detector import CycleDetector
+from generated_projection import write_swift_projection
 
 def get_namespace_path(lexicon_id: str) -> str:
     """Convert lexicon ID to hierarchical path.
@@ -20,6 +23,80 @@ def get_namespace_path(lexicon_id: str) -> str:
     return parts[0].capitalize()
 
 DEFAULT_EXCLUDED_NAMESPACES = ('tools.ozone',)
+
+CORE_NAMESPACE_ROOT_PATTERN = re.compile(r'^[a-z][a-z0-9]{0,62}$')
+SWIFT_RESERVED_IDENTIFIERS = frozenset({
+    'actor', 'any', 'as', 'associatedtype', 'async', 'await', 'break',
+    'case', 'catch', 'class', 'consume', 'consuming', 'continue',
+    'convenience', 'copy', 'default', 'defer', 'deinit', 'distributed',
+    'do', 'dynamic', 'else', 'enum', 'extension', 'fallthrough', 'false',
+    'fileprivate', 'final', 'for', 'func', 'get', 'guard', 'if', 'import', 'in',
+    'indirect', 'infix', 'init', 'inout', 'internal', 'is', 'isolated',
+    'lazy', 'let', 'macro', 'mutating', 'nil', 'nonisolated',
+    'nonmutating', 'open', 'operator', 'optional', 'override', 'package',
+    'postfix', 'precedencegroup', 'prefix', 'private', 'protocol', 'public',
+    'repeat', 'required', 'rethrows', 'return', 'self', 'some', 'static',
+    'struct', 'subscript', 'super', 'switch', 'throw', 'throws', 'true',
+    'try', 'typealias', 'unowned', 'var', 'weak', 'where', 'while', 'yield',
+})
+RESERVED_CORE_NAMESPACE_PROPERTIES = frozenset({'logout', 'storage'})
+RESERVED_CORE_NAMESPACE_TYPES = frozenset({'NetworkService', 'Sendable', 'Type'})
+
+def normalize_core_namespace_roots(
+    value: Sequence[str],
+    source: str = 'core_namespace_roots',
+) -> tuple[str, ...]:
+    """Validate, deduplicate, and deterministically order core-owned roots."""
+    if isinstance(value, (str, bytes, bytearray)) or not isinstance(value, Sequence):
+        raise ValueError(f"{source} must be a sequence of non-empty strings")
+
+    roots = []
+    root_set = set()
+    property_owners = {}
+    type_owners = {}
+    for index, root in enumerate(value):
+        if not isinstance(root, str) or not root.strip():
+            raise ValueError(
+                f"{source}[{index}] must be a non-empty namespace-root string"
+            )
+        if root != root.strip():
+            raise ValueError(
+                f"{source}[{index}] must not contain leading or trailing whitespace"
+            )
+        if not CORE_NAMESPACE_ROOT_PATTERN.fullmatch(root):
+            raise ValueError(
+                f"{source}[{index}] must be one canonical lowercase, "
+                "Swift-safe namespace-root segment"
+            )
+        if root in SWIFT_RESERVED_IDENTIFIERS:
+            raise ValueError(f"{source}[{index}] uses reserved Swift identifier '{root}'")
+        if root in root_set:
+            continue
+
+        property_name = lower_camel(root)
+        type_name = convert_to_camel_case(root)
+        if property_name in RESERVED_CORE_NAMESPACE_PROPERTIES:
+            raise ValueError(
+                f"{source}[{index}] collides with ATProtoClient member '{property_name}'"
+            )
+        if type_name in RESERVED_CORE_NAMESPACE_TYPES:
+            raise ValueError(
+                f"{source}[{index}] collides with generated type '{type_name}'"
+            )
+
+        property_owner = property_owners.get(property_name)
+        type_owner = type_owners.get(type_name)
+        if property_owner is not None or type_owner is not None:
+            collision = property_owner or type_owner
+            raise ValueError(
+                f"{source}[{index}] collides with namespace root '{collision}'"
+            )
+
+        root_set.add(root)
+        roots.append(root)
+        property_owners[property_name] = root
+        type_owners[type_name] = root
+    return tuple(sorted(roots))
 
 def load_manifest(path):
     """Load a generation manifest (JSON). Paths inside are relative to CWD."""
@@ -67,8 +144,9 @@ async def load_lexicons(dirs, exclude_namespaces, cycle_detector, skip_ids=()):
                 # Also register query/procedure output unions
                 main_def = defs.get('main', {})
                 if main_def.get('type') in ['query', 'procedure']:
-                    output_schema = main_def.get('output', {}).get('schema', {})
-                    if output_schema.get('type') == 'object':
+                    output = main_def.get('output')
+                    output_schema = output.get('schema') if isinstance(output, dict) else None
+                    if isinstance(output_schema, dict) and output_schema.get('type') == 'object':
                         cycle_detector.add_output_type(lexicon_id, output_schema)
 
                 loaded.append((filepath, lexicon))
@@ -90,13 +168,16 @@ async def generate_swift_from_lexicons_recursive(
     reference_dirs=(),
     overlay=False,
     package_name='Petrel',
+    core_namespace_roots: Sequence[str] = (),
 ):
     type_dict = {}
     namespace_hierarchy = {}
+    expected_files = {}
     cycle_detector = CycleDetector()
+    core_namespace_roots = normalize_core_namespace_roots(core_namespace_roots)
 
-    if not os.path.exists(output_folder):
-        os.makedirs(output_folder)
+    for root in core_namespace_roots:
+        namespace_hierarchy[root] = {}
 
     emit_dirs = folder_path if isinstance(folder_path, (list, tuple)) else [folder_path]
 
@@ -135,7 +216,12 @@ async def generate_swift_from_lexicons_recursive(
     else:
         print("No indirect enums detected")
 
-    async def process_lexicon(filepath, lexicon):
+    def add_expected_file(relative_path, content):
+        if relative_path in expected_files:
+            raise ValueError(f"duplicate generated Swift target: {relative_path}")
+        expected_files[relative_path] = content
+
+    def process_lexicon(filepath, lexicon):
         lexicon_id = lexicon.get('id', '')
         defs = lexicon.get('defs', {})
 
@@ -163,57 +249,52 @@ async def generate_swift_from_lexicons_recursive(
         # Create hierarchical output path based on lexicon namespace
         # e.g., "app.bsky.feed.post" -> "Lexicons/App/Bsky/"
         namespace_path = get_namespace_path(lexicon_id)
-        lexicon_output_dir = os.path.join(output_folder, 'Lexicons', namespace_path)
-        os.makedirs(lexicon_output_dir, exist_ok=True)
-
         output_filename = f"{convert_to_camel_case(lexicon_id)}.swift"
-        output_file_path = os.path.join(lexicon_output_dir, output_filename)
-        async with aiofiles.open(output_file_path, 'w') as swift_file:
-            await swift_file.write(swift_code)
+        output_file_path = f"Lexicons/{namespace_path}/{output_filename}"
+        add_expected_file(output_file_path, swift_code)
 
     # Second pass: Generate code with cycle information
-    tasks = []
     for filepath, lexicon in lexicons:
-        tasks.append(asyncio.create_task(process_lexicon(filepath, lexicon)))
-
-    await asyncio.gather(*tasks)
-
-    client_dir = os.path.join(output_folder, 'Client')
-    os.makedirs(client_dir, exist_ok=True)
+        process_lexicon(filepath, lexicon)
 
     if overlay:
         # Overlay: extend the core client's namespace tree instead of regenerating it,
         # and register this package's types with the core decoder registry.
-        overlay_namespaces = generate_swift_overlay_namespaces(namespace_hierarchy, reference_hierarchy)
+        overlay_namespaces = generate_swift_overlay_namespaces(
+            namespace_hierarchy,
+            reference_hierarchy,
+            core_namespace_roots=core_namespace_roots,
+        )
         overlay_client = (
             "import Foundation\nimport Petrel\n\n"
             f"// Generated namespace extensions for the {package_name} overlay package.\n\n"
             + overlay_namespaces
         )
-        overlay_client_path = os.path.join(client_dir, f'ATProtoClient+{package_name}.swift')
-        async with aiofiles.open(overlay_client_path, 'w') as f:
-            await f.write(overlay_client)
+        overlay_client_path = f'Client/ATProtoClient+{package_name}.swift'
+        add_expected_file(overlay_client_path, overlay_client)
 
         registration_code = generate_overlay_registration(type_dict, package_name)
-        registration_path = os.path.join(client_dir, f'{package_name}Lexicons.swift')
-        async with aiofiles.open(registration_path, 'w') as f:
-            await f.write(registration_code)
+        registration_path = f'Client/{package_name}Lexicons.swift'
+        add_expected_file(registration_path, registration_code)
     else:
         type_factory_code = generate_ATProtocolValueContainer_enum(type_dict)
         swift_namespace_classes = generate_swift_namespace_classes(namespace_hierarchy)
         atproto_client = render_atproto_client(swift_namespace_classes)
 
         # Output ATProtocolValueContainer to Core/Types within output folder
-        core_types_dir = os.path.join(output_folder, 'Core', 'Types')
-        os.makedirs(core_types_dir, exist_ok=True)
-        type_factory_file_path = os.path.join(core_types_dir, 'ATProtocolValueContainer.swift')
-        async with aiofiles.open(type_factory_file_path, 'w') as type_factory_file:
-            await type_factory_file.write(type_factory_code)
+        type_factory_file_path = 'Core/Types/ATProtocolValueContainer.swift'
+        add_expected_file(type_factory_file_path, type_factory_code)
 
         # Output main client file to Client directory within output folder
-        class_factory_file_path = os.path.join(client_dir, 'ATProtoClient+Generated.swift')
-        async with aiofiles.open(class_factory_file_path, 'w') as class_factory_file:
-            await class_factory_file.write(atproto_client)
+        class_factory_file_path = 'Client/ATProtoClient+Generated.swift'
+        add_expected_file(class_factory_file_path, atproto_client)
+
+        # Compatibility shims are generator-owned so a closed regeneration
+        # cannot silently discard the legacy source surface they preserve.
+        compatibility_file_path = 'Compatibility/Petrel020Compatibility.swift'
+        add_expected_file(compatibility_file_path, render_petrel_020_compatibility())
+
+    await write_swift_projection(output_folder, expected_files)
 
 def render_atproto_client(generated_classes):
     from templates import TemplateManager
@@ -221,6 +302,12 @@ def render_atproto_client(generated_classes):
     template = template_manager.env.get_template('ATProtoClientGeneratedMain.jinja')
     rendered_code = template.render(generated_classes=generated_classes)
     return rendered_code
+
+def render_petrel_020_compatibility():
+    from templates import TemplateManager
+    template_manager = TemplateManager()
+    template = template_manager.env.get_template('Petrel020Compatibility.jinja')
+    return template.render()
 
 def generate_ATProtocolValueContainer_enum(type_dict):
     from templates import TemplateManager
@@ -233,31 +320,41 @@ def generate_ATProtocolValueContainer_enum(type_dict):
     json_value_enum_code = template.render(type_cases=type_cases)
     return json_value_enum_code
 
-def generate_swift_overlay_namespaces(emit_hierarchy, reference_hierarchy):
+def generate_swift_overlay_namespaces(
+    emit_hierarchy,
+    reference_hierarchy,
+    core_namespace_roots: Sequence[str] = (),
+):
     """Namespace tree for an overlay package, as extensions on the core client.
 
     Nodes that already exist in the core (reference) hierarchy are extended;
-    new nodes become nested classes declared inside an extension, so e.g.
+    new nodes become nested values declared inside an extension, so e.g.
     ATProtoClient.Blue.Catbird.MlsChat resolves exactly like a core namespace
     and the per-lexicon method extensions attach unchanged.
     """
     sections = []
+    owned_reference_hierarchy = dict(reference_hierarchy)
+    for root in normalize_core_namespace_roots(core_namespace_roots):
+        owned_reference_hierarchy.setdefault(root, {})
 
     def class_path(parts):
         return 'ATProtoClient' + ''.join('.' + convert_to_camel_case(p) for p in parts)
 
-    def render_new_class_tree(name, sub, depth):
+    def render_new_value_tree(name, sub, depth):
         indent = '    ' * depth
         class_name = convert_to_camel_case(name)
-        code = f"{indent}public final class {class_name}: @unchecked Sendable {{\n"
+        code = f"{indent}public struct {class_name}: Sendable {{\n"
         code += f"{indent}    public let networkService: NetworkService\n"
         code += f"{indent}    public init(networkService: NetworkService) {{\n"
         code += f"{indent}        self.networkService = networkService\n"
         code += f"{indent}    }}\n\n"
         for child_name, child_sub in sub.items():
             child_class = convert_to_camel_case(child_name)
-            code += f"{indent}    public lazy var {lower_camel(child_name)}: {child_class} = .init(networkService: networkService)\n\n"
-            code += render_new_class_tree(child_name, child_sub, depth + 1)
+            code += (
+                f"{indent}    public var {lower_camel(child_name)}: {child_class} "
+                f"{{ {child_class}(networkService: networkService) }}\n\n"
+            )
+            code += render_new_value_tree(child_name, child_sub, depth + 1)
         code += f"{indent}}}\n\n"
         return code
 
@@ -266,10 +363,10 @@ def generate_swift_overlay_namespaces(emit_hierarchy, reference_hierarchy):
         class_name = convert_to_camel_case(name)
         prop = lower_camel(name)
         code = f"public extension {target} {{\n"
-        # Computed (not lazy: extensions cannot add stored state). On the actor this is
-        # actor-isolated, matching the core namespaces' lazy vars (`await client.blue`).
+        # Computed access preserves immutable value semantics. On the actor this is
+        # actor-isolated, matching the core root accessor (`await client.blue`).
         code += f"    var {prop}: {class_name} {{ {class_name}(networkService: networkService) }}\n\n"
-        code += render_new_class_tree(name, sub, 1)
+        code += render_new_value_tree(name, sub, 1)
         code += "}\n\n"
         return code
 
@@ -280,7 +377,7 @@ def generate_swift_overlay_namespaces(emit_hierarchy, reference_hierarchy):
             else:
                 sections.append(render_extension(parts, name, sub))
 
-    walk(emit_hierarchy, reference_hierarchy, [])
+    walk(emit_hierarchy, owned_reference_hierarchy, [])
     return ''.join(sections)
 
 
@@ -324,12 +421,14 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
         for namespace, sub_hierarchy in namespace_hierarchy.items():
             namespace_class = convert_to_camel_case(namespace)
             prop_name = lower_camel(namespace)
-            swift_code += f"public lazy var {prop_name}: {namespace_class} = {{\n"
-            swift_code += f"    return {namespace_class}(networkService: self.networkService)\n}}()\n\n"
+            swift_code += (
+                f"public var {prop_name}: {namespace_class} "
+                f"{{ {namespace_class}(networkService: networkService) }}\n\n"
+            )
             if prop_name != namespace.lower():
                 swift_code += f"@available(*, deprecated, renamed: \"{prop_name}\")\n"
                 swift_code += f"public var {namespace.lower()}: {namespace_class} {{ {prop_name} }}\n\n"
-            swift_code += f"public final class {namespace_class}: @unchecked Sendable {{\n"
+            swift_code += f"public struct {namespace_class}: Sendable {{\n"
             swift_code += f"    public let networkService: NetworkService\n"
             swift_code += f"    public init(networkService: NetworkService) {{\n"
             swift_code += f"        self.networkService = networkService\n    }}\n\n"
@@ -339,12 +438,14 @@ def generate_swift_namespace_classes(namespace_hierarchy, network_manager="Netwo
         for namespace, sub_namespaces in namespace_hierarchy.items():
             class_name = convert_to_camel_case(namespace)
             prop_name = lower_camel(namespace)
-            swift_code += f"{indent}public lazy var {prop_name}: {class_name} = {{\n"
-            swift_code += f"{indent}    return {class_name}(networkService: self.networkService)\n{indent}}}()\n\n"
+            swift_code += (
+                f"{indent}public var {prop_name}: {class_name} "
+                f"{{ {class_name}(networkService: networkService) }}\n\n"
+            )
             if prop_name != namespace.lower():
                 swift_code += f"{indent}@available(*, deprecated, renamed: \"{prop_name}\")\n"
                 swift_code += f"{indent}public var {namespace.lower()}: {class_name} {{ {prop_name} }}\n\n"
-            swift_code += f"{indent}public final class {class_name}: @unchecked Sendable {{\n"
+            swift_code += f"{indent}public struct {class_name}: Sendable {{\n"
             swift_code += f"{indent}    public let networkService: NetworkService\n"
             swift_code += f"{indent}    public init(networkService: NetworkService) {{\n"
             swift_code += f"{indent}        self.networkService = networkService\n{indent}    }}\n\n"
@@ -559,8 +660,13 @@ async def run_manifest(manifest_path, language='both'):
     emit_dirs = lex.get('emit', [])
     reference_dirs = lex.get('reference', [])
     exclude = tuple(lex.get('exclude_namespaces', []))
-    kind = manifest.get('package', {}).get('kind', 'core')
-    package_name = manifest.get('package', {}).get('name', 'Petrel')
+    package = manifest.get('package', {})
+    kind = package.get('kind', 'core')
+    package_name = package.get('name', 'Petrel')
+    core_namespace_roots = normalize_core_namespace_roots(
+        package.get('core_namespace_roots', ()),
+        source='package.core_namespace_roots',
+    )
     if kind not in ('core', 'overlay'):
         raise ValueError(f"Unknown package.kind '{kind}' in {manifest_path}")
     overlay = kind == 'overlay'
@@ -574,6 +680,7 @@ async def run_manifest(manifest_path, language='both'):
             emit_dirs, swift_cfg['output'],
             exclude_namespaces=exclude, reference_dirs=reference_dirs,
             overlay=overlay, package_name=package_name,
+            core_namespace_roots=core_namespace_roots,
         ))
     kotlin_cfg = manifest.get('kotlin')
     if kotlin_cfg and language in ('kotlin', 'both'):

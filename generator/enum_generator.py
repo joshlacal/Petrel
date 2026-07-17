@@ -1,4 +1,4 @@
-from utils import convert_to_camel_case, convert_ref, lowercase_first_letter
+from utils import convert_to_camel_case, lowercase_first_letter
 
 class EnumGenerator:
     def __init__(self, swift_code_generator):
@@ -68,10 +68,14 @@ class EnumGenerator:
             return
 
         self.swift_code_generator.generated_unions.add(unique_union_name)
-        refs_info = [{'ref': (self.swift_code_generator.lexicon_id + r if r.startswith('#') else r),
-                    'swift_ref': convert_ref(r),
-                    'camel_case_label': lowercase_first_letter(convert_ref(r))}
-                    for r in refs]
+        refs_info = []
+        for ref in refs:
+            swift_ref = self.swift_code_generator.type_converter.convert_ref(ref)
+            refs_info.append({
+                'ref': self.swift_code_generator.lexicon_id + ref if ref.startswith('#') else ref,
+                'swift_ref': swift_ref,
+                'camel_case_label': lowercase_first_letter(swift_ref),
+            })
         union_array_template = self.swift_code_generator.template_manager.env.get_template('unionArray.jinja')
         swift_code = union_array_template.render(array_name=name, union_name=unique_union_name, refs=refs_info, lexicon_id=self.swift_code_generator.lexicon_id)
         self.swift_code_generator.enums += swift_code + "\n\n"
@@ -85,3 +89,65 @@ class EnumGenerator:
         enum_code = template.render(enum_name=enum_name, values=values_with_descriptions)
         self.swift_code_generator.enums += enum_code + "\n\n"
         self.swift_code_generator.generated_tokens.add(enum_name)
+
+    @staticmethod
+    def _case_identifier(value):
+        encoded = ''.join(
+            char if char.isascii() and char.isalnum() else f'_u{ord(char):x}_'
+            for char in value
+        )
+        return f"value_{encoded}"
+
+    @staticmethod
+    def _swift_string_literal(value):
+        escapes = {
+            '\\': '\\\\',
+            '"': '\\"',
+            '\n': '\\n',
+            '\r': '\\r',
+            '\t': '\\t',
+            '\0': '\\0',
+        }
+        encoded = []
+        for char in value:
+            if char in escapes:
+                encoded.append(escapes[char])
+            elif ord(char) < 0x20 or ord(char) == 0x7f or char in ('\u2028', '\u2029'):
+                encoded.append(f"\\u{{{ord(char):x}}}")
+            else:
+                encoded.append(char)
+        return f'"{"".join(encoded)}"'
+
+    def generate_closed_string_enum(self, enum_name, values, identity):
+        if not isinstance(values, list) or not all(isinstance(value, str) for value in values):
+            raise ValueError(f"closed enum '{enum_name}' values must be a list of strings")
+        if len(values) != len(set(values)):
+            raise ValueError(f"closed enum '{enum_name}' contains duplicate wire values")
+
+        vocabulary = tuple(values)
+        existing = self.swift_code_generator.closed_enums_by_identity.get(identity)
+        if existing is not None:
+            existing_name, existing_vocabulary = existing
+            if existing_name != enum_name or existing_vocabulary != vocabulary:
+                raise ValueError(f"closed enum identity {identity!r} was reused with a different schema")
+            return existing_name
+
+        owner = self.swift_code_generator.closed_enum_identity_by_name.get(enum_name)
+        if owner is not None and owner != identity:
+            raise ValueError(
+                f"closed enum type name collision for '{enum_name}': {owner!r} vs {identity!r}"
+            )
+
+        template = self.swift_code_generator.template_manager.env.get_template('closedStringEnum.jinja')
+        cases = [
+            {
+                'identifier': self._case_identifier(value),
+                'wire_literal': self._swift_string_literal(value),
+            }
+            for value in values
+        ]
+        enum_code = template.render(enum_name=enum_name, cases=cases)
+        self.swift_code_generator.enums += enum_code + "\n\n"
+        self.swift_code_generator.closed_enums_by_identity[identity] = (enum_name, vocabulary)
+        self.swift_code_generator.closed_enum_identity_by_name[enum_name] = identity
+        return enum_name

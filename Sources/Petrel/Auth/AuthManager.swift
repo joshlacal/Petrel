@@ -7,14 +7,17 @@
 //
 
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 /// Coordinator class that manages authentication strategies.
 /// Holds a reference to the active strategy and forwards all AuthStrategy methods to it.
-actor AuthManager: AuthStrategy {
+actor AuthManager: AuthStrategy, AuthContinuityProviding {
     // MARK: - Types
 
     /// Authentication mode determining which strategy to use.
-    enum Mode: Sendable, Equatable {
+    enum Mode: Equatable {
         /// Legacy password-based authentication (App Passwords).
         case legacy
         /// Public OAuth for mobile/native apps (PAR + PKCE + DPoP).
@@ -49,6 +52,10 @@ actor AuthManager: AuthStrategy {
     private let oauthConfig: OAuthConfig
     private let didResolver: DIDResolving
     private let gatewayBaseURL: URL?
+    private var authContinuity: AuthContinuityState
+    private var authContinuityObserver: (@Sendable () async -> Void)?
+    private var pendingAuthContinuityMutations = 0
+    private var pendingStorageMutationTickets: Set<UUID> = []
 
     /// The current authentication mode.
     private(set) var currentMode: Mode
@@ -81,6 +88,7 @@ actor AuthManager: AuthStrategy {
         self.didResolver = didResolver
         self.gatewayBaseURL = gatewayBaseURL
         currentMode = mode
+        authContinuity = AuthContinuityState(mode: mode.authMode)
 
         activeStrategy = try Self.createStrategy(
             mode: mode,
@@ -101,10 +109,15 @@ actor AuthManager: AuthStrategy {
     func switchMode(_ mode: Mode) async throws {
         guard mode != currentMode else { return }
 
+        // Invalidate before cancelling the old strategy because cancellation is
+        // an actor suspension point and must not leave stale work authorized.
+        await beginAuthContinuityMutation()
+        defer { endAuthContinuityMutation() }
+
         // Cancel any ongoing OAuth flow before switching
         await activeStrategy.cancelOAuthFlow()
 
-        activeStrategy = try Self.createStrategy(
+        let newStrategy = try Self.createStrategy(
             mode: mode,
             storage: storage,
             accountManager: accountManager,
@@ -113,6 +126,12 @@ actor AuthManager: AuthStrategy {
             didResolver: didResolver,
             gatewayBaseURL: gatewayBaseURL
         )
+
+        // No suspension is permitted between publishing the continuity mode and
+        // the strategy that prepares requests for it. The pre-signal above has
+        // already invalidated every exact transaction based on the old mode.
+        authContinuity.commitMode(mode.authMode)
+        activeStrategy = newStrategy
         currentMode = mode
     }
 
@@ -155,7 +174,7 @@ actor AuthManager: AuthStrategy {
                 accountManager: accountManager
             )
 
-        case .cab(let backendURL):
+        case let .cab(backendURL):
             return CABOAuthStrategy(
                 backendURL: backendURL,
                 storage: storage,
@@ -194,7 +213,18 @@ actor AuthManager: AuthStrategy {
     }
 
     func handleOAuthCallback(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
-        try await activeStrategy.handleOAuthCallback(url: url)
+        let tracksGatewayContinuity = currentMode == .gateway
+        if tracksGatewayContinuity {
+            // The callback may install or replace an opaque gateway session.
+            // Invalidate before the strategy performs its first await.
+            await beginAuthContinuityMutation()
+        }
+        defer {
+            if tracksGatewayContinuity {
+                endAuthContinuityMutation()
+            }
+        }
+        return try await activeStrategy.handleOAuthCallback(url: url)
     }
 
     func loginWithPassword(
@@ -212,6 +242,8 @@ actor AuthManager: AuthStrategy {
     }
 
     func logout() async throws {
+        await beginAuthContinuityMutation()
+        defer { endAuthContinuityMutation() }
         try await activeStrategy.logout()
     }
 
@@ -254,10 +286,148 @@ actor AuthManager: AuthStrategy {
         data: Data,
         for request: URLRequest
     ) async throws -> (Data, HTTPURLResponse) {
-        try await activeStrategy.handleUnauthorizedResponse(response, data: data, for: request)
+        let invalidatesGatewayContinuity = currentMode == .gateway
+            && gatewayBaseURL.map {
+                isTerminalGatewayUnauthorized(data: data, request: request, gatewayURL: $0)
+            } == true
+        if invalidatesGatewayContinuity {
+            // The strategy will clear the local session. Change continuity
+            // before forwarding across the actor boundary.
+            await beginAuthContinuityMutation()
+        }
+        defer {
+            if invalidatesGatewayContinuity {
+                endAuthContinuityMutation()
+            }
+        }
+        return try await activeStrategy.handleUnauthorizedResponse(response, data: data, for: request)
     }
 
     func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {
         await activeStrategy.updateDPoPNonce(for: url, from: headers, did: did, jkt: jkt)
+    }
+
+    // MARK: - Authentication Continuity
+
+    func installAuthContinuityObserver(_ observer: @escaping @Sendable () async -> Void) async {
+        authContinuityObserver = observer
+        await storage.setAuthContinuityObserver { [weak self] event in
+            await self?.handleAuthContinuityStorageMutation(event)
+        }
+    }
+
+    private func beginAuthContinuityMutation() async {
+        pendingAuthContinuityMutations += 1
+        await notifyAuthContinuityMutation()
+        authContinuity.invalidate()
+    }
+
+    private func endAuthContinuityMutation() {
+        precondition(pendingAuthContinuityMutations > 0)
+        pendingAuthContinuityMutations -= 1
+    }
+
+    private func notifyAuthContinuityMutation() async {
+        await authContinuityObserver?()
+    }
+
+    func handleAuthContinuityStorageMutation(_ event: AuthContinuityStorageMutationEvent) async {
+        switch event {
+        case let .willMutate(ticket):
+            guard pendingStorageMutationTickets.insert(ticket).inserted else { return }
+            await beginAuthContinuityMutation()
+        case let .didMutate(ticket):
+            guard pendingStorageMutationTickets.remove(ticket) != nil else {
+                // This observer may have joined the mutation hub after the
+                // matching willMutate event. Conservatively invalidate without
+                // clearing any other in-flight ticket.
+                await beginAuthContinuityMutation()
+                endAuthContinuityMutation()
+                return
+            }
+            await notifyAuthContinuityMutation()
+            authContinuity.invalidate()
+            endAuthContinuityMutation()
+        }
+    }
+
+    func authContinuitySnapshot() async -> AuthContinuitySnapshot {
+        switch await authContinuityProviderSnapshot() {
+        case let .stable(snapshot): snapshot
+        case let .mutationPending(mode): AuthContinuitySnapshot(did: nil, mode: mode, generation: .max)
+        }
+    }
+
+    func authContinuityProviderSnapshot() async -> AuthContinuityProviderSnapshot {
+        while true {
+            guard pendingAuthContinuityMutations == 0 else {
+                return .mutationPending(mode: authContinuity.mode)
+            }
+            let generation = authContinuity.generation
+            let mode = authContinuity.mode
+            let exhausted = authContinuity.isExhausted
+
+            guard mode == .gateway, !exhausted else {
+                return .stable(authContinuity.snapshot)
+            }
+
+            // Use the versioned persistent selector rather than AccountManager's
+            // separately cached DID. KeychainStorage encloses selector and
+            // gateway-session mutations in NetworkService revision signals.
+            let did = try? await storage.getCurrentDID()
+            let session: String?
+            if let did, !did.isEmpty {
+                session = try? await storage.getGatewaySession(for: did)
+            } else {
+                session = nil
+            }
+
+            // Calls above can re-enter this actor. Retry rather than combining
+            // observations from two authentication generations or modes.
+            guard authContinuity.generation == generation,
+                  authContinuity.mode == mode,
+                  authContinuity.isExhausted == exhausted,
+                  pendingAuthContinuityMutations == 0
+            else {
+                continue
+            }
+
+            let identity: GatewayAuthIdentity? = if let did, !did.isEmpty, let session {
+                GatewayAuthIdentity(did: did, session: session)
+            } else {
+                nil
+            }
+            if authContinuity.wouldChangeWhenObservingGatewayIdentity(identity) {
+                pendingAuthContinuityMutations += 1
+                await notifyAuthContinuityMutation()
+                guard authContinuity.generation == generation,
+                      authContinuity.mode == mode,
+                      authContinuity.isExhausted == exhausted
+                else {
+                    endAuthContinuityMutation()
+                    continue
+                }
+                authContinuity.observeGatewayIdentity(identity)
+                endAuthContinuityMutation()
+                return .stable(authContinuity.snapshot)
+            }
+            authContinuity.observeGatewayIdentity(identity)
+            return .stable(authContinuity.snapshot)
+        }
+    }
+}
+
+private extension AuthManager.Mode {
+    var authMode: AuthMode {
+        switch self {
+        case .legacy:
+            .legacy
+        case .publicOAuth:
+            .publicOAuth
+        case .gateway:
+            .gateway
+        case let .cab(backendURL):
+            .cab(backendURL: backendURL)
+        }
     }
 }

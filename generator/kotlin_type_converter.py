@@ -37,13 +37,16 @@ class KotlinTypeConverter(BaseTypeConverter):
     """Converts lexicon types to Kotlin types."""
 
     def determine_type(self, name: str, prop_schema: Dict[str, Any],
-                       required_fields: List[str], current_struct_name: str) -> str:
+                       required_fields: List[str], current_struct_name: str,
+                       context_identity=None) -> str:
         """Determine the Kotlin type for a property."""
         prop_type = prop_schema.get('type', '')
         format_type = prop_schema.get('format', '')
         is_optional = name not in required_fields
 
-        kotlin_type = self._get_base_type(prop_schema, name, current_struct_name)
+        kotlin_type = self._get_base_type(
+            prop_schema, name, current_struct_name, context_identity=context_identity
+        )
 
         # Add nullability for optional fields
         if is_optional and not kotlin_type.endswith('?'):
@@ -51,12 +54,24 @@ class KotlinTypeConverter(BaseTypeConverter):
 
         return kotlin_type
 
-    def _get_base_type(self, prop_schema: Dict[str, Any], name: str, current_struct_name: str) -> str:
+    def _get_base_type(self, prop_schema: Dict[str, Any], name: str, current_struct_name: str,
+                       context_identity=None) -> str:
         """Get the base Kotlin type without nullability."""
         prop_type = prop_schema.get('type', '')
         format_type = prop_schema.get('format', '')
 
         if prop_type == 'string':
+            if 'enum' in prop_schema:
+                enum_name = f"{current_struct_name}{convert_to_pascal_case(name)}"
+                identity = (
+                    "inline", self.code_generator.lexicon_id,
+                    context_identity if context_identity is not None else ("rendered", current_struct_name),
+                    name,
+                )
+                self.code_generator.enum_generator.generate_closed_string_enum(
+                    enum_name, prop_schema['enum'], identity
+                )
+                return enum_name
             return self._convert_string_type(format_type)
         elif prop_type == 'integer':
             return 'Int'
@@ -65,7 +80,9 @@ class KotlinTypeConverter(BaseTypeConverter):
         elif prop_type == 'boolean':
             return 'Boolean'
         elif prop_type == 'array':
-            item_type = self._get_array_item_type(prop_schema, name, current_struct_name)
+            item_type = self._get_array_item_type(
+                prop_schema, name, current_struct_name, context_identity=context_identity
+            )
             return f'List<{item_type}>'
         elif prop_type == 'ref':
             return self.convert_ref(prop_schema['ref'])
@@ -111,7 +128,8 @@ class KotlinTypeConverter(BaseTypeConverter):
         }
         return format_map.get(format_type, 'String')
 
-    def _get_array_item_type(self, prop_schema: Dict[str, Any], name: str, current_struct_name: str) -> str:
+    def _get_array_item_type(self, prop_schema: Dict[str, Any], name: str, current_struct_name: str,
+                             context_identity=None) -> str:
         """Determine the type of array items."""
         items_schema = prop_schema.get('items', {})
         items_type = items_schema.get('type', '')
@@ -129,6 +147,17 @@ class KotlinTypeConverter(BaseTypeConverter):
                 )
             return union_name
         elif items_type == 'string':
+            if 'enum' in items_schema:
+                enum_name = f"{current_struct_name}{convert_to_pascal_case(name)}"
+                identity = (
+                    "inline", self.code_generator.lexicon_id,
+                    context_identity if context_identity is not None else ("rendered", current_struct_name),
+                    name,
+                )
+                self.code_generator.enum_generator.generate_closed_string_enum(
+                    enum_name, items_schema['enum'], identity
+                )
+                return enum_name
             return self._convert_string_type(items_schema.get('format', ''))
         elif items_type == 'integer':
             return 'Int'
@@ -156,13 +185,20 @@ class KotlinTypeConverter(BaseTypeConverter):
 
     def convert_ref(self, ref: str) -> str:
         """Convert a lexicon reference to a Kotlin type."""
-        if ref.startswith('#'):
-            # Local reference
-            if ref == '#main':
+        nsid, separator, fragment = ref.partition('#')
+        is_self_reference = not nsid or nsid == self.code_generator.lexicon_id
+
+        if is_self_reference:
+            fragment = fragment if separator else 'main'
+            if fragment == 'main':
                 return self.code_generator.class_name
-            
+
+            target = self.code_generator.defs.get(fragment)
+            if isinstance(target, dict) and target.get('type') == 'string' and 'enum' in target:
+                return self.code_generator.class_name + "Defs" + convert_to_pascal_case(fragment)
+
             # Use prefixed name
-            type_name = self.code_generator.class_name + convert_to_pascal_case(ref[1:])
+            type_name = self.code_generator.class_name + convert_to_pascal_case(fragment)
             # No object prefix as definitions are top-level
             return type_name
             

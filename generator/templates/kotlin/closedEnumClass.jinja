@@ -1,0 +1,8 @@
+@Serializable
+enum class {{ enum_name }} {
+    {% for constant in constants %}
+    @SerialName({{ constant.wire_literal }})
+    {{ constant.identifier }}{% if not loop.last %},
+    {% endif %}
+    {% endfor %}
+}

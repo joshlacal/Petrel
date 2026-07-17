@@ -12,10 +12,108 @@
 #endif
 import Foundation
 
+enum AuthContinuityStorageMutationEvent {
+    case willMutate(UUID)
+    case didMutate(UUID)
+}
+
+private actor AuthContinuityObserverMailbox {
+    private let observer: @Sendable (AuthContinuityStorageMutationEvent) async -> Void
+    private var deliveryTail: (id: UUID, task: Task<Void, Never>)?
+
+    init(observer: @escaping @Sendable (AuthContinuityStorageMutationEvent) async -> Void) {
+        self.observer = observer
+    }
+
+    func deliver(_ event: AuthContinuityStorageMutationEvent) async {
+        await deliver([event])
+    }
+
+    func deliver(_ events: [AuthContinuityStorageMutationEvent]) async {
+        guard !events.isEmpty else { return }
+
+        var previous = deliveryTail?.task
+        var finalID: UUID?
+        for event in events {
+            let predecessor = previous
+            let observer = observer
+            let id = UUID()
+            let task = Task {
+                if let predecessor {
+                    await predecessor.value
+                }
+                await observer(event)
+            }
+            deliveryTail = (id, task)
+            previous = task
+            finalID = id
+        }
+        await previous?.value
+        if deliveryTail?.id == finalID {
+            deliveryTail = nil
+        }
+    }
+}
+
+private actor AuthContinuityMutationHub {
+    struct Scope: Hashable {
+        let namespace: String
+        let accessGroup: String?
+    }
+
+    static let shared = AuthContinuityMutationHub()
+
+    private var observers: [Scope: [UUID: AuthContinuityObserverMailbox]] = [:]
+    private var activeTickets: [Scope: [UUID]] = [:]
+
+    func replaceObserver(
+        _ previousToken: UUID?,
+        for scope: Scope,
+        observer: @escaping @Sendable (AuthContinuityStorageMutationEvent) async -> Void
+    ) async -> UUID {
+        if let previousToken {
+            observers[scope]?.removeValue(forKey: previousToken)
+        }
+        let token = UUID()
+        let mailbox = AuthContinuityObserverMailbox(observer: observer)
+        observers[scope, default: [:]][token] = mailbox
+
+        // Registration and the active-ticket snapshot are one hub operation.
+        // Mailbox isolation preserves will-before-did ordering if completion
+        // re-enters this hub while a replay callback is suspended.
+        let replay = activeTickets[scope, default: []].map(AuthContinuityStorageMutationEvent.willMutate)
+        await mailbox.deliver(replay)
+        return token
+    }
+
+    func beginMutation(for scope: Scope) async -> UUID {
+        let ticket = UUID()
+        activeTickets[scope, default: []].append(ticket)
+        let mailboxes = Array(observers[scope, default: [:]].values)
+        for mailbox in mailboxes {
+            await mailbox.deliver(.willMutate(ticket))
+        }
+        return ticket
+    }
+
+    func endMutation(_ ticket: UUID, for scope: Scope) async {
+        activeTickets[scope, default: []].removeAll { $0 == ticket }
+        let mailboxes = Array(observers[scope, default: [:]].values)
+        for mailbox in mailboxes {
+            await mailbox.deliver(.didMutate(ticket))
+        }
+    }
+}
+
 /// A centralized storage layer for securely storing all persistent data using the keychain.
 public actor KeychainStorage {
     let namespace: String
     private let accessGroup: String?
+    private var authContinuityObserverToken: UUID?
+
+    private var authContinuityScope: AuthContinuityMutationHub.Scope {
+        AuthContinuityMutationHub.Scope(namespace: namespace, accessGroup: accessGroup)
+    }
 
     /// Initializes a new KeychainStorage instance.
     /// - Parameters:
@@ -30,6 +128,35 @@ public actor KeychainStorage {
         KeychainManager.configureDefaultAccessGroup(accessGroup)
         KeychainManager.configureAccessibility(accessibility)
     }
+
+    func setAuthContinuityObserver(
+        _ observer: @escaping @Sendable (AuthContinuityStorageMutationEvent) async -> Void
+    ) async {
+        let scope = authContinuityScope
+        authContinuityObserverToken = await AuthContinuityMutationHub.shared.replaceObserver(
+            authContinuityObserverToken,
+            for: scope,
+            observer: observer
+        )
+    }
+
+    private func beginAuthContinuityMutation() async -> UUID {
+        await AuthContinuityMutationHub.shared.beginMutation(for: authContinuityScope)
+    }
+
+    private func endAuthContinuityMutation(_ ticket: UUID) async {
+        await AuthContinuityMutationHub.shared.endMutation(ticket, for: authContinuityScope)
+    }
+
+    #if DEBUG
+        func beginAuthContinuityMutationForTesting() async -> UUID {
+            await beginAuthContinuityMutation()
+        }
+
+        func endAuthContinuityMutationForTesting(_ ticket: UUID) async {
+            await endAuthContinuityMutation(ticket)
+        }
+    #endif
 
     // MARK: - Account Management
 
@@ -236,7 +363,14 @@ public actor KeychainStorage {
     public func saveCurrentDID(_ did: String) async throws {
         let key = makeKey("currentDID")
         let data = did.data(using: .utf8) ?? Data()
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        let continuityTicket = await beginAuthContinuityMutation()
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            await endAuthContinuityMutation(continuityTicket)
+        } catch {
+            await endAuthContinuityMutation(continuityTicket)
+            throw error
+        }
     }
 
     /// Retrieves the current DID from the keychain.
@@ -258,7 +392,14 @@ public actor KeychainStorage {
         let key = makeKey("gatewaySession", did: did)
         let data = session.data(using: .utf8) ?? Data()
         LogManager.logInfo("KeychainStorage - Saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        let continuityTicket = await beginAuthContinuityMutation()
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            await endAuthContinuityMutation(continuityTicket)
+        } catch {
+            await endAuthContinuityMutation(continuityTicket)
+            throw error
+        }
         LogManager.logInfo("KeychainStorage - Successfully saved gateway session for DID: \(did.prefix(20))...")
     }
 
@@ -284,7 +425,14 @@ public actor KeychainStorage {
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
-        try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+        let continuityTicket = await beginAuthContinuityMutation()
+        do {
+            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            await endAuthContinuityMutation(continuityTicket)
+        } catch {
+            await endAuthContinuityMutation(continuityTicket)
+            throw error
+        }
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
     }
 
@@ -305,12 +453,12 @@ public actor KeychainStorage {
     private func migrateLegacyGatewaySessionIfNeeded(for did: String) async -> String? {
         guard await shouldMigrateLegacyGatewaySession(for: did) else { return nil }
 
-        if let legacySession = try? await getGatewaySession(), !legacySession.isEmpty {
+        if let legacySession = await getLegacyGatewaySession(), !legacySession.isEmpty {
             LogManager.logInfo(
                 "KeychainStorage - Migrating legacy gateway session to per-DID storage for DID: \(did.prefix(20))..."
             )
             try? await saveGatewaySession(legacySession, for: did)
-            try? await deleteGatewaySession()
+            try? await deleteLegacyGatewaySession()
             return legacySession
         }
 
@@ -340,13 +488,33 @@ public actor KeychainStorage {
     /// Legacy single-session methods for backward compatibility during migration
     @available(*, deprecated, message: "Use saveGatewaySession(_:for:) for multi-account support")
     func saveGatewaySession(_ session: String) async throws {
-        let key = makeKey("gatewaySession")
-        let data = session.data(using: .utf8) ?? Data()
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try await saveLegacyGatewaySession(session)
     }
 
     @available(*, deprecated, message: "Use getGatewaySession(for:) for multi-account support")
     func getGatewaySession() async throws -> String? {
+        await getLegacyGatewaySession()
+    }
+
+    @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
+    func deleteGatewaySession() async throws {
+        try await deleteLegacyGatewaySession()
+    }
+
+    private func saveLegacyGatewaySession(_ session: String) async throws {
+        let key = makeKey("gatewaySession")
+        let data = session.data(using: .utf8) ?? Data()
+        let continuityTicket = await beginAuthContinuityMutation()
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            await endAuthContinuityMutation(continuityTicket)
+        } catch {
+            await endAuthContinuityMutation(continuityTicket)
+            throw error
+        }
+    }
+
+    private func getLegacyGatewaySession() async -> String? {
         let key = makeKey("gatewaySession")
         do {
             let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
@@ -356,10 +524,16 @@ public actor KeychainStorage {
         }
     }
 
-    @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
-    func deleteGatewaySession() async throws {
+    private func deleteLegacyGatewaySession() async throws {
         let key = makeKey("gatewaySession")
-        try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+        let continuityTicket = await beginAuthContinuityMutation()
+        do {
+            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            await endAuthContinuityMutation(continuityTicket)
+        } catch {
+            await endAuthContinuityMutation(continuityTicket)
+            throw error
+        }
     }
 
     // MARK: - Session Management
@@ -764,14 +938,18 @@ public actor KeychainStorage {
 
     // MARK: - DPoP Key Management
 
-    /// Saves a DPoP key to the keychain.
-    /// - Parameters:
-    ///   - key: The private key to save
-    ///   - did: The DID associated with the key
-    public func saveDPoPKey(_ key: P256.Signing.PrivateKey, for did: String) async throws {
+    /// Saves a DPoP key representation without moving CryptoKit key material
+    /// across this actor's isolation boundary.
+    func saveDPoPKeyRepresentation(_ representation: Data, for did: String) throws {
+        // Validate inside the actor before persisting opaque bytes.
+        let key = try P256.Signing.PrivateKey(x963Representation: representation)
         let keyTag = makeKey("dpopKey", did: did)
         do {
-            try KeychainManager.storeDPoPKey(key, keyTag: keyTag, accessGroup: accessGroup)
+            try KeychainManager.storeDPoPKeyRepresentation(
+                key.x963Representation,
+                keyTag: keyTag,
+                accessGroup: accessGroup
+            )
             LogManager.logDebug(
                 "Successfully saved DPoP key to Keychain for DID \(LogManager.logDID(did))"
             )
@@ -779,36 +957,63 @@ public actor KeychainStorage {
             LogManager.logError(
                 "Failed to save DPoP key to Keychain (error: \(error)). This will likely cause authentication issues."
             )
-            throw error // Re-throw so the calling code can handle this properly
+            throw error
         }
     }
 
-    /// Retrieves a DPoP key from the keychain.
-    /// - Parameter did: The DID associated with the key to retrieve
-    /// - Returns: The private key if found, or nil if not found
-    public func getDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey? {
+    /// Retrieves a DPoP key as a Sendable representation so callers can
+    /// reconstruct it inside their own isolation domain.
+    func getDPoPKeyRepresentation(for did: String) throws -> Data? {
         let keyTag = makeKey("dpopKey", did: did)
         do {
-            return try KeychainManager.retrieveDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
+            let representation = try KeychainManager.retrieveDPoPKeyRepresentation(
+                keyTag: keyTag,
+                accessGroup: accessGroup
+            )
+            // Reject malformed or corrupted storage records before exposing bytes.
+            return try P256.Signing.PrivateKey(
+                x963Representation: representation
+            ).x963Representation
         } catch let KeychainError.itemRetrievalError(status) where status == errSecItemNotFound {
             LogManager.logDebug(
                 "DPoP key not found in Keychain for DID: \(did). A new key will be generated if needed."
             )
             return nil
         } catch let KeychainError.itemRetrievalError(status) {
-            // For any other keychain retrieval error (e.g., errSecAuthFailed while device locked),
-            // do NOT rotate the DPoP key. Propagate the error so callers can treat this as transient.
             LogManager.logError(
                 "Keychain retrieval error for DPoP key (status=\(status)) for DID: \(did). Will NOT rotate key."
             )
             throw KeychainError.itemRetrievalError(status: status)
         } catch {
-            // Unknown error — propagate so callers can avoid key rotation
             LogManager.logError(
                 "Failed to retrieve DPoP key from Keychain (error: \(error)). Will NOT rotate key."
             )
             throw error
         }
+    }
+
+    /// Saves a DPoP key to the keychain.
+    /// - Parameters:
+    ///   - key: The private key to save
+    ///   - did: The DID associated with the key
+    public func saveDPoPKey(_ key: P256.Signing.PrivateKey, for did: String) async throws {
+        try saveDPoPKeyRepresentation(key.x963Representation, for: did)
+    }
+
+    /// Retrieves a DPoP key from the keychain.
+    /// - Parameter did: The DID associated with the key to retrieve
+    /// - Returns: The private key if found, or nil if not found
+    public func getDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey? {
+        guard let representation = try getDPoPKeyRepresentation(for: did) else {
+            return nil
+        }
+        return try P256.Signing.PrivateKey(x963Representation: representation)
+    }
+
+    /// Checks whether a DPoP key exists without moving private key material
+    /// across the storage actor boundary.
+    public func containsDPoPKey(for did: String) async throws -> Bool {
+        try getDPoPKeyRepresentation(for: did) != nil
     }
 
     /// Deletes a DPoP key from the keychain.
@@ -846,7 +1051,7 @@ public actor KeychainStorage {
     /// Saves DPoP nonces scoped by JKT (key thumbprint) to the keychain.
     /// - Parameters:
     ///   - noncesByJKT: Mapping of JKT -> (domain -> nonce)
-    ///   ///   - did: The DID associated with these nonces
+    ///   - did: The DID associated with these nonces
     public func saveDPoPNoncesByJKT(_ noncesByJKT: [String: [String: String]], for did: String)
         async throws
     {

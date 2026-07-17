@@ -15,12 +15,24 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable, ATProtocol
 
     public let date: Date
 
+    /// The exact datetime string received on the wire, when this value was decoded.
+    /// `Date` is a binary floating-point offset and cannot represent every wire
+    /// timestamp exactly (e.g. ".301" re-formats as ".300"), so re-encoding must
+    /// emit this string verbatim or strict lossless round-trip checks fail.
+    private let rawString: String?
+
     public var toDate: Date {
         date
     }
 
     public init(date: Date) {
         self.date = date
+        rawString = nil
+    }
+
+    init(date: Date, rawString: String) {
+        self.date = date
+        self.rawString = rawString
     }
 
     public init(from decoder: Decoder) throws {
@@ -30,6 +42,7 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable, ATProtocol
         // Try parsing with explicit ISO8601 parsing strategy
         if let date = Self.parseDate(from: dateString) {
             self.date = date
+            rawString = dateString
         } else {
             throw DecodingError.dataCorruptedError(
                 in: container,
@@ -41,6 +54,14 @@ public struct ATProtocolDate: Codable, Hashable, Equatable, Sendable, ATProtocol
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(iso8601String)
+    }
+
+    public static func == (lhs: ATProtocolDate, rhs: ATProtocolDate) -> Bool {
+        lhs.date == rhs.date
+    }
+
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(date)
     }
 
     // MARK: - Parsing and Formatting
@@ -166,11 +187,11 @@ public extension ATProtocolDate {
         guard let date = Self.parseDate(from: iso8601String) else {
             return nil
         }
-        self.init(date: date)
+        self.init(date: date, rawString: iso8601String)
     }
 
     var iso8601String: String {
-        formattedDate
+        rawString ?? formattedDate
     }
 }
 

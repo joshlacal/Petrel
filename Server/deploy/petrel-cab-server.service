@@ -1,0 +1,20 @@
+[Unit]
+Description=Petrel CAB server (ATProto OAuth client assertion backend)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=exec
+User=cab
+Group=cab
+WorkingDirectory=/opt/petrel-cab-server
+ExecStart=/opt/petrel-cab-server/petrel-cab-server serve --config /opt/petrel-cab-server/config.json
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadOnlyPaths=/opt/petrel-cab-server
+
+[Install]
+WantedBy=multi-user.target

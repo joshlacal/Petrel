@@ -9,6 +9,10 @@ from utils import convert_to_camel_case, convert_ref
 
 class CycleDetector:
     def __init__(self):
+        # Canonical schemas by fully-qualified lexicon reference. Generators use
+        # this registry to attach strict decoding to an external ref boundary
+        # without inferring a runtime type's storage layout.
+        self.schemas_by_ref: Dict[str, Dict] = {}
         # Maps Swift type name to its properties and their types
         # Format: {"TypeName": {"propName": "PropType"}}
         self.type_properties: Dict[str, Dict[str, str]] = {}
@@ -23,6 +27,11 @@ class CycleDetector:
 
     def add_type(self, lexicon_id: str, def_name: str, def_schema: Dict):
         """Register a type and its properties"""
+        ref_key = lexicon_id if def_name == 'main' else f"{lexicon_id}#{def_name}"
+        existing = self.schemas_by_ref.get(ref_key)
+        if existing is not None and existing != def_schema:
+            raise ValueError(f"conflicting schema registration for '{ref_key}'")
+        self.schemas_by_ref[ref_key] = def_schema
         schema_type = def_schema.get('type')
 
         if schema_type not in ['object', 'record', 'array']:
@@ -112,8 +121,12 @@ class CycleDetector:
         """Register query/procedure output unions with 'Output' prefix"""
         swift_base = convert_to_camel_case(lexicon_id)
         properties = output_schema.get('properties', {})
+        if not isinstance(properties, dict):
+            return
 
         for prop_name, prop_schema in properties.items():
+            if not isinstance(prop_schema, dict):
+                continue
             # Handle union properties in output
             if prop_schema.get('type') == 'union':
                 # Output unions use "Output" as the struct name prefix

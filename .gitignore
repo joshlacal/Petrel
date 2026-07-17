@@ -19,6 +19,7 @@ venv/
 Examples/PostCLIDemo/.build/PetrelTemplate/.build/
 .build/
 .gradle/
+kotlin/.kotlin/
 petrel-kotlin/.build/
 petrel-kotlin/build/
 petrel-kotlin/.gradle/
@@ -26,3 +27,9 @@ petrel-kotlin/.idea/
 
 petrel-kotlin/bin/
 _trash/
+.superpowers/
+
+# CAB server signing keys (Server/README.md quickstart writes these) —
+# private key material must never be committed.
+Server/keys/
+*.pem

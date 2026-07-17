@@ -1,6 +1,7 @@
 """
 Kotlin code generator - generates Kotlin code from AT Protocol lexicons.
 """
+import json
 from typing import Dict, List, Any, Optional
 from base_code_generator import BaseCodeGenerator
 from kotlin_type_converter import KotlinTypeConverter, convert_to_pascal_case
@@ -19,6 +20,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         self.object_name = self.class_name + "Defs"
         self.sealed_interfaces = ""
         self.enum_classes = ""
+        self.strict_ref_serializers = {}
 
         self.template_manager = KotlinTemplateManager()
         self.type_converter = KotlinTypeConverter(self)
@@ -88,6 +90,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 object_name=self.object_name,
                 sealed_interfaces=self.sealed_interfaces,
                 enum_classes=self.enum_classes,
+                strict_ref_serializers="\n\n".join(self.strict_ref_serializers.values()),
                 lex_definitions=lex_definitions_code,
                 record=record_code,
                 main_properties=main_properties_code,
@@ -102,29 +105,106 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             )
 
             return self.post_process_kotlin_code(kotlin_code)
-
-        except Exception as e:
-            import traceback
-            return f"// Error generating Kotlin code: {str(e)}\n// {traceback.format_exc()}"
+        except Exception:
+            raise
 
     def generate_properties(self, properties: Dict[str, Any], required_fields: List[str],
-                           current_struct_name: str) -> List[Dict[str, Any]]:
+                           current_struct_name: str, context_identity=None) -> List[Dict[str, Any]]:
         """Generate property definitions."""
         kotlin_properties = []
 
         for name, prop in properties.items():
-            kotlin_type = self.type_converter.determine_type(name, prop, required_fields, current_struct_name)
+            if prop.get('x-security-strict-decode') and prop.get('type') != 'ref':
+                raise ValueError(
+                    f"x-security-strict-decode is supported only on ref properties: '{name}'"
+                )
+            kotlin_type = self.type_converter.determine_type(
+                name, prop, required_fields, current_struct_name,
+                context_identity=context_identity,
+            )
             description = prop.get('description', '')
             is_optional = name not in required_fields
+
+            strict_decode = bool(prop.get('x-security-strict-decode'))
+            strict_serializer = None
+            if strict_decode:
+                allowed_keys, expected_type_identifier = self.resolve_strict_ref_contract(
+                    prop['ref']
+                )
+                strict_serializer = (
+                    current_struct_name
+                    + convert_to_pascal_case(name)
+                    + "StrictReferenceSerializer"
+                )
+                serializer_source = self.template_manager.strict_ref_serializer_template.render(
+                    serializer_name=strict_serializer,
+                    target_type=kotlin_type.rstrip('?'),
+                    nullable=is_optional,
+                    allowed_keys_literal=", ".join(
+                        json.dumps(key) for key in allowed_keys
+                    ),
+                    expected_type_identifier_literal=json.dumps(
+                        expected_type_identifier
+                    ),
+                )
+                existing_source = self.strict_ref_serializers.get(strict_serializer)
+                if existing_source is not None and existing_source != serializer_source:
+                    raise ValueError(
+                        f"strict reference serializer collision for '{strict_serializer}'"
+                    )
+                self.strict_ref_serializers[strict_serializer] = serializer_source
 
             kotlin_properties.append({
                 'name': name,
                 'type': kotlin_type,
                 'optional': is_optional,
-                'description': description
+                'description': description,
+                'strict_decode': strict_decode,
+                'strict_serializer': strict_serializer,
             })
 
         return kotlin_properties
+
+    def resolve_strict_ref_contract(self, ref: str) -> tuple[List[str], str]:
+        nsid, separator, fragment = ref.partition('#')
+        if not nsid or nsid == self.lexicon_id:
+            target_name = fragment if separator else 'main'
+            schema = self.defs.get(target_name)
+            qualified_ref = (
+                self.lexicon_id
+                if target_name == 'main'
+                else f"{self.lexicon_id}#{target_name}"
+            )
+        else:
+            qualified_ref = nsid if not separator or fragment == 'main' else ref
+            registry = getattr(self.cycle_detector, 'schemas_by_ref', None)
+            schema = registry.get(qualified_ref) if registry is not None else None
+
+        if not isinstance(schema, dict):
+            raise ValueError(
+                f"strict reference '{ref}' cannot be resolved to a canonical schema"
+            )
+
+        schema_type = schema.get('type')
+        if schema_type == 'record':
+            object_schema = schema.get('record')
+        elif schema_type == 'object':
+            object_schema = schema
+        else:
+            raise ValueError(
+                f"strict reference '{qualified_ref}' must target an object or record schema"
+            )
+
+        properties = (
+            object_schema.get('properties')
+            if isinstance(object_schema, dict)
+            else None
+        )
+        if not isinstance(properties, dict):
+            raise ValueError(
+                f"strict reference '{qualified_ref}' has no canonical object properties"
+            )
+        return sorted(properties.keys()), qualified_ref
 
     def generate_main_properties(self) -> str:
         """Generate properties for main object type."""
@@ -141,6 +221,19 @@ class KotlinCodeGenerator(BaseCodeGenerator):
     def generate_lex_definitions(self) -> str:
         """Generate nested type definitions."""
         definitions = []
+        strict_documentation_defs = set()
+        output = self.main_def.get('output')
+        if isinstance(output, dict):
+            schema = output.get('schema')
+            if isinstance(schema, dict):
+                properties = schema.get('properties')
+                if isinstance(properties, dict):
+                    for prop in properties.values():
+                        if not isinstance(prop, dict) or not prop.get('x-security-strict-decode'):
+                            continue
+                        ref = prop.get('ref')
+                        if isinstance(ref, str) and ref.startswith('#'):
+                            strict_documentation_defs.add(ref[1:])
 
         for name, def_schema in self.defs.items():
             if name == 'main':
@@ -154,14 +247,21 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 properties = self.generate_properties(
                     def_schema.get('properties', {}),
                     def_schema.get('required', []),
-                    class_name
+                    class_name,
+                    context_identity=("definition", name),
                 )
                 definitions.append({
                     'name': class_name,
                     'type': 'data_class',
                     'properties': properties,
-                    'description': def_schema.get('description', '')
+                    'description': def_schema.get('description', ''),
+                    'security_strict_documentation': name in strict_documentation_defs,
                 })
+
+            elif def_type == 'string' and 'enum' in def_schema:
+                enum_name = self.class_name + "Defs" + convert_to_pascal_case(name)
+                identity = ("definition", self.lexicon_id, name)
+                self.enum_generator.generate_closed_string_enum(enum_name, def_schema['enum'], identity)
 
             elif def_type == 'string' and 'knownValues' in def_schema:
                 print(f"Generating enum for {name}")
