@@ -2,6 +2,15 @@ import Foundation
 @testable import Petrel
 import Testing
 
+private final class WeakReference<Value: AnyObject>: Sendable {
+  // Keep weak actor storage out of the async test frame for Swift 6.0 runtimes.
+  nonisolated(unsafe) weak var value: Value?
+
+  init(_ value: Value?) {
+    self.value = value
+  }
+}
+
 @Suite("ATProtoClient Simple Tests")
 struct ATProtoClientSimpleTests {
   // MARK: - Test Setup
@@ -134,14 +143,13 @@ struct ATProtoClientSimpleTests {
   func clientDeallocation() async throws {
     var client: ATProtoClient? = try await createTestClient()
 
-    weak var weakClient: ATProtoClient?
-    weakClient = client
+    let weakClient = WeakReference(client)
     client = nil
 
     // Allow deallocation
     await Task.yield()
 
-    #expect(weakClient == nil, "Client should be deallocated when no strong references remain")
+    #expect(weakClient.value == nil, "Client should be deallocated when no strong references remain")
   }
 
   // MARK: - Thread Safety Tests
