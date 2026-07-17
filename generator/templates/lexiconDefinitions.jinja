@@ -44,13 +44,13 @@
                 {% if prop.strict_decode -%}
                 {% if prop.optional -%}
                 if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
-                    let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}])
+                    let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                     self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
                 } else {
                     self.{% if prop.boxed %}_{{ prop.name }}{% else %}{{ prop.name }}{% endif %} = nil
                 }
                 {%- else -%}
-                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}])
+                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                 self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
                 {%- endif %}
                 {%- elif prop.boxed -%}
@@ -230,12 +230,12 @@
                     {% if prop.strict_decode -%}
                     {% if prop.optional -%}
                     if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
-                        self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}])
+                        self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                     } else {
                         self.{{ prop.name }} = nil
                     }
                     {%- else -%}
-                    self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}])
+                    self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                     {%- endif %}
                     {%- elif prop.optional -%}
                     self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})

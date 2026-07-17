@@ -355,12 +355,14 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
         self.assertIn("public let receipt: Receipt", generated)
         self.assertIn(
             "decodeStrictReference(Receipt.self, from: container, forKey: .receipt, "
-            "allowedKeys: [\"sequence\"])",
+            "allowedKeys: [\"sequence\"], expectedTypeIdentifier: "
+            "\"blue.catbird.mls.finalizeGroupChange#receipt\")",
             generated,
         )
         self.assertIn(
             "decodeStrictReference(Receipt.self, from: container, forKey: "
-            ".optionalStrict, allowedKeys: [\"sequence\"])",
+            ".optionalStrict, allowedKeys: [\"sequence\"], expectedTypeIdentifier: "
+            "\"blue.catbird.mls.finalizeGroupChange#receipt\")",
             generated,
         )
         self.assertNotIn("property 'optionalStrict' — degrading to nil", generated)

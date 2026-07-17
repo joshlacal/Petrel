@@ -76,11 +76,16 @@ class SwiftCodeGenerator:
                     f"x-security-strict-decode is supported only on ref properties: '{name}'"
                 )
             strict_allowed_keys_literal = None
+            strict_type_identifier_literal = None
             if strict_decode:
+                allowed_keys, expected_type_identifier = self.resolve_strict_ref_contract(
+                    prop['ref']
+                )
                 strict_allowed_keys_literal = ", ".join(
                     json.dumps(key)
-                    for key in self.resolve_strict_ref_allowed_keys(prop['ref'])
+                    for key in allowed_keys
                 )
+                strict_type_identifier_literal = json.dumps(expected_type_identifier)
 
             # Check if this property should be boxed to break a circular reference
             should_box = False
@@ -101,10 +106,11 @@ class SwiftCodeGenerator:
                 # Kept for the output template's established compatibility branch.
                 'strict_optional_decode': strict_decode,
                 'strict_allowed_keys_literal': strict_allowed_keys_literal,
+                'strict_type_identifier_literal': strict_type_identifier_literal,
             })
         return swift_properties
 
-    def resolve_strict_ref_allowed_keys(self, ref: str) -> List[str]:
+    def resolve_strict_ref_contract(self, ref: str) -> tuple[List[str], str]:
         nsid, separator, fragment = ref.partition('#')
         if not nsid or nsid == self.lexicon_id:
             target_name = fragment if separator else 'main'
@@ -127,10 +133,8 @@ class SwiftCodeGenerator:
         schema_type = schema.get('type')
         if schema_type == 'record':
             object_schema = schema.get('record')
-            extra_keys = ['$type']
         elif schema_type == 'object':
             object_schema = schema
-            extra_keys = []
         else:
             raise ValueError(
                 f"strict reference '{qualified_ref}' must target an object or record schema"
@@ -145,7 +149,7 @@ class SwiftCodeGenerator:
             raise ValueError(
                 f"strict reference '{qualified_ref}' has no canonical object properties"
             )
-        return sorted(set(properties.keys()) | set(extra_keys))
+        return sorted(properties.keys()), qualified_ref
 
     def generate_query_parameters(self, parameters: Optional[Dict[str, Any]]) -> str:
         if not parameters:

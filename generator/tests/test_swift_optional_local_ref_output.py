@@ -46,7 +46,8 @@ class SwiftOptionalLocalRefOutputTests(unittest.TestCase):
         self.assertIn("public let receipt: SequencerReceipt?", generated)
         self.assertIn(
             "decodeStrictReference(SequencerReceipt.self, from: container, forKey: "
-            ".receipt, allowedKeys: [\"sequencerTerm\"])",
+            ".receipt, allowedKeys: [\"sequencerTerm\"], expectedTypeIdentifier: "
+            "\"blue.catbird.test.receipt#sequencerReceipt\")",
             generated,
         )
         self.assertNotIn("property 'receipt' — degrading to nil", generated)
@@ -83,7 +84,8 @@ class SwiftOptionalLocalRefOutputTests(unittest.TestCase):
         self.assertIn("public let receipt: SequencerReceipt", generated)
         self.assertIn(
             "decodeStrictReference(SequencerReceipt.self, from: container, forKey: "
-            ".receipt, allowedKeys: [])",
+            ".receipt, allowedKeys: [], expectedTypeIdentifier: "
+            "\"blue.catbird.test.receipt#sequencerReceipt\")",
             generated,
         )
         self.assertNotIn("An error occurred during the Swift code generation", generated)

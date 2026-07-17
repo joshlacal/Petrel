@@ -38,7 +38,7 @@
             {% if prop.optional %}
             {% if prop.strict_decode %}
             if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
-                self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}])
+                self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
             } else {
                 self.{{ prop.name }} = nil
             }
@@ -53,7 +53,7 @@
             {% endif %}
             {% else %}
             {% if prop.strict_decode %}
-            self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}])
+            self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
             {% else %}
             self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
             {% endif %}

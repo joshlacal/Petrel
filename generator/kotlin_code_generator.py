@@ -128,7 +128,9 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             strict_decode = bool(prop.get('x-security-strict-decode'))
             strict_serializer = None
             if strict_decode:
-                allowed_keys = self.resolve_strict_ref_allowed_keys(prop['ref'])
+                allowed_keys, expected_type_identifier = self.resolve_strict_ref_contract(
+                    prop['ref']
+                )
                 strict_serializer = (
                     current_struct_name
                     + convert_to_pascal_case(name)
@@ -140,6 +142,9 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                     nullable=is_optional,
                     allowed_keys_literal=", ".join(
                         json.dumps(key) for key in allowed_keys
+                    ),
+                    expected_type_identifier_literal=json.dumps(
+                        expected_type_identifier
                     ),
                 )
                 existing_source = self.strict_ref_serializers.get(strict_serializer)
@@ -160,7 +165,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
 
         return kotlin_properties
 
-    def resolve_strict_ref_allowed_keys(self, ref: str) -> List[str]:
+    def resolve_strict_ref_contract(self, ref: str) -> tuple[List[str], str]:
         nsid, separator, fragment = ref.partition('#')
         if not nsid or nsid == self.lexicon_id:
             target_name = fragment if separator else 'main'
@@ -183,10 +188,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         schema_type = schema.get('type')
         if schema_type == 'record':
             object_schema = schema.get('record')
-            extra_keys = {'$type'}
         elif schema_type == 'object':
             object_schema = schema
-            extra_keys = set()
         else:
             raise ValueError(
                 f"strict reference '{qualified_ref}' must target an object or record schema"
@@ -201,7 +204,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             raise ValueError(
                 f"strict reference '{qualified_ref}' has no canonical object properties"
             )
-        return sorted(set(properties.keys()) | extra_keys)
+        return sorted(properties.keys()), qualified_ref
 
     def generate_main_properties(self) -> str:
         """Generate properties for main object type."""
