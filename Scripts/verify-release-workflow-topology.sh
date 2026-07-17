@@ -6,6 +6,7 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 WORKFLOW=$ROOT/.github/workflows/release.yml
 SWIFT_WORKFLOW=$ROOT/.github/workflows/swift.yml
 DOCC_WORKFLOW=$ROOT/.github/workflows/docc.yml
+ACTIVATE_RELEASE_TOOLCHAIN=$ROOT/Scripts/activate-release-toolchain.sh
 WORKFLOW_DIRECTORY=$ROOT/.github/workflows
 
 required_release_executables=(
@@ -64,22 +65,44 @@ done
   exit 1
 }
 
-/usr/bin/ruby - "$WORKFLOW" "$SWIFT_WORKFLOW" "$DOCC_WORKFLOW" "$WORKFLOW_DIRECTORY" <<'RUBY'
+/usr/bin/ruby - "$WORKFLOW" "$SWIFT_WORKFLOW" "$DOCC_WORKFLOW" \
+  "$WORKFLOW_DIRECTORY" "$ACTIVATE_RELEASE_TOOLCHAIN" <<'RUBY'
 require "psych"
+require "digest"
+require "json"
+
+canonicalize = nil
+canonicalize = lambda do |value|
+  case value
+  when Hash
+    value.keys.sort.to_h { |key| [key, canonicalize.call(value.fetch(key))] }
+  when Array
+    value.map { |entry| canonicalize.call(entry) }
+  else
+    value
+  end
+end
+semantic_fingerprint = lambda do |value|
+  Digest::SHA256.hexdigest(JSON.generate(canonicalize.call(value)))
+end
 
 workflow_path = ARGV.fetch(0)
 swift_workflow_path = ARGV.fetch(1)
 docc_workflow_path = ARGV.fetch(2)
 workflow_directory = ARGV.fetch(3)
+activation_path = ARGV.fetch(4)
 source = File.binread(workflow_path)
 swift_source = File.binread(swift_workflow_path)
 docc_source = File.binread(docc_workflow_path)
+activation_source = File.binread(activation_path)
 
 def fail!(message)
   abort "release workflow topology: #{message}"
 end
 
 def reject_unsafe_yaml!(node)
+  fail!("YAML anchors are forbidden") if node.respond_to?(:anchor) && node.anchor
+  fail!("YAML explicit tags are forbidden") if node.respond_to?(:tag) && node.tag
   case node
   when Psych::Nodes::Alias
     fail!("YAML aliases are forbidden")
@@ -87,6 +110,7 @@ def reject_unsafe_yaml!(node)
     seen = {}
     node.children.each_slice(2) do |key, value|
       fail!("mapping keys must be scalars") unless key.is_a?(Psych::Nodes::Scalar)
+      reject_unsafe_yaml!(key)
       fail!("duplicate YAML key #{key.value.inspect}") if seen.key?(key.value)
       seen[key.value] = true
       reject_unsafe_yaml!(value)
@@ -135,6 +159,19 @@ docc_workflow = Psych.safe_load(
 fail!("workflow root must be a mapping") unless workflow.is_a?(Hash)
 fail!("Swift workflow root must be a mapping") unless swift_workflow.is_a?(Hash)
 fail!("DocC workflow root must be a mapping") unless docc_workflow.is_a?(Hash)
+
+workflow_control_fingerprints = {
+  "release" => "5f179e79039184718e2190e141e43e018f33997d8af60b7ebd371cd21e769927",
+  "Swift compatibility" => "5e922b17616b7bab0ae33cb90d7f4ffce6632e91eff63cf225b40d16bf1e215f",
+}
+[
+  ["release", workflow],
+  ["Swift compatibility", swift_workflow],
+].each do |label, parsed_workflow|
+  control_metadata = parsed_workflow.reject { |key, _| key == "jobs" }
+  fail!("#{label} workflow control metadata must be exact") unless
+    semantic_fingerprint.call(control_metadata) == workflow_control_fingerprints.fetch(label)
+end
 
 expected_action_pins = {
   "actions/checkout" => "34e114876b0b11c390a56381ad16ebd13914f8d5", # v4.3.1
@@ -528,10 +565,7 @@ fail!("macos matrix include must be an array") unless rows.is_a?(Array)
 lanes = rows.map { |row| row.is_a?(Hash) ? row["lane"] : nil }
 fail!("macos lanes must be [minimum, newest-stable]") unless lanes == ["minimum", "newest-stable"]
 
-minimum_test_commands = [
-  '"$RELEASE_SWIFT" test --no-parallel --enable-xctest --disable-swift-testing',
-  '"$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing',
-]
+swift_rows = swift_jobs.fetch("macos").dig("strategy", "matrix", "include")
 expected_macos_test_branch = <<~'BASH'.chomp
   if [[ $RELEASE_TOOLCHAIN_LANE == minimum ]]; then
     Scripts/verify-owned-warnings.sh xctest -- \
@@ -547,6 +581,236 @@ expected_macos_test_branch = <<~'BASH'.chomp
       "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests
   fi
 BASH
+# Pin the complete parsed semantics and order of every non-build macOS step.
+# This closes shell-indirection and custom-action bypasses that command-pattern
+# matching cannot enumerate; the reviewed build step is validated in full below.
+expected_other_step_fingerprints = {
+  "release" => [
+    [nil, "c65f56c49a3c60ab4b32db846bbbe9c6adbe219ad18ad3ed536607646e09b893"],
+    ["Verify release workflow topology", "c6a141e807793165b1fc9aebb21638b4e1fa353d80e5665eb2cd942207841d23"],
+    [nil, "8ab62dfbc944c92aa4e154d38a5d08610976cddfad2947379f289a780e4e5206"],
+    ["Select and verify stable Xcode", "15a5f87efdd4340fbd074edd46e061f0a64aed62295a3649cd9da95dec0f6794"],
+    ["Validate bounded dependency requirements", "bf334e37ae97804ac15ad186b867d758f1bacb6c5063c1edec589bb5c9d4bc4c"],
+    ["Bootstrap locked generator and release tools", "c5795d8ed5ead5b43ae4f3b71e9ff4702e1462bf7925f159d9363eeb28402e0c"],
+    ["Run generator tests and verify deterministic projection", "afaacdedf8ac411eccbfeb43b313eccfde75a3519dbb7336519ab57c00874eb2"],
+    ["Validate documentation and compile public examples", "87d9ad80d8e7932d6281a6f94765d84cd38fc054da2c7b29284f6302c20975da"],
+    ["Diagnose API compatibility against exact 0.1.0", "e1a5d999d2c19b7cf931236e6fc421aa224af5379355257f254cd786fc08ebce"],
+  ],
+  "Swift compatibility" => [
+    [nil, "c65f56c49a3c60ab4b32db846bbbe9c6adbe219ad18ad3ed536607646e09b893"],
+    ["Select and verify stable Xcode", "8803b99e5bf8a298edfc72ee540b0df979535657b20f60be8bc609368c0a11be"],
+    ["Validate bounded dependency requirements", "7e0b66384a3edb57d48fb803d5cb694c870457950bbd10388befe913d8c781ca"],
+  ],
+}
+expected_macos_job_names = {
+  "release" => "macOS release gate (${{ matrix.lane }})",
+  "Swift compatibility" => "macOS (${{ matrix.lane }})",
+}
+[
+  ["release", macos],
+  ["Swift compatibility", swift_jobs.fetch("macos")],
+].each do |label, job|
+  strategy = job["strategy"]
+  fail!("#{label} macOS job metadata must be exact") unless
+    job.keys.sort == ["name", "runs-on", "steps", "strategy"] &&
+      job["name"] == expected_macos_job_names.fetch(label) &&
+      job["runs-on"] == "${{ matrix.runner }}" &&
+      strategy.is_a?(Hash) &&
+      strategy.keys.sort == ["fail-fast", "matrix"] &&
+      strategy["fail-fast"] == false
+  macos_steps = job.fetch("steps")
+  build_steps = macos_steps.select do |step|
+    step["name"] == "Build, test, and reject package-owned warnings"
+  end
+  fail!("#{label} macOS must contain exactly one reviewed build step") unless
+    build_steps.length == 1
+  build_step = build_steps.fetch(0)
+  build_step_metadata = build_step.reject { |key, _| key == "run" }
+  expected_build_step_metadata = {
+    "name" => "Build, test, and reject package-owned warnings",
+    "shell" => "bash",
+  }
+  fail!("#{label} macOS reviewed build step metadata must be exact") unless
+    build_step_metadata == expected_build_step_metadata
+  build_run = build_step.fetch("run")
+  if label == "release"
+    api_compatibility_steps = macos_steps.select do |step|
+      step.is_a?(Hash) && step["name"] == "Diagnose API compatibility against exact 0.1.0"
+    end
+    expected_api_compatibility_step = {
+      "name" => "Diagnose API compatibility against exact 0.1.0",
+      "if" => "${{ matrix.lane == 'newest-stable' }}",
+      "shell" => "bash",
+      "run" => "Scripts/run-api-compatibility.sh --current-git-checkout --breakage-allowlist-path api-breakage-allowlist.txt",
+    }
+    fail!("release API compatibility must run exactly once in newest-stable only") unless
+      api_compatibility_steps == [expected_api_compatibility_step]
+  end
+  other_step_fingerprints = macos_steps.reject { |step| step.equal?(build_step) }.map do |step|
+    canonical_step = JSON.generate(canonicalize.call(step))
+    [step["name"], Digest::SHA256.hexdigest(canonical_step)]
+  end
+  fail!("#{label} macOS other run steps must not contain build or platform proof primitives") unless
+    other_step_fingerprints == expected_other_step_fingerprints.fetch(label)
+  fail!("#{label} macOS must preserve the exact minimum/newest-stable test branch") unless
+    build_run.scan(expected_macos_test_branch).length == 1
+  expected_platform_proof = <<~'BASH'.chomp
+    if [[ $RELEASE_TOOLCHAIN_LANE == minimum ]]; then
+      SDK_PATH=$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-path)
+      test -d "$SDK_PATH"
+      test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = '18.4'
+      "$RELEASE_SWIFT" build \
+        --scratch-path .build/xcode163-iphoneos-cross \
+        --triple arm64-apple-ios18.0 \
+        --sdk "$SDK_PATH"
+    else
+      Scripts/verify-owned-warnings.sh ios-simulator -- "$RELEASE_XCODEBUILD" \
+        -scheme Petrel \
+        -destination 'generic/platform=iOS Simulator' \
+        build
+    fi
+  BASH
+  cardinality_fragments = [
+    'SDK_PATH=$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-path)',
+    'test -d "$SDK_PATH"',
+    'test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = \'18.4\'',
+    "  \"$RELEASE_SWIFT\" build \\\n",
+    '--scratch-path .build/xcode163-iphoneos-cross',
+    '--triple arm64-apple-ios18.0',
+    '--sdk "$SDK_PATH"',
+    'Scripts/verify-owned-warnings.sh ios-simulator -- "$RELEASE_XCODEBUILD"',
+    "-destination 'generic/platform=iOS Simulator'",
+  ]
+  fail!("#{label} platform proof paths, triple, SDK, scratch, and simulator destination must occur exactly once") unless
+    cardinality_fragments.all? { |fragment| build_run.scan(fragment).length == 1 } &&
+      build_run.scan("SDK_PATH=").length == 1
+  fail!("#{label} platform proof must keep minimum SwiftPM-cross and newest simulator xcodebuild isolated") unless
+    build_run.scan(expected_platform_proof).length == 1
+  outside_platform_proof = build_run.sub(expected_platform_proof, "")
+  forbidden_outside = [
+    'SDK_PATH',
+    'iphoneos',
+    '--scratch-path',
+    '--triple',
+    '--sdk',
+    '-destination',
+    'RELEASE_XCODEBUILD',
+    'xcodebuild',
+  ]
+  expected_common_swift_builds = [
+    'Scripts/verify-owned-warnings.sh debug-build -- "$RELEASE_SWIFT" build',
+    'Scripts/verify-owned-warnings.sh release-build -- "$RELEASE_SWIFT" build -c release',
+  ]
+  common_builds_exact = expected_common_swift_builds.all? do |command|
+    outside_platform_proof.scan(command).length == 1
+  end
+  unreviewed_builds = expected_common_swift_builds.reduce(outside_platform_proof) do |body, command|
+    body.sub(command, "")
+  end
+  alternate_swift_build =
+    unreviewed_builds.match?(/(?<![[:alnum:]_])swift["'}]*[[:space:]]+build\b/i) ||
+    unreviewed_builds.match?(/RELEASE_SWIFT["'}]*[[:space:]]+build\b/)
+  fail!("#{label} platform proof commands must not occur outside reviewed lane conditional") if
+    forbidden_outside.any? { |fragment| outside_platform_proof.include?(fragment) } ||
+      !common_builds_exact || alternate_swift_build
+  expected_build_run = [
+    "set -euo pipefail",
+    'Scripts/verify-owned-warnings.sh debug-build -- "$RELEASE_SWIFT" build',
+    expected_macos_test_branch,
+    'Scripts/verify-owned-warnings.sh release-build -- "$RELEASE_SWIFT" build -c release',
+    expected_platform_proof,
+  ].join("\n") + "\n"
+  fail!("#{label} platform proof commands must not occur outside reviewed lane conditional") unless
+    build_run == expected_build_run
+end
+
+expected_minimum_apple_tuple = {
+  "lane" => "minimum",
+  "runner" => "macos-15",
+  "selection" => "pinned-minimum",
+  "evidence-class" => "stable-release",
+  "developer-dir" => "/Applications/Xcode_16.3.app/Contents/Developer",
+  "xcode-version" => "16.3",
+  "xcode-build" => "16E140",
+  "deployment-target" => "18.0",
+  "ios-runtime" => "18.4",
+  "watchos-runtime" => "11.4",
+  "tvos-runtime" => "18.4",
+  "visionos-runtime" => "2.4",
+}
+expected_newest_stable_apple_tuple = {
+  "lane" => "newest-stable",
+  "runner" => "macos-26",
+  "selection" => "official-runner-inventory",
+  "evidence-class" => "stable-release",
+  "developer-dir" => "/Applications/Xcode_26.6.app/Contents/Developer",
+  "xcode-version" => "26.6",
+  "xcode-build" => "17F113",
+  "deployment-target" => "18.0",
+  "ios-runtime" => "26.5",
+  "watchos-runtime" => "26.5",
+  "tvos-runtime" => "26.5",
+  "visionos-runtime" => "26.5",
+}
+[
+  ["release", rows.fetch(0)],
+  ["Swift compatibility", swift_rows.fetch(0)],
+].each do |label, minimum_row|
+  fail!("#{label} minimum Apple toolchain tuple must be exact Xcode 16.3") unless
+    minimum_row == expected_minimum_apple_tuple
+end
+[
+  ["release", rows.fetch(1)],
+  ["Swift compatibility", swift_rows.fetch(1)],
+].each do |label, newest_row|
+  fail!("#{label} newest-stable Apple toolchain tuple must be exact") unless
+    newest_row == expected_newest_stable_apple_tuple
+end
+
+[
+  ["release matrix", source, "xcode-build: '16E140'", 1],
+  ["Swift compatibility matrix", swift_source, "xcode-build: '16E140'", 1],
+  ["release tagged consumer", source, "export RELEASE_XCODE_BUILD='16E140'", 1],
+  ["DocC", docc_source, "export RELEASE_XCODE_BUILD='16E140'", 1],
+].each do |label, workflow_source, required, count|
+  fail!("#{label} must source-quote Xcode build identity '16E140'") unless
+    workflow_source.scan(required).length == count
+end
+
+expected_minimum_exports = [
+  "export RELEASE_DEVELOPER_DIR=/Applications/Xcode_16.3.app/Contents/Developer",
+  "export RELEASE_XCODE_VERSION=16.3",
+  "export RELEASE_XCODE_BUILD='16E140'",
+  "export RELEASE_IOS_RUNTIME=18.4",
+  "export RELEASE_WATCHOS_RUNTIME=11.4",
+  "export RELEASE_TVOS_RUNTIME=18.4",
+  "export RELEASE_VISIONOS_RUNTIME=2.4",
+]
+[["DocC", validate_run_source]].each do |label, run_source|
+  expected_minimum_exports.each do |required|
+    fail!("#{label} minimum Apple toolchain tuple must be exact Xcode 16.3") unless
+      run_source.scan(required).length == 1
+  end
+end
+
+expected_activation_tuple = [
+  '$RELEASE_DEVELOPER_DIR != /Applications/Xcode_16.3.app/Contents/Developer',
+  '$RELEASE_XCODE_VERSION != 16.3',
+  '$RELEASE_XCODE_BUILD != 16E140',
+  '${RELEASE_IOS_RUNTIME:-} != 18.4',
+  '${RELEASE_WATCHOS_RUNTIME:-} != 11.4',
+  '${RELEASE_TVOS_RUNTIME:-} != 18.4',
+  '${RELEASE_VISIONOS_RUNTIME:-} != 2.4',
+]
+expected_activation_tuple.each do |required|
+  fail!("activation minimum Apple toolchain tuple must be exact Xcode 16.3") unless
+    activation_source.scan(required).length == 1
+end
+
+minimum_test_commands = [
+  '"$RELEASE_SWIFT" test --no-parallel --enable-xctest --disable-swift-testing',
+  '"$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing',
+]
 [
   ["release macOS", macos],
   ["Swift compatibility macOS", swift_jobs.fetch("macos")],
@@ -588,6 +852,10 @@ fail!("consumer path occurs outside tagged-clean-consumer run steps") unless sou
 tagged_run_source = tagged_steps.map do |step|
   step.is_a?(Hash) ? step.fetch("run", "") : ""
 end.join("\n")
+expected_minimum_exports.each do |required|
+  fail!("tagged clean consumer minimum Apple toolchain tuple must be exact Xcode 16.3") unless
+    tagged_run_source.scan(required).length == 1
+end
 [
   "Package.resolved",
   "EXPECTED_RELEASE_VERSION",
@@ -596,5 +864,22 @@ end.join("\n")
   'state.fetch("revision")',
 ].each do |required|
   fail!("tagged consumer does not verify #{required.inspect}") unless tagged_run_source.include?(required)
+end
+
+# Final fail-closed inventory gate: detailed checks above retain actionable
+# messages, while these canonical fingerprints cover every remaining parsed
+# workflow, job, and step control surface without depending on shell spellings.
+complete_workflow_fingerprints = {
+  "release" => "3a28ae18f4f4215b009566f51d445b8aee5dbe5101b1de7f36da06f09015d5e3",
+  "Swift compatibility" => "53000fea50e642c60a40f24cb06a0c077c5c1ee50a21e093f27ac8779740a3bd",
+  "DocC" => "c30190bbe4dbf04d1797b218953fd2a118e5ba6a847c774e296fcdd2c6b8b128",
+}
+[
+  ["release", workflow],
+  ["Swift compatibility", swift_workflow],
+  ["DocC", docc_workflow],
+].each do |label, parsed_workflow|
+  fail!("#{label} complete parsed workflow semantics must be exact") unless
+    semantic_fingerprint.call(parsed_workflow) == complete_workflow_fingerprints.fetch(label)
 end
 RUBY

@@ -23,14 +23,14 @@ jobs:
             runner: macos-15
             selection: pinned-minimum
             evidence-class: stable-release
-            developer-dir: /Applications/Xcode_16.0.app/Contents/Developer
-            xcode-version: '16.0'
-            xcode-build: 16A242d
+            developer-dir: /Applications/Xcode_16.3.app/Contents/Developer
+            xcode-version: '16.3'
+            xcode-build: '16E140'
             deployment-target: '18.0'
-            ios-runtime: '18.0'
-            watchos-runtime: '11.0'
-            tvos-runtime: '18.0'
-            visionos-runtime: '2.0'
+            ios-runtime: '18.4'
+            watchos-runtime: '11.4'
+            tvos-runtime: '18.4'
+            visionos-runtime: '2.4'
           - lane: newest-stable
             runner: macos-26
             selection: official-runner-inventory
@@ -99,10 +99,20 @@ jobs:
               "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests
           fi
           Scripts/verify-owned-warnings.sh release-build -- "$RELEASE_SWIFT" build -c release
-          Scripts/verify-owned-warnings.sh ios-simulator -- "$RELEASE_XCODEBUILD" \
-            -scheme Petrel \
-            -destination 'generic/platform=iOS Simulator' \
-            build
+          if [[ $RELEASE_TOOLCHAIN_LANE == minimum ]]; then
+            SDK_PATH=$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-path)
+            test -d "$SDK_PATH"
+            test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = '18.4'
+            "$RELEASE_SWIFT" build \
+              --scratch-path .build/xcode163-iphoneos-cross \
+              --triple arm64-apple-ios18.0 \
+              --sdk "$SDK_PATH"
+          else
+            Scripts/verify-owned-warnings.sh ios-simulator -- "$RELEASE_XCODEBUILD" \
+              -scheme Petrel \
+              -destination 'generic/platform=iOS Simulator' \
+              build
+          fi
 
   linux:
     name: Linux (Swift 6.0.3)

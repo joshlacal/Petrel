@@ -7,7 +7,7 @@ publication and parity are outside this SPM release gate.
 ## Requirements
 
 - Swift 6.0 or newer
-- Xcode 16.0 or newer for Apple-platform development
+- Xcode 16.3 or newer for Apple-platform development
 - iOS 18.0+ or macOS 15.0+ deployment target
 - Linux is supported by the Swift package's Linux release lane
 

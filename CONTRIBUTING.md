@@ -48,7 +48,7 @@ By participating in this project, you agree to abide by our Code of Conduct:
 
 ### Prerequisites
 
-- **Xcode 16.0+** with Swift 6.0+
+- **Xcode 16.3+** with Swift 6.1+
 - **Python 3.12** (for release-equivalent code generation)
 - **Git** for version control
 

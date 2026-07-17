@@ -64,13 +64,13 @@ case ${RELEASE_TOOLCHAIN_LANE:-} in
   minimum)
     if [[ ${RELEASE_TOOLCHAIN_SELECTION:-} != pinned-minimum ||
           ${RELEASE_EVIDENCE_CLASS:-} != stable-release ||
-          $RELEASE_DEVELOPER_DIR != /Applications/Xcode_16.0.app/Contents/Developer ||
-          $RELEASE_XCODE_VERSION != 16.0 ||
-          $RELEASE_XCODE_BUILD != 16A242d ||
-          ${RELEASE_IOS_RUNTIME:-} != 18.0 ||
-          ${RELEASE_WATCHOS_RUNTIME:-} != 11.0 ||
-          ${RELEASE_TVOS_RUNTIME:-} != 18.0 ||
-          ${RELEASE_VISIONOS_RUNTIME:-} != 2.0 ]]; then
+          $RELEASE_DEVELOPER_DIR != /Applications/Xcode_16.3.app/Contents/Developer ||
+          $RELEASE_XCODE_VERSION != 16.3 ||
+          $RELEASE_XCODE_BUILD != 16E140 ||
+          ${RELEASE_IOS_RUNTIME:-} != 18.4 ||
+          ${RELEASE_WATCHOS_RUNTIME:-} != 11.4 ||
+          ${RELEASE_TVOS_RUNTIME:-} != 18.4 ||
+          ${RELEASE_VISIONOS_RUNTIME:-} != 2.4 ]]; then
       _petrel_release_fail "release toolchain tuple is not an exact sealed lane"
       return 1
     fi
