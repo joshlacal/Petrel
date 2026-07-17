@@ -294,6 +294,6 @@ expect_semantic_failure \
 expect_semantic_failure \
   unbounded-reviewed \
   "$UNBOUNDED_REVIEWED_DUMP" \
-  "swiftcbor requirement must be 0.5.0..<0.6.0"
+  "swiftcbor requirement must be 0.6.0..<0.7.0"
 
 echo "Petrel dependency requirement gate tests passed"
