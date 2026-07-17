@@ -60,6 +60,47 @@ expect_failure() {
   fi
 }
 
+fixture=$TMP/minimum-test-runner-isolation
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/release.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+reviewed = '"$RELEASE_SWIFT" test --no-parallel --enable-xctest --disable-swift-testing'
+unsafe = '"$RELEASE_SWIFT" test --parallel --enable-xctest --enable-swift-testing'
+abort "minimum test runner fixture did not match" unless source.include?(reviewed)
+File.binwrite(path, source.sub(reviewed, unsafe))
+RUBY
+expect_failure "$fixture" 'release macOS must preserve the exact minimum/newest-stable test branch'
+
+fixture=$TMP/release-newest-stable-test-runner-deleted
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/release.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+reviewed = [
+  '          else',
+  '            Scripts/verify-owned-warnings.sh tests -- "$RELEASE_SWIFT" test',
+  "            Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \\",
+  '              "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests',
+  '          fi',
+].join("\n") + "\n"
+abort "release newest-stable runner fixture did not match" unless source.include?(reviewed)
+File.binwrite(path, source.sub(reviewed, "          fi\n"))
+RUBY
+expect_failure "$fixture" 'release macOS must preserve the exact minimum/newest-stable test branch'
+
+fixture=$TMP/swift-newest-stable-test-runner-weakened
+make_fixture "$fixture"
+/usr/bin/ruby - "$fixture/.github/workflows/swift.yml" <<'RUBY'
+path = ARGV.fetch(0)
+source = File.binread(path)
+reviewed = 'Scripts/verify-owned-warnings.sh tests -- "$RELEASE_SWIFT" test'
+weakened = reviewed + ' --disable-swift-testing'
+abort "Swift newest-stable runner fixture did not match" unless source.include?(reviewed)
+File.binwrite(path, source.sub(reviewed, weakened))
+RUBY
+expect_failure "$fixture" 'Swift compatibility macOS must preserve the exact minimum/newest-stable test branch'
+
 fixture=$TMP/yaml-inventory
 make_fixture "$fixture"
 printf '%s\n' \

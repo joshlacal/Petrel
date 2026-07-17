@@ -528,6 +528,49 @@ fail!("macos matrix include must be an array") unless rows.is_a?(Array)
 lanes = rows.map { |row| row.is_a?(Hash) ? row["lane"] : nil }
 fail!("macos lanes must be [minimum, newest-stable]") unless lanes == ["minimum", "newest-stable"]
 
+minimum_test_commands = [
+  '"$RELEASE_SWIFT" test --no-parallel --enable-xctest --disable-swift-testing',
+  '"$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing',
+]
+expected_macos_test_branch = <<~'BASH'.chomp
+  if [[ $RELEASE_TOOLCHAIN_LANE == minimum ]]; then
+    Scripts/verify-owned-warnings.sh xctest -- \
+      "$RELEASE_SWIFT" test --no-parallel --enable-xctest --disable-swift-testing
+    Scripts/verify-owned-warnings.sh swift-testing -- \
+      "$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing
+    Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \
+      "$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing \
+        --filter DAGCBORJSONBridgeTests
+  else
+    Scripts/verify-owned-warnings.sh tests -- "$RELEASE_SWIFT" test
+    Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \
+      "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests
+  fi
+BASH
+[
+  ["release macOS", macos],
+  ["Swift compatibility macOS", swift_jobs.fetch("macos")],
+].each do |label, job|
+  run_source = job.fetch("steps").map do |step|
+    step.is_a?(Hash) ? step.fetch("run", "") : ""
+  end.join("\n")
+  fail!("#{label} must preserve the exact minimum/newest-stable test branch") unless
+    run_source.scan(expected_macos_test_branch).length == 1
+end
+
+[
+  ["release Linux", linux],
+  ["Swift compatibility Linux", swift_jobs.fetch("linux")],
+].each do |label, job|
+  run_source = job.fetch("steps").map do |step|
+    step.is_a?(Hash) ? step.fetch("run", "") : ""
+  end.join("\n")
+  minimum_test_commands.each do |command|
+    fail!("#{label} is missing serialized minimum test command #{command.inspect}") unless
+      run_source.include?(command)
+  end
+end
+
 expected_container = "swift:6.0.3-jammy@sha256:f0bfe313779a0bb99db87f97c88ea6ada014aa6b3359f9c5583bf70b0b721217"
 fail!("linux container is not the pinned Swift image") unless linux["container"] == expected_container
 

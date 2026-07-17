@@ -85,9 +85,19 @@ jobs:
         run: |
           set -euo pipefail
           Scripts/verify-owned-warnings.sh debug-build -- "$RELEASE_SWIFT" build
-          Scripts/verify-owned-warnings.sh tests -- "$RELEASE_SWIFT" test
-          Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \
-            "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests
+          if [[ $RELEASE_TOOLCHAIN_LANE == minimum ]]; then
+            Scripts/verify-owned-warnings.sh xctest -- \
+              "$RELEASE_SWIFT" test --no-parallel --enable-xctest --disable-swift-testing
+            Scripts/verify-owned-warnings.sh swift-testing -- \
+              "$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing
+            Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \
+              "$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing \
+                --filter DAGCBORJSONBridgeTests
+          else
+            Scripts/verify-owned-warnings.sh tests -- "$RELEASE_SWIFT" test
+            Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \
+              "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests
+          fi
           Scripts/verify-owned-warnings.sh release-build -- "$RELEASE_SWIFT" build -c release
           Scripts/verify-owned-warnings.sh ios-simulator -- "$RELEASE_XCODEBUILD" \
             -scheme Petrel \
@@ -118,7 +128,11 @@ jobs:
         run: |
           set -euo pipefail
           Scripts/verify-owned-warnings.sh debug-build -- "$RELEASE_SWIFT" build
-          Scripts/verify-owned-warnings.sh tests -- "$RELEASE_SWIFT" test
+          Scripts/verify-owned-warnings.sh xctest -- \
+            "$RELEASE_SWIFT" test --no-parallel --enable-xctest --disable-swift-testing
+          Scripts/verify-owned-warnings.sh swift-testing -- \
+            "$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing
           Scripts/verify-owned-warnings.sh dag-cbor-bridge -- \
-            "$RELEASE_SWIFT" test --filter DAGCBORJSONBridgeTests
+            "$RELEASE_SWIFT" test --no-parallel --disable-xctest --enable-swift-testing \
+              --filter DAGCBORJSONBridgeTests
           Scripts/verify-owned-warnings.sh release-build -- "$RELEASE_SWIFT" build -c release
