@@ -1,6 +1,7 @@
 import asyncio
 import inspect
 import json
+import os
 import pathlib
 import sys
 import tempfile
@@ -234,6 +235,122 @@ class SwiftNamespaceGenerationTests(unittest.TestCase):
         self.assertIn("public extension ATProtoClient {", overlay)
         self.assertIn("public struct Blue: Sendable {", overlay)
         self.assertNotIn("public extension ATProtoClient.Blue {", overlay)
+
+    def test_overlay_without_key_inherits_core_root_via_package_graph(self):
+        # The overlay omits core_namespace_roots; it must still EXTEND
+        # ATProtoClient.Blue because the package graph's core package declares
+        # `blue` as owned. This is the "can't forget the key" safety net.
+        core_output = self.root / "graph-core-output"
+        core_manifest = self._write_manifest(
+            "graph-core",
+            kind="core",
+            package_name="Petrel",
+            emit=self.core_lexicons,
+            output=core_output,
+            core_namespace_roots=["blue"],
+        )
+        overlay_output = self.root / "graph-overlay-output"
+        overlay_manifest = self._write_manifest(
+            "graph-overlay",
+            kind="overlay",
+            package_name="PetrelBluemoji",
+            emit=self.moji_lexicons,
+            output=overlay_output,
+            reference=(self.core_lexicons,),
+            # NOTE: intentionally omit core_namespace_roots — inherited via graph
+        )
+        graph = self.root / "package-graph.json"
+        graph.write_text(
+            json.dumps({"packages": [
+                {"name": "Petrel", "kind": "core", "manifest": str(core_manifest)},
+                {"name": "PetrelBluemoji", "kind": "overlay", "manifest": str(overlay_manifest)},
+            ]}),
+            encoding="utf-8",
+        )
+
+        asyncio.run(
+            run_manifest(str(overlay_manifest), language="swift", graph_path=str(graph))
+        )
+        overlay = self._client_source(overlay_output, "ATProtoClient+PetrelBluemoji.swift")
+        self.assertIn("public extension ATProtoClient.Blue {", overlay)
+        self.assertNotIn("public struct Blue: Sendable {", overlay)
+        self.assertNotIn("final class Blue", overlay)
+
+    def test_malformed_package_graph_degrades_to_manifest_roots_without_failing(self):
+        # A broken graph must NEVER fail generation: the overlay falls back to
+        # its own (absent) core_namespace_roots and redeclares — same contract
+        # as no graph at all. Covers structurally-malformed shapes that parse
+        # as JSON but violate the schema (dict packages, string entries,
+        # null manifest, top-level list).
+        malformed_graphs = (
+            ("packages-as-dict", {"packages": {"name": "Petrel", "kind": "core"}}),
+            ("entries-as-strings", {"packages": ["Petrel", "PetrelBluemoji"]}),
+            ("manifest-null", {"packages": [{"name": "Petrel", "kind": "core", "manifest": None}]}),
+            ("top-level-list", [{"name": "Petrel", "kind": "core"}]),
+            ("no-core-entry", {"packages": [{"name": "X", "kind": "overlay", "manifest": "x.json"}]}),
+        )
+        for label, graph_content in malformed_graphs:
+            with self.subTest(graph=label):
+                output = self.root / f"malformed-{label}-output"
+                manifest = self._write_manifest(
+                    f"malformed-{label}",
+                    kind="overlay",
+                    package_name="MalformedOverlay",
+                    emit=self.moji_lexicons,
+                    output=output,
+                    reference=(self.core_lexicons,),
+                )
+                graph = self.root / f"graph-{label}.json"
+                graph.write_text(json.dumps(graph_content), encoding="utf-8")
+
+                # Must not raise; must degrade to redeclare (no inherited roots).
+                asyncio.run(
+                    run_manifest(str(manifest), language="swift", graph_path=str(graph))
+                )
+                overlay = self._client_source(output, "ATProtoClient+MalformedOverlay.swift")
+                self.assertIn("public struct Blue: Sendable {", overlay)
+                self.assertNotIn("public extension ATProtoClient.Blue {", overlay)
+
+    def test_relative_graph_paths_resolve_against_cwd(self):
+        # Production package-graph.json uses repo-root-relative manifest paths;
+        # exercise the CWD-join branch, not just absolute test paths.
+        core_manifest = self._write_manifest(
+            "relcwd-core",
+            kind="core",
+            package_name="Petrel",
+            emit=self.core_lexicons,
+            output=self.root / "relcwd-core-output",
+            core_namespace_roots=["blue"],
+        )
+        overlay_output = self.root / "relcwd-overlay-output"
+        overlay_manifest = self._write_manifest(
+            "relcwd-overlay",
+            kind="overlay",
+            package_name="RelCwdOverlay",
+            emit=self.moji_lexicons,
+            output=overlay_output,
+            reference=(self.core_lexicons,),
+        )
+        graph = self.root / "relcwd-graph.json"
+        graph.write_text(
+            json.dumps({"packages": [
+                # relative to CWD, which we set to self.root below
+                {"name": "Petrel", "kind": "core", "manifest": "relcwd-core.json"},
+            ]}),
+            encoding="utf-8",
+        )
+
+        previous_cwd = os.getcwd()
+        os.chdir(self.root)
+        try:
+            asyncio.run(
+                run_manifest(str(overlay_manifest), language="swift", graph_path=str(graph))
+            )
+        finally:
+            os.chdir(previous_cwd)
+        overlay = self._client_source(overlay_output, "ATProtoClient+RelCwdOverlay.swift")
+        self.assertIn("public extension ATProtoClient.Blue {", overlay)
+        self.assertNotIn("public struct Blue: Sendable {", overlay)
 
     def test_roots_are_deduplicated_and_sorted_before_rendering(self):
         self.assertEqual(

@@ -20,7 +20,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     if args.manifest:
-        asyncio.run(run_manifest(args.manifest, args.language or 'both'))
+        default_graph = os.path.join(generator_dir, 'package-graph.json')
+        graph_path = default_graph if os.path.exists(default_graph) else None
+        asyncio.run(run_manifest(args.manifest, args.language or 'both', graph_path=graph_path))
     elif args.lexicons_path and args.output_path:
         asyncio.run(main(args.lexicons_path, args.output_path, args.language or 'swift'))
     else:

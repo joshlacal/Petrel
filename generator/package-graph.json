@@ -1,0 +1,8 @@
+{
+  "$comment": "Package graph for the Petrel generator. Overlays inherit core-owned namespace roots (package.core_namespace_roots) from the 'core' package's manifest so they extend, never redeclare, shared roots (e.g. blue). Read by run.py on every --manifest run; resolve_owned_namespace_roots consults only the 'core' entry. Paths are relative to the Petrel repo root (the generator's CWD).",
+  "packages": [
+    { "name": "Petrel",         "kind": "core",    "manifest": "generator/manifests/petrel-core.json" },
+    { "name": "PetrelCatbird",  "kind": "overlay", "manifest": "../PetrelCatbird/manifests/petrel-catbird.json" },
+    { "name": "PetrelBluemoji", "kind": "overlay", "manifest": "../PetrelBluemoji/manifests/petrel-bluemoji.json" }
+  ]
+}

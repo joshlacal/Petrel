@@ -103,6 +103,38 @@ def load_manifest(path):
     with open(path, 'rb') as f:
         return orjson.loads(f.read())
 
+def resolve_owned_namespace_roots(graph_path):
+    """Namespace roots the core package declares owned, read from a package graph.
+
+    Robust by design: derives owned roots from the CORE manifest only (always
+    present when generating from the Petrel repo root), never from scanning
+    sibling overlay repos (which may be absent in partial checkouts). Returns ()
+    and degrades to per-manifest core_namespace_roots on any missing/invalid
+    input, so a broken graph can never fail generation.
+    """
+    if not graph_path or not os.path.exists(graph_path):
+        return ()
+    try:
+        graph = load_manifest(graph_path)
+        for pkg in graph.get('packages', []):
+            if pkg.get('kind') == 'core':
+                # Graph manifest paths are relative to the generator's CWD (the
+                # Petrel repo root); os.path.join no-ops when already absolute.
+                core_manifest_path = os.path.normpath(
+                    os.path.join(os.getcwd(), pkg['manifest'])
+                )
+                core = load_manifest(core_manifest_path)
+                return normalize_core_namespace_roots(
+                    core.get('package', {}).get('core_namespace_roots', ()),
+                    source=f"{pkg['manifest']}:package.core_namespace_roots",
+                )
+    except (OSError, ValueError, KeyError, TypeError, AttributeError) as exc:
+        # TypeError/AttributeError cover structurally-malformed JSON (e.g.
+        # "packages" as a dict, entries as strings, manifest: null) — a broken
+        # graph must degrade to per-manifest roots, never fail generation.
+        print(f"warning: could not resolve owned roots from {graph_path}: {exc}")
+    return ()
+
 def is_excluded(lexicon_id, exclude_namespaces):
     return any(
         lexicon_id == ns or lexicon_id.startswith(ns + '.')
@@ -653,8 +685,14 @@ def _resolve_kotlin_output():
     )
 
 
-async def run_manifest(manifest_path, language='both'):
-    """Generate from a manifest file (see Generator/manifests/*.json)."""
+async def run_manifest(manifest_path, language='both', graph_path=None):
+    """Generate from a manifest file (see Generator/manifests/*.json).
+
+    When ``graph_path`` is given, an overlay inherits the core package's owned
+    namespace roots from the graph, so overlays extend shared roots even if their
+    own manifest omits ``core_namespace_roots``. The default is discovered by the
+    CLI (run.py), not here, so unit tests calling run_manifest stay hermetic.
+    """
     manifest = load_manifest(manifest_path)
     lex = manifest.get('lexicons', {})
     emit_dirs = lex.get('emit', [])
@@ -663,8 +701,16 @@ async def run_manifest(manifest_path, language='both'):
     package = manifest.get('package', {})
     kind = package.get('kind', 'core')
     package_name = package.get('name', 'Petrel')
-    core_namespace_roots = normalize_core_namespace_roots(
+    # Validate the manifest's own declared roots first (normalize rejects a bare
+    # string/dict/None), then union with roots inherited from the graph's core
+    # package; both operands are already-normalized tuples of valid roots.
+    declared_roots = normalize_core_namespace_roots(
         package.get('core_namespace_roots', ()),
+        source='package.core_namespace_roots',
+    )
+    inherited_roots = resolve_owned_namespace_roots(graph_path) if kind == 'overlay' else ()
+    core_namespace_roots = normalize_core_namespace_roots(
+        declared_roots + inherited_roots,
         source='package.core_namespace_roots',
     )
     if kind not in ('core', 'overlay'):
