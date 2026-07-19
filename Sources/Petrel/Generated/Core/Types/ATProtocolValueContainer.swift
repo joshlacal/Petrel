@@ -3431,13 +3431,57 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         }
 
         do {
-            guard try typedValue.encodedDAGCBOR() == rawObject.encodedDAGCBOR() else {
+            guard try dagCBOREqualIgnoringTypeFraming(typedValue, rawObject) else {
                 return rawFallback
             }
         } catch {
             return rawFallback
         }
         return typedValue
+    }
+
+    /// Lossless-decode check that tolerates `$type` framing differences.
+    ///
+    /// Generated `encode(to:)` implementations frame every nested object
+    /// definition with its `$type` discriminator, while records written by
+    /// real AT Protocol clients omit `$type` on non-union nested objects
+    /// (facet `index`, embed `images[]`, `aspectRatio`, `reply` refs,
+    /// self-label values, …). A byte-exact DAG-CBOR comparison therefore
+    /// spuriously rejects faithful decodes of ordinary wire records. Comparing
+    /// after stripping `$type` entries from both sides keeps the guard's
+    /// purpose intact: dropped future fields and malformed optionals degraded
+    /// to nil still differ after normalization and fall back to the raw
+    /// representation.
+    private static func dagCBOREqualIgnoringTypeFraming(
+        _ typed: ATProtocolValueContainer,
+        _ raw: ATProtocolValueContainer
+    ) throws -> Bool {
+        try normalizedDAGCBORBytes(typed) == normalizedDAGCBORBytes(raw)
+    }
+
+    private static func normalizedDAGCBORBytes(_ value: ATProtocolValueContainer) throws -> Data {
+        try DAGCBOR.encodeValue(strippingTypeFraming(value.toCBORValue()))
+    }
+
+    private static func strippingTypeFraming(_ value: Any) -> Any {
+        switch value {
+        case let map as OrderedCBORMap:
+            return OrderedCBORMap(entries: map.entries.compactMap { entry in
+                entry.key == "$type"
+                    ? nil
+                    : (key: entry.key, value: strippingTypeFraming(entry.value))
+            })
+        case let dict as [String: Any]:
+            return dict.reduce(into: [String: Any]()) { result, element in
+                if element.key != "$type" {
+                    result[element.key] = strippingTypeFraming(element.value)
+                }
+            }
+        case let array as [Any]:
+            return array.map(strippingTypeFraming)
+        default:
+            return value
+        }
     }
 
     private static func decodeSpecialObject(
