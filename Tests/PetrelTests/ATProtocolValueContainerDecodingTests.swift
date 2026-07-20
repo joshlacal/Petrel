@@ -312,6 +312,93 @@ struct ATProtocolValueContainerDecodingTests {
         }
     }
 
+    @Test("Typed dispatch tolerates explicit nulls and unknown extra fields")
+    func typedDispatchToleratesNullsAndUnknownFields() throws {
+        // Modeled on a live third-party record (post 3mr3i2my2vt2r) that carries
+        // explicit nulls for absent optional fields, unknown extra fields, and
+        // nanosecond-precision createdAt. A strict byte-equality re-encode check
+        // demoted it to .unknownType, blanking the post in clients.
+        let json = #"""
+        {
+            "$type": "app.bsky.feed.post",
+            "allow": [],
+            "createdAt": "2026-07-20T14:13:03.720942844Z",
+            "embed": {
+                "$type": "app.bsky.embed.images",
+                "captions": [],
+                "external": null,
+                "images": [
+                    {
+                        "alt": "alt text",
+                        "aspectRatio": {"height": 1350, "width": 1080},
+                        "image": {
+                            "$type": "blob",
+                            "ref": {"$link": "bafkreic5mujznnhxwdlidm5wlffhgpwtaav5seoicro2ijgay4gwvy74ua"},
+                            "mimeType": "image/jpeg",
+                            "size": 327266
+                        }
+                    }
+                ],
+                "record": null,
+                "video": null
+            },
+            "facets": [
+                {
+                    "features": [
+                        {
+                            "$type": "app.bsky.richtext.facet#mention",
+                            "did": "did:plc:mrvatd2g4xdzxlcdam3ljnxc",
+                            "tag": null,
+                            "uri": null
+                        }
+                    ],
+                    "index": {"byteEnd": 41, "byteStart": 18}
+                }
+            ],
+            "hiddenReplies": [],
+            "text": "We're endorsing @amyactonoh.bsky.social for Ohio Governor"
+        }
+        """#
+
+        let decoded = try JSONDecoder().decode(
+            ATProtocolValueContainer.self,
+            from: Data(json.utf8)
+        )
+
+        guard case let .knownType(value) = decoded,
+              let post = value as? AppBskyFeedPost
+        else {
+            Issue.record("Expected AppBskyFeedPost dispatch despite nulls/unknown fields, got \(decoded)")
+            return
+        }
+        #expect(post.text.hasPrefix("We're endorsing"))
+        guard case let .appBskyEmbedImages(images)? = post.embed else {
+            Issue.record("Expected images embed to survive typed dispatch")
+            return
+        }
+        #expect(images.images.count == 1)
+        #expect(post.facets?.count == 1)
+    }
+
+    @Test("Typed dispatch still demotes when a shared field diverges")
+    func typedDispatchStillDemotesOnFieldDivergence() throws {
+        // A record whose typed decode fails (text is not a string) must still
+        // demote to .unknownType, retaining the raw object losslessly.
+        let json = #"{"$type":"app.bsky.feed.post","text":42,"createdAt":"2026-07-15T12:00:00.000Z"}"#
+
+        let decoded = try JSONDecoder().decode(
+            ATProtocolValueContainer.self,
+            from: Data(json.utf8)
+        )
+
+        guard case let .unknownType(type, .object(raw)) = decoded else {
+            Issue.record("Expected demotion to unknownType for malformed record")
+            return
+        }
+        #expect(type == "app.bsky.feed.post")
+        #expect(raw["text"] == .number(42))
+    }
+
     @Test("Direct object definitions remain unframed when embedded normally")
     func directObjectDefinitionsRemainUnframed() throws {
         let strongRef = try ComAtprotoRepoStrongRef(
