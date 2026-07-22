@@ -380,6 +380,46 @@ struct ATProtocolValueContainerDecodingTests {
         #expect(post.facets?.count == 1)
     }
 
+    @Test("Typed dispatch tolerates meaningful unknown fields like via")
+    func typedDispatchToleratesViaField() throws {
+        // Modeled on a live Witchsky record (post 3mr7xawjq3k26): third-party
+        // clients stamp a non-lexicon `via` field on posts. Clients must ignore
+        // unknown fields, not tombstone the whole post.
+        let json = #"""
+        {
+            "$type": "app.bsky.feed.post",
+            "createdAt": "2026-07-22T08:55:40.287Z",
+            "langs": ["en"],
+            "reply": {
+                "parent": {
+                    "cid": "bafyreifxe4xz3d6bcj47ctgoq7tnifjzrcqsnfcqghzcte7pfssbhzuoee",
+                    "uri": "at://did:plc:nbfjoeficjzf3pejpontvril/app.bsky.feed.post/3mr7x2qbras2k"
+                },
+                "root": {
+                    "cid": "bafyreifxe4xz3d6bcj47ctgoq7tnifjzrcqsnfcqghzcte7pfssbhzuoee",
+                    "uri": "at://did:plc:nbfjoeficjzf3pejpontvril/app.bsky.feed.post/3mr7x2qbras2k"
+                }
+            },
+            "text": "oh hey so i'm not just bad",
+            "via": "Witchsky Web App"
+        }
+        """#
+
+        let decoded = try JSONDecoder().decode(
+            ATProtocolValueContainer.self,
+            from: Data(json.utf8)
+        )
+
+        guard case let .knownType(value) = decoded,
+              let post = value as? AppBskyFeedPost
+        else {
+            Issue.record("Expected AppBskyFeedPost dispatch despite via field, got \(decoded)")
+            return
+        }
+        #expect(post.text == "oh hey so i'm not just bad")
+        #expect(post.reply != nil)
+    }
+
     @Test("Typed dispatch still demotes when a shared field diverges")
     func typedDispatchStillDemotesOnFieldDivergence() throws {
         // A record whose typed decode fails (text is not a string) must still
@@ -420,8 +460,8 @@ struct ATProtocolValueContainerDecodingTests {
         #expect(!cborValue.entries.contains(where: { $0.key == "$type" }))
     }
 
-    @Test("Registered top-level object definitions retain raw future fields")
-    func registeredTopLevelObjectsRetainRawFutureFields() throws {
+    @Test("Registered top-level object definitions tolerate unknown future fields")
+    func registeredTopLevelObjectsTolerateFutureFields() throws {
         let type = "com.atproto.repo.strongRef"
         let original = ATProtocolValueContainer.object([
             "$type": .string(type),
@@ -433,13 +473,13 @@ struct ATProtocolValueContainerDecodingTests {
 
         let decoded = try ATProtocolValueContainer.decodedFromDAGCBOR(encoded)
 
-        guard case let .unknownType(decodedType, .object(object)) = decoded else {
-            Issue.record("Expected raw fallback for a registered object with future fields")
+        guard case let .knownType(value) = decoded,
+              let strongRef = value as? ComAtprotoRepoStrongRef
+        else {
+            Issue.record("Expected typed dispatch to ignore the unknown future field")
             return
         }
-        #expect(decodedType == type)
-        #expect(object["future"] == .object(["enabled": .bool(true)]))
-        #expect(try decoded.encodedDAGCBOR() == encoded)
+        #expect(strongRef.uri.description == "at://did:plc:example/app.bsky.feed.post/test")
     }
 
     @Test("Custom typed dictionary objects receive their external discriminator")
@@ -475,8 +515,8 @@ struct ATProtocolValueContainerDecodingTests {
         }
     }
 
-    @Test("Known typed dispatch falls back to raw values when typed decoding loses wire data")
-    func knownTypedDispatchPreservesFutureAndMalformedFields() throws {
+    @Test("Known typed dispatch tolerates future fields and lenient optional degradation")
+    func knownTypedDispatchToleratesFutureAndLenientFields() throws {
         let type = AppBskyFeedPost.typeIdentifier
         let futurePost = ATProtocolValueContainer.object([
             "$type": .string(type),
@@ -487,27 +527,28 @@ struct ATProtocolValueContainerDecodingTests {
         let futurePostCBOR = try futurePost.encodedDAGCBOR()
 
         let decodedTopLevel = try ATProtocolValueContainer.decodedFromDAGCBOR(futurePostCBOR)
-        guard case let .unknownType(decodedType, .object(decodedObject)) = decodedTopLevel else {
-            Issue.record("Expected a raw fallback for a top-level known type with future fields")
+        guard case let .knownType(topValue) = decodedTopLevel,
+              let topPost = topValue as? AppBskyFeedPost
+        else {
+            Issue.record("Expected typed dispatch to ignore the top-level future field")
             return
         }
-        #expect(decodedType == type)
-        #expect(decodedObject["future"] == .object(["enabled": .bool(true)]))
-        #expect(try decodedTopLevel.encodedDAGCBOR() == futurePostCBOR)
+        #expect(topPost.text == "future value")
 
         let nestedRoot = ATProtocolValueContainer.object(["post": futurePost])
         let nestedCBOR = try nestedRoot.encodedDAGCBOR()
         let decodedNestedRoot = try ATProtocolValueContainer.decodedFromDAGCBOR(nestedCBOR)
         guard case let .object(nestedObject) = decodedNestedRoot,
-              case let .unknownType(nestedType, .object(nestedPost))? = nestedObject["post"]
+              case let .knownType(nestedValue)? = nestedObject["post"],
+              nestedValue is AppBskyFeedPost
         else {
-            Issue.record("Expected a raw fallback for a nested known type with future fields")
+            Issue.record("Expected typed dispatch to ignore the nested future field")
             return
         }
-        #expect(nestedType == type)
-        #expect(nestedPost["future"] == .object(["enabled": .bool(true)]))
-        #expect(try decodedNestedRoot.encodedDAGCBOR() == nestedCBOR)
 
+        // The generated decoder is lenient on langs (malformed value degrades to
+        // nil) and the dropped key is tolerated like an unknown field: the post
+        // renders without its language tags rather than tombstoning entirely.
         let malformedPost = ATProtocolValueContainer.object([
             "$type": .string(type),
             "text": .string("malformed optional value"),
@@ -516,13 +557,14 @@ struct ATProtocolValueContainerDecodingTests {
         ])
         let malformedCBOR = try malformedPost.encodedDAGCBOR()
         let decodedMalformed = try ATProtocolValueContainer.decodedFromDAGCBOR(malformedCBOR)
-        guard case let .unknownType(malformedType, .object(malformedObject)) = decodedMalformed else {
-            Issue.record("Expected malformed known fields to fall back to their raw object")
+        guard case let .knownType(malformedValue) = decodedMalformed,
+              let malformedTyped = malformedValue as? AppBskyFeedPost
+        else {
+            Issue.record("Expected lenient typed dispatch for a malformed optional field")
             return
         }
-        #expect(malformedType == type)
-        #expect(malformedObject["langs"] == .string("not-an-array"))
-        #expect(try decodedMalformed.encodedDAGCBOR() == malformedCBOR)
+        #expect(malformedTyped.text == "malformed optional value")
+        #expect(malformedTyped.langs == nil)
     }
 
     @Test("Link and bytes cases satisfy same-value Equatable and Hashable contracts")

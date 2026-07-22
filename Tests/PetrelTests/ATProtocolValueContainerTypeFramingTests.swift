@@ -1,7 +1,6 @@
 import Foundation
-import Testing
-
 @testable import Petrel
+import Testing
 
 /// Regression tests for the lossless-decode round-trip guard.
 ///
@@ -13,9 +12,9 @@ import Testing
 /// post containing those fields demotes to `.unknownType` and renderers
 /// tombstone it ("Post format error" in Catbird).
 struct ATProtocolValueContainerTypeFramingTests {
-  /// Verbatim wire record (facets post) as returned by the AppView for
-  /// at://…/app.bsky.feed.post/3mqyilqx6qc2d — nested objects carry no `$type`.
-  private static let facetedRecordJSON = """
+    /// Verbatim wire record (facets post) as returned by the AppView for
+    /// at://…/app.bsky.feed.post/3mqyilqx6qc2d — nested objects carry no `$type`.
+    private static let facetedRecordJSON = """
     {
       "$type": "app.bsky.feed.post",
       "createdAt": "2026-07-19T09:31:59.000Z",
@@ -43,9 +42,9 @@ struct ATProtocolValueContainerTypeFramingTests {
     }
     """
 
-  /// Verbatim wire record (single image post) — blob ref, alt, aspectRatio, no nested `$type`
-  /// beyond the embed union member and the blob itself.
-  private static let imageRecordJSON = """
+    /// Verbatim wire record (single image post) — blob ref, alt, aspectRatio, no nested `$type`
+    /// beyond the embed union member and the blob itself.
+    private static let imageRecordJSON = """
     {
       "$type": "app.bsky.feed.post",
       "createdAt": "2026-07-19T09:32:07.000Z",
@@ -68,8 +67,8 @@ struct ATProtocolValueContainerTypeFramingTests {
     }
     """
 
-  /// Verbatim wire record (reply) — strongRefs with no `$type`.
-  private static let replyRecordJSON = """
+    /// Verbatim wire record (reply) — strongRefs with no `$type`.
+    private static let replyRecordJSON = """
     {
       "$type": "app.bsky.feed.post",
       "createdAt": "2026-07-19T09:32:22.000Z",
@@ -87,47 +86,50 @@ struct ATProtocolValueContainerTypeFramingTests {
     }
     """
 
-  @Test(
-    "Wire records without nested $type framing decode as known types",
-    arguments: [facetedRecordJSON, imageRecordJSON, replyRecordJSON]
-  )
-  func wireRecordDecodesAsKnownType(_ json: String) throws {
-    let container = try JSONDecoder().decode(
-      ATProtocolValueContainer.self, from: Data(json.utf8))
-    guard case .knownType(let value) = container else {
-      Issue.record("Expected .knownType(AppBskyFeedPost), got \(container)")
-      return
+    @Test(
+        "Wire records without nested $type framing decode as known types",
+        arguments: [facetedRecordJSON, imageRecordJSON, replyRecordJSON]
+    )
+    func wireRecordDecodesAsKnownType(_ json: String) throws {
+        let container = try JSONDecoder().decode(
+            ATProtocolValueContainer.self, from: Data(json.utf8)
+        )
+        guard case let .knownType(value) = container else {
+            Issue.record("Expected .knownType(AppBskyFeedPost), got \(container)")
+            return
+        }
+        #expect(value is AppBskyFeedPost)
     }
-    #expect(value is AppBskyFeedPost)
-  }
 
-  @Test("Faceted wire record retains its facets through typed dispatch")
-  func facetsSurviveTypedDispatch() throws {
-    let container = try JSONDecoder().decode(
-      ATProtocolValueContainer.self, from: Data(Self.facetedRecordJSON.utf8))
-    guard case .knownType(let value) = container, let post = value as? AppBskyFeedPost else {
-      Issue.record("Expected .knownType(AppBskyFeedPost), got \(container)")
-      return
+    @Test("Faceted wire record retains its facets through typed dispatch")
+    func facetsSurviveTypedDispatch() throws {
+        let container = try JSONDecoder().decode(
+            ATProtocolValueContainer.self, from: Data(Self.facetedRecordJSON.utf8)
+        )
+        guard case let .knownType(value) = container, let post = value as? AppBskyFeedPost else {
+            Issue.record("Expected .knownType(AppBskyFeedPost), got \(container)")
+            return
+        }
+        #expect(post.facets?.count == 3)
     }
-    #expect(post.facets?.count == 3)
-  }
 
-  @Test("Future fields still demote typed dispatch to the raw fallback")
-  func futureFieldsStillFallBack() throws {
-    let json = """
-      {
-        "$type": "app.bsky.feed.post",
-        "createdAt": "2026-07-19T09:31:59.000Z",
-        "text": "future",
-        "future": {"enabled": true}
-      }
-      """
-    let container = try JSONDecoder().decode(
-      ATProtocolValueContainer.self, from: Data(json.utf8))
-    guard case .unknownType(let type, _) = container else {
-      Issue.record("Expected .unknownType raw fallback for future fields, got \(container)")
-      return
+    @Test("Future fields are ignored by typed dispatch")
+    func futureFieldsAreIgnored() throws {
+        let json = """
+        {
+          "$type": "app.bsky.feed.post",
+          "createdAt": "2026-07-19T09:31:59.000Z",
+          "text": "future",
+          "future": {"enabled": true}
+        }
+        """
+        let container = try JSONDecoder().decode(
+            ATProtocolValueContainer.self, from: Data(json.utf8)
+        )
+        guard case let .knownType(value) = container, let post = value as? AppBskyFeedPost else {
+            Issue.record("Expected typed dispatch to ignore the unknown future field, got \(container)")
+            return
+        }
+        #expect(post.text == "future")
     }
-    #expect(type == "app.bsky.feed.post")
-  }
 }

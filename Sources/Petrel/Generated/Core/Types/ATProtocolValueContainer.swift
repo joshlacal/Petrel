@@ -3488,14 +3488,15 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
 
     /// Fallback for the framing-normalized DAG-CBOR equality check in `decodeObjectValue`.
     ///
-    /// Records written by third-party clients can carry wire variances a typed
-    /// re-encode cannot reproduce byte-for-byte but that lose no information when
-    /// dropped: explicit `null` values standing in for absent optional fields
-    /// (`null` is not representable in the atproto data model) and unknown extra
-    /// fields whose value is empty. Accept the typed decode when every field it
-    /// re-encodes matches the raw wire value exactly and every raw field it drops
-    /// carries no information; records with meaningful unknown ("future") fields
-    /// keep the lossless raw fallback.
+    /// The atproto data model requires clients to ignore unknown record fields
+    /// (lexicon evolution: third-party clients stamp fields like `via`, and servers
+    /// ship new optional fields before SDKs regenerate), and real-world records
+    /// also carry explicit `null` stand-ins for absent optional fields. A typed
+    /// re-encode drops both, so byte equality can never hold for such records.
+    /// Accept the typed decode when every field it re-encodes matches the raw wire
+    /// value exactly — no mutation, no fabrication. Fields present only in the raw
+    /// object are ignored for dispatch; a decode that alters a shared field still
+    /// falls back to the lossless raw representation.
     private static func isSpecTolerantMatch(
         typed: ATProtocolValueContainer,
         raw: ATProtocolValueContainer
@@ -3514,37 +3515,20 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     private static func isSpecTolerantJSONMatch(typed: Any, raw: Any) -> Bool {
         switch (typed, raw) {
         case let (typedObject as [String: Any], rawObject as [String: Any]):
-            for (key, rawElement) in rawObject {
-                guard let typedElement = typedObject[key] else {
-                    guard isInformationless(rawElement) else { return false }
-                    continue
-                }
-                guard isSpecTolerantJSONMatch(typed: typedElement, raw: rawElement) else { return false }
-            }
             return typedObject.allSatisfy { element in
-                // Generated encoders emit self-describing `$type` discriminators
-                // on nested objects that wire records may omit; a typed-only
-                // `$type` is metadata, not a fabricated field.
-                rawObject[element.key] != nil || element.key == "$type"
+                guard let rawElement = rawObject[element.key] else {
+                    // Generated encoders emit self-describing `$type` discriminators
+                    // on nested objects that wire records may omit; a typed-only
+                    // `$type` is metadata, not a fabricated field.
+                    return element.key == "$type"
+                }
+                return isSpecTolerantJSONMatch(typed: element.value, raw: rawElement)
             }
         case let (typedArray as [Any], rawArray as [Any]):
             return typedArray.count == rawArray.count
                 && zip(typedArray, rawArray).allSatisfy { isSpecTolerantJSONMatch(typed: $0, raw: $1) }
         default:
             return (typed as? NSObject)?.isEqual(raw) ?? false
-        }
-    }
-
-    private static func isInformationless(_ value: Any) -> Bool {
-        switch value {
-        case is NSNull:
-            return true
-        case let array as [Any]:
-            return array.isEmpty
-        case let object as [String: Any]:
-            return object.isEmpty
-        default:
-            return false
         }
     }
 
