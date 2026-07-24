@@ -299,6 +299,29 @@ actor OAuthCore {
             nonces[domain] = nonce
             try await storage.saveDPoPNonces(nonces, for: did)
         } catch {}
+
+        // Also update the JKT-scoped nonce stores. `createDPoPProof` resolves the nonce
+        // for a domain from the in-memory `noncesByThumbprint` and the persisted
+        // JKT-scoped store *before* falling back to the DID-scoped store updated above.
+        // Updating only the DID-scoped store therefore leaves a stale JKT nonce that
+        // shadows the fresh one — the CAB refresh path (`CABOAuthStrategy.performTokenRefresh`)
+        // then keeps replaying the stale nonce and every `use_dpop_nonce` retry fails,
+        // so the session can never refresh. Mirror `AuthenticationService.updateAndVerifyNonce`
+        // and write every store `createDPoPProof` reads.
+        if let key = try? await getOrCreateDPoPKey(for: did),
+           let jwk = try? createJWK(from: key),
+           let thumbprint = try? calculateJWKThumbprint(jwk: jwk)
+        {
+            var memDomainMap = noncesByThumbprint[thumbprint] ?? [:]
+            memDomainMap[domain] = nonce
+            noncesByThumbprint[thumbprint] = memDomainMap
+
+            var jktNonces = (try? await storage.getDPoPNoncesByJKT(for: did)) ?? [:]
+            var jktDomainMap = jktNonces[thumbprint] ?? [:]
+            jktDomainMap[domain] = nonce
+            jktNonces[thumbprint] = jktDomainMap
+            try? await storage.saveDPoPNoncesByJKT(jktNonces, for: did)
+        }
     }
 
     // MARK: - Metadata Fetching
