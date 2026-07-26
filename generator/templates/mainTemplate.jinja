@@ -23,6 +23,12 @@ public struct {{ struct_name }}{{ conformance }} {
     {{- output_struct }}
     {{- message_union }}
     {{- errors_enum }}
+{%- if space_declaration %}
+    {{- space_declaration }}
+{%- endif %}
+{%- if server_contracts %}
+    {{- server_contracts }}
+{%- endif %}
 
 
 {{ enums }}

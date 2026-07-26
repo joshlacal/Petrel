@@ -6,7 +6,7 @@ from enum_generator import EnumGenerator
 from type_converter import TypeConverter
 
 class SwiftCodeGenerator:
-    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None):
+    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None, emit_server_contracts=False):
         self.lexicon = lexicon
         self.defs = lexicon.get('defs', {})
         self.lexicon_id = lexicon.get('id', '')
@@ -21,6 +21,7 @@ class SwiftCodeGenerator:
         self.enum_definitions = {}
         self.is_blob_upload = self.check_if_blob_upload(lexicon)
         self.cycle_detector = cycle_detector
+        self.emit_server_contracts = emit_server_contracts
 
         self.token_descriptions = {}
         self.generated_tokens = set()
@@ -407,6 +408,8 @@ class SwiftCodeGenerator:
             query = ""
             subscription = ""
             message_union = ""
+            space_declaration = ""
+            server_contracts = ""
             conformance = ""
 
             if 'main' not in self.defs:
@@ -421,6 +424,8 @@ class SwiftCodeGenerator:
                     record_struct = self.generate_record_struct()
                     lex_definitions = self.generate_lex_definitions()
                     conformance = ": ATProtocolCodable, ATProtocolValue"
+                elif main_def_type == 'space':
+                    space_declaration = self.generate_space_declaration(self.main_def)
                 elif main_def_type == 'query':
                     query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
                     output_struct = self.generate_output_struct(self.main_def.get('output'))
@@ -440,6 +445,8 @@ class SwiftCodeGenerator:
                     errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
                     lex_definitions = self.generate_lex_definitions()
                     subscription = self.generate_subscription_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
+                if self.emit_server_contracts and main_def_type in ('query', 'procedure', 'subscription'):
+                    server_contracts = self.generate_server_contracts(main_def_type)
             self.generate_all_enums()
             
             swift_code = self.template_manager.main_template.render(
@@ -460,12 +467,65 @@ class SwiftCodeGenerator:
                 query=query,
                 subscription=subscription,
                 message_union=message_union,
+                space_declaration=space_declaration,
+                server_contracts=server_contracts,
                 conformance=conformance
             )
             
             return self.post_process_swift_code(swift_code)
         except Exception:
             raise
+
+    def generate_space_declaration(self, main_def):
+        key_type = main_def.get('key', 'tid')
+        name = main_def.get('name', self.lexicon_id)
+        collections = main_def.get('collections', [])
+        collections_literal = ', '.join(json.dumps(value) for value in collections)
+        return f'''\n    public struct SpaceDeclarationDescriptor: Sendable, Equatable {{
+        public let nsid: String
+        public let keyType: String
+        public let name: String
+        public let collections: [String]
+    }}
+
+    public static let spaceDeclaration = SpaceDeclarationDescriptor(
+        nsid: "{self.lexicon_id}", keyType: {json.dumps(key_type)},
+        name: {json.dumps(name)}, collections: [{collections_literal}]
+    )
+'''
+
+    def generate_server_contracts(self, main_def_type):
+        parameters_type = 'Parameters' if 'parameters' in self.main_def else 'Void'
+        input_type = 'Input' if main_def_type == 'procedure' and 'input' in self.main_def else 'Void'
+        if main_def_type == 'subscription':
+            output_type = 'Message'
+        else:
+            output_type = 'Output' if 'output' in self.main_def else 'Void'
+        input_encoding = self.main_def.get('input', {}).get('encoding')
+        output_encoding = self.main_def.get('output', {}).get('encoding')
+        input_encoding_literal = json.dumps(input_encoding) if input_encoding is not None else 'nil'
+        output_encoding_literal = json.dumps(output_encoding) if output_encoding is not None else 'nil'
+        return f'''\n    public struct XRPCMethodDescriptor: Sendable, Equatable {{
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }}
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "{self.lexicon_id}", kind: "{main_def_type}",
+        inputEncoding: {input_encoding_literal}, outputEncoding: {output_encoding_literal},
+        declaredErrors: [{', '.join(json.dumps(error.get('name', '')) for error in self.main_def.get('errors', []))}]
+    )
+
+    public protocol ServerHandler: Sendable {{
+        associatedtype Context: Sendable
+        func handle(
+            parameters: {parameters_type}, input: {input_type}, context: Context
+        ) async throws -> {output_type}
+    }}
+'''
 
     @staticmethod
     def post_process_swift_code(code: str) -> str:

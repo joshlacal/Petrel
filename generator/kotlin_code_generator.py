@@ -47,6 +47,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             record_code = ""
             lex_definitions_code = ""
             main_properties_code = ""
+            space_declaration_code = ""
 
             # Generate based on lexicon type
             if not self.main_def:
@@ -58,6 +59,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             elif main_def_type == 'record':
                 record_code = self.generate_record()
                 lex_definitions_code = self.generate_lex_definitions()
+            elif main_def_type == 'space':
+                space_declaration_code = self.generate_space_declaration()
             elif main_def_type == 'query':
                 parameters_code = self.generate_parameters(self.main_def.get('parameters'))
                 output_code = self.generate_output(self.main_def.get('output'))
@@ -101,12 +104,30 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 errors=errors_code,
                 query=query_code,
                 procedure=procedure_code,
-                subscription=subscription_code
+                subscription=subscription_code,
+                space_declaration=space_declaration_code,
             )
 
             return self.post_process_kotlin_code(kotlin_code)
         except Exception:
             raise
+
+    def generate_space_declaration(self) -> str:
+        key_type = self.main_def.get('key', 'tid')
+        name = self.main_def.get('name', self.lexicon_id)
+        collections = self.main_def.get('collections', [])
+        collections_literal = ', '.join(json.dumps(value) for value in collections)
+        return f'''data class SpaceDeclarationDescriptor(
+    val nsid: String,
+    val keyType: String,
+    val name: String,
+    val collections: List<String>,
+)
+
+val spaceDeclaration = SpaceDeclarationDescriptor(
+    nsid = "{self.lexicon_id}", keyType = {json.dumps(key_type)},
+    name = {json.dumps(name)}, collections = listOf({collections_literal}),
+)'''
 
     def generate_properties(self, properties: Dict[str, Any], required_fields: List[str],
                            current_struct_name: str, context_identity=None) -> List[Dict[str, Any]]:

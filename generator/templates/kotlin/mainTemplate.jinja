@@ -60,6 +60,10 @@ object {{ object_name }} {
 {{ main_properties }}
 {% endif %}
 
+{% if space_declaration %}
+{{ space_declaration }}
+{% endif %}
+
 {% if query %}
 {{ query }}
 {% endif %}

@@ -201,6 +201,7 @@ async def generate_swift_from_lexicons_recursive(
     overlay=False,
     package_name='Petrel',
     core_namespace_roots: Sequence[str] = (),
+    emit_server_contracts=False,
 ):
     type_dict = {}
     namespace_hierarchy = {}
@@ -272,7 +273,9 @@ async def generate_swift_from_lexicons_recursive(
                 type_key = f"{lexicon_id}#{type_name}" if type_name != 'main' else lexicon_id
                 type_dict[type_key] = f"{swift_lex_id}{swift_type_name}"
 
-        swift_code = SwiftCodeGenerator(lexicon, cycle_detector).convert()
+        swift_code = SwiftCodeGenerator(
+            lexicon, cycle_detector, emit_server_contracts=emit_server_contracts
+        ).convert()
 
         if overlay:
             # Overlay files compile in a separate module and need the core import.
@@ -727,6 +730,7 @@ async def run_manifest(manifest_path, language='both', graph_path=None):
             exclude_namespaces=exclude, reference_dirs=reference_dirs,
             overlay=overlay, package_name=package_name,
             core_namespace_roots=core_namespace_roots,
+            emit_server_contracts=bool(swift_cfg.get('emit_server_contracts', False)),
         ))
     kotlin_cfg = manifest.get('kotlin')
     if kotlin_cfg and language in ('kotlin', 'both'):
