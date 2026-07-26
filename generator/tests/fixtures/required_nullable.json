@@ -1,0 +1,54 @@
+{
+  "lexicon": 1,
+  "id": "blue.catbird.test.requiredNullable",
+  "defs": {
+    "main": {
+      "type": "query",
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "entries"
+          ],
+          "properties": {
+            "entries": {
+              "type": "array",
+              "items": {
+                "type": "ref",
+                "ref": "#opEntry"
+              }
+            }
+          }
+        }
+      }
+    },
+    "opEntry": {
+      "type": "object",
+      "required": [
+        "nullableScalar",
+        "nullableCID",
+        "requiredCount"
+      ],
+      "nullable": [
+        "nullableScalar",
+        "nullableCID"
+      ],
+      "properties": {
+        "nullableScalar": {
+          "type": "string"
+        },
+        "nullableCID": {
+          "type": "string",
+          "format": "cid"
+        },
+        "requiredCount": {
+          "type": "integer"
+        },
+        "optionalNote": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}

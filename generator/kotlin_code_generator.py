@@ -129,9 +129,16 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
     name = {json.dumps(name)}, collections = listOf({collections_literal}),
 )'''
 
-    def generate_properties(self, properties: Dict[str, Any], required_fields: List[str],
-                           current_struct_name: str, context_identity=None) -> List[Dict[str, Any]]:
+    def generate_properties(
+        self,
+        properties: Dict[str, Any],
+        required_fields: List[str],
+        current_struct_name: str,
+        context_identity=None,
+        nullable_fields=None,
+    ) -> List[Dict[str, Any]]:
         """Generate property definitions."""
+        nullable_fields = nullable_fields or []
         kotlin_properties = []
 
         for name, prop in properties.items():
@@ -142,9 +149,11 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
             kotlin_type = self.type_converter.determine_type(
                 name, prop, required_fields, current_struct_name,
                 context_identity=context_identity,
+                nullable_fields=nullable_fields,
             )
             description = prop.get('description', '')
             is_optional = name not in required_fields
+            is_nullable = name in nullable_fields
 
             strict_decode = bool(prop.get('x-security-strict-decode'))
             strict_serializer = None
@@ -160,7 +169,7 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
                 serializer_source = self.template_manager.strict_ref_serializer_template.render(
                     serializer_name=strict_serializer,
                     target_type=kotlin_type.rstrip('?'),
-                    nullable=is_optional,
+                    nullable=is_optional or is_nullable,
                     allowed_keys_literal=", ".join(
                         json.dumps(key) for key in allowed_keys
                     ),
@@ -179,6 +188,7 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
                 'name': name,
                 'type': kotlin_type,
                 'optional': is_optional,
+                'nullable': is_nullable,
                 'description': description,
                 'strict_decode': strict_decode,
                 'strict_serializer': strict_serializer,
@@ -231,8 +241,11 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
         """Generate properties for main object type."""
         properties = self.main_def.get('properties', {})
         required = self.main_def.get('required', [])
+        nullable = self.main_def.get('nullable', [])
 
-        props = self.generate_properties(properties, required, self.class_name)
+        props = self.generate_properties(
+            properties, required, self.class_name, nullable_fields=nullable
+        )
 
         return self.template_manager.properties_template.render(
             properties=props,
@@ -270,6 +283,7 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
                     def_schema.get('required', []),
                     class_name,
                     context_identity=("definition", name),
+                    nullable_fields=def_schema.get('nullable', []),
                 )
                 definitions.append({
                     'name': class_name,
@@ -323,7 +337,8 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
         properties = self.generate_properties(
             record_schema.get('properties', {}),
             record_schema.get('required', []),
-            self.class_name
+            self.class_name,
+            nullable_fields=record_schema.get('nullable', []),
         )
 
         return self.template_manager.record_template.render(
@@ -340,7 +355,8 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
         properties = self.generate_properties(
             parameters.get('properties', {}),
             parameters.get('required', []),
-            self.class_name + "Parameters"
+            self.class_name + "Parameters",
+            nullable_fields=parameters.get('nullable', []),
         )
 
         return self.template_manager.parameters_template.render(
@@ -375,7 +391,8 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
             properties = self.generate_properties(
                 input_schema.get('properties', {}),
                 input_schema.get('required', []),
-                self.class_name + "Input"
+                self.class_name + "Input",
+                nullable_fields=input_schema.get('nullable', []),
             )
 
         return self.template_manager.input_template.render(
@@ -408,7 +425,8 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
             properties = self.generate_properties(
                 output_schema.get('properties', {}),
                 output_schema.get('required', []),
-                self.class_name + "Output"
+                self.class_name + "Output",
+                nullable_fields=output_schema.get('nullable', []),
             )
         else:
             properties = []
@@ -462,7 +480,8 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
         properties = self.generate_properties(
             schema.get('properties', {}),
             schema.get('required', []),
-            self.class_name + "Message"
+            self.class_name + "Message",
+            nullable_fields=schema.get('nullable', []),
         )
 
         return self.template_manager.message_template.render(

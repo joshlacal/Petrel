@@ -62,7 +62,15 @@ class SwiftCodeGenerator:
     def handle_subscription_type(self, main_def):
         return main_def
 
-    def generate_properties(self, properties, required_fields, current_struct_name, context_identity=None):
+    def generate_properties(
+        self,
+        properties,
+        required_fields,
+        current_struct_name,
+        context_identity=None,
+        nullable_fields=None,
+    ):
+        nullable_fields = nullable_fields or []
         swift_properties = []
         for name, prop in properties.items():
             swift_type = self.type_converter.determine_swift_type(
@@ -70,7 +78,9 @@ class SwiftCodeGenerator:
                 context_identity=context_identity,
             )
             description = prop.get('description', '')
-            is_optional = name not in required_fields
+            is_wire_optional = name not in required_fields
+            is_nullable = name in nullable_fields
+            is_optional = is_wire_optional or is_nullable
             strict_decode = prop.get('x-security-strict-decode', False)
             if strict_decode and prop.get('type') != 'ref':
                 raise ValueError(
@@ -101,6 +111,8 @@ class SwiftCodeGenerator:
                 'name': name,
                 'type': swift_type,
                 'optional': is_optional,
+                'wire_optional': is_wire_optional,
+                'required_nullable': not is_wire_optional and is_nullable,
                 'description': description,
                 'boxed': should_box,
                 'strict_decode': strict_decode,
@@ -155,7 +167,12 @@ class SwiftCodeGenerator:
     def generate_query_parameters(self, parameters: Optional[Dict[str, Any]]) -> str:
         if not parameters:
             return ""
-        properties = self.generate_properties(parameters['properties'], parameters.get('required', []), "Parameters")
+        properties = self.generate_properties(
+            parameters['properties'],
+            parameters.get('required', []),
+            "Parameters",
+            nullable_fields=parameters.get('nullable', []),
+        )
         return self.template_manager.query_parameters_template.render(properties=properties)
 
     def generate_input_struct(self, input_obj: Optional[Dict[str, Any]]) -> str:
@@ -183,7 +200,12 @@ class SwiftCodeGenerator:
             ref_type = self.type_converter.convert_ref(input_schema['ref'])
             properties = [{"name": "data", "type": ref_type, "optional": False}]
         else:
-            properties = self.generate_properties(input_schema.get('properties', {}), input_schema.get('required', []), "Input")
+            properties = self.generate_properties(
+                input_schema.get('properties', {}),
+                input_schema.get('required', []),
+                "Input",
+                nullable_fields=input_schema.get('nullable', []),
+            )
             self.input_properties = properties
 
         return self.template_manager.input_struct_template.render(properties=properties, conformance=conformance)
@@ -225,7 +247,12 @@ class SwiftCodeGenerator:
             else:
                 context['properties'] = []
         else:
-            context['properties'] = self.generate_properties(output_schema.get('properties', {}), output_schema.get('required', []), "Output")
+            context['properties'] = self.generate_properties(
+                output_schema.get('properties', {}),
+                output_schema.get('required', []),
+                "Output",
+                nullable_fields=output_schema.get('nullable', []),
+            )
 
         return self.template_manager.output_struct_template.render(**context)
 
@@ -311,6 +338,7 @@ class SwiftCodeGenerator:
                 properties = self.generate_properties(
                     def_schema.get('properties', {}), def_schema.get('required', []),
                     current_struct_name, context_identity=("definition", name),
+                    nullable_fields=def_schema.get('nullable', []),
                 )
                 
                 sub_structs = {}
@@ -323,6 +351,7 @@ class SwiftCodeGenerator:
                                 value.get('properties', {}), value.get('required', []),
                                 convert_to_camel_case(key),
                                 context_identity=("definition", name, "sub", key),
+                                nullable_fields=value.get('nullable', []),
                             )
                             sub_structs[convert_to_camel_case(key)] = {
                                 'wire_fragment': key,
@@ -372,7 +401,12 @@ class SwiftCodeGenerator:
             return ""
         record_schema = self.main_def['record']
         current_struct_name = self.struct_name 
-        properties = self.generate_properties(record_schema.get('properties', {}), record_schema.get('required', []), current_struct_name)
+        properties = self.generate_properties(
+            record_schema.get('properties', {}),
+            record_schema.get('required', []),
+            current_struct_name,
+            nullable_fields=record_schema.get('nullable', []),
+        )
         return self.template_manager.record_template.render(struct_name=self.struct_name, properties=properties, conformance=": ATProtocolCodable, ATProtocolValue")
 
     def generate_all_enums(self):
@@ -418,7 +452,14 @@ class SwiftCodeGenerator:
                 main_def_type = self.main_def.get('type')
                 if main_def_type == 'object':
                     lex_definitions = self.generate_lex_definitions()
-                    main_properties = self.template_manager.properties_template.render(properties=self.generate_properties(self.main_def.get('properties', {}), self.main_def.get('required', []), convert_to_camel_case(self.lexicon_id)))
+                    main_properties = self.template_manager.properties_template.render(
+                        properties=self.generate_properties(
+                            self.main_def.get('properties', {}),
+                            self.main_def.get('required', []),
+                            convert_to_camel_case(self.lexicon_id),
+                            nullable_fields=self.main_def.get('nullable', []),
+                        )
+                    )
                     conformance = ": ATProtocolCodable, ATProtocolValue"
                 elif main_def_type == 'record':
                     record_struct = self.generate_record_struct()

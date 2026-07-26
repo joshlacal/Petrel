@@ -35,6 +35,17 @@
             {% if properties and properties|length > 0 %}
             let container = try decoder.container(keyedBy: CodingKeys.self)
             {%- for prop in properties %}
+            {%- if prop.required_nullable %}
+            guard container.contains(.{{ prop.name }}) else {
+                throw DecodingError.keyNotFound(
+                    CodingKeys.{{ prop.name }},
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Missing required property '{{ prop.name }}'"
+                    )
+                )
+            }
+            {%- endif %}
             {% if prop.optional %}
             {% if prop.strict_decode %}
             if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
@@ -42,6 +53,8 @@
             } else {
                 self.{{ prop.name }} = nil
             }
+            {% elif prop.required_nullable %}
+            self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
             {% else %}
             do {
                 self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
@@ -73,7 +86,9 @@
             {% if properties and properties|length > 0 %}
             var container = encoder.container(keyedBy: CodingKeys.self)
             {%- for prop in properties %}
-            {% if prop.optional %}
+            {% if prop.required_nullable %}
+            try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+            {% elif prop.optional %}
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent({{ prop.name }}, forKey: .{{ prop.name }})
             {% else %}
@@ -94,7 +109,14 @@
             var map = OrderedCBORMap()
 
             {% for prop in properties %}
-            {% if prop.optional %}
+            {% if prop.required_nullable %}
+            if let value = {{ prop.name }} {
+                let {{ prop.name }}Value = try value.toCBORValue()
+                map = map.adding(key: "{{ prop.name }}", value: {{ prop.name }}Value)
+            } else {
+                map = map.adding(key: "{{ prop.name }}", value: NSNull())
+            }
+            {% elif prop.optional %}
             if let value = {{ prop.name }} {
                 // Encode optional property even if it's an empty array for CBOR
                 let {{ prop.name }}Value = try value.toCBORValue()
