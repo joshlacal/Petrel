@@ -34,6 +34,11 @@ class SwiftCodeGenerator:
         self.type_converter = TypeConverter(self)
 
         self.main_def = self.handle_main_def()
+        self.server_input_definitions = (
+            self.find_server_input_definitions()
+            if self.emit_server_contracts
+            else set()
+        )
 
     def check_if_blob_upload(self, lexicon: Dict[str, Any]) -> bool:
         main_def = lexicon.get('defs', {}).get('main', {})
@@ -62,6 +67,58 @@ class SwiftCodeGenerator:
     def handle_subscription_type(self, main_def):
         return main_def
 
+    def find_server_input_definitions(self):
+        """Return local definitions transitively reachable from an XRPC input."""
+        main_input = self.defs.get('main', {}).get('input')
+        if not isinstance(main_input, dict):
+            return set()
+        input_schema = main_input.get('schema')
+        if not isinstance(input_schema, dict):
+            return set()
+
+        reachable = set()
+        visiting = set()
+
+        def local_definition_name(ref):
+            if not isinstance(ref, str):
+                return None
+            if ref.startswith('#'):
+                name = ref[1:]
+            else:
+                nsid, separator, fragment = ref.partition('#')
+                if nsid != self.lexicon_id:
+                    return None
+                name = fragment if separator else 'main'
+            return name if name in self.defs else None
+
+        def visit(node):
+            if not isinstance(node, dict):
+                return
+
+            if node.get('type') == 'ref':
+                name = local_definition_name(node.get('ref'))
+                if name is not None and name not in visiting:
+                    reachable.add(name)
+                    visiting.add(name)
+                    visit(self.defs[name])
+                    visiting.remove(name)
+
+            refs = node.get('refs')
+            if isinstance(refs, list):
+                for ref in refs:
+                    visit({'type': 'ref', 'ref': ref})
+
+            properties = node.get('properties')
+            if isinstance(properties, dict):
+                for property_schema in properties.values():
+                    visit(property_schema)
+
+            visit(node.get('items'))
+            visit(node.get('record'))
+
+        visit(input_schema)
+        return reachable
+
     def generate_properties(
         self,
         properties,
@@ -69,6 +126,7 @@ class SwiftCodeGenerator:
         current_struct_name,
         context_identity=None,
         nullable_fields=None,
+        server_input=False,
     ):
         nullable_fields = nullable_fields or []
         swift_properties = []
@@ -113,6 +171,8 @@ class SwiftCodeGenerator:
                 'optional': is_optional,
                 'wire_optional': is_wire_optional,
                 'required_nullable': not is_wire_optional and is_nullable,
+                'nullable': is_nullable,
+                'server_input': server_input,
                 'description': description,
                 'boxed': should_box,
                 'strict_decode': strict_decode,
@@ -205,6 +265,7 @@ class SwiftCodeGenerator:
                 input_schema.get('required', []),
                 "Input",
                 nullable_fields=input_schema.get('nullable', []),
+                server_input=self.emit_server_contracts,
             )
             self.input_properties = properties
 
@@ -364,7 +425,8 @@ class SwiftCodeGenerator:
                     'wire_fragment': name,
                     'properties': properties, 
                     'conformance': conformance,
-                    'sub_structs': sub_structs
+                    'sub_structs': sub_structs,
+                    'server_input': name in self.server_input_definitions,
                 }
             elif def_schema.get('type', '') == "array" and def_schema.get('items', {}).get('type', '') == 'union':
                 union_array_name = convert_to_camel_case(name) + ""
@@ -379,7 +441,8 @@ class SwiftCodeGenerator:
                     'wire_fragment': name,
                     'properties': properties,
                     'conformance': ': ATProtocolCodable, ATProtocolValue',
-                    'sub_structs': {}
+                    'sub_structs': {},
+                    'server_input': name in self.server_input_definitions,
                 }
             elif def_schema.get('type', "") == "string" and 'enum' in def_schema:
                 enum_name = f"Defs{convert_to_camel_case(name)}"
