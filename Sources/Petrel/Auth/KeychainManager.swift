@@ -249,9 +249,17 @@ enum KeychainManager {
         #endif
     }
 
-    private static func isItemNotFound(_ error: Error) -> Bool {
-        guard case let KeychainError.itemRetrievalError(status) = error else { return false }
-        return status == itemNotFoundStatus
+    /// True when `error` reports that the item simply does not exist, as opposed to
+    /// a storage failure. Callers use this to tell absence from "could not read",
+    /// which must never be collapsed into the same nil.
+    static func isItemNotFound(_ error: Error) -> Bool {
+        switch error {
+        case let KeychainError.itemRetrievalError(status),
+             let KeychainError.deletionError(status):
+            return status == itemNotFoundStatus
+        default:
+            return false
+        }
     }
 
     /// Configure cache limits
@@ -452,14 +460,33 @@ enum KeychainManager {
         accessGroup: String? = nil
     ) throws {
         let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-        try storage.delete(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
-        if resolvedAccessGroup != nil {
-            try? storage.delete(key: key, namespace: namespace, accessGroup: nil)
+        let namespacedKey = "\(namespace).\(key)"
+
+        // Remove from cache before either delete so a failure below cannot leave a
+        // deleted item readable from memory.
+        dataCache.removeObject(forKey: namespacedKey as NSString)
+
+        do {
+            try storage.delete(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
+        } catch {
+            LogManager.logError("KeychainManager - Failed to delete item for key \(namespacedKey): \(error)")
+            throw error
         }
 
-        // Remove from cache
-        let namespacedKey = "\(namespace).\(key)"
-        dataCache.removeObject(forKey: namespacedKey as NSString)
+        if resolvedAccessGroup != nil {
+            // `retrieve` re-migrates the legacy no-access-group copy on the next read,
+            // so a silently skipped deletion resurrects the credential we just removed.
+            do {
+                try storage.delete(key: key, namespace: namespace, accessGroup: nil)
+            } catch {
+                guard isItemNotFound(error) else {
+                    LogManager.logError(
+                        "KeychainManager - Deleted item for key \(namespacedKey) from the access group but failed to delete the legacy copy: \(error). The legacy copy would be re-migrated on the next read."
+                    )
+                    throw error
+                }
+            }
+        }
 
         LogManager.logDebug("KeychainManager: Successfully deleted item for key \(namespacedKey).")
     }
@@ -584,7 +611,18 @@ enum KeychainManager {
         let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
         try storage.deleteDPoPKey(keyTag: keyTag, accessGroup: resolvedAccessGroup)
         if resolvedAccessGroup != nil {
-            try? storage.deleteDPoPKey(keyTag: keyTag, accessGroup: nil)
+            // `retrieveDPoPKeyRepresentation` re-migrates the legacy no-access-group
+            // key on the next read, so a skipped deletion resurrects a revoked key.
+            do {
+                try storage.deleteDPoPKey(keyTag: keyTag, accessGroup: nil)
+            } catch {
+                guard isItemNotFound(error) else {
+                    LogManager.logError(
+                        "KeychainManager - Deleted DPoP key for tag \(keyTag) from the access group but failed to delete the legacy copy: \(error). The legacy key would be re-migrated on the next read."
+                    )
+                    throw error
+                }
+            }
         }
     }
 

@@ -29,6 +29,11 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     var storeFailuresRemaining = 0
     /// Fail store calls whose (un-namespaced) key matches this predicate.
     var failStoreMatching: (@Sendable (String) -> Bool)?
+    /// Fail retrieve calls whose (un-namespaced) key matches this predicate, with a
+    /// storage error rather than "not found" — the case callers must not read as absence.
+    var failRetrieveMatching: (@Sendable (String) -> Bool)?
+    /// Fail delete calls whose (un-namespaced) key matches this predicate.
+    var failDeleteMatching: (@Sendable (String) -> Bool)?
 
     private func fullKey(_ key: String, _ namespace: String) -> String {
         "\(namespace)|\(key)"
@@ -51,8 +56,12 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         lock.lock()
         let data = items[fullKey(key, namespace)]
         let observer = operationObserver
+        let shouldFail = failRetrieveMatching?(key) ?? false
         lock.unlock()
         observer?(.retrieve, key)
+        if shouldFail {
+            throw KeychainError.itemRetrievalError(status: -25308)
+        }
         guard let data else {
             throw KeychainError.itemRetrievalError(status: -25300)
         }
@@ -61,10 +70,16 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
 
     func delete(key: String, namespace: String, accessGroup _: String?) throws {
         lock.lock()
-        items.removeValue(forKey: fullKey(key, namespace))
+        let shouldFail = failDeleteMatching?(key) ?? false
+        if !shouldFail {
+            items.removeValue(forKey: fullKey(key, namespace))
+        }
         let observer = operationObserver
         lock.unlock()
         observer?(.delete, key)
+        if shouldFail {
+            throw KeychainError.deletionError(status: -25308)
+        }
     }
 
     func deleteAll(namespace: String, accessGroup _: String?) throws {
@@ -98,6 +113,14 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         items[fullKey(key, namespace)] = data
+    }
+
+    /// Reads raw bytes without going through `KeychainManager` (no cache, no failure
+    /// scripting) — used to assert what actually landed in storage.
+    func peek(key: String, namespace: String) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        return items[fullKey(key, namespace)]
     }
 
     func setOperationObserver(_ observer: (@Sendable (Operation, String) -> Void)?) {

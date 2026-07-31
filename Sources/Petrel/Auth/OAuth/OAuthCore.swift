@@ -283,8 +283,19 @@ actor OAuthCore {
             throw AuthError.dpopKeyError
         }
 
-        // Check if this is an OAuth session that requires a specific key
-        if let session = try? await storage.getSession(for: did), session.tokenType == .dpop {
+        // Check if this is an OAuth session that requires a specific key. A failed
+        // session read must not be taken for "first login": minting a fresh key would
+        // permanently break the cnf/jkt binding of the tokens already issued.
+        let existingSession: Session?
+        do {
+            existingSession = try await storage.getSession(for: did)
+        } catch {
+            LogManager.logError(
+                "Cannot determine whether DID \(LogManager.logDID(did)) has a DPoP-bound session (\(error)); refusing to mint a new DPoP key"
+            )
+            throw AuthError.dpopKeyError
+        }
+        if let existingSession, existingSession.tokenType == .dpop {
             throw AuthError.dpopKeyError
         }
 

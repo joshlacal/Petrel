@@ -192,7 +192,7 @@ public actor KeychainStorage {
 
         // Newest-wins guard: refresh tokens are single-use and rotate on every refresh,
         // so overwriting a newer session with an older one bricks the account.
-        if isStaleSessionWrite(session, for: did) {
+        if try isStaleSessionWrite(session, for: did) {
             LogManager.logWarning(
                 "Refusing to overwrite newer stored session with stale one (createdAt \(session.createdAt)) for DID: \(LogManager.logDID(did))"
             )
@@ -210,7 +210,7 @@ public actor KeychainStorage {
         // Re-check after the suspension above: another save may have committed a
         // newer session while this call was suspended. The commit block below is
         // fully synchronous, so this check cannot be bypassed again.
-        if isStaleSessionWrite(session, for: did) {
+        if try isStaleSessionWrite(session, for: did) {
             LogManager.logWarning(
                 "Newer session committed while suspended; skipping stale save for DID: \(LogManager.logDID(did))"
             )
@@ -287,52 +287,84 @@ public actor KeychainStorage {
             )
 
             // Recovery: Attempt to restore from backups if final saves failed
-            if let backupAccountData = try? KeychainManager.retrieve(
-                key: backupAccountKey, namespace: namespace, accessGroup: accessGroup
-            ) {
-                do {
-                    try KeychainManager.store(key: accountKey, value: backupAccountData, namespace: namespace, accessGroup: accessGroup)
-                    LogManager.logDebug("Account restored from backup for DID: \(LogManager.logDID(did))")
-                } catch {
-                    LogManager.logError(
-                        "Failed to restore account backup for DID: \(LogManager.logDID(did)), error: \(error)"
-                    )
-                }
-            }
-
-            if let backupSessionData = try? KeychainManager.retrieve(
-                key: backupSessionKey, namespace: namespace, accessGroup: accessGroup
-            ) {
-                do {
-                    try KeychainManager.store(key: sessionKey, value: backupSessionData, namespace: namespace, accessGroup: accessGroup)
-                    LogManager.logDebug("Session restored from backup for DID: \(LogManager.logDID(did))")
-                } catch {
-                    LogManager.logError(
-                        "Failed to restore session backup for DID: \(LogManager.logDID(did)), error: \(error)"
-                    )
-                }
-            }
+            let accountRestored = restoreFromBackup(
+                backupKey: backupAccountKey, into: accountKey, label: "account", did: did
+            )
+            let sessionRestored = restoreFromBackup(
+                backupKey: backupSessionKey, into: sessionKey, label: "session", did: did
+            )
 
             // Cleanup temporary files in error case
             try? KeychainManager.delete(key: tempAccountKey, namespace: namespace, accessGroup: accessGroup)
             try? KeychainManager.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
+            // A backup is only redundant once its contents are back in place; deleting
+            // one we failed to restore from destroys the very copy recovery needs.
+            if accountRestored {
+                try? KeychainManager.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
+            }
+            if sessionRestored {
+                try? KeychainManager.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
+            }
+            if !accountRestored || !sessionRestored {
+                LogManager.logError(
+                    "Keeping backup copies for DID: \(LogManager.logDID(did)) because a restore did not complete (account restored: \(accountRestored), session restored: \(sessionRestored))"
+                )
+            }
 
             throw error
         }
     }
 
+    /// Copies a backup entry back over its primary key.
+    /// - Returns: True when the primary is known to hold the backed-up value, or when
+    ///   there was no backup to restore. False means the backup must be kept.
+    private func restoreFromBackup(
+        backupKey: String, into primaryKey: String, label: String, did: String
+    ) -> Bool {
+        let backupData: Data
+        do {
+            backupData = try KeychainManager.retrieve(
+                key: backupKey, namespace: namespace, accessGroup: accessGroup
+            )
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return true }
+            LogManager.logError(
+                "Could not read \(label) backup for DID: \(LogManager.logDID(did)), error: \(error)"
+            )
+            return false
+        }
+
+        do {
+            try KeychainManager.store(
+                key: primaryKey, value: backupData, namespace: namespace, accessGroup: accessGroup
+            )
+            LogManager.logDebug("\(label.capitalized) restored from backup for DID: \(LogManager.logDID(did))")
+            return true
+        } catch {
+            LogManager.logError(
+                "Failed to restore \(label) backup for DID: \(LogManager.logDID(did)), error: \(error)"
+            )
+            return false
+        }
+    }
+
     /// Retrieves an account from the keychain.
     /// - Parameter did: The DID of the account to retrieve
-    /// - Returns: The account if found, or nil if not found
+    /// - Returns: The account, or nil only when no account is stored for `did`.
+    /// - Throws: The underlying storage error when the account could not be read or
+    ///   decoded. Absence and failure are deliberately distinct: callers repair or
+    ///   delete state based on "no account", and a failed read is not that.
     public func getAccount(for did: String) async throws -> Account? {
         let key = makeKey("account", did: did)
         do {
             let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return try JSONDecoder().decode(Account.self, from: data)
         } catch {
-            return nil
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError(
+                "KeychainStorage - Failed to read account for DID \(LogManager.logDID(did)): \(error)"
+            )
+            throw error
         }
     }
 
@@ -347,14 +379,27 @@ public actor KeychainStorage {
     }
 
     /// Lists all account DIDs stored in the keychain.
-    /// - Returns: An array of DIDs
+    /// - Returns: The stored DIDs, or an empty array only when no list has been stored.
+    /// - Throws: The underlying storage error when the list could not be read or
+    ///   decoded — an empty array would otherwise read as "no accounts" and let
+    ///   `addToAccountsList`/`removeFromAccountsList` overwrite the real list.
     public func listAccountDIDs() async throws -> [String] {
         let key = makeKey("accountDIDs")
+        let data: Data
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return [] }
+            LogManager.logError("KeychainStorage - Failed to read the account DID list: \(error)")
+            throw error
+        }
+        do {
             return try JSONDecoder().decode([String].self, from: data)
         } catch {
-            return []
+            // Reported as a distinct error so the write paths can rebuild the list;
+            // a storage failure above must never be repaired by overwriting.
+            LogManager.logError("KeychainStorage - Stored account DID list could not be decoded: \(error)")
+            throw KeychainError.dataFormatError
         }
     }
 
@@ -374,14 +419,21 @@ public actor KeychainStorage {
     }
 
     /// Retrieves the current DID from the keychain.
-    /// - Returns: The current DID if found, or nil if not found
+    /// - Returns: The current DID, or nil only when none has been stored.
+    /// - Throws: The underlying storage error when the selector could not be read.
     public func getCurrentDID() async throws -> String? {
         let key = makeKey("currentDID")
         do {
             let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
-            return String(data: data, encoding: .utf8)
+            guard let did = String(data: data, encoding: .utf8) else {
+                LogManager.logError("KeychainStorage - Stored current DID is not valid UTF-8")
+                throw KeychainError.dataFormatError
+            }
+            return did
         } catch {
-            return nil
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError("KeychainStorage - Failed to read the current DID: \(error)")
+            throw error
         }
     }
 
@@ -403,17 +455,32 @@ public actor KeychainStorage {
         LogManager.logInfo("KeychainStorage - Successfully saved gateway session for DID: \(did.prefix(20))...")
     }
 
-    /// Retrieves the gateway session for a specific account
+    /// Retrieves the gateway session for a specific account.
+    /// - Returns: The session, or nil only when none is stored for `did` (including
+    ///   the legacy locations).
+    /// - Throws: The underlying storage error when the session could not be read.
+    ///   Legacy migration is deliberately not attempted in that case: it would
+    ///   overwrite a per-DID session that is present but momentarily unreadable.
     func getGatewaySession(for did: String) async throws -> String? {
         let key = makeKey("gatewaySession", did: did)
         LogManager.logInfo("KeychainStorage - Looking for gateway session with key: \(namespace).\(key)")
         do {
             let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             LogManager.logInfo("KeychainStorage - Retrieved gateway session for DID: \(did.prefix(20))...")
-            return String(data: data, encoding: .utf8)
+            guard let session = String(data: data, encoding: .utf8) else {
+                LogManager.logError("KeychainStorage - Stored gateway session is not valid UTF-8 for key \(namespace).\(key)")
+                throw KeychainError.dataFormatError
+            }
+            return session
         } catch {
-            LogManager.logWarning("KeychainStorage - Gateway session not found for key \(namespace).\(key): \(error). Attempting legacy migration...")
-            if let migratedSession = await migrateLegacyGatewaySessionIfNeeded(for: did) {
+            guard KeychainManager.isItemNotFound(error) else {
+                LogManager.logError(
+                    "KeychainStorage - Failed to read gateway session for key \(namespace).\(key): \(error). Not treating this as a missing session."
+                )
+                throw error
+            }
+            LogManager.logWarning("KeychainStorage - Gateway session not found for key \(namespace).\(key). Attempting legacy migration...")
+            if let migratedSession = try await migrateLegacyGatewaySessionIfNeeded(for: did) {
                 LogManager.logInfo("KeychainStorage - Successfully migrated legacy gateway session for DID: \(did.prefix(20))...")
                 return migratedSession
             }
@@ -436,53 +503,107 @@ public actor KeychainStorage {
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
     }
 
-    private func shouldMigrateLegacyGatewaySession(for did: String) async -> Bool {
+    private func shouldMigrateLegacyGatewaySession(for did: String) async throws -> Bool {
         guard !did.isEmpty else { return false }
 
-        if let currentDID = try? await getCurrentDID(), !currentDID.isEmpty {
+        if let currentDID = try await getCurrentDID(), !currentDID.isEmpty {
             return currentDID == did
         }
 
-        if let dids = try? await listAccountDIDs(), dids.count == 1, dids.first == did {
-            return true
-        }
-
-        return false
+        let dids = try await listAccountDIDs()
+        return dids.count == 1 && dids.first == did
     }
 
-    private func migrateLegacyGatewaySessionIfNeeded(for did: String) async -> String? {
-        guard await shouldMigrateLegacyGatewaySession(for: did) else { return nil }
+    /// - Throws: The underlying storage error when a legacy location could not be
+    ///   read. Swallowing it would report "no gateway session" for an account whose
+    ///   session exists, sending startup validation down the re-authentication path.
+    private func migrateLegacyGatewaySessionIfNeeded(for did: String) async throws -> String? {
+        guard try await shouldMigrateLegacyGatewaySession(for: did) else { return nil }
 
-        if let legacySession = await getLegacyGatewaySession(), !legacySession.isEmpty {
+        if let legacySession = try await getLegacyGatewaySession(), !legacySession.isEmpty {
             LogManager.logInfo(
                 "KeychainStorage - Migrating legacy gateway session to per-DID storage for DID: \(did.prefix(20))..."
             )
-            try? await saveGatewaySession(legacySession, for: did)
-            try? await deleteLegacyGatewaySession()
+            if await persistMigratedGatewaySession(legacySession, for: did) {
+                do {
+                    try await deleteLegacyGatewaySession()
+                } catch {
+                    LogManager.logWarning(
+                        "KeychainStorage - Migrated legacy gateway session but failed to remove the source copy: \(error)"
+                    )
+                }
+            }
             return legacySession
         }
 
-        if let data = try? await KeychainManager.retrieveAsync(
-            key: "gatewaySession",
-            namespace: "catbird.gateway",
-            accessGroup: accessGroup
-        ),
-            let session = String(data: data, encoding: .utf8),
-            !session.isEmpty
+        if let data = try await readGlobalGatewaySession(),
+           let session = String(data: data, encoding: .utf8),
+           !session.isEmpty
         {
             LogManager.logInfo(
                 "KeychainStorage - Migrating global gateway session to per-DID storage for DID: \(did.prefix(20))..."
             )
-            try? await saveGatewaySession(session, for: did)
-            try? await KeychainManager.deleteAsync(
-                key: "gatewaySession",
-                namespace: "catbird.gateway",
-                accessGroup: accessGroup
-            )
+            if await persistMigratedGatewaySession(session, for: did) {
+                do {
+                    try await KeychainManager.deleteAsync(
+                        key: "gatewaySession",
+                        namespace: "catbird.gateway",
+                        accessGroup: accessGroup
+                    )
+                } catch {
+                    LogManager.logWarning(
+                        "KeychainStorage - Migrated global gateway session but failed to remove the source copy: \(error)"
+                    )
+                }
+            }
             return session
         }
 
         return nil
+    }
+
+    /// Reads the pre-multi-account gateway session from its global namespace.
+    /// - Returns: The raw bytes, or nil only when nothing is stored there.
+    private func readGlobalGatewaySession() async throws -> Data? {
+        do {
+            return try await KeychainManager.retrieveAsync(
+                key: "gatewaySession",
+                namespace: "catbird.gateway",
+                accessGroup: accessGroup
+            )
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError("KeychainStorage - Failed to read the global gateway session: \(error)")
+            throw error
+        }
+    }
+
+    /// Writes a migrated gateway session to per-DID storage and reads it back.
+    /// - Returns: True only when the new copy is verified readable, so the caller
+    ///   never deletes the source of a migration that did not land.
+    private func persistMigratedGatewaySession(_ session: String, for did: String) async -> Bool {
+        do {
+            try await saveGatewaySession(session, for: did)
+        } catch {
+            LogManager.logError(
+                "KeychainStorage - Failed to persist migrated gateway session for DID: \(did.prefix(20))...: \(error). Keeping the legacy copy."
+            )
+            return false
+        }
+
+        let key = makeKey("gatewaySession", did: did)
+        guard
+            let verification = try? await KeychainManager.retrieveAsync(
+                key: key, namespace: namespace, accessGroup: accessGroup
+            ),
+            String(data: verification, encoding: .utf8) == session
+        else {
+            LogManager.logError(
+                "KeychainStorage - Could not verify migrated gateway session for DID: \(did.prefix(20)).... Keeping the legacy copy."
+            )
+            return false
+        }
+        return true
     }
 
     /// Legacy single-session methods for backward compatibility during migration
@@ -493,7 +614,7 @@ public actor KeychainStorage {
 
     @available(*, deprecated, message: "Use getGatewaySession(for:) for multi-account support")
     func getGatewaySession() async throws -> String? {
-        await getLegacyGatewaySession()
+        try await getLegacyGatewaySession()
     }
 
     @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
@@ -514,13 +635,15 @@ public actor KeychainStorage {
         }
     }
 
-    private func getLegacyGatewaySession() async -> String? {
+    private func getLegacyGatewaySession() async throws -> String? {
         let key = makeKey("gatewaySession")
         do {
             let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return String(data: data, encoding: .utf8)
         } catch {
-            return nil
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError("KeychainStorage - Failed to read the legacy gateway session: \(error)")
+            throw error
         }
     }
 
@@ -567,7 +690,7 @@ public actor KeychainStorage {
 
         // Newest-wins guard: never replace a newer stored session with an older one
         // (single-use rotating refresh tokens make stale overwrites unrecoverable).
-        if isStaleSessionWrite(session, for: did) {
+        if try isStaleSessionWrite(session, for: did) {
             LogManager.logWarning(
                 "Refusing to overwrite newer stored session with stale one (createdAt \(session.createdAt)) for DID: \(LogManager.logDID(did))"
             )
@@ -684,9 +807,25 @@ public actor KeychainStorage {
 
         case .finalSaveFailed, .verificationFailed, .unexpectedError:
             // For final save or verification failures, attempt recovery from backup
-            if let backupData = try? KeychainManager.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup) {
+            var restored = false
+            var backupData: Data?
+            do {
+                backupData = try KeychainManager.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+            } catch {
+                if KeychainManager.isItemNotFound(error) {
+                    // Nothing was backed up, so nothing needs preserving.
+                    restored = true
+                } else {
+                    LogManager.logError(
+                        "Could not read session backup for DID: \(LogManager.logDID(did)): \(error)"
+                    )
+                }
+            }
+
+            if let backupData {
                 do {
                     try KeychainManager.store(key: key, value: backupData, namespace: namespace, accessGroup: accessGroup)
+                    restored = true
                     LogManager.logInfo(
                         "Session restored from backup after save failure for DID: \(LogManager.logDID(did))"
                     )
@@ -699,7 +838,15 @@ public actor KeychainStorage {
 
             // Always cleanup temporary files in error cases
             try? KeychainManager.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+            // Only drop the backup once its contents are known to be back in place;
+            // deleting the copy we just failed to restore from destroys the session.
+            if restored {
+                try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+            } else {
+                LogManager.logError(
+                    "Keeping the session backup for DID: \(LogManager.logDID(did)) because the restore did not complete; getSession can still recover from it"
+                )
+            }
         }
     }
 
@@ -761,27 +908,42 @@ public actor KeychainStorage {
     ///   - bypassCache: When true, reads the keychain directly instead of the
     ///     in-memory cache — required to observe rotations made by other processes
     ///     sharing the access group (e.g. app extensions) before refreshing.
-    /// - Returns: The session if found, or nil if not found
+    /// - Returns: The session, or nil only when no copy exists anywhere.
+    /// - Throws: The underlying storage error when the primary copy could not be read
+    ///   (its freshness is then unknown, so no fallback may be promoted over it), or
+    ///   when no copy could be read at all and at least one read failed. A *missing*
+    ///   copy still falls through to the next candidate; only absence proven by
+    ///   successful reads is reported as nil, because callers delete state on nil.
     public func getSession(for did: String, bypassCache: Bool = false) async throws -> Session? {
         let key = makeKey("session", did: did)
         let tempKey = makeKey("session.temp", did: did)
         let backupKey = makeKey("session.backup", did: did)
         let pendingKey = makeKey("session.pending", did: did)
 
-        let primary = decodeSession(
-            try? await KeychainManager.retrieveAsync(
-                key: key, namespace: namespace, accessGroup: accessGroup, bypassCache: bypassCache
+        var readErrors: [Error] = []
+
+        let primaryRead = await readSessionCopy(key, for: did, bypassCache: bypassCache)
+        if let primaryError = primaryRead.error {
+            // Every fallback below is resolved against the primary's `createdAt` and
+            // then written back over the primary key. A primary that failed to read
+            // may hold a newer session than any copy, so promoting one here would do
+            // exactly what this newest-wins logic exists to prevent: replace a newer
+            // session with an older, already-rotated refresh token.
+            LogManager.logError(
+                "KeychainStorage - Primary session unreadable for DID: \(LogManager.logDID(did)); refusing to promote a fallback copy over it: \(primaryError)"
             )
-        )
+            throw primaryError
+        }
+        let primary = decodeSession(primaryRead.data)
 
         // A pending session exists only if a refresh succeeded but the atomic save
         // failed. The server has already rotated the refresh token, so the pending
         // copy is authoritative when newer: promote it to primary.
-        if let pending = decodeSession(
-            try? await KeychainManager.retrieveAsync(
-                key: pendingKey, namespace: namespace, accessGroup: accessGroup, bypassCache: bypassCache
-            )
-        ), primary == nil || pending.createdAt > primary!.createdAt {
+        let pendingRead = await readSessionCopy(pendingKey, for: did, bypassCache: bypassCache)
+        if let error = pendingRead.error { readErrors.append(error) }
+        if let pending = decodeSession(pendingRead.data),
+           primary == nil || pending.createdAt > primary!.createdAt
+        {
             LogManager.logInfo(
                 "Promoting pending session to primary for DID: \(LogManager.logDID(did))"
             )
@@ -804,18 +966,26 @@ public actor KeychainStorage {
         // Primary unreadable: recover the NEWEST of temp/backup. Restoring blindly
         // could resurrect an already-rotated (single-use) refresh token, so pick by
         // createdAt and only write back because no readable primary exists.
-        let temp = decodeSession(
-            try? await KeychainManager.retrieveAsync(key: tempKey, namespace: namespace, accessGroup: accessGroup)
-        )
-        let backup = decodeSession(
-            try? await KeychainManager.retrieveAsync(key: backupKey, namespace: namespace, accessGroup: accessGroup)
-        )
+        let tempRead = await readSessionCopy(tempKey, for: did)
+        if let error = tempRead.error { readErrors.append(error) }
+        let backupRead = await readSessionCopy(backupKey, for: did)
+        if let error = backupRead.error { readErrors.append(error) }
+        let temp = decodeSession(tempRead.data)
+        let backup = decodeSession(backupRead.data)
 
         let candidates = [(temp, tempKey, "temporary"), (backup, backupKey, "backup")]
             .compactMap { session, sourceKey, label in session.map { ($0, sourceKey, label) } }
             .sorted { $0.0.createdAt > $1.0.createdAt }
 
         guard let (recovered, sourceKey, label) = candidates.first else {
+            if let firstError = readErrors.first {
+                // No copy was readable and at least one read genuinely failed, so
+                // "no session" is not a supported conclusion: report the failure.
+                LogManager.logError(
+                    "KeychainStorage - No session copy could be read for DID: \(LogManager.logDID(did)) (\(readErrors.count) read failure(s)); reporting the read error instead of absence"
+                )
+                throw firstError
+            }
             return nil
         }
 
@@ -830,6 +1000,28 @@ public actor KeychainStorage {
         return recovered
     }
 
+    /// Reads one stored session copy.
+    /// - Returns: The raw bytes when present, plus the storage error when the read
+    ///   itself failed. A copy that is simply absent yields `(nil, nil)` so the
+    ///   caller can fall through to the next candidate without losing the
+    ///   distinction between "not stored" and "could not be read".
+    private func readSessionCopy(
+        _ copyKey: String, for did: String, bypassCache: Bool = false
+    ) async -> (data: Data?, error: Error?) {
+        do {
+            let data = try await KeychainManager.retrieveAsync(
+                key: copyKey, namespace: namespace, accessGroup: accessGroup, bypassCache: bypassCache
+            )
+            return (data, nil)
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return (nil, nil) }
+            LogManager.logError(
+                "KeychainStorage - Failed to read session copy \(namespace).\(copyKey) for DID: \(LogManager.logDID(did)): \(error)"
+            )
+            return (nil, error)
+        }
+    }
+
     /// Decodes a session from optional raw keychain data, returning nil on any failure.
     private func decodeSession(_ data: Data?) -> Session? {
         guard let data else { return nil }
@@ -838,12 +1030,32 @@ public actor KeychainStorage {
 
     /// Returns true if a decodable stored session for `did` is newer than `session`.
     /// Used by save paths so interleaved writers converge on the newest session.
-    private func isStaleSessionWrite(_ session: Session, for did: String) -> Bool {
+    ///
+    /// Fails closed: if the stored session cannot be read, the write is refused by
+    /// throwing rather than allowed, because the unreadable copy may be newer and a
+    /// single-use refresh token overwritten by an older one is unrecoverable.
+    /// Throwing (rather than silently reporting "stale") is what lets the caller
+    /// fall back to `savePendingSession` instead of believing the write landed.
+    /// A stored session that reads back but cannot be *decoded* is unusable to every
+    /// reader, so overwriting it is the repair path, not a loss.
+    private func isStaleSessionWrite(_ session: Session, for did: String) throws -> Bool {
         let key = makeKey("session", did: did)
-        guard
-            let data = try? KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup),
-            let existing = try? JSONDecoder().decode(Session.self, from: data)
-        else { return false }
+        let data: Data
+        do {
+            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return false }
+            LogManager.logError(
+                "KeychainStorage - Cannot compare against the stored session for DID: \(LogManager.logDID(did)): \(error). Refusing the write rather than risk overwriting a newer session."
+            )
+            throw error
+        }
+        guard let existing = try? JSONDecoder().decode(Session.self, from: data) else {
+            LogManager.logError(
+                "KeychainStorage - Stored session for DID: \(LogManager.logDID(did)) could not be decoded; allowing the write to replace it."
+            )
+            return false
+        }
         return session.createdAt < existing.createdAt
     }
 
@@ -859,12 +1071,32 @@ public actor KeychainStorage {
 
     /// Deletes a session from the keychain, including pending/temp/backup copies
     /// so no recovery path can resurrect it.
+    ///
+    /// Every copy is attempted, but a copy left behind is reported: `getSession`
+    /// promotes pending/temp/backup copies, so a best-effort deletion here means a
+    /// logged-out session comes back on the next read.
     /// - Parameter did: The DID associated with the session to delete
     public func deleteSession(for did: String) async throws {
-        let key = makeKey("session", did: did)
-        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
-        for suffix in ["session.pending", "session.temp", "session.backup"] {
-            try? KeychainManager.delete(key: makeKey(suffix, did: did), namespace: namespace, accessGroup: accessGroup)
+        var failures: [Error] = []
+        for suffix in ["session", "session.pending", "session.temp", "session.backup"] {
+            do {
+                try KeychainManager.delete(key: makeKey(suffix, did: did), namespace: namespace, accessGroup: accessGroup)
+            } catch {
+                guard KeychainManager.isItemNotFound(error) else {
+                    LogManager.logError(
+                        "KeychainStorage - Failed to delete \(suffix) for DID: \(LogManager.logDID(did)): \(error)"
+                    )
+                    failures.append(error)
+                    continue
+                }
+            }
+        }
+
+        if let first = failures.first {
+            LogManager.logError(
+                "KeychainStorage - \(failures.count) session copy/copies survived deletion for DID: \(LogManager.logDID(did)); a later read could resurrect the session"
+            )
+            throw first
         }
     }
 
@@ -1037,13 +1269,29 @@ public actor KeychainStorage {
 
     /// Retrieves DPoP nonces from the keychain.
     /// - Parameter did: The DID associated with the nonces to retrieve
-    /// - Returns: The nonces if found, or nil if not found
+    /// - Returns: The nonces, or nil when none are stored or the stored map cannot be
+    ///   decoded. Callers treat nil as an empty map and rewrite the store, which is
+    ///   the only way an undecodable map is ever repaired — throwing here would abort
+    ///   every nonce update before it saved, wedging DPoP retries permanently.
+    /// - Throws: The underlying storage error when the nonces could not be read.
     public func getDPoPNonces(for did: String) async throws -> [String: String]? {
         let key = makeKey("dpopNonces", did: did)
+        let data: Data
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError(
+                "KeychainStorage - Failed to read DPoP nonces for DID: \(LogManager.logDID(did)): \(error)"
+            )
+            throw error
+        }
+        do {
             return try JSONDecoder().decode([String: String].self, from: data)
         } catch {
+            LogManager.logError(
+                "KeychainStorage - Stored DPoP nonces for DID: \(LogManager.logDID(did)) could not be decoded (\(error)); treating them as empty so the next update rewrites the store"
+            )
             return nil
         }
     }
@@ -1062,13 +1310,28 @@ public actor KeychainStorage {
 
     /// Retrieves DPoP nonces scoped by JKT (key thumbprint) from the keychain.
     /// - Parameter did: The DID associated with these nonces
-    /// - Returns: Mapping of JKT -> (domain -> nonce) if found
+    /// - Returns: Mapping of JKT -> (domain -> nonce), or nil when none are stored or
+    ///   the stored map cannot be decoded — see `getDPoPNonces` for why an
+    ///   undecodable map is reported as absent rather than as an error.
+    /// - Throws: The underlying storage error when the nonces could not be read.
     public func getDPoPNoncesByJKT(for did: String) async throws -> [String: [String: String]]? {
         let key = makeKey("dpopNoncesByJKT", did: did)
+        let data: Data
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError(
+                "KeychainStorage - Failed to read JKT-scoped DPoP nonces for DID: \(LogManager.logDID(did)): \(error)"
+            )
+            throw error
+        }
+        do {
             return try JSONDecoder().decode([String: [String: String]].self, from: data)
         } catch {
+            LogManager.logError(
+                "KeychainStorage - Stored JKT-scoped DPoP nonces for DID: \(LogManager.logDID(did)) could not be decoded (\(error)); treating them as empty so the next update rewrites the store"
+            )
             return nil
         }
     }
@@ -1092,7 +1355,9 @@ public actor KeychainStorage {
             let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
             return try JSONDecoder().decode(OAuthState.self, from: data)
         } catch {
-            return nil
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError("KeychainStorage - Failed to read OAuth state: \(error)")
+            throw error
         }
     }
 
@@ -1116,9 +1381,25 @@ public actor KeychainStorage {
             LogManager.logDebug("Validating authentication state for \(accountDIDs.count) accounts")
 
             for did in accountDIDs {
-                let accountExists = try (await getAccount(for: did)) != nil
-                let sessionExists = try (await getSession(for: did)) != nil
-                let gatewaySessionExists = (try? await getGatewaySession(for: did)) != nil
+                // Every branch below is destructive or advises re-authentication, and
+                // each decision turns on something being *absent*. A read that failed
+                // is not an absence, so a DID whose state cannot be read is skipped
+                // rather than repaired — the previous code deleted live sessions when
+                // the account read failed.
+                let accountExists: Bool
+                let sessionExists: Bool
+                let gatewaySessionExists: Bool
+                do {
+                    accountExists = try await getAccount(for: did) != nil
+                    sessionExists = try await getSession(for: did) != nil
+                    gatewaySessionExists = try await getGatewaySession(for: did) != nil
+                } catch {
+                    LogManager.logError(
+                        "Skipping auth-state repair for DID \(LogManager.logDID(did)): stored state could not be read (\(error)). Repair requires proven absence."
+                    )
+                    result.unreadableStates.append(did)
+                    continue
+                }
                 let hasAuthSession = sessionExists || gatewaySessionExists
 
                 if accountExists && !hasAuthSession {
@@ -1241,11 +1522,14 @@ public actor KeychainStorage {
         var cleanedOrphanedAccounts: [String] = []
         var cleanedOrphanedSessions: [String] = []
         var requiresReauth: [String] = []
+        /// DIDs whose stored state could not be read, so no repair was attempted.
+        var unreadableStates: [String] = []
         var validationError: Error?
 
         var hasIssues: Bool {
             return !inconsistentStates.isEmpty || !cleanedOrphanedAccounts.isEmpty
-                || !cleanedOrphanedSessions.isEmpty || !requiresReauth.isEmpty || validationError != nil
+                || !cleanedOrphanedSessions.isEmpty || !requiresReauth.isEmpty
+                || !unreadableStates.isEmpty || validationError != nil
         }
 
         var summary: String {
@@ -1264,6 +1548,9 @@ public actor KeychainStorage {
             }
             if !requiresReauth.isEmpty {
                 parts.append("\(requiresReauth.count) accounts need re-authentication")
+            }
+            if !unreadableStates.isEmpty {
+                parts.append("\(unreadableStates.count) accounts skipped (state unreadable)")
             }
             if let error = validationError {
                 parts.append("validation error: \(error)")
@@ -1294,7 +1581,7 @@ public actor KeychainStorage {
     /// - Parameter did: The DID to add
     private func addToAccountsList(_ did: String) async throws {
         let key = makeKey("accountDIDs")
-        var dids = try await listAccountDIDs()
+        var dids = try await accountDIDsForRewrite()
 
         if !dids.contains(did) {
             dids.append(did)
@@ -1303,11 +1590,25 @@ public actor KeychainStorage {
         }
     }
 
+    /// The account DID list as a basis for rewriting it. A list that cannot be
+    /// decoded is unusable to every reader, so it is rebuilt; a list that could not
+    /// be *read* is rethrown, because overwriting it would drop the other accounts.
+    private func accountDIDsForRewrite() async throws -> [String] {
+        do {
+            return try await listAccountDIDs()
+        } catch KeychainError.dataFormatError {
+            LogManager.logError(
+                "KeychainStorage - Rebuilding the account DID list from scratch because the stored list could not be decoded"
+            )
+            return []
+        }
+    }
+
     /// Removes a DID from the accounts list.
     /// - Parameter did: The DID to remove
     private func removeFromAccountsList(_ did: String) async throws {
         let key = makeKey("accountDIDs")
-        var dids = try await listAccountDIDs()
+        var dids = try await accountDIDsForRewrite()
 
         dids.removeAll { $0 == did }
         let data = try JSONEncoder().encode(dids)

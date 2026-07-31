@@ -374,12 +374,24 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             // Use the versioned persistent selector rather than AccountManager's
             // separately cached DID. KeychainStorage encloses selector and
             // gateway-session mutations in NetworkService revision signals.
-            let did = try? await storage.getCurrentDID()
+            let did: String?
             let session: String?
-            if let did, !did.isEmpty {
-                session = try? await storage.getGatewaySession(for: did)
-            } else {
-                session = nil
+            do {
+                did = try await storage.getCurrentDID()
+                if let did, !did.isEmpty {
+                    session = try await storage.getGatewaySession(for: did)
+                } else {
+                    session = nil
+                }
+            } catch {
+                // A keychain read failure is not evidence of a signed-out user.
+                // Observing it as "no identity" invalidates continuity durably (and
+                // can exhaust it), so leave the state untouched and report what is
+                // already known.
+                LogManager.logError(
+                    "AuthManager - Could not read the gateway identity (\(error)); leaving auth-continuity state untouched"
+                )
+                return .stable(authContinuity.snapshot)
             }
 
             // Calls above can re-enter this actor. Retry rather than combining
