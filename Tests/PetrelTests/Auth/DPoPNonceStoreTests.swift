@@ -23,6 +23,21 @@ private func withInMemoryStorage<T>(
     }
 }
 
+/// The `nonce` claim of a compact DPoP proof.
+private func nonceInProofString(_ compactJWS: String) throws -> String? {
+    let parts = compactJWS.split(separator: ".")
+    try #require(parts.count == 3)
+    var encoded = String(parts[1])
+        .replacingOccurrences(of: "-", with: "+")
+        .replacingOccurrences(of: "_", with: "/")
+    while encoded.count % 4 != 0 {
+        encoded += "="
+    }
+    let data = try #require(Data(base64Encoded: encoded))
+    let payload = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+    return payload["nonce"] as? String
+}
+
 /// Covers the invariant that every write of a DPoP nonce reaches all three stores
 /// `OAuthCore.createDPoPProof` reads (in-memory JKT map, persisted JKT map,
 /// persisted DID map), and that every clear empties all of them. A write landing
@@ -92,17 +107,7 @@ struct DPoPNonceStoreTests {
             type: .tokenRefresh,
             did: did
         )
-        let parts = proof.split(separator: ".")
-        try #require(parts.count == 3)
-        var encoded = String(parts[1])
-            .replacingOccurrences(of: "-", with: "+")
-            .replacingOccurrences(of: "_", with: "/")
-        while encoded.count % 4 != 0 {
-            encoded += "="
-        }
-        let data = try #require(Data(base64Encoded: encoded))
-        let payload = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
-        return payload["nonce"] as? String
+        return try nonceInProofString(proof)
     }
 
     // MARK: - Writes
@@ -211,6 +216,32 @@ struct DPoPNonceStoreTests {
 
             let proofNonce = try await nonceInProof(from: staleCore)
             #expect(proofNonce == "fresh")
+        }
+    }
+
+    @Test("A merge cannot reinstate a persisted nonce over one that failed to persist")
+    func mergeDoesNotClobberAnUnpersistedNonce() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryStorage(backend) {
+            let storage = KeychainStorage(namespace: "test.nonce.unpersisted-write")
+            let core = makeCore(storage: storage)
+            try await installDPoPKey(storage: storage, core: core)
+
+            await core.updateDPoPNonceInternal(domain: Self.host, nonce: "first", for: Self.did)
+
+            // The keychain goes read-only (device locked) and the server hands out a new
+            // nonce: memory has it, persistence still holds the one just rejected.
+            backend.failStoreMatching = { $0.hasPrefix("dpopNoncesByJKT.") }
+            defer { backend.failStoreMatching = nil }
+            let applied = await core.updateDPoPNonceInternal(
+                domain: Self.host, nonce: "second", for: Self.did
+            )
+            #expect(applied)
+
+            // This proof merges persistence. It must not restore "first" over the newer
+            // in-memory value, or the retry replays the nonce the server rejected.
+            let proofNonce = try await nonceInProof(from: core)
+            #expect(proofNonce == "second")
         }
     }
 
@@ -390,14 +421,24 @@ struct DPoPNonceStoreTests {
             let core = makeCore(storage: storage)
             let thumbprint = try await installDPoPKey(storage: storage, core: core)
 
-            // What `pushAuthorizationRequest` records before any DID exists.
-            await core.recordOAuthFlowNonce("par-nonce", for: Self.endpoint)
-            // A second login to a different authorization server, still in flight.
-            await core.recordOAuthFlowNonce("other-par-nonce", for: "https://auth.other.test/par")
-            let recorded = await core.oauthFlowNonces
-            #expect(recorded[Self.host] == "par-nonce")
+            // What `pushAuthorizationRequest` records before any DID exists. This flow's
+            // ephemeral key is the one already installed for the DID.
+            await core.recordOAuthFlowNonce(
+                "par-nonce", for: Self.endpoint, keyThumbprint: thumbprint
+            )
+            // A second login to the *same* authorization server, still in flight, under
+            // its own ephemeral key.
+            let otherFlowKey = P256.Signing.PrivateKey()
+            let otherFlowThumbprint = try await core.calculateJWKThumbprint(
+                jwk: core.createJWK(from: otherFlowKey)
+            )
+            await core.recordOAuthFlowNonce(
+                "other-flow-nonce",
+                for: Self.endpoint,
+                ephemeralKeyRawRepresentation: otherFlowKey.rawRepresentation
+            )
 
-            await core.transferOAuthFlowNonces(to: Self.did, from: [Self.endpoint])
+            await core.transferOAuthFlowNonces(to: Self.did)
 
             let didNonces = try await storage.getDPoPNonces(for: Self.did)
             let jktNonces = try await storage.getDPoPNoncesByJKT(for: Self.did)
@@ -405,10 +446,48 @@ struct DPoPNonceStoreTests {
             let proofNonce = try await nonceInProof(from: core)
             #expect(didNonces?[Self.host] == "par-nonce")
             #expect(jktNonces?[thumbprint]?[Self.host] == "par-nonce")
-            #expect(remainingFlowNonces[Self.host] == nil)
-            // The concurrent flow's nonce is left for the login that is still using it.
-            #expect(remainingFlowNonces["auth.other.test"] == "other-par-nonce")
+            #expect(remainingFlowNonces[thumbprint] == nil)
+            // The concurrent flow keeps its own nonce even on the same host.
+            #expect(remainingFlowNonces[otherFlowThumbprint]?[Self.host] == "other-flow-nonce")
             #expect(proofNonce == "par-nonce")
+        }
+    }
+
+    @Test("Two flows on the same host keep separate nonces")
+    func concurrentSameHostFlowsDoNotShareNonces() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryStorage(backend) {
+            let storage = KeychainStorage(namespace: "test.nonce.same-host-flows")
+            let core = makeCore(storage: storage)
+            let firstKey = P256.Signing.PrivateKey()
+            let secondKey = P256.Signing.PrivateKey()
+
+            await core.recordOAuthFlowNonce(
+                "first-flow-nonce",
+                for: Self.endpoint,
+                ephemeralKeyRawRepresentation: firstKey.rawRepresentation
+            )
+            await core.recordOAuthFlowNonce(
+                "second-flow-nonce",
+                for: Self.endpoint,
+                ephemeralKeyRawRepresentation: secondKey.rawRepresentation
+            )
+
+            // Each flow signs with the nonce its own PAR response returned.
+            let firstProof = try await core.createDPoPProof(
+                for: "POST",
+                url: Self.endpoint,
+                type: .tokenRequest,
+                ephemeralKeyRawRepresentation: firstKey.rawRepresentation
+            )
+            let secondProof = try await core.createDPoPProof(
+                for: "POST",
+                url: Self.endpoint,
+                type: .tokenRequest,
+                ephemeralKeyRawRepresentation: secondKey.rawRepresentation
+            )
+            #expect(try nonceInProofString(firstProof) == "first-flow-nonce")
+            #expect(try nonceInProofString(secondProof) == "second-flow-nonce")
         }
     }
 }

@@ -69,6 +69,7 @@ private final class OAuthFlowURLProtocol: URLProtocol {
 private let pdsHost = "https://pds.exchange.test"
 private let authHost = "https://auth.exchange.test"
 private let tokenEndpoint = "\(authHost)/oauth/token"
+private let authServerHost = "auth.exchange.test"
 
 private func jsonResponse(
     url: URL,
@@ -274,6 +275,15 @@ struct OAuthTokenExchangeNonceTests {
             let secondNonce = try nonceInProof(#require(proofs.last))
             #expect(firstNonce == initialPARNonce)
             #expect(secondNonce == "server-nonce")
+
+            // The account inherits the nonce the server accepted, not the one it
+            // rejected — otherwise the first authenticated request pays for another
+            // use_dpop_nonce round trip.
+            let storedNonces = try await storage.getDPoPNonces(for: result.did)
+            let storedByJKT = try await storage.getDPoPNoncesByJKT(for: result.did)
+            let thumbprint = try #require(storedByJKT?.keys.first)
+            #expect(storedNonces?[authServerHost] == "server-nonce")
+            #expect(storedByJKT?[thumbprint]?[authServerHost] == "server-nonce")
         }
     }
 }

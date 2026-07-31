@@ -40,7 +40,11 @@ actor OAuthCore {
     var noncesByThumbprint: [String: [String: String]] = [:]
     var usedRefreshTokens: Set<String> = []
     var activeRefreshTasks: [String: Task<TokenRefreshResult, Error>] = [:]
-    var oauthFlowNonces: [String: String] = [:]
+    /// Nonces observed during OAuth flows that have no account yet, keyed by the
+    /// flow's ephemeral DPoP key thumbprint and then by host. Keying by host alone
+    /// would collide whenever two logins to the same authorization server (the common
+    /// case — everyone's PDS is bsky.social) overlap.
+    var oauthFlowNonces: [String: [String: String]] = [:]
     var ambiguousRefreshUntil: [String: Date] = [:]
     var nextRefreshResourceOverride: String?
 
@@ -53,6 +57,13 @@ actor OAuthCore {
     /// own DPoP key), but `noncesByThumbprint` is keyed by thumbprint alone, so
     /// without this reverse index a clear could only be all-or-nothing.
     var thumbprintsByDID: [String: Set<String>] = [:]
+
+    /// DIDs whose JKT-scoped nonce write could not be persisted (e.g. a locked
+    /// keychain). Their persisted copy is known to be older than what memory holds, so
+    /// a merge may only fill gaps for them instead of letting persistence win —
+    /// otherwise the next merge would reinstate a nonce the server has already
+    /// rejected. Cleared as soon as a persist for that DID succeeds.
+    var didsWithUnpersistedNonces: Set<String> = []
 
     /// How long a merge of the persisted JKT-scoped nonces is trusted before the next
     /// proof re-reads the keychain.
@@ -241,7 +252,7 @@ actor OAuthCore {
                   let urlObject = URL(string: url),
                   let domain = urlObject.host?.lowercased()
         {
-            finalNonce = oauthFlowNonces[domain]
+            finalNonce = oauthFlowNonces[keyThumbprint]?[domain]
         } else if let targetDID = targetDID, let urlObject = URL(string: url), let domain = urlObject.host?.lowercased() {
             // Pick up nonces written by another OAuthCore or another process, letting
             // persistence win. Rate-limited: see `persistedNonceMergeInterval`.
@@ -369,9 +380,13 @@ actor OAuthCore {
         jktNonces[resolvedThumbprint] = jktDomainMap
         do {
             try await storage.saveDPoPNoncesByJKT(jktNonces, for: did)
+            didsWithUnpersistedNonces.remove(did)
         } catch {
             // The in-memory map is read first, so this process still uses the fresh
-            // nonce; only the next launch falls back to the DID-scoped copy.
+            // nonce; only the next launch falls back to the DID-scoped copy. Flagging
+            // the DID stops a later merge from reinstating the older persisted value
+            // over the one just written here.
+            didsWithUnpersistedNonces.insert(did)
             LogManager.logWarning(
                 "Failed to persist JKT-scoped DPoP nonce for DID: \(LogManager.logDID(did)), domain: \(domain), error: \(error)",
                 category: .authentication
@@ -417,9 +432,13 @@ actor OAuthCore {
         lastPersistedNonceMerge[did] = Date()
 
         guard let persistedByJKT = try? await storage.getDPoPNoncesByJKT(for: did) else { return }
+        // Persistence normally wins: it is how a write by another OAuthCore or another
+        // process is observed. The exception is a DID whose own write never reached the
+        // keychain — there the persisted copy is the older one, so memory keeps it.
+        let memoryIsNewer = didsWithUnpersistedNonces.contains(did)
         for (persistedThumbprint, domainMap) in persistedByJKT {
             var merged = noncesByThumbprint[persistedThumbprint] ?? [:]
-            merged.merge(domainMap) { _, new in new } // Persisted values win
+            merged.merge(domainMap) { cached, persisted in memoryIsNewer ? cached : persisted }
             noncesByThumbprint[persistedThumbprint] = merged
             thumbprintsByDID[did, default: []].insert(persistedThumbprint)
         }
@@ -437,14 +456,41 @@ actor OAuthCore {
         }
         thumbprintsByDID.removeValue(forKey: did)
         lastPersistedNonceMerge.removeValue(forKey: did)
+        didsWithUnpersistedNonces.remove(did)
     }
 
-    /// Records a nonce observed during a DID-less OAuth flow, keyed by the endpoint's
-    /// host. `createDPoPProof` reads this map for ephemeral-key proofs, which have no
-    /// account to scope a nonce to yet.
-    func recordOAuthFlowNonce(_ nonce: String, for endpoint: String) {
+    /// Upper bound on the number of in-flight OAuth flows holding a nonce. Flows are
+    /// short-lived and user-driven, so anything past this is abandoned logins whose
+    /// nonces nobody will claim. Past the cap the map is dropped wholesale; a flow that
+    /// was still live simply pays for one `use_dpop_nonce` challenge.
+    private static let oauthFlowNonceKeyCap = 8
+
+    /// Records a nonce observed during an OAuth flow, scoped to the flow's ephemeral
+    /// DPoP key. `createDPoPProof` reads this map for ephemeral-key proofs, which have
+    /// no account to scope a nonce to yet.
+    func recordOAuthFlowNonce(
+        _ nonce: String,
+        for endpoint: String,
+        ephemeralKeyRawRepresentation: Data
+    ) {
+        guard let key = try? P256.Signing.PrivateKey(rawRepresentation: ephemeralKeyRawRepresentation),
+              let thumbprint = try? calculateJWKThumbprint(jwk: createJWK(from: key))
+        else {
+            LogManager.logWarning(
+                "Could not derive a thumbprint for an OAuth flow key; dropping the flow nonce for \(endpoint)",
+                category: .authentication
+            )
+            return
+        }
+        recordOAuthFlowNonce(nonce, for: endpoint, keyThumbprint: thumbprint)
+    }
+
+    func recordOAuthFlowNonce(_ nonce: String, for endpoint: String, keyThumbprint: String) {
         guard let domain = URL(string: endpoint)?.host?.lowercased() else { return }
-        oauthFlowNonces[domain] = nonce
+        if oauthFlowNonces[keyThumbprint] == nil, oauthFlowNonces.count >= Self.oauthFlowNonceKeyCap {
+            oauthFlowNonces.removeAll()
+        }
+        oauthFlowNonces[keyThumbprint, default: [:]][domain] = nonce
     }
 
     /// Moves the nonces collected during the OAuth flow into `did`'s stores, once the
@@ -452,20 +498,18 @@ actor OAuthCore {
     /// first authenticated request re-learns each nonce through a wasted 400.
     /// Call after persisting the DPoP key for `did`.
     ///
-    /// Only the hosts of `endpoints` (this account's authorization server) are moved:
-    /// `oauthFlowNonces` is keyed by host and shared by every flow in progress, so
-    /// draining it wholesale would take a concurrent login's nonce with it.
-    func transferOAuthFlowNonces(to did: String, from endpoints: [String]) async {
-        let hosts = Set(endpoints.compactMap { URL(string: $0)?.host?.lowercased() })
-        // Taken before the first suspension point: the actor can accept another flow's
-        // nonce while the writes below are in flight.
-        let pending = hosts.compactMap { host in oauthFlowNonces[host].map { (host, $0) } }
-        guard !pending.isEmpty else { return }
-        for (host, _) in pending {
-            oauthFlowNonces.removeValue(forKey: host)
+    /// Only this flow's nonces move: they are looked up under the DID's own DPoP
+    /// thumbprint, which at this point is the flow's ephemeral key, so a login running
+    /// concurrently against the same authorization server keeps its own.
+    func transferOAuthFlowNonces(to did: String) async {
+        guard let thumbprint = await dpopKeyThumbprint(for: did),
+              // Taken before the first suspension point below: the actor can accept
+              // another flow's nonce while the writes are in flight.
+              let pending = oauthFlowNonces.removeValue(forKey: thumbprint)
+        else {
+            return
         }
 
-        let thumbprint = await dpopKeyThumbprint(for: did)
         for (domain, nonce) in pending {
             await writeNonceToAllStores(domain: domain, nonce: nonce, did: did, thumbprint: thumbprint)
         }
@@ -619,7 +663,11 @@ actor OAuthCore {
             }
             let requestURI = parResponse.requestURI
             let parNonce = extractNonceFromHeaders(httpResponse.allHeaderFields)
-            if let parNonce { recordOAuthFlowNonce(parNonce, for: endpoint) }
+            if let parNonce {
+                recordOAuthFlowNonce(
+                    parNonce, for: endpoint, ephemeralKeyRawRepresentation: proofKeyRawRepresentation
+                )
+            }
             return (requestURI, parNonce)
         } else if httpResponse.statusCode == 400 {
             let dpopNonceHeader = extractNonceFromHeaders(httpResponse.allHeaderFields)
@@ -632,7 +680,9 @@ actor OAuthCore {
 
             if isNonceError, let receivedNonce = dpopNonceHeader {
                 // Retry with nonce
-                recordOAuthFlowNonce(receivedNonce, for: endpoint)
+                recordOAuthFlowNonce(
+                    receivedNonce, for: endpoint, ephemeralKeyRawRepresentation: proofKeyRawRepresentation
+                )
                 var retryRequest = request
                 let retryProof = try await createDPoPProof(
                     for: "POST",
@@ -653,7 +703,11 @@ actor OAuthCore {
                         throw AuthError.invalidResponse
                     }
                     let parNonce = extractNonceFromHeaders(retryHttpResponse.allHeaderFields)
-                    if let parNonce { recordOAuthFlowNonce(parNonce, for: endpoint) }
+                    if let parNonce {
+                        recordOAuthFlowNonce(
+                            parNonce, for: endpoint, ephemeralKeyRawRepresentation: proofKeyRawRepresentation
+                        )
+                    }
                     return (parResponse.requestURI, parNonce)
                 } else {
                     throw AuthError.authorizationFailed

@@ -168,14 +168,7 @@ actor CABOAuthStrategy: AuthStrategy {
         // The flow's ephemeral key is now this DID's DPoP key, so the nonces learned
         // during PAR/token exchange are still valid for it — hand them over instead of
         // re-learning each one through a wasted 400 on the first authenticated request.
-        await core.transferOAuthFlowNonces(
-            to: did,
-            from: [
-                metadata.tokenEndpoint,
-                metadata.pushedAuthorizationRequestEndpoint,
-                metadata.issuer,
-            ]
-        )
+        await core.transferOAuthFlowNonces(to: did)
 
         // Create Session
         let session = Session(
@@ -571,6 +564,7 @@ actor CABOAuthStrategy: AuthStrategy {
             }
 
             if (200 ..< 300).contains(httpResponse.statusCode) {
+                await recordFlowNonce(from: httpResponse, endpoint: tokenEndpoint, key: key)
                 return try JSONDecoder().decode(TokenResponse.self, from: data)
             } else if httpResponse.statusCode == 400 {
                 // Handle use_dpop_nonce error. The PAR nonce carried in via `nonce` can
@@ -586,6 +580,15 @@ actor CABOAuthStrategy: AuthStrategy {
                 }
 
                 if isNonceError, let receivedNonce = dpopNonceHeader {
+                    // The flow's stored nonce is the one the server just rejected. Replace
+                    // it now, or the callback hands that dead nonce to the new account and
+                    // its first authenticated request pays for another challenge.
+                    await core.recordOAuthFlowNonce(
+                        receivedNonce,
+                        for: tokenEndpoint,
+                        ephemeralKeyRawRepresentation: key.rawRepresentation
+                    )
+
                     let newDpopProof = try await core.createDPoPProof(
                         for: "POST",
                         url: tokenEndpoint,
@@ -604,6 +607,7 @@ actor CABOAuthStrategy: AuthStrategy {
                     else {
                         throw AuthError.tokenRefreshFailed
                     }
+                    await recordFlowNonce(from: retryHttpResponse, endpoint: tokenEndpoint, key: key)
                     return try JSONDecoder().decode(TokenResponse.self, from: retryData)
                 } else {
                     throw AuthError.invalidCredentials
@@ -618,6 +622,19 @@ actor CABOAuthStrategy: AuthStrategy {
         } catch {
             throw AuthError.tokenRefreshFailed
         }
+    }
+
+    /// Keeps the flow's nonce current from a token-endpoint response, so the callback
+    /// hands the freshest nonce to the new account rather than a spent one.
+    private func recordFlowNonce(
+        from response: HTTPURLResponse,
+        endpoint: String,
+        key: P256.Signing.PrivateKey
+    ) async {
+        guard let nonce = await core.extractNonceFromHeaders(response.allHeaderFields) else { return }
+        await core.recordOAuthFlowNonce(
+            nonce, for: endpoint, ephemeralKeyRawRepresentation: key.rawRepresentation
+        )
     }
 
     // MARK: - Token Refresh (Strategy-Specific)
