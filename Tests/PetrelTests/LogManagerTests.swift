@@ -170,17 +170,22 @@ struct LogManagerTests {
             await recorder.record(event)
         }
 
+        // Unique to this test: the broadcast bus is global, so suites running in
+        // parallel deliver their own incidents to this observer. Only an event
+        // carrying this DID would prove the unrepresentable incident leaked through.
+        let did = "did:plc:unrepresentable-incident-probe"
         LogManager.logAuthIncident(
             "InvalidGrantWithValidToken",
             details: [
-                "did": "did:plc:valid",
+                "did": did,
                 "tokenExpiresIn": "3600.0",
                 "description": "session preserved",
             ]
         )
         await PetrelAuthEvents.drain()
 
-        #expect(await recorder.events.isEmpty)
+        let leaked = await recorder.events.filter { String(describing: $0).contains(did) }
+        #expect(leaked.isEmpty)
         await PetrelAuthEvents.removeAllObservers()
     }
 
