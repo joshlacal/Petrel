@@ -1269,7 +1269,6 @@ public actor KeychainStorage {
 
     /// Retrieves DPoP nonces from the keychain.
     /// - Parameter did: The DID associated with the nonces to retrieve
-    /// - Returns: The nonces if found, or nil if not found
     /// - Returns: The nonces, or nil when none are stored or the stored map cannot be
     ///   decoded. Callers treat nil as an empty map and rewrite the store, which is
     ///   the only way an undecodable map is ever repaired — throwing here would abort
