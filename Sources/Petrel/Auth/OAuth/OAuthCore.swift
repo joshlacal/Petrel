@@ -222,13 +222,22 @@ actor OAuthCore {
         {
             finalNonce = oauthFlowNonces[domain]
         } else if let targetDID = targetDID, let urlObject = URL(string: url), let domain = urlObject.host?.lowercased() {
-            // Multi-layer nonce retrieval
+            // Re-merge the persisted JKT-scoped nonces into memory, letting persistence win.
+            // Every strategy builds its own OAuthCore (and app extensions share the keychain
+            // access group), so another writer can hold a fresher nonce than this actor's
+            // cache — without this merge the stale in-memory entry shadows it.
+            if let persistedByJKT = try? await storage.getDPoPNoncesByJKT(for: targetDID) {
+                for (persistedThumbprint, domainMap) in persistedByJKT {
+                    var merged = noncesByThumbprint[persistedThumbprint] ?? [:]
+                    merged.merge(domainMap) { _, new in new }
+                    noncesByThumbprint[persistedThumbprint] = merged
+                }
+            }
+
+            // Multi-layer nonce retrieval: JKT-scoped (in-memory, now including everything
+            // persisted above) first, DID-scoped persistence as the fallback.
             if let jktNonce = noncesByThumbprint[keyThumbprint]?[domain] {
                 finalNonce = jktNonce
-            } else if let persistedJktNonces = try? await storage.getDPoPNoncesByJKT(for: targetDID),
-                      let jktPersistentNonce = persistedJktNonces[keyThumbprint]?[domain]
-            {
-                finalNonce = jktPersistentNonce
             } else if let storedNonces = try? await storage.getDPoPNonces(for: targetDID),
                       let didNonce = storedNonces[domain]
             {
@@ -293,34 +302,124 @@ actor OAuthCore {
         return newKey
     }
 
-    func updateDPoPNonceInternal(domain: String, nonce: String, for did: String) async {
+    /// Records `nonce` in every store `createDPoPProof` reads for `did`: the in-memory
+    /// JKT map, the persisted JKT-scoped map, and the persisted DID-scoped map.
+    ///
+    /// Writing only the DID-scoped store is never enough — it sits last in the read
+    /// precedence, so a stale JKT-scoped entry shadows it and the next `use_dpop_nonce`
+    /// retry replays the value the server just rejected.
+    ///
+    /// `thumbprint` is the DPoP key thumbprint when the caller already knows it
+    /// (e.g. from an `AuthContext`); pass `nil` to derive it from the DID's stored key.
+    ///
+    /// - Returns: `false` when the thumbprint could not be resolved, i.e. the
+    ///   JKT-scoped layers still hold whatever stale value shadows this write —
+    ///   callers about to retry a request with the fresh nonce must not bother.
+    @discardableResult
+    private func writeNonceToAllStores(
+        domain: String,
+        nonce: String,
+        did: String,
+        thumbprint: String?
+    ) async -> Bool {
+        var nonces = (try? await storage.getDPoPNonces(for: did)) ?? [:]
+        nonces[domain] = nonce
         do {
-            var nonces = try await storage.getDPoPNonces(for: did) ?? [:]
-            nonces[domain] = nonce
             try await storage.saveDPoPNonces(nonces, for: did)
-        } catch {}
+        } catch {
+            LogManager.logWarning(
+                "Failed to persist DID-scoped DPoP nonce for DID: \(LogManager.logDID(did)), domain: \(domain), error: \(error)",
+                category: .authentication
+            )
+        }
 
-        // Also update the JKT-scoped nonce stores. `createDPoPProof` resolves the nonce
-        // for a domain from the in-memory `noncesByThumbprint` and the persisted
-        // JKT-scoped store *before* falling back to the DID-scoped store updated above.
-        // Updating only the DID-scoped store therefore leaves a stale JKT nonce that
-        // shadows the fresh one — the CAB refresh path (`CABOAuthStrategy.performTokenRefresh`)
-        // then keeps replaying the stale nonce and every `use_dpop_nonce` retry fails,
-        // so the session can never refresh. Mirror `AuthenticationService.updateAndVerifyNonce`
-        // and write every store `createDPoPProof` reads.
-        if let key = try? await getOrCreateDPoPKey(for: did),
-           let jwk = try? createJWK(from: key),
-           let thumbprint = try? calculateJWKThumbprint(jwk: jwk)
-        {
-            var memDomainMap = noncesByThumbprint[thumbprint] ?? [:]
-            memDomainMap[domain] = nonce
-            noncesByThumbprint[thumbprint] = memDomainMap
+        var candidateThumbprint = thumbprint
+        if candidateThumbprint == nil {
+            candidateThumbprint = await dpopKeyThumbprint(for: did)
+        }
+        guard let resolvedThumbprint = candidateThumbprint else {
+            LogManager.logError(
+                "Could not resolve DPoP key thumbprint for DID: \(LogManager.logDID(did)); the fresh nonce for domain \(domain) reached only the DID-scoped store and stays shadowed by the JKT-scoped stores",
+                category: .authentication
+            )
+            return false
+        }
 
-            var jktNonces = (try? await storage.getDPoPNoncesByJKT(for: did)) ?? [:]
-            var jktDomainMap = jktNonces[thumbprint] ?? [:]
-            jktDomainMap[domain] = nonce
-            jktNonces[thumbprint] = jktDomainMap
-            try? await storage.saveDPoPNoncesByJKT(jktNonces, for: did)
+        var memDomainMap = noncesByThumbprint[resolvedThumbprint] ?? [:]
+        memDomainMap[domain] = nonce
+        noncesByThumbprint[resolvedThumbprint] = memDomainMap
+
+        var jktNonces = (try? await storage.getDPoPNoncesByJKT(for: did)) ?? [:]
+        var jktDomainMap = jktNonces[resolvedThumbprint] ?? [:]
+        jktDomainMap[domain] = nonce
+        jktNonces[resolvedThumbprint] = jktDomainMap
+        do {
+            try await storage.saveDPoPNoncesByJKT(jktNonces, for: did)
+        } catch {
+            // The in-memory map is read first, so this process still uses the fresh
+            // nonce; only the next launch falls back to the DID-scoped copy.
+            LogManager.logWarning(
+                "Failed to persist JKT-scoped DPoP nonce for DID: \(LogManager.logDID(did)), domain: \(domain), error: \(error)",
+                category: .authentication
+            )
+        }
+
+        return true
+    }
+
+    /// The JWK thumbprint of the DID's DPoP key, or `nil` when the key is unavailable
+    /// (e.g. a locked keychain) — the nonce stores are keyed by it.
+    private func dpopKeyThumbprint(for did: String) async -> String? {
+        do {
+            let key = try await getOrCreateDPoPKey(for: did)
+            return try calculateJWKThumbprint(jwk: createJWK(from: key))
+        } catch {
+            LogManager.logError(
+                "Failed to derive DPoP key thumbprint for DID: \(LogManager.logDID(did)): \(error)",
+                category: .authentication
+            )
+            return nil
+        }
+    }
+
+    /// Applies a server-issued nonce for `domain` to all of `did`'s nonce stores.
+    /// - Returns: `false` when the write could not reach the JKT-scoped stores, so a
+    ///   retry would replay the stale nonce the server just rejected.
+    @discardableResult
+    func updateDPoPNonceInternal(domain: String, nonce: String, for did: String) async -> Bool {
+        await writeNonceToAllStores(domain: domain, nonce: nonce, did: did, thumbprint: nil)
+    }
+
+    /// Clears the in-memory nonce caches. Persisted stores are cleared by the caller
+    /// (they are per-DID; these caches are not, so logging one account out drops the
+    /// cached nonces of any other — they are re-learned from a single server challenge).
+    func clearNonceCache() {
+        noncesByThumbprint.removeAll()
+        oauthFlowNonces.removeAll()
+    }
+
+    /// Records a nonce observed during a DID-less OAuth flow, keyed by the endpoint's
+    /// host. `createDPoPProof` reads this map for ephemeral-key proofs, which have no
+    /// account to scope a nonce to yet.
+    func recordOAuthFlowNonce(_ nonce: String, for endpoint: String) {
+        guard let domain = URL(string: endpoint)?.host?.lowercased() else { return }
+        oauthFlowNonces[domain] = nonce
+    }
+
+    /// Moves the nonces collected during the OAuth flow into `did`'s stores, once the
+    /// callback has bound the flow's ephemeral DPoP key to the account. Without this the
+    /// first authenticated request re-learns each nonce through a wasted 400.
+    /// Call after persisting the DPoP key for `did`.
+    func transferOAuthFlowNonces(to did: String) async {
+        guard !oauthFlowNonces.isEmpty else { return }
+        // Take the entries before the first suspension point: the actor can accept
+        // another flow's nonce while the writes below are in flight.
+        let pending = oauthFlowNonces
+        oauthFlowNonces.removeAll()
+
+        let thumbprint = await dpopKeyThumbprint(for: did)
+        for (domain, nonce) in pending {
+            await writeNonceToAllStores(domain: domain, nonce: nonce, did: did, thumbprint: thumbprint)
         }
     }
 
@@ -472,6 +571,7 @@ actor OAuthCore {
             }
             let requestURI = parResponse.requestURI
             let parNonce = extractNonceFromHeaders(httpResponse.allHeaderFields)
+            if let parNonce { recordOAuthFlowNonce(parNonce, for: endpoint) }
             return (requestURI, parNonce)
         } else if httpResponse.statusCode == 400 {
             let dpopNonceHeader = extractNonceFromHeaders(httpResponse.allHeaderFields)
@@ -484,6 +584,7 @@ actor OAuthCore {
 
             if isNonceError, let receivedNonce = dpopNonceHeader {
                 // Retry with nonce
+                recordOAuthFlowNonce(receivedNonce, for: endpoint)
                 var retryRequest = request
                 let retryProof = try await createDPoPProof(
                     for: "POST",
@@ -504,6 +605,7 @@ actor OAuthCore {
                         throw AuthError.invalidResponse
                     }
                     let parNonce = extractNonceFromHeaders(retryHttpResponse.allHeaderFields)
+                    if let parNonce { recordOAuthFlowNonce(parNonce, for: endpoint) }
                     return (parResponse.requestURI, parNonce)
                 } else {
                     throw AuthError.authorizationFailed
@@ -552,23 +654,11 @@ actor OAuthCore {
         }
         guard let resolvedDID = targetDID else { return }
 
-        // Update persistent store
-        var nonces = (try? await storage.getDPoPNonces(for: resolvedDID)) ?? [:]
-        nonces[domain] = nonce
-        try? await storage.saveDPoPNonces(nonces, for: resolvedDID)
-
-        if let jkt {
-            var jktNonces = (try? await storage.getDPoPNoncesByJKT(for: resolvedDID)) ?? [:]
-            var domainMap = jktNonces[jkt] ?? [:]
-            domainMap[domain] = nonce
-            jktNonces[jkt] = domainMap
-            try? await storage.saveDPoPNoncesByJKT(jktNonces, for: resolvedDID)
-
-            // Update memory
-            var memMap = noncesByThumbprint[jkt] ?? [:]
-            memMap[domain] = nonce
-            noncesByThumbprint[jkt] = memMap
-        }
+        // `jkt` is nil for every response the network layer handles without an
+        // AuthContext — notably the token endpoint, whose 200 carries the nonce the
+        // *next* refresh needs. Deriving the thumbprint from the DID's key keeps that
+        // nonce out of the DID-scoped store alone, where the JKT layers would shadow it.
+        await writeNonceToAllStores(domain: domain, nonce: nonce, did: resolvedDID, thumbprint: jkt)
     }
 
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {

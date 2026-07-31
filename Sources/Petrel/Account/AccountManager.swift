@@ -293,6 +293,21 @@ actor AccountManager: AccountManaging {
         // Delete related data
         try await storage.deleteSession(for: did)
         try await storage.deleteDPoPKey(for: did)
+
+        // Both nonce stores, mirroring `clearInconsistentAuthenticationState`: leaving
+        // them behind lets nonces bound to the DPoP key just deleted survive into a later
+        // re-login with the same DID. Failure here must not fail the removal.
+        do {
+            try await storage.saveDPoPNonces([:], for: did)
+            try await storage.saveDPoPNoncesByJKT([:], for: did)
+            LogManager.logDebug(
+                "AccountManager - Cleared DPoP nonces for removed DID: \(LogManager.logDID(did))"
+            )
+        } catch {
+            LogManager.logWarning(
+                "AccountManager - Failed to clear DPoP nonces for removed DID: \(LogManager.logDID(did)): \(error)"
+            )
+        }
     }
 
     /// Sets the current active account.
