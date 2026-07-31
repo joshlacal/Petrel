@@ -46,7 +46,6 @@ actor OAuthCore {
     /// case — everyone's PDS is bsky.social) overlap.
     var oauthFlowNonces: [String: [String: String]] = [:]
     var ambiguousRefreshUntil: [String: Date] = [:]
-    var nextRefreshResourceOverride: String?
 
     /// When each DID's persisted JKT-scoped nonces were last merged into
     /// `noncesByThumbprint`. Bounds how often a proof re-reads the keychain.
