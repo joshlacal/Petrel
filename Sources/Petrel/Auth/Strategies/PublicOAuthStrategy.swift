@@ -232,8 +232,24 @@ actor PublicOAuthStrategy: AuthStrategy {
         guard let did = await accountManager.getCurrentAccount()?.did else { return }
 
         let storage = core.storage
-        // Revoke token if possible
-        if let session = try? await storage.getSession(for: did),
+        // Revoke token if possible. A read failure leaves the refresh token valid
+        // server-side, which is materially different from having no session at all.
+        let session: Session?
+        do {
+            session = try await storage.getSession(for: did)
+            if session == nil {
+                LogManager.logInfo(
+                    "PublicOAuthStrategy - No stored session for DID \(LogManager.logDID(did)) at logout; nothing to revoke"
+                )
+            }
+        } catch {
+            LogManager.logError(
+                "PublicOAuthStrategy - Could not read the session for DID \(LogManager.logDID(did)) at logout (\(error)); skipping server-side revocation. The refresh token may remain valid."
+            )
+            session = nil
+        }
+
+        if let session,
            let refreshToken = session.refreshToken,
            let account = await accountManager.getAccount(did: did),
            let endpoint = account.authorizationServerMetadata?.revocationEndpoint
