@@ -675,17 +675,40 @@
                     throw KeychainError.dataFormatError
                 }
 
-                // Try to delete SecKey
+                // Both representations are live key material — retrieval reads either — so
+                // attempt both deletions independently and only then report the first
+                // failure; a SecKey failure must not strand the password fallback.
+                var firstFailure: (any Error)?
+
                 let keyQuery: [String: Any] = [
                     kSecClass as String: kSecClassKey,
                     kSecAttrApplicationTag as String: tagData,
                 ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
                 let keyStatus = SecItemDelete(keyQuery as CFDictionary)
                 LogManager.logDebug("AppleKeychainStore - macOS SecKey delete status: \(keyStatus)")
+                if keyStatus != errSecSuccess, keyStatus != errSecItemNotFound {
+                    LogManager.logError(
+                        "AppleKeychainStore - Failed to delete macOS SecKey for tag \(keyTag). Status: \(keyStatus)"
+                    )
+                    firstFailure = KeychainError.deletionError(status: Int(keyStatus))
+                }
 
-                // Try to delete password fallback
+                // Delete password fallback (tolerates a missing item)
                 let passwordKey = "\(keyTag).password"
-                try? delete(key: passwordKey, namespace: "dpopkeys", accessGroup: accessGroup)
+                do {
+                    try delete(key: passwordKey, namespace: "dpopkeys", accessGroup: accessGroup)
+                } catch {
+                    LogManager.logError(
+                        "AppleKeychainStore - Failed to delete password fallback for tag \(keyTag): \(error)"
+                    )
+                    if firstFailure == nil {
+                        firstFailure = error
+                    }
+                }
+
+                if let firstFailure {
+                    throw firstFailure
+                }
             }
         #endif
     }
