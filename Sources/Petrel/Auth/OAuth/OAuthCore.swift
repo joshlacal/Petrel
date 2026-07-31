@@ -42,7 +42,6 @@ actor OAuthCore {
     var activeRefreshTasks: [String: Task<TokenRefreshResult, Error>] = [:]
     var oauthFlowNonces: [String: String] = [:]
     var ambiguousRefreshUntil: [String: Date] = [:]
-    var nextRefreshResourceOverride: String?
 
     /// Sessions that were successfully refreshed server-side but could not be
     /// persisted to the keychain (e.g. device locked). Held in memory so the

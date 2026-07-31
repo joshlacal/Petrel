@@ -6,7 +6,7 @@
     public extension ATProtoClient {
         /// Debug helper to simulate an ambiguous refresh timeout scenario.
         /// Sleeps for the provided number of seconds and then triggers app-startup handling
-        /// so the AuthenticationService can observe any interrupted refresh state.
+        /// so the active auth strategy can observe any interrupted refresh state.
         /// This is a no-op in release builds.
         func simulateAmbiguousRefreshTimeout(durationSeconds: Int) async {
             // Bound the duration to a reasonable maximum to avoid accidental long sleeps in tests.
