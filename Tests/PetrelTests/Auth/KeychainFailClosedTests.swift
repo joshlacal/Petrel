@@ -175,6 +175,170 @@ struct KeychainFailClosedTests {
         }
     }
 
+    @Test("An unreadable primary session is never replaced by a pending copy")
+    func unreadablePrimaryIsNotOverwrittenByPending() async throws {
+        let backend = InMemorySecureStorage()
+        try await withBackend(backend) {
+            let namespace = "test.failclosed.primaryerror.pending"
+            let storage = KeychainStorage(namespace: namespace)
+            // The primary holds the newest session; the pending copy is older, e.g.
+            // left behind by an earlier refresh whose atomic save failed.
+            try await storage.saveAccountAndSession(
+                makeFailClosedAccount(),
+                session: makeFailClosedSession(refreshToken: "rt-newest"),
+                for: failClosedDID
+            )
+            try await storage.savePendingSession(
+                makeFailClosedSession(
+                    refreshToken: "rt-older", createdAt: Date(timeIntervalSinceNow: -3600)
+                ),
+                for: failClosedDID
+            )
+
+            backend.failRetrieveMatching = { $0 == "session.\(failClosedDID)" }
+            KeychainManager.clearCache()
+
+            // The primary's freshness is unknown, so no copy may be promoted over it.
+            await #expect(throws: (any Error).self) {
+                try await storage.getSession(for: failClosedDID)
+            }
+
+            let primaryBytes = try #require(
+                backend.peek(key: "session.\(failClosedDID)", namespace: namespace)
+            )
+            let primary = try JSONDecoder().decode(Session.self, from: primaryBytes)
+            #expect(
+                primary.refreshToken == "rt-newest",
+                "An older pending copy must not overwrite an unreadable primary"
+            )
+            #expect(
+                backend.peek(key: "session.pending.\(failClosedDID)", namespace: namespace) != nil,
+                "The pending copy must survive so a later successful read can resolve it"
+            )
+        }
+    }
+
+    @Test("An unreadable primary session is never replaced by a backup copy")
+    func unreadablePrimaryIsNotOverwrittenByBackup() async throws {
+        let backend = InMemorySecureStorage()
+        try await withBackend(backend) {
+            let namespace = "test.failclosed.primaryerror.backup"
+            let storage = KeychainStorage(namespace: namespace)
+            try await storage.saveAccountAndSession(
+                makeFailClosedAccount(),
+                session: makeFailClosedSession(refreshToken: "rt-newest"),
+                for: failClosedDID
+            )
+            try await storage.saveSessionBackup(
+                makeFailClosedSession(
+                    refreshToken: "rt-older", createdAt: Date(timeIntervalSinceNow: -3600)
+                ),
+                for: failClosedDID
+            )
+
+            backend.failRetrieveMatching = { $0 == "session.\(failClosedDID)" }
+            KeychainManager.clearCache()
+
+            await #expect(throws: (any Error).self) {
+                try await storage.getSession(for: failClosedDID)
+            }
+
+            let primaryBytes = try #require(
+                backend.peek(key: "session.\(failClosedDID)", namespace: namespace)
+            )
+            let primary = try JSONDecoder().decode(Session.self, from: primaryBytes)
+            #expect(
+                primary.refreshToken == "rt-newest",
+                "An older backup must not be restored over an unreadable primary"
+            )
+        }
+    }
+
+    @Test("A missing primary still recovers from the newest surviving copy")
+    func absentPrimaryStillRecoversFromBackup() async throws {
+        let backend = InMemorySecureStorage()
+        try await withBackend(backend) {
+            let storage = KeychainStorage(namespace: "test.failclosed.primaryabsent")
+            let session = makeFailClosedSession(refreshToken: "rt-recovered")
+            try await storage.saveAccount(makeFailClosedAccount(), for: failClosedDID)
+            try await storage.saveSessionBackup(session, for: failClosedDID)
+            KeychainManager.clearCache()
+
+            // Absence is proven here, not assumed, so recovery is still allowed.
+            let recovered = try await storage.getSession(for: failClosedDID)
+            #expect(recovered?.refreshToken == "rt-recovered")
+        }
+    }
+
+    @Test("An undecodable nonce store is rewritten rather than wedged")
+    func undecodableNoncesAreTreatedAsEmpty() async throws {
+        let backend = InMemorySecureStorage()
+        try await withBackend(backend) {
+            let namespace = "test.failclosed.nonces"
+            let storage = KeychainStorage(namespace: namespace)
+            backend.plant(
+                key: "dpopNonces.\(failClosedDID)", namespace: namespace, data: Data("garbage".utf8)
+            )
+            backend.plant(
+                key: "dpopNoncesByJKT.\(failClosedDID)", namespace: namespace, data: Data("garbage".utf8)
+            )
+            KeychainManager.clearCache()
+
+            // Nil, not a throw: every nonce update reads-modifies-writes, so throwing
+            // would abort before the fresh server nonce was saved, forever.
+            #expect(try await storage.getDPoPNonces(for: failClosedDID) == nil)
+            #expect(try await storage.getDPoPNoncesByJKT(for: failClosedDID) == nil)
+
+            try await storage.saveDPoPNonces(["pds.test": "nonce-1"], for: failClosedDID)
+            try await storage.saveDPoPNoncesByJKT(["jkt": ["pds.test": "nonce-1"]], for: failClosedDID)
+
+            #expect(try await storage.getDPoPNonces(for: failClosedDID) == ["pds.test": "nonce-1"])
+            #expect(
+                try await storage.getDPoPNoncesByJKT(for: failClosedDID) == ["jkt": ["pds.test": "nonce-1"]]
+            )
+        }
+    }
+
+    @Test("An unreadable nonce store is still an error")
+    func unreadableNoncesThrow() async throws {
+        let backend = InMemorySecureStorage()
+        try await withBackend(backend) {
+            let storage = KeychainStorage(namespace: "test.failclosed.noncesunreadable")
+            try await storage.saveDPoPNonces(["pds.test": "nonce-1"], for: failClosedDID)
+
+            backend.failRetrieveMatching = { $0.hasPrefix("dpopNonces") }
+            KeychainManager.clearCache()
+
+            await #expect(throws: (any Error).self) {
+                try await storage.getDPoPNonces(for: failClosedDID)
+            }
+            await #expect(throws: (any Error).self) {
+                try await storage.getDPoPNoncesByJKT(for: failClosedDID)
+            }
+        }
+    }
+
+    @Test("An unreadable legacy gateway entry is an error, not a missing session")
+    func unreadableLegacyGatewayEntryThrows() async throws {
+        let backend = InMemorySecureStorage()
+        try await withBackend(backend) {
+            let namespace = "test.failclosed.legacyunreadable"
+            let storage = KeychainStorage(namespace: namespace)
+            try await storage.saveAccount(makeFailClosedAccount(), for: failClosedDID)
+            try await storage.saveCurrentDID(failClosedDID)
+            backend.plant(key: "gatewaySession", namespace: namespace, data: Data("legacy-session".utf8))
+
+            // The per-DID key is absent and the legacy entry cannot be read: reporting
+            // nil here would send startup validation to the re-authentication path.
+            backend.failRetrieveMatching = { $0 == "gatewaySession" }
+            KeychainManager.clearCache()
+
+            await #expect(throws: (any Error).self) {
+                try await storage.getGatewaySession(for: failClosedDID)
+            }
+        }
+    }
+
     @Test("A session that is genuinely absent still reads as nil")
     func getSessionReturnsNilWhenAbsent() async throws {
         let backend = InMemorySecureStorage()

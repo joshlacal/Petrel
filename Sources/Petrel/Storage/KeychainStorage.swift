@@ -480,7 +480,7 @@ public actor KeychainStorage {
                 throw error
             }
             LogManager.logWarning("KeychainStorage - Gateway session not found for key \(namespace).\(key). Attempting legacy migration...")
-            if let migratedSession = await migrateLegacyGatewaySessionIfNeeded(for: did) {
+            if let migratedSession = try await migrateLegacyGatewaySessionIfNeeded(for: did) {
                 LogManager.logInfo("KeychainStorage - Successfully migrated legacy gateway session for DID: \(did.prefix(20))...")
                 return migratedSession
             }
@@ -503,24 +503,24 @@ public actor KeychainStorage {
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
     }
 
-    private func shouldMigrateLegacyGatewaySession(for did: String) async -> Bool {
+    private func shouldMigrateLegacyGatewaySession(for did: String) async throws -> Bool {
         guard !did.isEmpty else { return false }
 
-        if let currentDID = try? await getCurrentDID(), !currentDID.isEmpty {
+        if let currentDID = try await getCurrentDID(), !currentDID.isEmpty {
             return currentDID == did
         }
 
-        if let dids = try? await listAccountDIDs(), dids.count == 1, dids.first == did {
-            return true
-        }
-
-        return false
+        let dids = try await listAccountDIDs()
+        return dids.count == 1 && dids.first == did
     }
 
-    private func migrateLegacyGatewaySessionIfNeeded(for did: String) async -> String? {
-        guard await shouldMigrateLegacyGatewaySession(for: did) else { return nil }
+    /// - Throws: The underlying storage error when a legacy location could not be
+    ///   read. Swallowing it would report "no gateway session" for an account whose
+    ///   session exists, sending startup validation down the re-authentication path.
+    private func migrateLegacyGatewaySessionIfNeeded(for did: String) async throws -> String? {
+        guard try await shouldMigrateLegacyGatewaySession(for: did) else { return nil }
 
-        if let legacySession = try? await getLegacyGatewaySession(), !legacySession.isEmpty {
+        if let legacySession = try await getLegacyGatewaySession(), !legacySession.isEmpty {
             LogManager.logInfo(
                 "KeychainStorage - Migrating legacy gateway session to per-DID storage for DID: \(did.prefix(20))..."
             )
@@ -536,13 +536,9 @@ public actor KeychainStorage {
             return legacySession
         }
 
-        if let data = try? await KeychainManager.retrieveAsync(
-            key: "gatewaySession",
-            namespace: "catbird.gateway",
-            accessGroup: accessGroup
-        ),
-            let session = String(data: data, encoding: .utf8),
-            !session.isEmpty
+        if let data = try await readGlobalGatewaySession(),
+           let session = String(data: data, encoding: .utf8),
+           !session.isEmpty
         {
             LogManager.logInfo(
                 "KeychainStorage - Migrating global gateway session to per-DID storage for DID: \(did.prefix(20))..."
@@ -564,6 +560,22 @@ public actor KeychainStorage {
         }
 
         return nil
+    }
+
+    /// Reads the pre-multi-account gateway session from its global namespace.
+    /// - Returns: The raw bytes, or nil only when nothing is stored there.
+    private func readGlobalGatewaySession() async throws -> Data? {
+        do {
+            return try await KeychainManager.retrieveAsync(
+                key: "gatewaySession",
+                namespace: "catbird.gateway",
+                accessGroup: accessGroup
+            )
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError("KeychainStorage - Failed to read the global gateway session: \(error)")
+            throw error
+        }
     }
 
     /// Writes a migrated gateway session to per-DID storage and reads it back.
@@ -897,10 +909,11 @@ public actor KeychainStorage {
     ///     in-memory cache — required to observe rotations made by other processes
     ///     sharing the access group (e.g. app extensions) before refreshing.
     /// - Returns: The session, or nil only when no copy exists anywhere.
-    /// - Throws: The first underlying storage error when no copy could be read *and*
-    ///   at least one read failed. Individual copies still fall through to the next
-    ///   candidate; only the final "nothing anywhere" answer distinguishes a missing
-    ///   session from an unreadable one, because callers delete state on nil.
+    /// - Throws: The underlying storage error when the primary copy could not be read
+    ///   (its freshness is then unknown, so no fallback may be promoted over it), or
+    ///   when no copy could be read at all and at least one read failed. A *missing*
+    ///   copy still falls through to the next candidate; only absence proven by
+    ///   successful reads is reported as nil, because callers delete state on nil.
     public func getSession(for did: String, bypassCache: Bool = false) async throws -> Session? {
         let key = makeKey("session", did: did)
         let tempKey = makeKey("session.temp", did: did)
@@ -910,7 +923,17 @@ public actor KeychainStorage {
         var readErrors: [Error] = []
 
         let primaryRead = await readSessionCopy(key, for: did, bypassCache: bypassCache)
-        if let error = primaryRead.error { readErrors.append(error) }
+        if let primaryError = primaryRead.error {
+            // Every fallback below is resolved against the primary's `createdAt` and
+            // then written back over the primary key. A primary that failed to read
+            // may hold a newer session than any copy, so promoting one here would do
+            // exactly what this newest-wins logic exists to prevent: replace a newer
+            // session with an older, already-rotated refresh token.
+            LogManager.logError(
+                "KeychainStorage - Primary session unreadable for DID: \(LogManager.logDID(did)); refusing to promote a fallback copy over it: \(primaryError)"
+            )
+            throw primaryError
+        }
         let primary = decodeSession(primaryRead.data)
 
         // A pending session exists only if a refresh succeeded but the atomic save
@@ -1247,17 +1270,30 @@ public actor KeychainStorage {
     /// Retrieves DPoP nonces from the keychain.
     /// - Parameter did: The DID associated with the nonces to retrieve
     /// - Returns: The nonces if found, or nil if not found
+    /// - Returns: The nonces, or nil when none are stored or the stored map cannot be
+    ///   decoded. Callers treat nil as an empty map and rewrite the store, which is
+    ///   the only way an undecodable map is ever repaired — throwing here would abort
+    ///   every nonce update before it saved, wedging DPoP retries permanently.
+    /// - Throws: The underlying storage error when the nonces could not be read.
     public func getDPoPNonces(for did: String) async throws -> [String: String]? {
         let key = makeKey("dpopNonces", did: did)
+        let data: Data
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
-            return try JSONDecoder().decode([String: String].self, from: data)
+            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
             LogManager.logError(
                 "KeychainStorage - Failed to read DPoP nonces for DID: \(LogManager.logDID(did)): \(error)"
             )
             throw error
+        }
+        do {
+            return try JSONDecoder().decode([String: String].self, from: data)
+        } catch {
+            LogManager.logError(
+                "KeychainStorage - Stored DPoP nonces for DID: \(LogManager.logDID(did)) could not be decoded (\(error)); treating them as empty so the next update rewrites the store"
+            )
+            return nil
         }
     }
 
@@ -1275,18 +1311,29 @@ public actor KeychainStorage {
 
     /// Retrieves DPoP nonces scoped by JKT (key thumbprint) from the keychain.
     /// - Parameter did: The DID associated with these nonces
-    /// - Returns: Mapping of JKT -> (domain -> nonce) if found
+    /// - Returns: Mapping of JKT -> (domain -> nonce), or nil when none are stored or
+    ///   the stored map cannot be decoded — see `getDPoPNonces` for why an
+    ///   undecodable map is reported as absent rather than as an error.
+    /// - Throws: The underlying storage error when the nonces could not be read.
     public func getDPoPNoncesByJKT(for did: String) async throws -> [String: [String: String]]? {
         let key = makeKey("dpopNoncesByJKT", did: did)
+        let data: Data
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
-            return try JSONDecoder().decode([String: [String: String]].self, from: data)
+            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
             LogManager.logError(
                 "KeychainStorage - Failed to read JKT-scoped DPoP nonces for DID: \(LogManager.logDID(did)): \(error)"
             )
             throw error
+        }
+        do {
+            return try JSONDecoder().decode([String: [String: String]].self, from: data)
+        } catch {
+            LogManager.logError(
+                "KeychainStorage - Stored JKT-scoped DPoP nonces for DID: \(LogManager.logDID(did)) could not be decoded (\(error)); treating them as empty so the next update rewrites the store"
+            )
+            return nil
         }
     }
 

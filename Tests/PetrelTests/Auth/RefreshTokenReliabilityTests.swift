@@ -115,6 +115,14 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         items[fullKey(key, namespace)] = data
     }
 
+    /// Reads raw bytes without going through `KeychainManager` (no cache, no failure
+    /// scripting) — used to assert what actually landed in storage.
+    func peek(key: String, namespace: String) -> Data? {
+        lock.lock()
+        defer { lock.unlock() }
+        return items[fullKey(key, namespace)]
+    }
+
     func setOperationObserver(_ observer: (@Sendable (Operation, String) -> Void)?) {
         lock.lock()
         defer { lock.unlock() }
