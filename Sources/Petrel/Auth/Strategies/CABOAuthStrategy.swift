@@ -165,6 +165,11 @@ actor CABOAuthStrategy: AuthStrategy {
         // Persist DPoP Key
         try await storage.saveDPoPKeyRepresentation(ephemeralKey.x963Representation, for: did)
 
+        // The flow's ephemeral key is now this DID's DPoP key, so the nonces learned
+        // during PAR/token exchange are still valid for it — hand them over instead of
+        // re-learning each one through a wasted 400 on the first authenticated request.
+        await core.transferOAuthFlowNonces(to: did)
+
         // Create Session
         let session = Session(
             accessToken: tokenResponse.accessToken,
@@ -237,7 +242,14 @@ actor CABOAuthStrategy: AuthStrategy {
 
         try await storage.deleteSession(for: did)
         try await storage.deleteDPoPKey(for: did)
+        // Every store `createDPoPProof` reads, or the next login inherits nonces bound
+        // to the DPoP key just deleted. The in-memory clear is scoped to this DID, so a
+        // second signed-in account keeps its cached nonces. OAuth flow nonces are keyed
+        // by host rather than by account and belong to a flow in progress, so they are
+        // deliberately untouched here.
         try await storage.saveDPoPNonces([:], for: did)
+        try await storage.saveDPoPNoncesByJKT([:], for: did)
+        await core.clearNonceCache(for: did)
 
         await accountManager.clearCurrentAccount()
     }
@@ -568,9 +580,13 @@ actor CABOAuthStrategy: AuthStrategy {
             }
 
             if (200 ..< 300).contains(httpResponse.statusCode) {
+                await recordFlowNonce(from: httpResponse, endpoint: tokenEndpoint, key: key)
                 return try JSONDecoder().decode(TokenResponse.self, from: data)
-            } else if httpResponse.statusCode == 400 && nonce == nil {
-                // Handle use_dpop_nonce error
+            } else if httpResponse.statusCode == 400 {
+                // Handle use_dpop_nonce error. The PAR nonce carried in via `nonce` can
+                // already have rotated by the time the code is exchanged, so this single
+                // retry runs whether or not an initial nonce was supplied — gating it on
+                // `nonce == nil` failed the login outright on a rotated PAR nonce.
                 let dpopNonceHeader = await core.extractNonceFromHeaders(httpResponse.allHeaderFields)
                 var isNonceError = false
                 if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data),
@@ -580,6 +596,15 @@ actor CABOAuthStrategy: AuthStrategy {
                 }
 
                 if isNonceError, let receivedNonce = dpopNonceHeader {
+                    // The flow's stored nonce is the one the server just rejected. Replace
+                    // it now, or the callback hands that dead nonce to the new account and
+                    // its first authenticated request pays for another challenge.
+                    await core.recordOAuthFlowNonce(
+                        receivedNonce,
+                        for: tokenEndpoint,
+                        ephemeralKeyRawRepresentation: key.rawRepresentation
+                    )
+
                     let newDpopProof = try await core.createDPoPProof(
                         for: "POST",
                         url: tokenEndpoint,
@@ -598,6 +623,7 @@ actor CABOAuthStrategy: AuthStrategy {
                     else {
                         throw AuthError.tokenRefreshFailed
                     }
+                    await recordFlowNonce(from: retryHttpResponse, endpoint: tokenEndpoint, key: key)
                     return try JSONDecoder().decode(TokenResponse.self, from: retryData)
                 } else {
                     throw AuthError.invalidCredentials
@@ -612,6 +638,19 @@ actor CABOAuthStrategy: AuthStrategy {
         } catch {
             throw AuthError.tokenRefreshFailed
         }
+    }
+
+    /// Keeps the flow's nonce current from a token-endpoint response, so the callback
+    /// hands the freshest nonce to the new account rather than a spent one.
+    private func recordFlowNonce(
+        from response: HTTPURLResponse,
+        endpoint: String,
+        key: P256.Signing.PrivateKey
+    ) async {
+        guard let nonce = await core.extractNonceFromHeaders(response.allHeaderFields) else { return }
+        await core.recordOAuthFlowNonce(
+            nonce, for: endpoint, ephemeralKeyRawRepresentation: key.rawRepresentation
+        )
     }
 
     // MARK: - Token Refresh (Strategy-Specific)
@@ -709,9 +748,16 @@ actor CABOAuthStrategy: AuthStrategy {
                errorResponse.error == "use_dpop_nonce",
                let receivedNonce = await core.extractNonceFromHeaders(httpResponse.allHeaderFields)
             {
-                // Update nonce and retry
-                if let domain = endpointURL.host?.lowercased() {
-                    await core.updateDPoPNonceInternal(domain: domain, nonce: receivedNonce, for: did)
+                // Retry only once the fresh nonce is in every store the proof reads —
+                // otherwise the retry replays the nonce the server just rejected.
+                guard let domain = endpointURL.host?.lowercased(),
+                      await core.updateDPoPNonceInternal(domain: domain, nonce: receivedNonce, for: did)
+                else {
+                    LogManager.logError(
+                        "Could not apply the server's fresh DPoP nonce for DID: \(LogManager.logDID(did)); skipping the refresh retry that would replay the stale nonce",
+                        category: .authentication
+                    )
+                    return (data, httpResponse)
                 }
 
                 let retryProof = try await core.createDPoPProof(
