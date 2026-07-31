@@ -188,7 +188,7 @@ struct DPoPNonceStoreTests {
         }
     }
 
-    @Test("A persisted nonce wins over a stale in-memory one from another core")
+    @Test("A merge lets a persisted nonce win over a stale in-memory one")
     func persistedNonceWinsOverStaleMemory() async throws {
         let backend = InMemorySecureStorage()
         try await withInMemoryStorage(backend) {
@@ -211,6 +211,38 @@ struct DPoPNonceStoreTests {
 
             let proofNonce = try await nonceInProof(from: staleCore)
             #expect(proofNonce == "fresh")
+        }
+    }
+
+    @Test("Within the merge interval a proof reuses the nonce it already holds")
+    func mergeIntervalBoundsPersistenceReads() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryStorage(backend) {
+            let storage = KeychainStorage(namespace: "test.nonce.merge-interval")
+            let core = makeCore(storage: storage)
+            let otherCore = makeCore(storage: storage)
+            try await installDPoPKey(storage: storage, core: core)
+
+            await core.updateDPoPNonceInternal(domain: Self.host, nonce: "first", for: Self.did)
+            // This proof merges persistence and starts the interval.
+            let firstProofNonce = try await nonceInProof(from: core)
+            #expect(firstProofNonce == "first")
+
+            await otherCore.updateDPoPNonceInternal(
+                domain: Self.host, nonce: "second", for: Self.did
+            )
+
+            // The documented staleness window: within the interval this core keeps
+            // signing with the nonce it already holds instead of re-reading. A server
+            // that has moved on answers use_dpop_nonce, and that handler writes the
+            // fresh nonce to every store — so the window is self-correcting.
+            let cachedProofNonce = try await nonceInProof(from: core)
+            #expect(cachedProofNonce == "first")
+
+            // Persistence really does hold the newer value: a core that has not merged
+            // yet picks it up on its first proof.
+            let freshProofNonce = try await nonceInProof(from: makeCore(storage: storage))
+            #expect(freshProofNonce == "second")
         }
     }
 
@@ -238,18 +270,53 @@ struct DPoPNonceStoreTests {
                 makeAccount(), session: makeSession(), for: Self.did
             )
             await core.updateDPoPNonceInternal(domain: Self.host, nonce: "stale", for: Self.did)
-            await core.recordOAuthFlowNonce("flow-stale", for: Self.endpoint)
 
             try await strategy.logout()
 
             let didNonces = try await storage.getDPoPNonces(for: Self.did)
             let jktNonces = try await storage.getDPoPNoncesByJKT(for: Self.did)
             let cached = await core.noncesByThumbprint
-            let flowNonces = await core.oauthFlowNonces
             #expect(didNonces?.isEmpty != false)
             #expect(jktNonces?.isEmpty != false)
             #expect(cached[thumbprint] == nil)
-            #expect(flowNonces.isEmpty)
+        }
+    }
+
+    @Test("Logging one account out leaves another account's cached nonces intact")
+    func logoutIsScopedToTheAccountLoggingOut() async throws {
+        let backend = InMemorySecureStorage()
+        let otherDID = "did:plc:noncestore-other"
+        try await withInMemoryStorage(backend) {
+            let storage = KeychainStorage(namespace: "test.nonce.scoped-logout")
+            let strategy = PublicOAuthStrategy(
+                storage: storage,
+                accountManager: MockAccountManager(account: makeAccount()),
+                networkService: NetworkService(baseURL: URL(string: "https://pds.test")!),
+                oauthConfig: OAuthConfig(
+                    clientId: "https://client.example/oauth-client-metadata.json",
+                    redirectUri: "https://client.example/callback",
+                    scope: "atproto"
+                ),
+                didResolver: MockDIDResolver()
+            )
+            let core = await strategy.core
+            let thumbprint = try await installDPoPKey(storage: storage, core: core)
+            let otherThumbprint = try await installDPoPKey(
+                storage: storage, core: core, did: otherDID
+            )
+            try await storage.saveAccountAndSession(
+                makeAccount(), session: makeSession(), for: Self.did
+            )
+            await core.updateDPoPNonceInternal(domain: Self.host, nonce: "stale", for: Self.did)
+            await core.updateDPoPNonceInternal(domain: Self.host, nonce: "other", for: otherDID)
+
+            try await strategy.logout()
+
+            let cached = await core.noncesByThumbprint
+            let otherPersisted = try await storage.getDPoPNoncesByJKT(for: otherDID)
+            #expect(cached[thumbprint] == nil)
+            #expect(cached[otherThumbprint]?[Self.host] == "other")
+            #expect(otherPersisted?[otherThumbprint]?[Self.host] == "other")
         }
     }
 
@@ -325,10 +392,12 @@ struct DPoPNonceStoreTests {
 
             // What `pushAuthorizationRequest` records before any DID exists.
             await core.recordOAuthFlowNonce("par-nonce", for: Self.endpoint)
+            // A second login to a different authorization server, still in flight.
+            await core.recordOAuthFlowNonce("other-par-nonce", for: "https://auth.other.test/par")
             let recorded = await core.oauthFlowNonces
             #expect(recorded[Self.host] == "par-nonce")
 
-            await core.transferOAuthFlowNonces(to: Self.did)
+            await core.transferOAuthFlowNonces(to: Self.did, from: [Self.endpoint])
 
             let didNonces = try await storage.getDPoPNonces(for: Self.did)
             let jktNonces = try await storage.getDPoPNoncesByJKT(for: Self.did)
@@ -336,7 +405,9 @@ struct DPoPNonceStoreTests {
             let proofNonce = try await nonceInProof(from: core)
             #expect(didNonces?[Self.host] == "par-nonce")
             #expect(jktNonces?[thumbprint]?[Self.host] == "par-nonce")
-            #expect(remainingFlowNonces.isEmpty)
+            #expect(remainingFlowNonces[Self.host] == nil)
+            // The concurrent flow's nonce is left for the login that is still using it.
+            #expect(remainingFlowNonces["auth.other.test"] == "other-par-nonce")
             #expect(proofNonce == "par-nonce")
         }
     }

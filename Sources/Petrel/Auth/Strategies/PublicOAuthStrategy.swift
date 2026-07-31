@@ -190,7 +190,14 @@ actor PublicOAuthStrategy: AuthStrategy {
         // The flow's ephemeral key is now this DID's DPoP key, so the nonces learned
         // during PAR/token exchange are still valid for it — hand them over instead of
         // re-learning each one through a wasted 400 on the first authenticated request.
-        await core.transferOAuthFlowNonces(to: did)
+        await core.transferOAuthFlowNonces(
+            to: did,
+            from: [
+                metadata.tokenEndpoint,
+                metadata.pushedAuthorizationRequestEndpoint,
+                metadata.issuer,
+            ]
+        )
 
         // Create Session
         let session = Session(
@@ -249,10 +256,13 @@ actor PublicOAuthStrategy: AuthStrategy {
         try await storage.deleteSession(for: did)
         try await storage.deleteDPoPKey(for: did)
         // Every store `createDPoPProof` reads, or the next login inherits nonces bound
-        // to the DPoP key just deleted.
+        // to the DPoP key just deleted. The in-memory clear is scoped to this DID, so a
+        // second signed-in account keeps its cached nonces. OAuth flow nonces are keyed
+        // by host rather than by account and belong to a flow in progress, so they are
+        // deliberately untouched here.
         try await storage.saveDPoPNonces([:], for: did)
         try await storage.saveDPoPNoncesByJKT([:], for: did)
-        await core.clearNonceCache()
+        await core.clearNonceCache(for: did)
 
         await accountManager.clearCurrentAccount()
     }

@@ -44,6 +44,27 @@ actor OAuthCore {
     var ambiguousRefreshUntil: [String: Date] = [:]
     var nextRefreshResourceOverride: String?
 
+    /// When each DID's persisted JKT-scoped nonces were last merged into
+    /// `noncesByThumbprint`. Bounds how often a proof re-reads the keychain.
+    var lastPersistedNonceMerge: [String: Date] = [:]
+
+    /// Which thumbprints hold cached nonces for which DID, so one account's logout
+    /// clears exactly its own entries. Thumbprints are per-DID (each account has its
+    /// own DPoP key), but `noncesByThumbprint` is keyed by thumbprint alone, so
+    /// without this reverse index a clear could only be all-or-nothing.
+    var thumbprintsByDID: [String: Set<String>] = [:]
+
+    /// How long a merge of the persisted JKT-scoped nonces is trusted before the next
+    /// proof re-reads the keychain.
+    ///
+    /// This instance is the only writer of its own nonces, so the merge exists solely
+    /// to observe writes by *another* `OAuthCore` (each strategy builds its own) or
+    /// another process in the keychain access group. Missing one of those costs a
+    /// single `use_dpop_nonce` 400, whose handler writes the server's fresh nonce to
+    /// every store — so the staleness is self-correcting and worth trading for one
+    /// keychain read per DID per interval instead of one per outbound request.
+    private static let persistedNonceMergeInterval: TimeInterval = 30
+
     /// Sessions that were successfully refreshed server-side but could not be
     /// persisted to the keychain (e.g. device locked). Held in memory so the
     /// running process keeps working; `getSession`'s pending-key handling covers
@@ -222,17 +243,9 @@ actor OAuthCore {
         {
             finalNonce = oauthFlowNonces[domain]
         } else if let targetDID = targetDID, let urlObject = URL(string: url), let domain = urlObject.host?.lowercased() {
-            // Re-merge the persisted JKT-scoped nonces into memory, letting persistence win.
-            // Every strategy builds its own OAuthCore (and app extensions share the keychain
-            // access group), so another writer can hold a fresher nonce than this actor's
-            // cache — without this merge the stale in-memory entry shadows it.
-            if let persistedByJKT = try? await storage.getDPoPNoncesByJKT(for: targetDID) {
-                for (persistedThumbprint, domainMap) in persistedByJKT {
-                    var merged = noncesByThumbprint[persistedThumbprint] ?? [:]
-                    merged.merge(domainMap) { _, new in new }
-                    noncesByThumbprint[persistedThumbprint] = merged
-                }
-            }
+            // Pick up nonces written by another OAuthCore or another process, letting
+            // persistence win. Rate-limited: see `persistedNonceMergeInterval`.
+            await mergePersistedNoncesIfStale(for: targetDID)
 
             // Multi-layer nonce retrieval: JKT-scoped (in-memory, now including everything
             // persisted above) first, DID-scoped persistence as the fallback.
@@ -348,6 +361,7 @@ actor OAuthCore {
         var memDomainMap = noncesByThumbprint[resolvedThumbprint] ?? [:]
         memDomainMap[domain] = nonce
         noncesByThumbprint[resolvedThumbprint] = memDomainMap
+        thumbprintsByDID[did, default: []].insert(resolvedThumbprint)
 
         var jktNonces = (try? await storage.getDPoPNoncesByJKT(for: did)) ?? [:]
         var jktDomainMap = jktNonces[resolvedThumbprint] ?? [:]
@@ -390,12 +404,39 @@ actor OAuthCore {
         await writeNonceToAllStores(domain: domain, nonce: nonce, did: did, thumbprint: nil)
     }
 
-    /// Clears the in-memory nonce caches. Persisted stores are cleared by the caller
-    /// (they are per-DID; these caches are not, so logging one account out drops the
-    /// cached nonces of any other — they are re-learned from a single server challenge).
-    func clearNonceCache() {
-        noncesByThumbprint.removeAll()
-        oauthFlowNonces.removeAll()
+    /// Merges the persisted JKT-scoped nonces for `did` into memory unless the last
+    /// merge is still within `persistedNonceMergeInterval`.
+    private func mergePersistedNoncesIfStale(for did: String) async {
+        if let mergedAt = lastPersistedNonceMerge[did],
+           Date().timeIntervalSince(mergedAt) < Self.persistedNonceMergeInterval
+        {
+            return
+        }
+        // Stamped before the read so proofs issued concurrently don't all queue their
+        // own keychain round trip behind this one.
+        lastPersistedNonceMerge[did] = Date()
+
+        guard let persistedByJKT = try? await storage.getDPoPNoncesByJKT(for: did) else { return }
+        for (persistedThumbprint, domainMap) in persistedByJKT {
+            var merged = noncesByThumbprint[persistedThumbprint] ?? [:]
+            merged.merge(domainMap) { _, new in new } // Persisted values win
+            noncesByThumbprint[persistedThumbprint] = merged
+            thumbprintsByDID[did, default: []].insert(persistedThumbprint)
+        }
+    }
+
+    /// Clears the in-memory nonce caches belonging to `did`. Persisted stores are
+    /// cleared by the caller. Other accounts' cached nonces are left alone — they are
+    /// keyed by their own DPoP thumbprints and remain valid.
+    ///
+    /// Safe to call after the DID's DPoP key has been deleted: the thumbprints come
+    /// from the reverse index rather than from re-deriving the key.
+    func clearNonceCache(for did: String) {
+        for thumbprint in thumbprintsByDID[did] ?? [] {
+            noncesByThumbprint.removeValue(forKey: thumbprint)
+        }
+        thumbprintsByDID.removeValue(forKey: did)
+        lastPersistedNonceMerge.removeValue(forKey: did)
     }
 
     /// Records a nonce observed during a DID-less OAuth flow, keyed by the endpoint's
@@ -410,12 +451,19 @@ actor OAuthCore {
     /// callback has bound the flow's ephemeral DPoP key to the account. Without this the
     /// first authenticated request re-learns each nonce through a wasted 400.
     /// Call after persisting the DPoP key for `did`.
-    func transferOAuthFlowNonces(to did: String) async {
-        guard !oauthFlowNonces.isEmpty else { return }
-        // Take the entries before the first suspension point: the actor can accept
-        // another flow's nonce while the writes below are in flight.
-        let pending = oauthFlowNonces
-        oauthFlowNonces.removeAll()
+    ///
+    /// Only the hosts of `endpoints` (this account's authorization server) are moved:
+    /// `oauthFlowNonces` is keyed by host and shared by every flow in progress, so
+    /// draining it wholesale would take a concurrent login's nonce with it.
+    func transferOAuthFlowNonces(to did: String, from endpoints: [String]) async {
+        let hosts = Set(endpoints.compactMap { URL(string: $0)?.host?.lowercased() })
+        // Taken before the first suspension point: the actor can accept another flow's
+        // nonce while the writes below are in flight.
+        let pending = hosts.compactMap { host in oauthFlowNonces[host].map { (host, $0) } }
+        guard !pending.isEmpty else { return }
+        for (host, _) in pending {
+            oauthFlowNonces.removeValue(forKey: host)
+        }
 
         let thumbprint = await dpopKeyThumbprint(for: did)
         for (domain, nonce) in pending {
