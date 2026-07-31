@@ -1375,7 +1375,11 @@ class GeneratorProjectionPublicationTests(unittest.TestCase):
         self.assertIn("case \"$link\":", value_container)
         self.assertIn("case \"$bytes\":", value_container)
         self.assertIn(
-            "typedValue.encodedDAGCBOR() == rawObject.encodedDAGCBOR()",
+            "try !dagCBOREqualIgnoringTypeFraming(typedValue, rawObject)",
+            value_container,
+        )
+        self.assertIn(
+            "!isSpecTolerantMatch(typed: typedValue, raw: rawObject)",
             value_container,
         )
         self.assertIn("try container.decodeNil(forKey: key)", value_container)
