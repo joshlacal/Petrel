@@ -33,3 +33,4 @@ _trash/
 # private key material must never be committed.
 Server/keys/
 *.pem
+.build-xcbeta/

@@ -682,10 +682,18 @@
                 ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
                 let keyStatus = SecItemDelete(keyQuery as CFDictionary)
                 LogManager.logDebug("AppleKeychainStore - macOS SecKey delete status: \(keyStatus)")
+                // Both representations are live key material — retrieval reads either — so a
+                // failure to remove one must not be reported as a deleted key.
+                guard keyStatus == errSecSuccess || keyStatus == errSecItemNotFound else {
+                    LogManager.logError(
+                        "AppleKeychainStore - Failed to delete macOS SecKey for tag \(keyTag). Status: \(keyStatus)"
+                    )
+                    throw KeychainError.deletionError(status: Int(keyStatus))
+                }
 
-                // Try to delete password fallback
+                // Delete password fallback (tolerates a missing item)
                 let passwordKey = "\(keyTag).password"
-                try? delete(key: passwordKey, namespace: "dpopkeys", accessGroup: accessGroup)
+                try delete(key: passwordKey, namespace: "dpopkeys", accessGroup: accessGroup)
             }
         #endif
     }

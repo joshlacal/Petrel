@@ -171,9 +171,31 @@
             return decrypted
         }
 
+        /// A secret that is already absent satisfies a delete; anything else — a
+        /// permission failure, a read-only volume — leaves the secret on disk and must
+        /// reach the caller rather than be reported as a successful wipe.
+        private func isFileNotFound(_ error: any Error) -> Bool {
+            if let cocoaError = error as? CocoaError {
+                return cocoaError.code == .fileNoSuchFile
+            }
+            let nsError = error as NSError
+            return nsError.domain == NSCocoaErrorDomain && nsError.code == NSFileNoSuchFileError
+        }
+
         func delete(key: String, namespace: String, accessGroup: String?) throws {
             let url = fileURL(for: key, namespace: namespace)
-            try? FileManager.default.removeItem(at: url)
+            do {
+                try FileManager.default.removeItem(at: url)
+            } catch {
+                guard isFileNotFound(error) else {
+                    LogManager.logError(
+                        "FileEncryptedStore: Failed to delete key \(namespace).\(key): \(error)"
+                    )
+                    throw error
+                }
+                LogManager.logDebug("FileEncryptedStore: No stored value for key \(namespace).\(key)")
+                return
+            }
             LogManager.logDebug("FileEncryptedStore: Deleted key \(namespace).\(key)")
         }
 
@@ -183,6 +205,7 @@
                 includingPropertiesForKeys: nil
             )
             var deletedCount = 0
+            var failures: [any Error] = []
             for file in files {
                 // Decode filename to check namespace
                 let filename = file.lastPathComponent
@@ -192,9 +215,25 @@
                    let namespacedKey = String(data: decoded, encoding: .utf8),
                    namespacedKey.hasPrefix("\(namespace).")
                 {
-                    try? FileManager.default.removeItem(at: file)
-                    deletedCount += 1
+                    do {
+                        try FileManager.default.removeItem(at: file)
+                        deletedCount += 1
+                    } catch {
+                        // Keep going so one unremovable file cannot strand the rest of the
+                        // namespace, then fail once every remaining secret has been attempted.
+                        guard isFileNotFound(error) else {
+                            failures.append(error)
+                            continue
+                        }
+                    }
                 }
+            }
+            if let firstFailure = failures.first {
+                LogManager.logError("""
+                FileEncryptedStore: Deleted \(deletedCount) items for namespace \(namespace) but \
+                \(failures.count) could not be removed. First failure: \(firstFailure)
+                """)
+                throw firstFailure
             }
             LogManager.logInfo("FileEncryptedStore: Deleted \(deletedCount) items for namespace: \(namespace)")
         }
