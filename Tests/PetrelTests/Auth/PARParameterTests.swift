@@ -178,4 +178,46 @@ struct PARParameterTests {
     #expect(params["client_id"] == "https://override.example/meta.json")
     #expect(params.count == 7)
   }
+
+  @Test("Form encoding preserves '&' and '=' inside a rich-scope parameter value")
+  func formEncodingPreservesDelimitersInsideValues() async throws {
+    // Regression test: atproto rich permission-set scopes use '&' as an internal
+    // parameter separator, e.g. "repo:com.example.profile?action=create&action=update".
+    // .urlQueryAllowed permits '&'/'='/'+' unescaped, so encoding a value with that
+    // character set lets a literal '&' inside the scope collide with the '&' joining
+    // top-level form fields — the receiving server splits it into a bogus extra
+    // "action=update" field and silently truncates the scope.
+    let core = makeCore(namespace: "test.par.formencoding")
+    let scope = "atproto repo:com.example.profile?action=create&action=update space"
+    var params = await core.buildPARParameters(
+      codeChallenge: "c", identifier: nil, state: "s", additionalParameters: nil
+    )
+    params["scope"] = scope
+
+    let body = await core.encodeFormData(params)
+    let bodyString = try #require(String(data: body, encoding: .utf8))
+
+    var components = URLComponents()
+    components.percentEncodedQuery = bodyString
+    let queryItems = try #require(components.queryItems)
+
+    // Exactly one field per input parameter — no extra fields spawned by an
+    // unescaped '&' inside a value.
+    #expect(queryItems.count == params.count)
+
+    let decodedScope = queryItems.first(where: { $0.name == "scope" })?.value
+    #expect(decodedScope == scope)
+    #expect(queryItems.first(where: { $0.name == "action" }) == nil)
+  }
+
+  @Test("Form encoding does not decode literal '+' as a space")
+  func formEncodingEscapesPlus() async throws {
+    // In application/x-www-form-urlencoded, an unescaped '+' decodes as a space.
+    // A value containing a literal '+' must be percent-encoded or it round-trips
+    // as " ".
+    let core = makeCore(namespace: "test.par.formencoding.plus")
+    let body = await core.encodeFormData(["value": "a+b"])
+    let bodyString = try #require(String(data: body, encoding: .utf8))
+    #expect(bodyString == "value=a%2Bb")
+  }
 }

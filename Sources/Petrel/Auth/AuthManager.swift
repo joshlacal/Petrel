@@ -267,6 +267,26 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         try await activeStrategy.attemptRecoveryFromServerFailures(for: did)
     }
 
+    /// Returns the exact OAuth scopes granted to an account, read from its
+    /// persisted session. Empty for unknown DIDs, legacy password sessions,
+    /// and gateway-mode accounts (the gateway holds the tokens server-side).
+    /// - Parameter did: The account DID, or `nil` for the active account.
+    func grantedScopes(for did: String?) async -> Set<String> {
+        let targetDID: String?
+        if let did {
+            targetDID = did
+        } else {
+            targetDID = await accountManager.getCurrentAccount()?.did
+        }
+
+        guard let targetDID,
+              let session = try? await storage.getSession(for: targetDID)
+        else {
+            return []
+        }
+        return session.grantedScopes
+    }
+
     // MARK: - AuthenticationProvider Forwarding
 
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {

@@ -132,9 +132,19 @@ actor OAuthCore {
     }
 
     func encodeFormData(_ params: [String: String]) -> Data {
+        // `.urlQueryAllowed` permits '&', '=', '+', and ';' — legal in a query component
+        // overall, but they collide with the delimiters this encoding relies on: '&'/'='
+        // join the key/value pairs below, '+' decodes as a space, and ';' is a legacy
+        // pair separator. A value containing one of them literally — e.g. an atproto
+        // rich-scope entry like "repo:com.example.profile?action=create&action=update" —
+        // would otherwise be split into bogus extra form fields by the receiving server,
+        // silently truncating the value.
+        var formValueAllowed = CharacterSet.urlQueryAllowed
+        formValueAllowed.remove(charactersIn: "&=+;")
+
         let queryItems = params.map { key, value in
-            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key
-            let escapedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
+            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: formValueAllowed) ?? key
+            let escapedValue = value.addingPercentEncoding(withAllowedCharacters: formValueAllowed) ?? value
             return "\(escapedKey)=\(escapedValue)"
         }
         return queryItems.joined(separator: "&").data(using: .utf8) ?? Data()

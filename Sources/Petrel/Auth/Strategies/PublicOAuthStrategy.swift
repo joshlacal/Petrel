@@ -199,7 +199,8 @@ actor PublicOAuthStrategy: AuthStrategy {
             createdAt: Date(),
             expiresIn: TimeInterval(tokenResponse.expiresIn),
             tokenType: .dpop,
-            did: did
+            did: did,
+            grantedScopes: tokenResponse.grantedScopes
         )
 
         // Create/Update Account
@@ -603,7 +604,10 @@ actor PublicOAuthStrategy: AuthStrategy {
                 createdAt: Date(),
                 expiresIn: TimeInterval(tokenResponse.expiresIn),
                 tokenType: session.tokenType,
-                did: account.did
+                did: account.did,
+                // Refresh responses restate the grant; the server may have reduced
+                // it (e.g. the user revoked scopes), so persist the new set.
+                grantedScopes: tokenResponse.grantedScopes
             )
             // The server has rotated the refresh token; persistence failures are handled
             // inside (retry + pending key + in-memory) and must not fail the refresh.

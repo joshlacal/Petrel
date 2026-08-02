@@ -210,6 +210,12 @@ struct TokenResponse: Decodable {
     let sub: String?
     let dpopJkt: String?
 
+    /// The exact scopes the authorization server granted, parsed from the
+    /// space-delimited `scope` value.
+    var grantedScopes: Set<String> {
+        Set(scope.split(whereSeparator: \.isWhitespace).map(String.init))
+    }
+
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case tokenType = "token_type"
@@ -218,6 +224,27 @@ struct TokenResponse: Decodable {
         case scope
         case sub
         case dpopJkt = "dpop_jkt"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        tokenType = try container.decode(String.self, forKey: .tokenType)
+        expiresIn = try container.decode(Int.self, forKey: .expiresIn)
+        refreshToken = try container.decode(String.self, forKey: .refreshToken)
+        scope = try container.decode(String.self, forKey: .scope)
+        sub = try container.decodeIfPresent(String.self, forKey: .sub)
+        dpopJkt = try container.decodeIfPresent(String.self, forKey: .dpopJkt)
+
+        // The atproto OAuth profile requires every grant to include the `atproto`
+        // scope; a response without it is not a usable atproto session.
+        guard grantedScopes.contains("atproto") else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .scope,
+                in: container,
+                debugDescription: "OAuth token response scope must contain atproto"
+            )
+        }
     }
 }
 
