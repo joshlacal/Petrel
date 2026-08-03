@@ -1625,6 +1625,8 @@ public struct AppBskyActorDefs {
     public struct ViewerState: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.actor.defs#viewerState"
         public let muted: Bool?
+        public let mutedOnlyReposts: Bool?
+        public let mutedOnlyQuoteposts: Bool?
         public let mutedByList: AppBskyGraphDefs.ListViewBasic?
         public let blockedBy: Bool?
         public let blocking: ATProtocolURI?
@@ -1635,9 +1637,11 @@ public struct AppBskyActorDefs {
         public let activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
 
         public init(
-            muted: Bool?, mutedByList: AppBskyGraphDefs.ListViewBasic?, blockedBy: Bool?, blocking: ATProtocolURI?, blockingByList: AppBskyGraphDefs.ListViewBasic?, following: ATProtocolURI?, followedBy: ATProtocolURI?, knownFollowers: KnownFollowers?, activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
+            muted: Bool?, mutedOnlyReposts: Bool?, mutedOnlyQuoteposts: Bool?, mutedByList: AppBskyGraphDefs.ListViewBasic?, blockedBy: Bool?, blocking: ATProtocolURI?, blockingByList: AppBskyGraphDefs.ListViewBasic?, following: ATProtocolURI?, followedBy: ATProtocolURI?, knownFollowers: KnownFollowers?, activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
         ) {
             self.muted = muted
+            self.mutedOnlyReposts = mutedOnlyReposts
+            self.mutedOnlyQuoteposts = mutedOnlyQuoteposts
             self.mutedByList = mutedByList
             self.blockedBy = blockedBy
             self.blocking = blocking
@@ -1657,6 +1661,22 @@ public struct AppBskyActorDefs {
                 // must not fail the whole response.
                 LogManager.logWarning("Decoding error for optional property 'muted' — degrading to nil: \(error)")
                 muted = nil
+            }
+            do {
+                mutedOnlyReposts = try container.decodeIfPresent(Bool.self, forKey: .mutedOnlyReposts)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'mutedOnlyReposts' — degrading to nil: \(error)")
+                mutedOnlyReposts = nil
+            }
+            do {
+                mutedOnlyQuoteposts = try container.decodeIfPresent(Bool.self, forKey: .mutedOnlyQuoteposts)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'mutedOnlyQuoteposts' — degrading to nil: \(error)")
+                mutedOnlyQuoteposts = nil
             }
             do {
                 mutedByList = try container.decodeIfPresent(AppBskyGraphDefs.ListViewBasic.self, forKey: .mutedByList)
@@ -1728,6 +1748,8 @@ public struct AppBskyActorDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(muted, forKey: .muted)
+            try container.encodeIfPresent(mutedOnlyReposts, forKey: .mutedOnlyReposts)
+            try container.encodeIfPresent(mutedOnlyQuoteposts, forKey: .mutedOnlyQuoteposts)
             try container.encodeIfPresent(mutedByList, forKey: .mutedByList)
             try container.encodeIfPresent(blockedBy, forKey: .blockedBy)
             try container.encodeIfPresent(blocking, forKey: .blocking)
@@ -1740,6 +1762,16 @@ public struct AppBskyActorDefs {
 
         public func hash(into hasher: inout Hasher) {
             if let value = muted {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = mutedOnlyReposts {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = mutedOnlyQuoteposts {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -1791,6 +1823,12 @@ public struct AppBskyActorDefs {
             if muted != other.muted {
                 return false
             }
+            if mutedOnlyReposts != other.mutedOnlyReposts {
+                return false
+            }
+            if mutedOnlyQuoteposts != other.mutedOnlyQuoteposts {
+                return false
+            }
             if mutedByList != other.mutedByList {
                 return false
             }
@@ -1828,6 +1866,14 @@ public struct AppBskyActorDefs {
             if let value = muted {
                 let mutedValue = try value.toCBORValue()
                 map = map.adding(key: "muted", value: mutedValue)
+            }
+            if let value = mutedOnlyReposts {
+                let mutedOnlyRepostsValue = try value.toCBORValue()
+                map = map.adding(key: "mutedOnlyReposts", value: mutedOnlyRepostsValue)
+            }
+            if let value = mutedOnlyQuoteposts {
+                let mutedOnlyQuotepostsValue = try value.toCBORValue()
+                map = map.adding(key: "mutedOnlyQuoteposts", value: mutedOnlyQuotepostsValue)
             }
             if let value = mutedByList {
                 let mutedByListValue = try value.toCBORValue()
@@ -1867,6 +1913,8 @@ public struct AppBskyActorDefs {
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case muted
+            case mutedOnlyReposts
+            case mutedOnlyQuoteposts
             case mutedByList
             case blockedBy
             case blocking

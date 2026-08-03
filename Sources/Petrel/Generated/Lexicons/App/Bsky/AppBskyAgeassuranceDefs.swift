@@ -224,6 +224,7 @@ public enum AppBskyAgeassuranceDefs {
 
     public struct ConfigRegion: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegion"
+        public let platforms: [String]?
         public let countryCode: String
         public let regionCode: String?
         public let minAccessAge: Int
@@ -231,8 +232,9 @@ public enum AppBskyAgeassuranceDefs {
         public let rules: [ConfigRegionRulesUnion]
 
         public init(
-            countryCode: String, regionCode: String?, minAccessAge: Int, additionalVerificationMethods: [String]?, rules: [ConfigRegionRulesUnion]
+            platforms: [String]?, countryCode: String, regionCode: String?, minAccessAge: Int, additionalVerificationMethods: [String]?, rules: [ConfigRegionRulesUnion]
         ) {
+            self.platforms = platforms
             self.countryCode = countryCode
             self.regionCode = regionCode
             self.minAccessAge = minAccessAge
@@ -242,6 +244,14 @@ public enum AppBskyAgeassuranceDefs {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                platforms = try container.decodeIfPresent([String].self, forKey: .platforms)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'platforms' — degrading to nil: \(error)")
+                platforms = nil
+            }
             do {
                 countryCode = try container.decode(String.self, forKey: .countryCode)
             } catch {
@@ -281,6 +291,7 @@ public enum AppBskyAgeassuranceDefs {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encodeIfPresent(platforms, forKey: .platforms)
             try container.encode(countryCode, forKey: .countryCode)
             try container.encodeIfPresent(regionCode, forKey: .regionCode)
             try container.encode(minAccessAge, forKey: .minAccessAge)
@@ -289,6 +300,11 @@ public enum AppBskyAgeassuranceDefs {
         }
 
         public func hash(into hasher: inout Hasher) {
+            if let value = platforms {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(countryCode)
             if let value = regionCode {
                 hasher.combine(value)
@@ -306,6 +322,9 @@ public enum AppBskyAgeassuranceDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
+            if platforms != other.platforms {
+                return false
+            }
             if countryCode != other.countryCode {
                 return false
             }
@@ -331,6 +350,10 @@ public enum AppBskyAgeassuranceDefs {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
             map = map.adding(key: "$type", value: Self.typeIdentifier)
+            if let value = platforms {
+                let platformsValue = try value.toCBORValue()
+                map = map.adding(key: "platforms", value: platformsValue)
+            }
             let countryCodeValue = try countryCode.toCBORValue()
             map = map.adding(key: "countryCode", value: countryCodeValue)
             if let value = regionCode {
@@ -350,6 +373,7 @@ public enum AppBskyAgeassuranceDefs {
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
+            case platforms
             case countryCode
             case regionCode
             case minAccessAge

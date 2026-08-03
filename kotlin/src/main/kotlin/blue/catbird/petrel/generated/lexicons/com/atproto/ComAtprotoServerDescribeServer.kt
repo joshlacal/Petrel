@@ -38,7 +38,8 @@ object ComAtprotoServerDescribeServerDefs {
     data class ComAtprotoServerDescribeServerOutput(
 // If true, an invite code must be supplied to create an account on this instance.        @SerialName("inviteCodeRequired")
         val inviteCodeRequired: Boolean? = null,// If true, a phone verification token must be supplied to create an account on this instance.        @SerialName("phoneVerificationRequired")
-        val phoneVerificationRequired: Boolean? = null,// List of domain suffixes that can be used in account handles.        @SerialName("availableUserDomains")
+        val phoneVerificationRequired: Boolean? = null,// Maximum size of a blob that can be uploaded via com.atproto.repo.uploadBlob, in bytes.        @SerialName("blobUploadLimit")
+        val blobUploadLimit: Int? = null,// List of domain suffixes that can be used in account handles.        @SerialName("availableUserDomains")
         val availableUserDomains: List<String>,// URLs of service policy documents.        @SerialName("links")
         val links: ComAtprotoServerDescribeServerLinks? = null,// Contact information        @SerialName("contact")
         val contact: ComAtprotoServerDescribeServerContact? = null,        @SerialName("did")

@@ -23,7 +23,8 @@ object AppBskyNotificationListNotificationsDefs {
         val author: AppBskyActorDefsProfileView,/** The reason why this notification was delivered - e.g. your post was liked, or you received a new follower. */        @SerialName("reason")
         val reason: String,        @SerialName("reasonSubject")
         val reasonSubject: ATProtocolURI? = null,        @SerialName("record")
-        val record: JsonElement,        @SerialName("isRead")
+        val record: JsonElement,/** The starter pack associated with this notification. Present when the notification is for a follow originating from a starter pack. */        @SerialName("starterPack")
+        val starterPack: AppBskyGraphDefsStarterPackViewBasic? = null,        @SerialName("isRead")
         val isRead: Boolean,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate,        @SerialName("labels")
         val labels: List<ComAtprotoLabelDefsLabel>? = null    ) {

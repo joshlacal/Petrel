@@ -36,11 +36,11 @@ public enum AppBskyDraftCreateDraft {
     }
 
     public struct Output: ATProtocolCodable {
-        public let id: String
+        public let id: TID
 
         /// Standard public initializer
         public init(
-            id: String
+            id: TID
 
         ) {
             self.id = id
@@ -49,7 +49,7 @@ public enum AppBskyDraftCreateDraft {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            id = try container.decode(String.self, forKey: .id)
+            id = try container.decode(TID.self, forKey: .id)
         }
 
         public func encode(to encoder: Encoder) throws {

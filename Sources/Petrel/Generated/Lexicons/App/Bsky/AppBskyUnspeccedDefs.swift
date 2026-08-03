@@ -298,6 +298,7 @@ public enum AppBskyUnspeccedDefs {
         public static let typeIdentifier = "app.bsky.unspecced.defs#skeletonTrend"
         public let topic: String
         public let displayName: String
+        public let description: String?
         public let link: String
         public let startedAt: ATProtocolDate
         public let postCount: Int
@@ -306,10 +307,11 @@ public enum AppBskyUnspeccedDefs {
         public let dids: [DID]
 
         public init(
-            topic: String, displayName: String, link: String, startedAt: ATProtocolDate, postCount: Int, status: String?, category: String?, dids: [DID]
+            topic: String, displayName: String, description: String?, link: String, startedAt: ATProtocolDate, postCount: Int, status: String?, category: String?, dids: [DID]
         ) {
             self.topic = topic
             self.displayName = displayName
+            self.description = description
             self.link = link
             self.startedAt = startedAt
             self.postCount = postCount
@@ -331,6 +333,14 @@ public enum AppBskyUnspeccedDefs {
             } catch {
                 LogManager.logError("Decoding error for required property 'displayName': \(error)")
                 throw error
+            }
+            do {
+                description = try container.decodeIfPresent(String.self, forKey: .description)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+                description = nil
             }
             do {
                 link = try container.decode(String.self, forKey: .link)
@@ -379,6 +389,7 @@ public enum AppBskyUnspeccedDefs {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(topic, forKey: .topic)
             try container.encode(displayName, forKey: .displayName)
+            try container.encodeIfPresent(description, forKey: .description)
             try container.encode(link, forKey: .link)
             try container.encode(startedAt, forKey: .startedAt)
             try container.encode(postCount, forKey: .postCount)
@@ -390,6 +401,11 @@ public enum AppBskyUnspeccedDefs {
         public func hash(into hasher: inout Hasher) {
             hasher.combine(topic)
             hasher.combine(displayName)
+            if let value = description {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(link)
             hasher.combine(startedAt)
             hasher.combine(postCount)
@@ -412,6 +428,9 @@ public enum AppBskyUnspeccedDefs {
                 return false
             }
             if displayName != other.displayName {
+                return false
+            }
+            if description != other.description {
                 return false
             }
             if link != other.link {
@@ -446,6 +465,10 @@ public enum AppBskyUnspeccedDefs {
             map = map.adding(key: "topic", value: topicValue)
             let displayNameValue = try displayName.toCBORValue()
             map = map.adding(key: "displayName", value: displayNameValue)
+            if let value = description {
+                let descriptionValue = try value.toCBORValue()
+                map = map.adding(key: "description", value: descriptionValue)
+            }
             let linkValue = try link.toCBORValue()
             map = map.adding(key: "link", value: linkValue)
             let startedAtValue = try startedAt.toCBORValue()
@@ -469,6 +492,7 @@ public enum AppBskyUnspeccedDefs {
             case typeIdentifier = "$type"
             case topic
             case displayName
+            case description
             case link
             case startedAt
             case postCount
@@ -482,6 +506,7 @@ public enum AppBskyUnspeccedDefs {
         public static let typeIdentifier = "app.bsky.unspecced.defs#trendView"
         public let topic: String
         public let displayName: String
+        public let description: String?
         public let link: String
         public let startedAt: ATProtocolDate
         public let postCount: Int
@@ -490,10 +515,11 @@ public enum AppBskyUnspeccedDefs {
         public let actors: [AppBskyActorDefs.ProfileViewBasic]
 
         public init(
-            topic: String, displayName: String, link: String, startedAt: ATProtocolDate, postCount: Int, status: String?, category: String?, actors: [AppBskyActorDefs.ProfileViewBasic]
+            topic: String, displayName: String, description: String?, link: String, startedAt: ATProtocolDate, postCount: Int, status: String?, category: String?, actors: [AppBskyActorDefs.ProfileViewBasic]
         ) {
             self.topic = topic
             self.displayName = displayName
+            self.description = description
             self.link = link
             self.startedAt = startedAt
             self.postCount = postCount
@@ -515,6 +541,14 @@ public enum AppBskyUnspeccedDefs {
             } catch {
                 LogManager.logError("Decoding error for required property 'displayName': \(error)")
                 throw error
+            }
+            do {
+                description = try container.decodeIfPresent(String.self, forKey: .description)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+                description = nil
             }
             do {
                 link = try container.decode(String.self, forKey: .link)
@@ -563,6 +597,7 @@ public enum AppBskyUnspeccedDefs {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(topic, forKey: .topic)
             try container.encode(displayName, forKey: .displayName)
+            try container.encodeIfPresent(description, forKey: .description)
             try container.encode(link, forKey: .link)
             try container.encode(startedAt, forKey: .startedAt)
             try container.encode(postCount, forKey: .postCount)
@@ -574,6 +609,11 @@ public enum AppBskyUnspeccedDefs {
         public func hash(into hasher: inout Hasher) {
             hasher.combine(topic)
             hasher.combine(displayName)
+            if let value = description {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(link)
             hasher.combine(startedAt)
             hasher.combine(postCount)
@@ -596,6 +636,9 @@ public enum AppBskyUnspeccedDefs {
                 return false
             }
             if displayName != other.displayName {
+                return false
+            }
+            if description != other.description {
                 return false
             }
             if link != other.link {
@@ -630,6 +673,10 @@ public enum AppBskyUnspeccedDefs {
             map = map.adding(key: "topic", value: topicValue)
             let displayNameValue = try displayName.toCBORValue()
             map = map.adding(key: "displayName", value: displayNameValue)
+            if let value = description {
+                let descriptionValue = try value.toCBORValue()
+                map = map.adding(key: "description", value: descriptionValue)
+            }
             let linkValue = try link.toCBORValue()
             map = map.adding(key: "link", value: linkValue)
             let startedAtValue = try startedAt.toCBORValue()
@@ -653,6 +700,7 @@ public enum AppBskyUnspeccedDefs {
             case typeIdentifier = "$type"
             case topic
             case displayName
+            case description
             case link
             case startedAt
             case postCount
@@ -668,16 +716,20 @@ public enum AppBskyUnspeccedDefs {
         public let moreParents: Bool
         public let moreReplies: Int
         public let opThread: Bool
+        public let opThreadPostIndex: Int?
+        public let opThreadPostCount: Int?
         public let hiddenByThreadgate: Bool
         public let mutedByViewer: Bool
 
         public init(
-            post: AppBskyFeedDefs.PostView, moreParents: Bool, moreReplies: Int, opThread: Bool, hiddenByThreadgate: Bool, mutedByViewer: Bool
+            post: AppBskyFeedDefs.PostView, moreParents: Bool, moreReplies: Int, opThread: Bool, opThreadPostIndex: Int?, opThreadPostCount: Int?, hiddenByThreadgate: Bool, mutedByViewer: Bool
         ) {
             self.post = post
             self.moreParents = moreParents
             self.moreReplies = moreReplies
             self.opThread = opThread
+            self.opThreadPostIndex = opThreadPostIndex
+            self.opThreadPostCount = opThreadPostCount
             self.hiddenByThreadgate = hiddenByThreadgate
             self.mutedByViewer = mutedByViewer
         }
@@ -709,6 +761,22 @@ public enum AppBskyUnspeccedDefs {
                 throw error
             }
             do {
+                opThreadPostIndex = try container.decodeIfPresent(Int.self, forKey: .opThreadPostIndex)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'opThreadPostIndex' — degrading to nil: \(error)")
+                opThreadPostIndex = nil
+            }
+            do {
+                opThreadPostCount = try container.decodeIfPresent(Int.self, forKey: .opThreadPostCount)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'opThreadPostCount' — degrading to nil: \(error)")
+                opThreadPostCount = nil
+            }
+            do {
                 hiddenByThreadgate = try container.decode(Bool.self, forKey: .hiddenByThreadgate)
             } catch {
                 LogManager.logError("Decoding error for required property 'hiddenByThreadgate': \(error)")
@@ -729,6 +797,8 @@ public enum AppBskyUnspeccedDefs {
             try container.encode(moreParents, forKey: .moreParents)
             try container.encode(moreReplies, forKey: .moreReplies)
             try container.encode(opThread, forKey: .opThread)
+            try container.encodeIfPresent(opThreadPostIndex, forKey: .opThreadPostIndex)
+            try container.encodeIfPresent(opThreadPostCount, forKey: .opThreadPostCount)
             try container.encode(hiddenByThreadgate, forKey: .hiddenByThreadgate)
             try container.encode(mutedByViewer, forKey: .mutedByViewer)
         }
@@ -738,6 +808,16 @@ public enum AppBskyUnspeccedDefs {
             hasher.combine(moreParents)
             hasher.combine(moreReplies)
             hasher.combine(opThread)
+            if let value = opThreadPostIndex {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = opThreadPostCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(hiddenByThreadgate)
             hasher.combine(mutedByViewer)
         }
@@ -754,6 +834,12 @@ public enum AppBskyUnspeccedDefs {
                 return false
             }
             if opThread != other.opThread {
+                return false
+            }
+            if opThreadPostIndex != other.opThreadPostIndex {
+                return false
+            }
+            if opThreadPostCount != other.opThreadPostCount {
                 return false
             }
             if hiddenByThreadgate != other.hiddenByThreadgate {
@@ -780,6 +866,14 @@ public enum AppBskyUnspeccedDefs {
             map = map.adding(key: "moreReplies", value: moreRepliesValue)
             let opThreadValue = try opThread.toCBORValue()
             map = map.adding(key: "opThread", value: opThreadValue)
+            if let value = opThreadPostIndex {
+                let opThreadPostIndexValue = try value.toCBORValue()
+                map = map.adding(key: "opThreadPostIndex", value: opThreadPostIndexValue)
+            }
+            if let value = opThreadPostCount {
+                let opThreadPostCountValue = try value.toCBORValue()
+                map = map.adding(key: "opThreadPostCount", value: opThreadPostCountValue)
+            }
             let hiddenByThreadgateValue = try hiddenByThreadgate.toCBORValue()
             map = map.adding(key: "hiddenByThreadgate", value: hiddenByThreadgateValue)
             let mutedByViewerValue = try mutedByViewer.toCBORValue()
@@ -793,6 +887,8 @@ public enum AppBskyUnspeccedDefs {
             case moreParents
             case moreReplies
             case opThread
+            case opThreadPostIndex
+            case opThreadPostCount
             case hiddenByThreadgate
             case mutedByViewer
         }

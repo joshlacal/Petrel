@@ -23,7 +23,8 @@ object AppBskyVideoDefsDefs {
         val state: String,/** Progress within the current processing state. */        @SerialName("progress")
         val progress: Int? = null,        @SerialName("blob")
         val blob: Blob? = null,        @SerialName("error")
-        val error: String? = null,        @SerialName("message")
+        val error: String? = null,/** A machine-readable code for why the video processing job failed. */        @SerialName("failureCode")
+        val failureCode: String? = null,        @SerialName("message")
         val message: String? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyVideoDefsJobStatus"

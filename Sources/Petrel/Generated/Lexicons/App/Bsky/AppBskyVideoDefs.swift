@@ -14,10 +14,11 @@ public enum AppBskyVideoDefs {
         public let progress: Int?
         public let blob: Blob?
         public let error: String?
+        public let failureCode: String?
         public let message: String?
 
         public init(
-            jobId: String, did: DID, state: String, progress: Int?, blob: Blob?, error: String?, message: String?
+            jobId: String, did: DID, state: String, progress: Int?, blob: Blob?, error: String?, failureCode: String?, message: String?
         ) {
             self.jobId = jobId
             self.did = did
@@ -25,6 +26,7 @@ public enum AppBskyVideoDefs {
             self.progress = progress
             self.blob = blob
             self.error = error
+            self.failureCode = failureCode
             self.message = message
         }
 
@@ -73,6 +75,14 @@ public enum AppBskyVideoDefs {
                 self.error = nil
             }
             do {
+                failureCode = try container.decodeIfPresent(String.self, forKey: .failureCode)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'failureCode' — degrading to nil: \(error)")
+                failureCode = nil
+            }
+            do {
                 message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
@@ -91,6 +101,7 @@ public enum AppBskyVideoDefs {
             try container.encodeIfPresent(progress, forKey: .progress)
             try container.encodeIfPresent(blob, forKey: .blob)
             try container.encodeIfPresent(error, forKey: .error)
+            try container.encodeIfPresent(failureCode, forKey: .failureCode)
             try container.encodeIfPresent(message, forKey: .message)
         }
 
@@ -109,6 +120,11 @@ public enum AppBskyVideoDefs {
                 hasher.combine(nil as Int?)
             }
             if let value = error {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = failureCode {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -138,6 +154,9 @@ public enum AppBskyVideoDefs {
                 return false
             }
             if error != other.error {
+                return false
+            }
+            if failureCode != other.failureCode {
                 return false
             }
             if message != other.message {
@@ -171,6 +190,10 @@ public enum AppBskyVideoDefs {
                 let errorValue = try value.toCBORValue()
                 map = map.adding(key: "error", value: errorValue)
             }
+            if let value = failureCode {
+                let failureCodeValue = try value.toCBORValue()
+                map = map.adding(key: "failureCode", value: failureCodeValue)
+            }
             if let value = message {
                 let messageValue = try value.toCBORValue()
                 map = map.adding(key: "message", value: messageValue)
@@ -186,6 +209,7 @@ public enum AppBskyVideoDefs {
             case progress
             case blob
             case error
+            case failureCode
             case message
         }
     }

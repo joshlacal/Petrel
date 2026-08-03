@@ -198,7 +198,8 @@ enum class AppBskyAgeassuranceDefsStatus {
      */
     @Serializable
     data class AppBskyAgeassuranceDefsConfigRegion(
-/** The ISO 3166-1 alpha-2 country code this configuration applies to. */        @SerialName("countryCode")
+/** The platforms this configuration applies to. If omitted, the configuration applies to all platforms. */        @SerialName("platforms")
+        val platforms: List<String>? = null,/** The ISO 3166-1 alpha-2 country code this configuration applies to. */        @SerialName("countryCode")
         val countryCode: String,/** The ISO 3166-2 region code this configuration applies to. If omitted, the configuration applies to the entire country. */        @SerialName("regionCode")
         val regionCode: String? = null,/** The minimum age (as a whole integer) required to use Bluesky in this region. */        @SerialName("minAccessAge")
         val minAccessAge: Int,/** Verification methods permitted in this region in addition to the third-party (KWS) flow, which is always supported. `device` permits using the native on-device age APIs (e.g. Apple Declared Age Range, Google Play Age Signals). */        @SerialName("additionalVerificationMethods")

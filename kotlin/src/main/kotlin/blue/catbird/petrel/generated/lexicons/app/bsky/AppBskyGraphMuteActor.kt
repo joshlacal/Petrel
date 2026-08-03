@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: app.bsky.graph.muteActor
-// Creates a mute relationship for the specified account. Mutes are private in Bluesky. Requires auth.
+// Creates a mute relationship for the specified account. If a mute already exists for the account, it is updated in place: the stored scope is replaced with the scope in this request. Mutes are private in Bluesky. Requires auth.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -18,10 +18,12 @@ object AppBskyGraphMuteActorDefs {
 @Serializable
     data class AppBskyGraphMuteActorInput(
         @SerialName("actor")
-        val actor: ATIdentifier    )
+        val actor: ATIdentifier,// Restrict the mute to the account's reposts. When any 'only' scope is set, just the scoped content is muted; when none are set, the account is fully muted. Repeat calls replace the stored scope rather than adding to it.        @SerialName("onlyReposts")
+        val onlyReposts: Boolean? = null,// Restrict the mute to the account's quote posts. See onlyReposts.        @SerialName("onlyQuoteposts")
+        val onlyQuoteposts: Boolean? = null    )
 
 /**
- * Creates a mute relationship for the specified account. Mutes are private in Bluesky. Requires auth.
+ * Creates a mute relationship for the specified account. If a mute already exists for the account, it is updated in place: the stored scope is replaced with the scope in this request. Mutes are private in Bluesky. Requires auth.
  *
  * Endpoint: app.bsky.graph.muteActor
  */

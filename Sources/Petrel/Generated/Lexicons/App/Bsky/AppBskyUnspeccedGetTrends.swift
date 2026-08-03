@@ -18,24 +18,41 @@ public enum AppBskyUnspeccedGetTrends {
     public struct Output: ATProtocolCodable {
         public let trends: [AppBskyUnspeccedDefs.TrendView]
 
+        public let recIdStr: String?
+
         /// Standard public initializer
         public init(
-            trends: [AppBskyUnspeccedDefs.TrendView]
+            trends: [AppBskyUnspeccedDefs.TrendView],
+
+            recIdStr: String? = nil
 
         ) {
             self.trends = trends
+
+            self.recIdStr = recIdStr
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
             trends = try container.decode([AppBskyUnspeccedDefs.TrendView].self, forKey: .trends)
+
+            do {
+                recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
+                recIdStr = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
             try container.encode(trends, forKey: .trends)
+
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
         }
 
         public func toCBORValue() throws -> Any {
@@ -44,11 +61,18 @@ public enum AppBskyUnspeccedGetTrends {
             let trendsValue = try trends.toCBORValue()
             map = map.adding(key: "trends", value: trendsValue)
 
+            if let value = recIdStr {
+                // Encode optional property even if it's an empty array for CBOR
+                let recIdStrValue = try value.toCBORValue()
+                map = map.adding(key: "recIdStr", value: recIdStrValue)
+            }
+
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case trends
+            case recIdStr
         }
     }
 }

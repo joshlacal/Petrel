@@ -24,7 +24,8 @@ object AppBskyUnspeccedGetTrendsSkeletonDefs {
     @Serializable
     data class AppBskyUnspeccedGetTrendsSkeletonOutput(
         @SerialName("trends")
-        val trends: List<AppBskyUnspeccedDefsSkeletonTrend>    )
+        val trends: List<AppBskyUnspeccedDefsSkeletonTrend>,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recIdStr")
+        val recIdStr: String? = null    )
 
 /**
  * Get the skeleton of trends on the network. Intended to be called and then hydrated through app.bsky.unspecced.getTrends
