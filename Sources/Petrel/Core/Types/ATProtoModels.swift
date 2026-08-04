@@ -160,6 +160,11 @@ public struct Session: Codable, Equatable, Sendable {
     /// The DID associated with this session
     public let did: String
 
+    /// The exact OAuth scopes granted by the authorization server.
+    /// Legacy password sessions and sessions written by Petrel versions before
+    /// 1.0.0 do not have a granted scope set.
+    public let grantedScopes: Set<String>
+
     /// Whether the token has expired
     public var isExpired: Bool {
         Date() > createdAt.addingTimeInterval(expiresIn)
@@ -185,7 +190,8 @@ public struct Session: Codable, Equatable, Sendable {
         createdAt: Date,
         expiresIn: TimeInterval,
         tokenType: TokenType,
-        did: String
+        did: String,
+        grantedScopes: Set<String> = []
     ) {
         self.accessToken = accessToken
         self.refreshToken = refreshToken
@@ -193,6 +199,28 @@ public struct Session: Codable, Equatable, Sendable {
         self.expiresIn = expiresIn
         self.tokenType = tokenType
         self.did = did
+        self.grantedScopes = grantedScopes
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case accessToken
+        case refreshToken
+        case createdAt
+        case expiresIn
+        case tokenType
+        case did
+        case grantedScopes
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        refreshToken = try container.decodeIfPresent(String.self, forKey: .refreshToken)
+        createdAt = try container.decode(Date.self, forKey: .createdAt)
+        expiresIn = try container.decode(TimeInterval.self, forKey: .expiresIn)
+        tokenType = try container.decode(TokenType.self, forKey: .tokenType)
+        did = try container.decode(String.self, forKey: .did)
+        grantedScopes = try container.decodeIfPresent(Set<String>.self, forKey: .grantedScopes) ?? []
     }
 }
 

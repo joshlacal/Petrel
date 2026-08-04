@@ -172,7 +172,8 @@ actor CABOAuthStrategy: AuthStrategy {
             createdAt: Date(),
             expiresIn: TimeInterval(tokenResponse.expiresIn),
             tokenType: .dpop,
-            did: did
+            did: did,
+            grantedScopes: tokenResponse.grantedScopes
         )
 
         // Create/Update Account
@@ -619,7 +620,8 @@ actor CABOAuthStrategy: AuthStrategy {
                 createdAt: Date(),
                 expiresIn: TimeInterval(tokenResponse.expiresIn),
                 tokenType: session.tokenType,
-                did: account.did
+                did: account.did,
+                grantedScopes: tokenResponse.grantedScopes
             )
             // The server has rotated the refresh token; persistence failures are handled
             // inside (retry + pending key + in-memory) and must not fail the refresh.

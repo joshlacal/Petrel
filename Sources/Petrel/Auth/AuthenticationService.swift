@@ -567,7 +567,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
             createdAt: Date(), // Use current time
             expiresIn: adjustedExpiresIn,
             tokenType: tokenType,
-            did: did
+            did: did,
+            grantedScopes: tokenResponse.grantedScopes
         )
         LogManager.logDebug("Created new session for DID: \(did)")
 
@@ -2166,7 +2167,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                     createdAt: Date(), // Use current time as the refresh time
                     expiresIn: adjustedExpiresIn,
                     tokenType: session.tokenType, // Assume token type doesn't change on refresh
-                    did: account.did
+                    did: account.did,
+                    grantedScopes: tokenResponse.grantedScopes
                 )
 
                 // Save session with enhanced validation
@@ -2289,7 +2291,8 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
                             createdAt: Date(),
                             expiresIn: adjustedExpiresIn,
                             tokenType: session.tokenType,
-                            did: account.did
+                            did: account.did,
+                            grantedScopes: tokenResponse.grantedScopes
                         )
                         try await storage.saveSession(newSession, for: account.did)
 
@@ -4127,6 +4130,10 @@ struct TokenResponse: Decodable {
     let sub: String?
     let dpopJkt: String?
 
+    var grantedScopes: Set<String> {
+        Set(scope.split(whereSeparator: \.isWhitespace).map(String.init))
+    }
+
     enum CodingKeys: String, CodingKey {
         case accessToken = "access_token"
         case tokenType = "token_type"
@@ -4135,6 +4142,25 @@ struct TokenResponse: Decodable {
         case scope
         case sub
         case dpopJkt = "dpop_jkt"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        accessToken = try container.decode(String.self, forKey: .accessToken)
+        tokenType = try container.decode(String.self, forKey: .tokenType)
+        expiresIn = try container.decode(Int.self, forKey: .expiresIn)
+        refreshToken = try container.decode(String.self, forKey: .refreshToken)
+        scope = try container.decode(String.self, forKey: .scope)
+        sub = try container.decodeIfPresent(String.self, forKey: .sub)
+        dpopJkt = try container.decodeIfPresent(String.self, forKey: .dpopJkt)
+
+        guard grantedScopes.contains("atproto") else {
+            throw DecodingError.dataCorruptedError(
+                forKey: .scope,
+                in: container,
+                debugDescription: "OAuth token response scope must contain atproto"
+            )
+        }
     }
 }
 

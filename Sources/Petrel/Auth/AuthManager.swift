@@ -267,6 +267,22 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         try await activeStrategy.attemptRecoveryFromServerFailures(for: did)
     }
 
+    func grantedScopes(for did: String?) async -> Set<String> {
+        let targetDID: String?
+        if let did {
+            targetDID = did
+        } else {
+            targetDID = await accountManager.getCurrentAccount()?.did
+        }
+
+        guard let targetDID,
+              let session = try? await storage.getSession(for: targetDID)
+        else {
+            return []
+        }
+        return session.grantedScopes
+    }
+
     // MARK: - AuthenticationProvider Forwarding
 
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {

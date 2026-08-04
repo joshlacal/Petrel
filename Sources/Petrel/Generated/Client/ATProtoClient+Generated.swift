@@ -687,6 +687,12 @@ public actor ATProtoClient {
         return await accountManager?.getCurrentAccount()
     }
 
+    /// Returns the exact scopes granted to an OAuth account.
+    /// - Parameter did: The account DID, or `nil` for the active account.
+    public func getGrantedScopes(for did: String? = nil) async -> Set<String> {
+        await authManager?.grantedScopes(for: did) ?? []
+    }
+
     // MARK: - DID Resolution
 
     /// Resolves a handle to a DID.
