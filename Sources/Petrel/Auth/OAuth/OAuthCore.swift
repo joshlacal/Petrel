@@ -101,9 +101,15 @@ actor OAuthCore {
     }
 
     func encodeFormData(_ params: [String: String]) -> Data {
+        // See AuthenticationService.encodeFormData: '&'/'='/'+' must not stay in the
+        // per-value allowed set or a value containing them (e.g. a rich-scope entry with
+        // an embedded '&') collides with the delimiters joining key/value pairs below.
+        var formValueAllowed = CharacterSet.urlQueryAllowed
+        formValueAllowed.remove(charactersIn: "&=+;")
+
         let queryItems = params.map { key, value in
-            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key
-            let escapedValue = value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
+            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: formValueAllowed) ?? key
+            let escapedValue = value.addingPercentEncoding(withAllowedCharacters: formValueAllowed) ?? value
             return "\(escapedKey)=\(escapedValue)"
         }
         return queryItems.joined(separator: "&").data(using: .utf8) ?? Data()

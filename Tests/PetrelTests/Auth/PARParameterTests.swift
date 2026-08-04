@@ -178,4 +178,38 @@ struct PARParameterTests {
     #expect(params["client_id"] == "https://override.example/meta.json")
     #expect(params.count == 7)
   }
+
+  @Test("Form encoding preserves '&' and '=' inside a rich-scope parameter value")
+  func formEncodingPreservesDelimitersInsideValues() async throws {
+    // Regression test: atproto rich permission-set scopes use '&' as an internal
+    // parameter separator, e.g. "repo:com.getorbyt.profile?action=create&action=update".
+    // .urlQueryAllowed permits '&'/'='/'+' unescaped, so encoding a value with that
+    // character set let a literal '&' inside the scope leak out and collide with the
+    // '&' joining top-level form fields — the receiving server split it into a bogus
+    // extra "action=update" field and silently truncated the scope. Assert the body
+    // round-trips through URLComponents (a real form-urlencoded parser) with exactly
+    // the fields we put in, and that the scope value is intact.
+    let core = makeCore(namespace: "test.par.formencoding")
+    let scope = "atproto repo:com.getorbyt.profile?action=create&action=update space"
+    let params = await core.buildPARParameters(
+      codeChallenge: "c", identifier: nil, state: "s", additionalParameters: nil
+    )
+    var mutableParams = params
+    mutableParams["scope"] = scope
+
+    let body = await core.encodeFormData(mutableParams)
+    let bodyString = try #require(String(data: body, encoding: .utf8))
+
+    var components = URLComponents()
+    components.percentEncodedQuery = bodyString
+    let queryItems = try #require(components.queryItems)
+
+    // Exactly one field per input parameter — no extra fields spawned by an
+    // unescaped '&' inside a value.
+    #expect(queryItems.count == mutableParams.count)
+
+    let decodedScope = queryItems.first(where: { $0.name == "scope" })?.value
+    #expect(decodedScope == scope)
+    #expect(queryItems.first(where: { $0.name == "action" }) == nil)
+  }
 }

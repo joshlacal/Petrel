@@ -3602,10 +3602,19 @@ actor AuthenticationService: AuthServiceProtocol, AuthStrategy, AuthenticationPr
     /// - Parameter params: The parameters to encode.
     /// - Returns: The encoded data.
     private func encodeFormData(_ params: [String: String]) -> Data {
+        // `.urlQueryAllowed` permits '&', '=', and '+' (they're legal within a query
+        // component overall), but those are exactly the delimiters this method uses to
+        // join key/value pairs. A value containing a literal '&' or '=' — e.g. an atproto
+        // rich-scope entry like "repo:com.getorbyt.profile?action=create&action=update" —
+        // would otherwise leak an extra '&'/'=' into the encoded body and get split into
+        // bogus extra form fields by the receiving server, silently truncating the value.
+        var formValueAllowed = CharacterSet.urlQueryAllowed
+        formValueAllowed.remove(charactersIn: "&=+;")
+
         let queryItems = params.map { key, value in
-            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? key
+            let escapedKey = key.addingPercentEncoding(withAllowedCharacters: formValueAllowed) ?? key
             let escapedValue =
-                value.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? value
+                value.addingPercentEncoding(withAllowedCharacters: formValueAllowed) ?? value
             return "\(escapedKey)=\(escapedValue)"
         }
 
