@@ -14,12 +14,13 @@ public enum AppBskyNotificationListNotifications {
         public let reason: String
         public let reasonSubject: ATProtocolURI?
         public let record: ATProtocolValueContainer
+        public let starterPack: AppBskyGraphDefs.StarterPackViewBasic?
         public let isRead: Bool
         public let indexedAt: ATProtocolDate
         public let labels: [ComAtprotoLabelDefs.Label]?
 
         public init(
-            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileView, reason: String, reasonSubject: ATProtocolURI?, record: ATProtocolValueContainer, isRead: Bool, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?
+            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileView, reason: String, reasonSubject: ATProtocolURI?, record: ATProtocolValueContainer, starterPack: AppBskyGraphDefs.StarterPackViewBasic?, isRead: Bool, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?
         ) {
             self.uri = uri
             self.cid = cid
@@ -27,6 +28,7 @@ public enum AppBskyNotificationListNotifications {
             self.reason = reason
             self.reasonSubject = reasonSubject
             self.record = record
+            self.starterPack = starterPack
             self.isRead = isRead
             self.indexedAt = indexedAt
             self.labels = labels
@@ -73,6 +75,14 @@ public enum AppBskyNotificationListNotifications {
                 throw error
             }
             do {
+                starterPack = try container.decodeIfPresent(AppBskyGraphDefs.StarterPackViewBasic.self, forKey: .starterPack)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'starterPack' — degrading to nil: \(error)")
+                starterPack = nil
+            }
+            do {
                 isRead = try container.decode(Bool.self, forKey: .isRead)
             } catch {
                 LogManager.logError("Decoding error for required property 'isRead': \(error)")
@@ -103,6 +113,7 @@ public enum AppBskyNotificationListNotifications {
             try container.encode(reason, forKey: .reason)
             try container.encodeIfPresent(reasonSubject, forKey: .reasonSubject)
             try container.encode(record, forKey: .record)
+            try container.encodeIfPresent(starterPack, forKey: .starterPack)
             try container.encode(isRead, forKey: .isRead)
             try container.encode(indexedAt, forKey: .indexedAt)
             try container.encodeIfPresent(labels, forKey: .labels)
@@ -119,6 +130,11 @@ public enum AppBskyNotificationListNotifications {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(record)
+            if let value = starterPack {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(isRead)
             hasher.combine(indexedAt)
             if let value = labels {
@@ -146,6 +162,9 @@ public enum AppBskyNotificationListNotifications {
                 return false
             }
             if record != other.record {
+                return false
+            }
+            if starterPack != other.starterPack {
                 return false
             }
             if isRead != other.isRead {
@@ -181,6 +200,10 @@ public enum AppBskyNotificationListNotifications {
             }
             let recordValue = try record.toCBORValue()
             map = map.adding(key: "record", value: recordValue)
+            if let value = starterPack {
+                let starterPackValue = try value.toCBORValue()
+                map = map.adding(key: "starterPack", value: starterPackValue)
+            }
             let isReadValue = try isRead.toCBORValue()
             map = map.adding(key: "isRead", value: isReadValue)
             let indexedAtValue = try indexedAt.toCBORValue()
@@ -200,6 +223,7 @@ public enum AppBskyNotificationListNotifications {
             case reason
             case reasonSubject
             case record
+            case starterPack
             case isRead
             case indexedAt
             case labels

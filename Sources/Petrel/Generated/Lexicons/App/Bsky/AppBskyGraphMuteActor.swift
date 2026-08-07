@@ -7,31 +7,49 @@ public enum AppBskyGraphMuteActor {
     public static let typeIdentifier = "app.bsky.graph.muteActor"
     public struct Input: ATProtocolCodable {
         public let actor: ATIdentifier
+        public let onlyReposts: Bool?
+        public let onlyQuoteposts: Bool?
 
         /// Standard public initializer
-        public init(actor: ATIdentifier) {
+        public init(actor: ATIdentifier, onlyReposts: Bool? = nil, onlyQuoteposts: Bool? = nil) {
             self.actor = actor
+            self.onlyReposts = onlyReposts
+            self.onlyQuoteposts = onlyQuoteposts
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             actor = try container.decode(ATIdentifier.self, forKey: .actor)
+            onlyReposts = try container.decodeIfPresent(Bool.self, forKey: .onlyReposts)
+            onlyQuoteposts = try container.decodeIfPresent(Bool.self, forKey: .onlyQuoteposts)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(actor, forKey: .actor)
+            try container.encodeIfPresent(onlyReposts, forKey: .onlyReposts)
+            try container.encodeIfPresent(onlyQuoteposts, forKey: .onlyQuoteposts)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
             let actorValue = try actor.toCBORValue()
             map = map.adding(key: "actor", value: actorValue)
+            if let value = onlyReposts {
+                let onlyRepostsValue = try value.toCBORValue()
+                map = map.adding(key: "onlyReposts", value: onlyRepostsValue)
+            }
+            if let value = onlyQuoteposts {
+                let onlyQuotepostsValue = try value.toCBORValue()
+                map = map.adding(key: "onlyQuoteposts", value: onlyQuotepostsValue)
+            }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case actor
+            case onlyReposts
+            case onlyQuoteposts
         }
     }
 }
@@ -39,7 +57,7 @@ public enum AppBskyGraphMuteActor {
 public extension ATProtoClient.App.Bsky.Graph {
     // MARK: - muteActor
 
-    // Creates a mute relationship for the specified account. Mutes are private in Bluesky. Requires auth.
+    // Creates a mute relationship for the specified account. If a mute already exists for the account, it is updated in place: the stored scope is replaced with the scope in this request. Mutes are private in Bluesky. Requires auth.
     //
     // - Parameter input: The input parameters for the request
 

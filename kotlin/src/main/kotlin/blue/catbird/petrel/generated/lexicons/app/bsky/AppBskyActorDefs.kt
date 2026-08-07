@@ -783,8 +783,10 @@ enum class AppBskyActorDefsMutedWordTarget {
      */
     @Serializable
     data class AppBskyActorDefsViewerState(
-        @SerialName("muted")
-        val muted: Boolean? = null,        @SerialName("mutedByList")
+/** Whether the account is fully muted, directly or via a mutelist. False when the mute is scoped to specific kinds; see mutedOnlyReposts and mutedOnlyQuoteposts. */        @SerialName("muted")
+        val muted: Boolean? = null,/** Whether the account's reposts are muted. Scoped mutes are exclusive with muted: this can be true while muted is false. If muted is true, this will be false. */        @SerialName("mutedOnlyReposts")
+        val mutedOnlyReposts: Boolean? = null,/** Whether the account's quote posts are muted. Scoped mutes are exclusive with muted: this can be true while muted is false. If muted is true, this will be false. */        @SerialName("mutedOnlyQuoteposts")
+        val mutedOnlyQuoteposts: Boolean? = null,        @SerialName("mutedByList")
         val mutedByList: AppBskyGraphDefsListViewBasic? = null,        @SerialName("blockedBy")
         val blockedBy: Boolean? = null,        @SerialName("blocking")
         val blocking: ATProtocolURI? = null,        @SerialName("blockingByList")

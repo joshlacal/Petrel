@@ -23,7 +23,8 @@ object AppBskyUnspeccedGetTrendsDefs {
     @Serializable
     data class AppBskyUnspeccedGetTrendsOutput(
         @SerialName("trends")
-        val trends: List<AppBskyUnspeccedDefsTrendView>    )
+        val trends: List<AppBskyUnspeccedDefsTrendView>,// Snowflake for this recommendation, use when submitting recommendation events.        @SerialName("recIdStr")
+        val recIdStr: String? = null    )
 
 /**
  * Get the current trends on the network

@@ -163,6 +163,8 @@ public enum ComAtprotoServerDescribeServer {
 
         public let phoneVerificationRequired: Bool?
 
+        public let blobUploadLimit: Int?
+
         public let availableUserDomains: [String]
 
         public let links: Links?
@@ -177,6 +179,8 @@ public enum ComAtprotoServerDescribeServer {
 
             phoneVerificationRequired: Bool? = nil,
 
+            blobUploadLimit: Int? = nil,
+
             availableUserDomains: [String],
 
             links: Links? = nil,
@@ -189,6 +193,8 @@ public enum ComAtprotoServerDescribeServer {
             self.inviteCodeRequired = inviteCodeRequired
 
             self.phoneVerificationRequired = phoneVerificationRequired
+
+            self.blobUploadLimit = blobUploadLimit
 
             self.availableUserDomains = availableUserDomains
 
@@ -216,6 +222,14 @@ public enum ComAtprotoServerDescribeServer {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
                 LogManager.logWarning("Decoding error for optional property 'phoneVerificationRequired' — degrading to nil: \(error)")
                 phoneVerificationRequired = nil
+            }
+
+            do {
+                blobUploadLimit = try container.decodeIfPresent(Int.self, forKey: .blobUploadLimit)
+            } catch {
+                // Forward compatibility: a malformed optional field must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'blobUploadLimit' — degrading to nil: \(error)")
+                blobUploadLimit = nil
             }
 
             availableUserDomains = try container.decode([String].self, forKey: .availableUserDomains)
@@ -248,6 +262,9 @@ public enum ComAtprotoServerDescribeServer {
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(phoneVerificationRequired, forKey: .phoneVerificationRequired)
 
+            // Encode optional property even if it's an empty array
+            try container.encodeIfPresent(blobUploadLimit, forKey: .blobUploadLimit)
+
             try container.encode(availableUserDomains, forKey: .availableUserDomains)
 
             // Encode optional property even if it's an empty array
@@ -274,6 +291,12 @@ public enum ComAtprotoServerDescribeServer {
                 map = map.adding(key: "phoneVerificationRequired", value: phoneVerificationRequiredValue)
             }
 
+            if let value = blobUploadLimit {
+                // Encode optional property even if it's an empty array for CBOR
+                let blobUploadLimitValue = try value.toCBORValue()
+                map = map.adding(key: "blobUploadLimit", value: blobUploadLimitValue)
+            }
+
             let availableUserDomainsValue = try availableUserDomains.toCBORValue()
             map = map.adding(key: "availableUserDomains", value: availableUserDomainsValue)
 
@@ -298,6 +321,7 @@ public enum ComAtprotoServerDescribeServer {
         private enum CodingKeys: String, CodingKey {
             case inviteCodeRequired
             case phoneVerificationRequired
+            case blobUploadLimit
             case availableUserDomains
             case links
             case contact

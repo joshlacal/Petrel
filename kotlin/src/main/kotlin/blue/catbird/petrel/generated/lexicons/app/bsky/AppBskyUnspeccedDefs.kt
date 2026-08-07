@@ -58,7 +58,8 @@ object AppBskyUnspeccedDefsDefs {
     data class AppBskyUnspeccedDefsSkeletonTrend(
         @SerialName("topic")
         val topic: String,        @SerialName("displayName")
-        val displayName: String,        @SerialName("link")
+        val displayName: String,        @SerialName("description")
+        val description: String? = null,        @SerialName("link")
         val link: String,        @SerialName("startedAt")
         val startedAt: ATProtocolDate,        @SerialName("postCount")
         val postCount: Int,        @SerialName("status")
@@ -74,7 +75,8 @@ object AppBskyUnspeccedDefsDefs {
     data class AppBskyUnspeccedDefsTrendView(
         @SerialName("topic")
         val topic: String,        @SerialName("displayName")
-        val displayName: String,        @SerialName("link")
+        val displayName: String,        @SerialName("description")
+        val description: String? = null,        @SerialName("link")
         val link: String,        @SerialName("startedAt")
         val startedAt: ATProtocolDate,        @SerialName("postCount")
         val postCount: Int,        @SerialName("status")
@@ -91,8 +93,10 @@ object AppBskyUnspeccedDefsDefs {
         @SerialName("post")
         val post: AppBskyFeedDefsPostView,/** This post has more parents that were not present in the response. This is just a boolean, without the number of parents. */        @SerialName("moreParents")
         val moreParents: Boolean,/** This post has more replies that were not present in the response. This is a numeric value, which is best-effort and might not be accurate. */        @SerialName("moreReplies")
-        val moreReplies: Int,/** This post is part of a contiguous thread by the OP from the thread root. Many different OP threads can happen in the same thread. */        @SerialName("opThread")
-        val opThread: Boolean,/** The threadgate created by the author indicates this post as a reply to be hidden for everyone consuming the thread. */        @SerialName("hiddenByThreadgate")
+        val moreReplies: Int,/** This post is part of a contiguous thread by the OP from the thread root. Sub-threads by OP deeper in the tree are not considered an OP thread. */        @SerialName("opThread")
+        val opThread: Boolean,/** The 1-indexed position of this post within the contiguous OP thread. Only present when this post is part of the OP thread (see `opThread`). */        @SerialName("opThreadPostIndex")
+        val opThreadPostIndex: Int? = null,/** The total number of posts in the contiguous OP thread that this post belongs to. Only present when this post is part of the OP thread (see `opThread`). */        @SerialName("opThreadPostCount")
+        val opThreadPostCount: Int? = null,/** The threadgate created by the author indicates this post as a reply to be hidden for everyone consuming the thread. */        @SerialName("hiddenByThreadgate")
         val hiddenByThreadgate: Boolean,/** This is by an account muted by the viewer requesting it. */        @SerialName("mutedByViewer")
         val mutedByViewer: Boolean    ) {
         companion object {

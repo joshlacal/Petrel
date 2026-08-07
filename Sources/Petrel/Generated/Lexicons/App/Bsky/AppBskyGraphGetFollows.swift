@@ -9,15 +9,18 @@ public enum AppBskyGraphGetFollows {
         public let actor: ATIdentifier
         public let limit: Int?
         public let cursor: String?
+        public let sort: String?
 
         public init(
             actor: ATIdentifier,
             limit: Int? = nil,
-            cursor: String? = nil
+            cursor: String? = nil,
+            sort: String? = nil
         ) {
             self.actor = actor
             self.limit = limit
             self.cursor = cursor
+            self.sort = sort
         }
     }
 
