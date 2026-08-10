@@ -14,7 +14,7 @@ public enum ComAtprotoSyncSubscribeRepos {
         public let repo: DID
         public let commit: CID
         public let rev: TID
-        public let since: TID
+        public let since: TID?
         public let blocks: Bytes
         public let ops: [RepoOp]
         public let blobs: [CID]
@@ -22,7 +22,7 @@ public enum ComAtprotoSyncSubscribeRepos {
         public let time: ATProtocolDate
 
         public init(
-            seq: Int, rebase: Bool, tooBig: Bool, repo: DID, commit: CID, rev: TID, since: TID, blocks: Bytes, ops: [RepoOp], blobs: [CID], prevData: CID?, time: ATProtocolDate
+            seq: Int, rebase: Bool, tooBig: Bool, repo: DID, commit: CID, rev: TID, since: TID?, blocks: Bytes, ops: [RepoOp], blobs: [CID], prevData: CID?, time: ATProtocolDate
         ) {
             self.seq = seq
             self.rebase = rebase
@@ -77,7 +77,16 @@ public enum ComAtprotoSyncSubscribeRepos {
                 throw error
             }
             do {
-                since = try container.decode(TID.self, forKey: .since)
+                guard container.contains(.since) else {
+                    throw DecodingError.keyNotFound(
+                        CodingKeys.since,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Missing required property 'since'"
+                        )
+                    )
+                }
+                since = try container.decodeIfPresent(TID.self, forKey: .since)
             } catch {
                 LogManager.logError("Decoding error for required property 'since': \(error)")
                 throw error
@@ -140,7 +149,11 @@ public enum ComAtprotoSyncSubscribeRepos {
             hasher.combine(repo)
             hasher.combine(commit)
             hasher.combine(rev)
-            hasher.combine(since)
+            if let value = since {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(blocks)
             hasher.combine(ops)
             hasher.combine(blobs)
@@ -212,8 +225,12 @@ public enum ComAtprotoSyncSubscribeRepos {
             map = map.adding(key: "commit", value: commitValue)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
-            let sinceValue = try since.toCBORValue()
-            map = map.adding(key: "since", value: sinceValue)
+            if let value = since {
+                let sinceValue = try value.toCBORValue()
+                map = map.adding(key: "since", value: sinceValue)
+            } else {
+                map = map.adding(key: "since", value: NSNull())
+            }
             let blocksValue = try blocks.toCBORValue()
             map = map.adding(key: "blocks", value: blocksValue)
             let opsValue = try ops.toCBORValue()
@@ -690,11 +707,11 @@ public enum ComAtprotoSyncSubscribeRepos {
         public static let typeIdentifier = "com.atproto.sync.subscribeRepos#repoOp"
         public let action: String
         public let path: String
-        public let cid: CID
+        public let cid: CID?
         public let prev: CID?
 
         public init(
-            action: String, path: String, cid: CID, prev: CID?
+            action: String, path: String, cid: CID?, prev: CID?
         ) {
             self.action = action
             self.path = path
@@ -717,7 +734,16 @@ public enum ComAtprotoSyncSubscribeRepos {
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                guard container.contains(.cid) else {
+                    throw DecodingError.keyNotFound(
+                        CodingKeys.cid,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Missing required property 'cid'"
+                        )
+                    )
+                }
+                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
             } catch {
                 LogManager.logError("Decoding error for required property 'cid': \(error)")
                 throw error
@@ -744,7 +770,11 @@ public enum ComAtprotoSyncSubscribeRepos {
         public func hash(into hasher: inout Hasher) {
             hasher.combine(action)
             hasher.combine(path)
-            hasher.combine(cid)
+            if let value = cid {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             if let value = prev {
                 hasher.combine(value)
             } else {
@@ -780,8 +810,12 @@ public enum ComAtprotoSyncSubscribeRepos {
             map = map.adding(key: "action", value: actionValue)
             let pathValue = try path.toCBORValue()
             map = map.adding(key: "path", value: pathValue)
-            let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            if let value = cid {
+                let cidValue = try value.toCBORValue()
+                map = map.adding(key: "cid", value: cidValue)
+            } else {
+                map = map.adding(key: "cid", value: NSNull())
+            }
             if let value = prev {
                 let prevValue = try value.toCBORValue()
                 map = map.adding(key: "prev", value: prevValue)

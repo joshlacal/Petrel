@@ -9,7 +9,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
 }
 
 public extension AppBskyAgeassuranceDefs.ConfigRegion {
-    @available(*, deprecated, message: "Use init(countryCode:regionCode:minAccessAge:additionalVerificationMethods:rules:) instead")
+    @available(*, deprecated, message: "Use init(platforms:countryCode:regionCode:minAccessAge:additionalVerificationMethods:rules:) instead")
     init(
         countryCode: String,
         regionCode: String?,
@@ -17,6 +17,7 @@ public extension AppBskyAgeassuranceDefs.ConfigRegion {
         rules: [AppBskyAgeassuranceDefs.ConfigRegionRulesUnion]
     ) {
         self.init(
+            platforms: nil,
             countryCode: countryCode,
             regionCode: regionCode,
             minAccessAge: minAccessAge,

@@ -124,7 +124,7 @@ object ComAtprotoSyncSubscribeReposMessageUnionSerializer : kotlinx.serializatio
         val repo: DID,/** Repo commit object CID. */        @SerialName("commit")
         val commit: JsonElement,/** The rev of the emitted commit. Note that this information is also in the commit object included in blocks, unless this is a tooBig event. */        @SerialName("rev")
         val rev: String,/** The rev of the last emitted commit from this repo (if any). */        @SerialName("since")
-        val since: String,/** CAR file containing relevant blocks, as a diff since the previous repo state. The commit must be included as a block, and the commit block CID must be the first entry in the CAR header 'roots' list. */        @SerialName("blocks")
+        val since: String?,/** CAR file containing relevant blocks, as a diff since the previous repo state. The commit must be included as a block, and the commit block CID must be the first entry in the CAR header 'roots' list. */        @SerialName("blocks")
         val blocks: Bytes,        @SerialName("ops")
         val ops: List<ComAtprotoSyncSubscribeReposRepoOp>,        @SerialName("blobs")
         val blobs: List<JsonElement>,/** The root CID of the MST tree for the previous commit from this repo (indicated by the 'since' revision field in this message). Corresponds to the 'data' field in the repo commit object. NOTE: this field is effectively required for the 'inductive' version of firehose. */        @SerialName("prevData")
@@ -200,7 +200,7 @@ object ComAtprotoSyncSubscribeReposMessageUnionSerializer : kotlinx.serializatio
         @SerialName("action")
         val action: String,        @SerialName("path")
         val path: String,/** For creates and updates, the new record CID. For deletions, null. */        @SerialName("cid")
-        val cid: JsonElement,/** For updates and deletes, the previous record CID (required for inductive firehose). For creations, field should not be defined. */        @SerialName("prev")
+        val cid: JsonElement?,/** For updates and deletes, the previous record CID (required for inductive firehose). For creations, field should not be defined. */        @SerialName("prev")
         val prev: JsonElement? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSyncSubscribeReposRepoOp"
