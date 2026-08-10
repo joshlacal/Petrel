@@ -93,3 +93,25 @@ API breakage: enumelement ChatBskyConvoSendMessageBatch.Error.replyTargetNotFoun
 API breakage: enum ComAtprotoAdminUpdateSubjectStatus.ComAtprotoAdminUpdateSubjectStatusSubjectUnion has been removed
 API breakage: enum ComAtprotoModerationCreateReport.ComAtprotoModerationCreateReportSubjectUnion has been removed
 API breakage: enum ComAtprotoRepoApplyWrites.ComAtprotoRepoApplyWritesWritesUnion has been removed
+API breakage: var ComAtprotoSyncSubscribeRepos.Commit.since has declared type change from Petrel.TID to Petrel.TID?
+API breakage: accessor ComAtprotoSyncSubscribeRepos.Commit.since.Get() has return type change from Petrel.TID to Petrel.TID?
+API breakage: constructor ComAtprotoSyncSubscribeRepos.Commit.init(seq:rebase:tooBig:repo:commit:rev:since:blocks:ops:blobs:prevData:time:) has parameter 6 type change from Petrel.TID to Petrel.TID?
+API breakage: var ComAtprotoSyncSubscribeRepos.RepoOp.cid has declared type change from Petrel.CID to Petrel.CID?
+API breakage: accessor ComAtprotoSyncSubscribeRepos.RepoOp.cid.Get() has return type change from Petrel.CID to Petrel.CID?
+API breakage: constructor ComAtprotoSyncSubscribeRepos.RepoOp.init(action:path:cid:prev:) has parameter 2 type change from Petrel.CID to Petrel.CID?
+API breakage: var AppBskyDraftCreateDraft.Output.id has declared type change from Swift.String to Petrel.TID
+API breakage: accessor AppBskyDraftCreateDraft.Output.id.Get() has return type change from Swift.String to Petrel.TID
+API breakage: constructor AppBskyDraftCreateDraft.Output.init(id:) has parameter 0 type change from Swift.String to Petrel.TID
+API breakage: constructor Session.init(accessToken:refreshToken:createdAt:expiresIn:tokenType:did:) has been removed
+API breakage: constructor AppBskyActorDefs.ViewerState.init(muted:mutedByList:blockedBy:blocking:blockingByList:following:followedBy:knownFollowers:activitySubscription:) has been removed
+API breakage: constructor AppBskyGraphGetFollowers.Parameters.init(actor:limit:cursor:) has been removed
+API breakage: constructor AppBskyGraphGetFollows.Parameters.init(actor:limit:cursor:) has been removed
+API breakage: constructor AppBskyGraphMuteActor.Input.init(actor:) has been removed
+API breakage: constructor AppBskyNotificationListNotifications.Notification.init(uri:cid:author:reason:reasonSubject:record:isRead:indexedAt:labels:) has been removed
+API breakage: constructor AppBskyUnspeccedDefs.SkeletonTrend.init(topic:displayName:link:startedAt:postCount:status:category:dids:) has been removed
+API breakage: constructor AppBskyUnspeccedDefs.ThreadItemPost.init(post:moreParents:moreReplies:opThread:hiddenByThreadgate:mutedByViewer:) has been removed
+API breakage: constructor AppBskyUnspeccedDefs.TrendView.init(topic:displayName:link:startedAt:postCount:status:category:actors:) has been removed
+API breakage: constructor AppBskyUnspeccedGetTrends.Output.init(trends:) has been removed
+API breakage: constructor AppBskyUnspeccedGetTrendsSkeleton.Output.init(trends:) has been removed
+API breakage: constructor AppBskyVideoDefs.JobStatus.init(jobId:did:state:progress:blob:error:message:) has been removed
+API breakage: constructor ComAtprotoServerDescribeServer.Output.init(inviteCodeRequired:phoneVerificationRequired:availableUserDomains:links:contact:did:) has been removed
