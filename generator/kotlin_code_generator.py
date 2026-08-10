@@ -47,6 +47,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             record_code = ""
             lex_definitions_code = ""
             main_properties_code = ""
+            space_declaration_code = ""
 
             # Generate based on lexicon type
             if not self.main_def:
@@ -58,6 +59,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             elif main_def_type == 'record':
                 record_code = self.generate_record()
                 lex_definitions_code = self.generate_lex_definitions()
+            elif main_def_type == 'space':
+                space_declaration_code = self.generate_space_declaration()
             elif main_def_type == 'query':
                 parameters_code = self.generate_parameters(self.main_def.get('parameters'))
                 output_code = self.generate_output(self.main_def.get('output'))
@@ -101,16 +104,41 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 errors=errors_code,
                 query=query_code,
                 procedure=procedure_code,
-                subscription=subscription_code
+                subscription=subscription_code,
+                space_declaration=space_declaration_code,
             )
 
             return self.post_process_kotlin_code(kotlin_code)
         except Exception:
             raise
 
-    def generate_properties(self, properties: Dict[str, Any], required_fields: List[str],
-                           current_struct_name: str, context_identity=None) -> List[Dict[str, Any]]:
+    def generate_space_declaration(self) -> str:
+        key_type = self.main_def.get('key', 'tid')
+        name = self.main_def.get('name', self.lexicon_id)
+        collections = self.main_def.get('collections', [])
+        collections_literal = ', '.join(json.dumps(value) for value in collections)
+        return f'''data class SpaceDeclarationDescriptor(
+    val nsid: String,
+    val keyType: String,
+    val name: String,
+    val collections: List<String>,
+)
+
+val spaceDeclaration = SpaceDeclarationDescriptor(
+    nsid = "{self.lexicon_id}", keyType = {json.dumps(key_type)},
+    name = {json.dumps(name)}, collections = listOf({collections_literal}),
+)'''
+
+    def generate_properties(
+        self,
+        properties: Dict[str, Any],
+        required_fields: List[str],
+        current_struct_name: str,
+        context_identity=None,
+        nullable_fields=None,
+    ) -> List[Dict[str, Any]]:
         """Generate property definitions."""
+        nullable_fields = nullable_fields or []
         kotlin_properties = []
 
         for name, prop in properties.items():
@@ -121,9 +149,11 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             kotlin_type = self.type_converter.determine_type(
                 name, prop, required_fields, current_struct_name,
                 context_identity=context_identity,
+                nullable_fields=nullable_fields,
             )
             description = prop.get('description', '')
             is_optional = name not in required_fields
+            is_nullable = name in nullable_fields
 
             strict_decode = bool(prop.get('x-security-strict-decode'))
             strict_serializer = None
@@ -139,7 +169,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 serializer_source = self.template_manager.strict_ref_serializer_template.render(
                     serializer_name=strict_serializer,
                     target_type=kotlin_type.rstrip('?'),
-                    nullable=is_optional,
+                    nullable=is_optional or is_nullable,
                     allowed_keys_literal=", ".join(
                         json.dumps(key) for key in allowed_keys
                     ),
@@ -158,6 +188,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                 'name': name,
                 'type': kotlin_type,
                 'optional': is_optional,
+                'nullable': is_nullable,
                 'description': description,
                 'strict_decode': strict_decode,
                 'strict_serializer': strict_serializer,
@@ -210,8 +241,11 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         """Generate properties for main object type."""
         properties = self.main_def.get('properties', {})
         required = self.main_def.get('required', [])
+        nullable = self.main_def.get('nullable', [])
 
-        props = self.generate_properties(properties, required, self.class_name)
+        props = self.generate_properties(
+            properties, required, self.class_name, nullable_fields=nullable
+        )
 
         return self.template_manager.properties_template.render(
             properties=props,
@@ -249,6 +283,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
                     def_schema.get('required', []),
                     class_name,
                     context_identity=("definition", name),
+                    nullable_fields=def_schema.get('nullable', []),
                 )
                 definitions.append({
                     'name': class_name,
@@ -302,7 +337,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         properties = self.generate_properties(
             record_schema.get('properties', {}),
             record_schema.get('required', []),
-            self.class_name
+            self.class_name,
+            nullable_fields=record_schema.get('nullable', []),
         )
 
         return self.template_manager.record_template.render(
@@ -319,7 +355,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         properties = self.generate_properties(
             parameters.get('properties', {}),
             parameters.get('required', []),
-            self.class_name + "Parameters"
+            self.class_name + "Parameters",
+            nullable_fields=parameters.get('nullable', []),
         )
 
         return self.template_manager.parameters_template.render(
@@ -354,7 +391,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             properties = self.generate_properties(
                 input_schema.get('properties', {}),
                 input_schema.get('required', []),
-                self.class_name + "Input"
+                self.class_name + "Input",
+                nullable_fields=input_schema.get('nullable', []),
             )
 
         return self.template_manager.input_template.render(
@@ -387,7 +425,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
             properties = self.generate_properties(
                 output_schema.get('properties', {}),
                 output_schema.get('required', []),
-                self.class_name + "Output"
+                self.class_name + "Output",
+                nullable_fields=output_schema.get('nullable', []),
             )
         else:
             properties = []
@@ -441,7 +480,8 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         properties = self.generate_properties(
             schema.get('properties', {}),
             schema.get('required', []),
-            self.class_name + "Message"
+            self.class_name + "Message",
+            nullable_fields=schema.get('nullable', []),
         )
 
         return self.template_manager.message_template.render(

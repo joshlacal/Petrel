@@ -38,18 +38,19 @@ class KotlinTypeConverter(BaseTypeConverter):
 
     def determine_type(self, name: str, prop_schema: Dict[str, Any],
                        required_fields: List[str], current_struct_name: str,
-                       context_identity=None) -> str:
+                       context_identity=None, nullable_fields=None) -> str:
         """Determine the Kotlin type for a property."""
         prop_type = prop_schema.get('type', '')
         format_type = prop_schema.get('format', '')
         is_optional = name not in required_fields
+        is_nullable = name in (nullable_fields or [])
 
         kotlin_type = self._get_base_type(
             prop_schema, name, current_struct_name, context_identity=context_identity
         )
 
-        # Add nullability for optional fields
-        if is_optional and not kotlin_type.endswith('?'):
+        # Optional and explicitly nullable fields both need nullable value types.
+        if (is_optional or is_nullable) and not kotlin_type.endswith('?'):
             kotlin_type += '?'
 
         return kotlin_type

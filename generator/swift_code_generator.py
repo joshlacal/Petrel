@@ -6,7 +6,7 @@ from enum_generator import EnumGenerator
 from type_converter import TypeConverter
 
 class SwiftCodeGenerator:
-    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None):
+    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None, emit_server_contracts=False):
         self.lexicon = lexicon
         self.defs = lexicon.get('defs', {})
         self.lexicon_id = lexicon.get('id', '')
@@ -21,6 +21,7 @@ class SwiftCodeGenerator:
         self.enum_definitions = {}
         self.is_blob_upload = self.check_if_blob_upload(lexicon)
         self.cycle_detector = cycle_detector
+        self.emit_server_contracts = emit_server_contracts
 
         self.token_descriptions = {}
         self.generated_tokens = set()
@@ -33,6 +34,11 @@ class SwiftCodeGenerator:
         self.type_converter = TypeConverter(self)
 
         self.main_def = self.handle_main_def()
+        self.server_input_definitions = (
+            self.find_server_input_definitions()
+            if self.emit_server_contracts
+            else set()
+        )
 
     def check_if_blob_upload(self, lexicon: Dict[str, Any]) -> bool:
         main_def = lexicon.get('defs', {}).get('main', {})
@@ -61,7 +67,68 @@ class SwiftCodeGenerator:
     def handle_subscription_type(self, main_def):
         return main_def
 
-    def generate_properties(self, properties, required_fields, current_struct_name, context_identity=None):
+    def find_server_input_definitions(self):
+        """Return local definitions transitively reachable from an XRPC input."""
+        main_input = self.defs.get('main', {}).get('input')
+        if not isinstance(main_input, dict):
+            return set()
+        input_schema = main_input.get('schema')
+        if not isinstance(input_schema, dict):
+            return set()
+
+        reachable = set()
+        visiting = set()
+
+        def local_definition_name(ref):
+            if not isinstance(ref, str):
+                return None
+            if ref.startswith('#'):
+                name = ref[1:]
+            else:
+                nsid, separator, fragment = ref.partition('#')
+                if nsid != self.lexicon_id:
+                    return None
+                name = fragment if separator else 'main'
+            return name if name in self.defs else None
+
+        def visit(node):
+            if not isinstance(node, dict):
+                return
+
+            if node.get('type') == 'ref':
+                name = local_definition_name(node.get('ref'))
+                if name is not None and name not in visiting:
+                    reachable.add(name)
+                    visiting.add(name)
+                    visit(self.defs[name])
+                    visiting.remove(name)
+
+            refs = node.get('refs')
+            if isinstance(refs, list):
+                for ref in refs:
+                    visit({'type': 'ref', 'ref': ref})
+
+            properties = node.get('properties')
+            if isinstance(properties, dict):
+                for property_schema in properties.values():
+                    visit(property_schema)
+
+            visit(node.get('items'))
+            visit(node.get('record'))
+
+        visit(input_schema)
+        return reachable
+
+    def generate_properties(
+        self,
+        properties,
+        required_fields,
+        current_struct_name,
+        context_identity=None,
+        nullable_fields=None,
+        server_input=False,
+    ):
+        nullable_fields = nullable_fields or []
         swift_properties = []
         for name, prop in properties.items():
             swift_type = self.type_converter.determine_swift_type(
@@ -69,7 +136,9 @@ class SwiftCodeGenerator:
                 context_identity=context_identity,
             )
             description = prop.get('description', '')
-            is_optional = name not in required_fields
+            is_wire_optional = name not in required_fields
+            is_nullable = name in nullable_fields
+            is_optional = is_wire_optional or is_nullable
             strict_decode = prop.get('x-security-strict-decode', False)
             if strict_decode and prop.get('type') != 'ref':
                 raise ValueError(
@@ -100,6 +169,10 @@ class SwiftCodeGenerator:
                 'name': name,
                 'type': swift_type,
                 'optional': is_optional,
+                'wire_optional': is_wire_optional,
+                'required_nullable': not is_wire_optional and is_nullable,
+                'nullable': is_nullable,
+                'server_input': server_input,
                 'description': description,
                 'boxed': should_box,
                 'strict_decode': strict_decode,
@@ -154,7 +227,12 @@ class SwiftCodeGenerator:
     def generate_query_parameters(self, parameters: Optional[Dict[str, Any]]) -> str:
         if not parameters:
             return ""
-        properties = self.generate_properties(parameters['properties'], parameters.get('required', []), "Parameters")
+        properties = self.generate_properties(
+            parameters['properties'],
+            parameters.get('required', []),
+            "Parameters",
+            nullable_fields=parameters.get('nullable', []),
+        )
         return self.template_manager.query_parameters_template.render(properties=properties)
 
     def generate_input_struct(self, input_obj: Optional[Dict[str, Any]]) -> str:
@@ -182,7 +260,13 @@ class SwiftCodeGenerator:
             ref_type = self.type_converter.convert_ref(input_schema['ref'])
             properties = [{"name": "data", "type": ref_type, "optional": False}]
         else:
-            properties = self.generate_properties(input_schema.get('properties', {}), input_schema.get('required', []), "Input")
+            properties = self.generate_properties(
+                input_schema.get('properties', {}),
+                input_schema.get('required', []),
+                "Input",
+                nullable_fields=input_schema.get('nullable', []),
+                server_input=self.emit_server_contracts,
+            )
             self.input_properties = properties
 
         return self.template_manager.input_struct_template.render(properties=properties, conformance=conformance)
@@ -224,7 +308,12 @@ class SwiftCodeGenerator:
             else:
                 context['properties'] = []
         else:
-            context['properties'] = self.generate_properties(output_schema.get('properties', {}), output_schema.get('required', []), "Output")
+            context['properties'] = self.generate_properties(
+                output_schema.get('properties', {}),
+                output_schema.get('required', []),
+                "Output",
+                nullable_fields=output_schema.get('nullable', []),
+            )
 
         return self.template_manager.output_struct_template.render(**context)
 
@@ -310,6 +399,7 @@ class SwiftCodeGenerator:
                 properties = self.generate_properties(
                     def_schema.get('properties', {}), def_schema.get('required', []),
                     current_struct_name, context_identity=("definition", name),
+                    nullable_fields=def_schema.get('nullable', []),
                 )
                 
                 sub_structs = {}
@@ -322,6 +412,7 @@ class SwiftCodeGenerator:
                                 value.get('properties', {}), value.get('required', []),
                                 convert_to_camel_case(key),
                                 context_identity=("definition", name, "sub", key),
+                                nullable_fields=value.get('nullable', []),
                             )
                             sub_structs[convert_to_camel_case(key)] = {
                                 'wire_fragment': key,
@@ -334,7 +425,8 @@ class SwiftCodeGenerator:
                     'wire_fragment': name,
                     'properties': properties, 
                     'conformance': conformance,
-                    'sub_structs': sub_structs
+                    'sub_structs': sub_structs,
+                    'server_input': name in self.server_input_definitions,
                 }
             elif def_schema.get('type', '') == "array" and def_schema.get('items', {}).get('type', '') == 'union':
                 union_array_name = convert_to_camel_case(name) + ""
@@ -349,7 +441,8 @@ class SwiftCodeGenerator:
                     'wire_fragment': name,
                     'properties': properties,
                     'conformance': ': ATProtocolCodable, ATProtocolValue',
-                    'sub_structs': {}
+                    'sub_structs': {},
+                    'server_input': name in self.server_input_definitions,
                 }
             elif def_schema.get('type', "") == "string" and 'enum' in def_schema:
                 enum_name = f"Defs{convert_to_camel_case(name)}"
@@ -371,7 +464,12 @@ class SwiftCodeGenerator:
             return ""
         record_schema = self.main_def['record']
         current_struct_name = self.struct_name 
-        properties = self.generate_properties(record_schema.get('properties', {}), record_schema.get('required', []), current_struct_name)
+        properties = self.generate_properties(
+            record_schema.get('properties', {}),
+            record_schema.get('required', []),
+            current_struct_name,
+            nullable_fields=record_schema.get('nullable', []),
+        )
         return self.template_manager.record_template.render(struct_name=self.struct_name, properties=properties, conformance=": ATProtocolCodable, ATProtocolValue")
 
     def generate_all_enums(self):
@@ -407,6 +505,8 @@ class SwiftCodeGenerator:
             query = ""
             subscription = ""
             message_union = ""
+            space_declaration = ""
+            server_contracts = ""
             conformance = ""
 
             if 'main' not in self.defs:
@@ -415,12 +515,21 @@ class SwiftCodeGenerator:
                 main_def_type = self.main_def.get('type')
                 if main_def_type == 'object':
                     lex_definitions = self.generate_lex_definitions()
-                    main_properties = self.template_manager.properties_template.render(properties=self.generate_properties(self.main_def.get('properties', {}), self.main_def.get('required', []), convert_to_camel_case(self.lexicon_id)))
+                    main_properties = self.template_manager.properties_template.render(
+                        properties=self.generate_properties(
+                            self.main_def.get('properties', {}),
+                            self.main_def.get('required', []),
+                            convert_to_camel_case(self.lexicon_id),
+                            nullable_fields=self.main_def.get('nullable', []),
+                        )
+                    )
                     conformance = ": ATProtocolCodable, ATProtocolValue"
                 elif main_def_type == 'record':
                     record_struct = self.generate_record_struct()
                     lex_definitions = self.generate_lex_definitions()
                     conformance = ": ATProtocolCodable, ATProtocolValue"
+                elif main_def_type == 'space':
+                    space_declaration = self.generate_space_declaration(self.main_def)
                 elif main_def_type == 'query':
                     query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
                     output_struct = self.generate_output_struct(self.main_def.get('output'))
@@ -440,6 +549,8 @@ class SwiftCodeGenerator:
                     errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
                     lex_definitions = self.generate_lex_definitions()
                     subscription = self.generate_subscription_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
+                if self.emit_server_contracts and main_def_type in ('query', 'procedure', 'subscription'):
+                    server_contracts = self.generate_server_contracts(main_def_type)
             self.generate_all_enums()
             
             swift_code = self.template_manager.main_template.render(
@@ -460,12 +571,65 @@ class SwiftCodeGenerator:
                 query=query,
                 subscription=subscription,
                 message_union=message_union,
+                space_declaration=space_declaration,
+                server_contracts=server_contracts,
                 conformance=conformance
             )
             
             return self.post_process_swift_code(swift_code)
         except Exception:
             raise
+
+    def generate_space_declaration(self, main_def):
+        key_type = main_def.get('key', 'tid')
+        name = main_def.get('name', self.lexicon_id)
+        collections = main_def.get('collections', [])
+        collections_literal = ', '.join(json.dumps(value) for value in collections)
+        return f'''\n    public struct SpaceDeclarationDescriptor: Sendable, Equatable {{
+        public let nsid: String
+        public let keyType: String
+        public let name: String
+        public let collections: [String]
+    }}
+
+    public static let spaceDeclaration = SpaceDeclarationDescriptor(
+        nsid: "{self.lexicon_id}", keyType: {json.dumps(key_type)},
+        name: {json.dumps(name)}, collections: [{collections_literal}]
+    )
+'''
+
+    def generate_server_contracts(self, main_def_type):
+        parameters_type = 'Parameters' if 'parameters' in self.main_def else 'Void'
+        input_type = 'Input' if main_def_type == 'procedure' and 'input' in self.main_def else 'Void'
+        if main_def_type == 'subscription':
+            output_type = 'Message'
+        else:
+            output_type = 'Output' if 'output' in self.main_def else 'Void'
+        input_encoding = self.main_def.get('input', {}).get('encoding')
+        output_encoding = self.main_def.get('output', {}).get('encoding')
+        input_encoding_literal = json.dumps(input_encoding) if input_encoding is not None else 'nil'
+        output_encoding_literal = json.dumps(output_encoding) if output_encoding is not None else 'nil'
+        return f'''\n    public struct XRPCMethodDescriptor: Sendable, Equatable {{
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }}
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "{self.lexicon_id}", kind: "{main_def_type}",
+        inputEncoding: {input_encoding_literal}, outputEncoding: {output_encoding_literal},
+        declaredErrors: [{', '.join(json.dumps(error.get('name', '')) for error in self.main_def.get('errors', []))}]
+    )
+
+    public protocol ServerHandler: Sendable {{
+        associatedtype Context: Sendable
+        func handle(
+            parameters: {parameters_type}, input: {input_type}, context: Context
+        ) async throws -> {output_type}
+    }}
+'''
 
     @staticmethod
     def post_process_swift_code(code: str) -> str:
