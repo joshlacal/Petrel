@@ -43,6 +43,31 @@ The committed generated code is post-SwiftFormat; raw generator output differs
 until `swiftformat Sources/Petrel/Generated` runs (CI enforces the regen+format
 round-trip producing an empty diff).
 
+## Release Versioning
+
+Downstream packages consume Petrel with `.upToNextMinor(from:)`, so **the minor
+component is the compatibility boundary**. Pick the bump before tagging:
+
+| Change | Bump | Example |
+|---|---|---|
+| Bug fix, no change to any public declaration | **patch** | `1.1.0` → `1.1.1` |
+| Lexicon regen, or anything landing in `api-breakage-allowlist.txt` | **minor** | `1.1.1` → `1.2.0` |
+| Deliberate redesign of the hand-written API surface | **major** | `1.2.0` → `2.0.0` |
+
+A lexicon regen is a **minor** bump even when the API diff looks additive:
+generated memberwise inits gain parameters, field types tighten (`String` →
+`TID`), and optionality flips. Some of that is source-compatible and some is
+not, and the allowlist deliberately does not distinguish them.
+
+Tagging a regen as a patch is what broke Catbird at 1.0.7 — three call sites
+(`DraftSyncService`, `PostManager`, `UIKitThreadView`) stopped compiling on
+what consumers had every right to treat as a drop-in fix. Under
+`.upToNextMinor`, a correctly-numbered minor is simply not picked up until a
+consumer opts in, which is the whole point.
+
+Release train: a Petrel tag requires matching PetrelCatbird and CatbirdMLSCore
+tags (CatbirdMLSCore pins **both**), then a Catbird `Package.resolved` bump.
+
 ## High-Level Architecture
 
 ### Code Generation Pipeline
