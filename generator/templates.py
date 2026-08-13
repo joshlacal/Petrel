@@ -2,6 +2,38 @@ import os
 import jinja2
 from utils import convert_to_camel_case
 
+# Swift reserved keywords that cannot be used as bare identifiers.
+# Mirror of sanitize_kotlin_keyword in kotlin_templates.py. Case-sensitive:
+# only Any/Self are reserved capitalized; `Protocol`, `Type` etc. are fine.
+SWIFT_KEYWORDS = {
+    # Declaration keywords
+    'associatedtype', 'class', 'deinit', 'enum', 'extension', 'fileprivate',
+    'func', 'import', 'init', 'inout', 'internal', 'let', 'open', 'operator',
+    'private', 'precedencegroup', 'protocol', 'public', 'rethrows', 'static',
+    'struct', 'subscript', 'typealias', 'var',
+    # Statement keywords
+    'break', 'case', 'catch', 'continue', 'default', 'defer', 'do', 'else',
+    'fallthrough', 'for', 'guard', 'if', 'in', 'repeat', 'return', 'switch',
+    'where', 'while', 'throw',
+    # Expression/type keywords
+    'Any', 'as', 'false', 'is', 'nil', 'self', 'Self', 'super', 'true',
+    'throws', 'try',
+}
+
+
+def sanitize_swift_keyword(s: str) -> str:
+    """Escape Swift reserved keywords by wrapping in backticks.
+
+    Applied only at identifier positions in templates (declarations, member
+    access, CodingKeys cases) — never inside string literals, where the raw
+    wire name must be preserved. A backticked enum case still gets the
+    unescaped implicit raw value, so CodingKeys stay wire-correct.
+    """
+    if s in SWIFT_KEYWORDS:
+        return f'`{s}`'
+    return s
+
+
 class TemplateManager:
     def __init__(self):
         script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -11,6 +43,7 @@ class TemplateManager:
         self.env.filters['lowerCamelCase'] = self.lowerCamelCase
         self.env.filters['convertRefToSwift'] = self.convert_ref_to_swift
         self.env.filters['enum_case'] = self.enum_case_filter
+        self.env.filters['sanitizeKeyword'] = sanitize_swift_keyword
 
         self.main_template = self.env.get_template('mainTemplate.jinja')
         self.properties_template = self.env.get_template('properties.jinja')

@@ -5,33 +5,33 @@
 
         {%- for prop in def_schema.properties %}
             {%- if prop.boxed %}
-            private let _{{ prop.name }}: IndirectBox<{{ prop.type }}>{% if prop.optional %}?{% endif %}
-            public var {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %} {
+            private let _{{ prop.name|sanitizeKeyword }}: IndirectBox<{{ prop.type }}>{% if prop.optional %}?{% endif %}
+            public var {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %} {
                 {% if prop.optional %}
-                _{{ prop.name }}?.value
+                _{{ prop.name|sanitizeKeyword }}?.value
                 {%- else %}
-                _{{ prop.name }}.value
+                _{{ prop.name|sanitizeKeyword }}.value
                 {%- endif %}
             }
             {%- else %}
-            public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
+            public let {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
             {%- endif %}
         {%- endfor %}
 
         public init(
             {% for prop in def_schema.properties -%}
-            {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
+            {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
             {%- endfor %}
         ) {
             {%- for prop in def_schema.properties %}
             {%- if prop.boxed %}
             {% if prop.optional %}
-            self._{{ prop.name }} = {{ prop.name }}.map { IndirectBox($0) }
+            self._{{ prop.name|sanitizeKeyword }} = {{ prop.name|sanitizeKeyword }}.map { IndirectBox($0) }
             {%- else %}
-            self._{{ prop.name }} = IndirectBox({{ prop.name }})
+            self._{{ prop.name|sanitizeKeyword }} = IndirectBox({{ prop.name|sanitizeKeyword }})
             {%- endif %}
             {%- else %}
-            self.{{ prop.name }} = {{ prop.name }}
+            self.{{ prop.name|sanitizeKeyword }} = {{ prop.name|sanitizeKeyword }}
             {%- endif %}
             {%- endfor %}
         }
@@ -42,9 +42,9 @@
             {%- for prop in def_schema.properties %}
             {%- if def_schema.server_input -%}
             {%- if prop.required_nullable %}
-            guard container.contains(.{{ prop.name }}) else {
+            guard container.contains(.{{ prop.name|sanitizeKeyword }}) else {
                 throw DecodingError.keyNotFound(
-                    CodingKeys.{{ prop.name }},
+                    CodingKeys.{{ prop.name|sanitizeKeyword }},
                     DecodingError.Context(
                         codingPath: container.codingPath,
                         debugDescription: "Missing required property '{{ prop.name }}'"
@@ -54,8 +54,8 @@
             {%- endif %}
             {% if prop.strict_decode -%}
             {% if prop.wire_optional and not prop.nullable -%}
-            if container.contains(.{{ prop.name }}) {
-                guard try !container.decodeNil(forKey: .{{ prop.name }}) else {
+            if container.contains(.{{ prop.name|sanitizeKeyword }}) {
+                guard try !container.decodeNil(forKey: .{{ prop.name|sanitizeKeyword }}) else {
                     throw DecodingError.valueNotFound(
                         {{ prop.type }}.self,
                         DecodingError.Context(
@@ -64,25 +64,25 @@
                         )
                     )
                 }
-                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
-                self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
+                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }} = IndirectBox(decoded){% else %}{{ prop.name|sanitizeKeyword }} = decoded{% endif %}
             } else {
-                self.{% if prop.boxed %}_{{ prop.name }}{% else %}{{ prop.name }}{% endif %} = nil
+                self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }}{% else %}{{ prop.name|sanitizeKeyword }}{% endif %} = nil
             }
             {%- elif prop.optional -%}
-            if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
-                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
-                self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
+            if container.contains(.{{ prop.name|sanitizeKeyword }}), try !container.decodeNil(forKey: .{{ prop.name|sanitizeKeyword }}) {
+                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }} = IndirectBox(decoded){% else %}{{ prop.name|sanitizeKeyword }} = decoded{% endif %}
             } else {
-                self.{% if prop.boxed %}_{{ prop.name }}{% else %}{{ prop.name }}{% endif %} = nil
+                self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }}{% else %}{{ prop.name|sanitizeKeyword }}{% endif %} = nil
             }
             {%- else -%}
-            let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
-            self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
+            let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+            self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }} = IndirectBox(decoded){% else %}{{ prop.name|sanitizeKeyword }} = decoded{% endif %}
             {%- endif %}
             {%- elif prop.wire_optional and not prop.nullable -%}
-            if container.contains(.{{ prop.name }}) {
-                guard try !container.decodeNil(forKey: .{{ prop.name }}) else {
+            if container.contains(.{{ prop.name|sanitizeKeyword }}) {
+                guard try !container.decodeNil(forKey: .{{ prop.name|sanitizeKeyword }}) else {
                     throw DecodingError.valueNotFound(
                         {{ prop.type }}.self,
                         DecodingError.Context(
@@ -92,35 +92,35 @@
                     )
                 }
                 {% if prop.boxed -%}
-                let decoded = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
-                self._{{ prop.name }} = IndirectBox(decoded)
+                let decoded = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
+                self._{{ prop.name|sanitizeKeyword }} = IndirectBox(decoded)
                 {%- else -%}
-                self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+                self.{{ prop.name|sanitizeKeyword }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
                 {%- endif %}
             } else {
-                self.{% if prop.boxed %}_{{ prop.name }}{% else %}{{ prop.name }}{% endif %} = nil
+                self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }}{% else %}{{ prop.name|sanitizeKeyword }}{% endif %} = nil
             }
             {%- elif prop.boxed -%}
             {% if prop.optional -%}
-            let decoded = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
-            self._{{ prop.name }} = decoded.map { IndirectBox($0) }
+            let decoded = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
+            self._{{ prop.name|sanitizeKeyword }} = decoded.map { IndirectBox($0) }
             {%- else -%}
-            let decoded = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
-            self._{{ prop.name }} = IndirectBox(decoded)
+            let decoded = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
+            self._{{ prop.name|sanitizeKeyword }} = IndirectBox(decoded)
             {%- endif %}
             {%- else -%}
             {% if prop.optional -%}
-            self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+            self.{{ prop.name|sanitizeKeyword }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
             {%- else -%}
-            self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+            self.{{ prop.name|sanitizeKeyword }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
             {%- endif %}
             {%- endif %}
             {%- else %}
             do {
                 {%- if prop.required_nullable %}
-                guard container.contains(.{{ prop.name }}) else {
+                guard container.contains(.{{ prop.name|sanitizeKeyword }}) else {
                     throw DecodingError.keyNotFound(
-                        CodingKeys.{{ prop.name }},
+                        CodingKeys.{{ prop.name|sanitizeKeyword }},
                         DecodingError.Context(
                             codingPath: container.codingPath,
                             debugDescription: "Missing required property '{{ prop.name }}'"
@@ -130,29 +130,29 @@
                 {%- endif %}
                 {% if prop.strict_decode -%}
                 {% if prop.optional -%}
-                if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
-                    let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
-                    self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
+                if container.contains(.{{ prop.name|sanitizeKeyword }}), try !container.decodeNil(forKey: .{{ prop.name|sanitizeKeyword }}) {
+                    let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                    self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }} = IndirectBox(decoded){% else %}{{ prop.name|sanitizeKeyword }} = decoded{% endif %}
                 } else {
-                    self.{% if prop.boxed %}_{{ prop.name }}{% else %}{{ prop.name }}{% endif %} = nil
+                    self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }}{% else %}{{ prop.name|sanitizeKeyword }}{% endif %} = nil
                 }
                 {%- else -%}
-                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
-                self.{% if prop.boxed %}_{{ prop.name }} = IndirectBox(decoded){% else %}{{ prop.name }} = decoded{% endif %}
+                let decoded = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }} = IndirectBox(decoded){% else %}{{ prop.name|sanitizeKeyword }} = decoded{% endif %}
                 {%- endif %}
                 {%- elif prop.boxed -%}
                 {% if prop.optional -%}
-                let decoded = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
-                self._{{ prop.name }} = decoded.map { IndirectBox($0) }
+                let decoded = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
+                self._{{ prop.name|sanitizeKeyword }} = decoded.map { IndirectBox($0) }
                 {%- else -%}
-                let decoded = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
-                self._{{ prop.name }} = IndirectBox(decoded)
+                let decoded = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
+                self._{{ prop.name|sanitizeKeyword }} = IndirectBox(decoded)
                 {%- endif %}
                 {%- else -%}
                 {% if prop.optional -%}
-                self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+                self.{{ prop.name|sanitizeKeyword }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
                 {%- else -%}
-                self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+                self.{{ prop.name|sanitizeKeyword }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
                 {%- endif %}
                 {%- endif %}
             } catch {
@@ -160,7 +160,7 @@
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
                 LogManager.logWarning("Decoding error for optional property '{{ prop.name }}' — degrading to nil: \(error)")
-                self.{% if prop.boxed %}_{{ prop.name }}{% else %}{{ prop.name }}{% endif %} = nil
+                self.{% if prop.boxed %}_{{ prop.name|sanitizeKeyword }}{% else %}{{ prop.name|sanitizeKeyword }}{% endif %} = nil
                 {%- else -%}
                 LogManager.logError("Decoding error for required property '{{ prop.name }}': \(error)")
                 throw error
@@ -179,19 +179,19 @@
             {%- for prop in def_schema.properties %}
             {% if prop.boxed -%}
             {% if prop.required_nullable -%}
-            try container.encode(_{{ prop.name }}?.value, forKey: .{{ prop.name }})
+            try container.encode(_{{ prop.name|sanitizeKeyword }}?.value, forKey: .{{ prop.name|sanitizeKeyword }})
             {%- elif prop.optional -%}
-            try container.encodeIfPresent(_{{ prop.name }}?.value, forKey: .{{ prop.name }})
+            try container.encodeIfPresent(_{{ prop.name|sanitizeKeyword }}?.value, forKey: .{{ prop.name|sanitizeKeyword }})
             {%- else -%}
-            try container.encode(_{{ prop.name }}.value, forKey: .{{ prop.name }})
+            try container.encode(_{{ prop.name|sanitizeKeyword }}.value, forKey: .{{ prop.name|sanitizeKeyword }})
             {%- endif %}
             {%- else -%}
             {% if prop.required_nullable -%}
-            try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+            try container.encode({{ prop.name|sanitizeKeyword }}, forKey: .{{ prop.name|sanitizeKeyword }})
             {%- elif prop.optional -%}
-            try container.encodeIfPresent({{ prop.name }}, forKey: .{{ prop.name }})
+            try container.encodeIfPresent({{ prop.name|sanitizeKeyword }}, forKey: .{{ prop.name|sanitizeKeyword }})
             {%- else -%}
-            try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+            try container.encode({{ prop.name|sanitizeKeyword }}, forKey: .{{ prop.name|sanitizeKeyword }})
             {%- endif %}
             {%- endif %}
             {%- endfor %}
@@ -201,23 +201,23 @@
             {%- for prop in def_schema.properties %}
             {%- if prop.boxed %}
             {%- if prop.optional %}
-            if let value = _{{ prop.name }}?.value {
+            if let value = _{{ prop.name|sanitizeKeyword }}?.value {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
             }
             {%- else %}
-            hasher.combine(_{{ prop.name }}.value)
+            hasher.combine(_{{ prop.name|sanitizeKeyword }}.value)
             {%- endif %}
             {%- else %}
             {%- if prop.optional %}
-            if let value = {{ prop.name }} {
+            if let value = {{ prop.name|sanitizeKeyword }} {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
             }
             {%- else %}
-            hasher.combine({{ prop.name }})
+            hasher.combine({{ prop.name|sanitizeKeyword }})
             {%- endif %}
             {%- endif %}
             {%- endfor %}
@@ -229,16 +229,16 @@
             {%- for prop in def_schema.properties %}
             {% if prop.boxed -%}
             {% if prop.optional -%}
-            if _{{ prop.name }}?.value != other._{{ prop.name }}?.value {
+            if _{{ prop.name|sanitizeKeyword }}?.value != other._{{ prop.name|sanitizeKeyword }}?.value {
                 return false
             }
             {%- else -%}
-            if _{{ prop.name }}.value != other._{{ prop.name }}.value {
+            if _{{ prop.name|sanitizeKeyword }}.value != other._{{ prop.name|sanitizeKeyword }}.value {
                 return false
             }
             {%- endif %}
             {%- else -%}
-            if {{ prop.name }} != other.{{ prop.name }} {
+            if {{ prop.name|sanitizeKeyword }} != other.{{ prop.name|sanitizeKeyword }} {
                 return false
             }
             {%- endif %}
@@ -259,7 +259,7 @@
             {%- for prop in def_schema.properties %}
             {% if prop.boxed -%}
             {% if prop.required_nullable -%}
-            if let value = _{{ prop.name }}?.value {
+            if let value = _{{ prop.name|sanitizeKeyword }}?.value {
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try value.toCBORValue()
                 map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
@@ -267,19 +267,19 @@
                 map = map.adding(key: "{{ prop.name }}", value: NSNull())
             }
             {%- elif prop.optional -%}
-            if let value = _{{ prop.name }}?.value {
+            if let value = _{{ prop.name|sanitizeKeyword }}?.value {
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try value.toCBORValue()
                 map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
             }
             {%- else -%}
             {% set var_name = prop.name + 'Value' -%}
-            let {{ var_name }} = try _{{ prop.name }}.value.toCBORValue()
+            let {{ var_name }} = try _{{ prop.name|sanitizeKeyword }}.value.toCBORValue()
             map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
             {%- endif %}
             {%- else -%}
             {% if prop.required_nullable -%}
-            if let value = {{ prop.name }} {
+            if let value = {{ prop.name|sanitizeKeyword }} {
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try value.toCBORValue()
                 map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
@@ -287,14 +287,14 @@
                 map = map.adding(key: "{{ prop.name }}", value: NSNull())
             }
             {%- elif prop.optional -%}
-            if let value = {{ prop.name }} {
+            if let value = {{ prop.name|sanitizeKeyword }} {
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try value.toCBORValue()
                 map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
             }
             {%- else -%}
             {% set var_name = prop.name + 'Value' -%}
-            let {{ var_name }} = try {{ prop.name }}.toCBORValue()
+            let {{ var_name }} = try {{ prop.name|sanitizeKeyword }}.toCBORValue()
             map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
             {%- endif %}
             {%- endif %}
@@ -309,7 +309,7 @@
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             {%- for prop in def_schema.properties %}
-            case {{ prop.name }}
+            case {{ prop.name|sanitizeKeyword }}
             {%- endfor %}
         }
 
@@ -319,14 +319,14 @@
             public static let typeIdentifier = "{{ lexicon_id }}#{{ sub_struct.wire_fragment }}"
 
             {%- for prop in sub_struct.properties %}
-            public let {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
+            public let {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
             {%- endfor %}
 
             public init({% for prop in sub_struct.properties -%}
-                {{ prop.name }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
+                {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
             {%- endfor %}) {
                 {%- for prop in sub_struct.properties %}
-                self.{{ prop.name }} = {{ prop.name }}
+                self.{{ prop.name|sanitizeKeyword }} = {{ prop.name|sanitizeKeyword }}
                 {%- endfor %}
             }
 
@@ -336,9 +336,9 @@
                 {%- for prop in sub_struct.properties %}
                 {%- if def_schema.server_input -%}
                 {%- if prop.required_nullable %}
-                guard container.contains(.{{ prop.name }}) else {
+                guard container.contains(.{{ prop.name|sanitizeKeyword }}) else {
                     throw DecodingError.keyNotFound(
-                        CodingKeys.{{ prop.name }},
+                        CodingKeys.{{ prop.name|sanitizeKeyword }},
                         DecodingError.Context(
                             codingPath: container.codingPath,
                             debugDescription: "Missing required property '{{ prop.name }}'"
@@ -348,8 +348,8 @@
                 {%- endif %}
                 {% if prop.strict_decode -%}
                 {% if prop.wire_optional and not prop.nullable -%}
-                if container.contains(.{{ prop.name }}) {
-                    guard try !container.decodeNil(forKey: .{{ prop.name }}) else {
+                if container.contains(.{{ prop.name|sanitizeKeyword }}) {
+                    guard try !container.decodeNil(forKey: .{{ prop.name|sanitizeKeyword }}) else {
                         throw DecodingError.valueNotFound(
                             {{ prop.type }}.self,
                             DecodingError.Context(
@@ -358,22 +358,22 @@
                             )
                         )
                     }
-                    self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                    self.{{ prop.name|sanitizeKeyword }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                 } else {
-                    self.{{ prop.name }} = nil
+                    self.{{ prop.name|sanitizeKeyword }} = nil
                 }
                 {%- elif prop.optional -%}
-                if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
-                    self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                if container.contains(.{{ prop.name|sanitizeKeyword }}), try !container.decodeNil(forKey: .{{ prop.name|sanitizeKeyword }}) {
+                    self.{{ prop.name|sanitizeKeyword }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                 } else {
-                    self.{{ prop.name }} = nil
+                    self.{{ prop.name|sanitizeKeyword }} = nil
                 }
                 {%- else -%}
-                self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                self.{{ prop.name|sanitizeKeyword }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                 {%- endif %}
                 {%- elif prop.wire_optional and not prop.nullable -%}
-                if container.contains(.{{ prop.name }}) {
-                    guard try !container.decodeNil(forKey: .{{ prop.name }}) else {
+                if container.contains(.{{ prop.name|sanitizeKeyword }}) {
+                    guard try !container.decodeNil(forKey: .{{ prop.name|sanitizeKeyword }}) else {
                         throw DecodingError.valueNotFound(
                             {{ prop.type }}.self,
                             DecodingError.Context(
@@ -382,21 +382,21 @@
                             )
                         )
                     }
-                    self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+                    self.{{ prop.name|sanitizeKeyword }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
                 } else {
-                    self.{{ prop.name }} = nil
+                    self.{{ prop.name|sanitizeKeyword }} = nil
                 }
                 {%- elif prop.optional -%}
-                self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+                self.{{ prop.name|sanitizeKeyword }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
                 {%- else -%}
-                self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+                self.{{ prop.name|sanitizeKeyword }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
                 {%- endif %}
                 {%- else -%}
                 do {
                     {%- if prop.required_nullable %}
-                    guard container.contains(.{{ prop.name }}) else {
+                    guard container.contains(.{{ prop.name|sanitizeKeyword }}) else {
                         throw DecodingError.keyNotFound(
-                            CodingKeys.{{ prop.name }},
+                            CodingKeys.{{ prop.name|sanitizeKeyword }},
                             DecodingError.Context(
                                 codingPath: container.codingPath,
                                 debugDescription: "Missing required property '{{ prop.name }}'"
@@ -406,23 +406,23 @@
                     {%- endif %}
                     {% if prop.strict_decode -%}
                     {% if prop.optional -%}
-                    if container.contains(.{{ prop.name }}), try !container.decodeNil(forKey: .{{ prop.name }}) {
-                        self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                    if container.contains(.{{ prop.name|sanitizeKeyword }}), try !container.decodeNil(forKey: .{{ prop.name|sanitizeKeyword }}) {
+                        self.{{ prop.name|sanitizeKeyword }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                     } else {
-                        self.{{ prop.name }} = nil
+                        self.{{ prop.name|sanitizeKeyword }} = nil
                     }
                     {%- else -%}
-                    self.{{ prop.name }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+                    self.{{ prop.name|sanitizeKeyword }} = try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.name|sanitizeKeyword }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
                     {%- endif %}
                     {%- elif prop.optional -%}
-                    self.{{ prop.name }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name }})
+                    self.{{ prop.name|sanitizeKeyword }} = try container.decodeIfPresent({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
                     {%- else -%}
-                    self.{{ prop.name }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name }})
+                    self.{{ prop.name|sanitizeKeyword }} = try container.decode({{ prop.type }}.self, forKey: .{{ prop.name|sanitizeKeyword }})
                     {%- endif %}
                 } catch {
                     {% if prop.wire_optional and not prop.strict_decode -%}
                     LogManager.logDebug("Decoding error for optional sub-struct property '{{ prop.name }}': \(error)")
-                    self.{{ prop.name }} = nil
+                    self.{{ prop.name|sanitizeKeyword }} = nil
                     {%- else -%}
                     LogManager.logError("Decoding error for required sub-struct property '{{ prop.name }}': \(error)")
                     throw error
@@ -440,11 +440,11 @@
                 try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
                 {%- for prop in sub_struct.properties %}
                 {% if prop.required_nullable -%}
-                try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+                try container.encode({{ prop.name|sanitizeKeyword }}, forKey: .{{ prop.name|sanitizeKeyword }})
                 {%- elif prop.optional -%}
-                try container.encodeIfPresent({{ prop.name }}, forKey: .{{ prop.name }})
+                try container.encodeIfPresent({{ prop.name|sanitizeKeyword }}, forKey: .{{ prop.name|sanitizeKeyword }})
                 {%- else -%}
-                try container.encode({{ prop.name }}, forKey: .{{ prop.name }})
+                try container.encode({{ prop.name|sanitizeKeyword }}, forKey: .{{ prop.name|sanitizeKeyword }})
                 {%- endif %}
                 {%- endfor %}
             }
@@ -452,13 +452,13 @@
             public func hash(into hasher: inout Hasher) {
                 {%- for prop in sub_struct.properties %}
                 {%- if prop.optional %}
-                if let value = {{ prop.name }} {
+                if let value = {{ prop.name|sanitizeKeyword }} {
                     hasher.combine(value)
                 } else {
                     hasher.combine(nil as Int?)
                 }
                 {%- else %}
-                hasher.combine({{ prop.name }})
+                hasher.combine({{ prop.name|sanitizeKeyword }})
                 {%- endif %}
                 {%- endfor %}
             }
@@ -467,7 +467,7 @@
                 {% if sub_struct.properties -%}
                 guard let other = other as? Self else { return false }
                 {%- for prop in sub_struct.properties %}
-                if {{ prop.name }} != other.{{ prop.name }} {
+                if {{ prop.name|sanitizeKeyword }} != other.{{ prop.name|sanitizeKeyword }} {
                     return false
                 }
                 {%- endfor %}
@@ -486,7 +486,7 @@
                 map = map.adding(key: "$type", value: Self.typeIdentifier)
                 {%- for prop in sub_struct.properties %}
                 {% if prop.required_nullable -%}
-                if let value = {{ prop.name }} {
+                if let value = {{ prop.name|sanitizeKeyword }} {
                     {% set var_name = prop.name + 'Value' -%}
                     let {{ var_name }} = try value.toCBORValue()
                     map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
@@ -494,14 +494,14 @@
                     map = map.adding(key: "{{ prop.name }}", value: NSNull())
                 }
                 {%- elif prop.optional -%}
-                if let value = {{ prop.name }} {
+                if let value = {{ prop.name|sanitizeKeyword }} {
                     {% set var_name = prop.name + 'Value' -%}
                     let {{ var_name }} = try value.toCBORValue()
                     map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
                 }
                 {%- else -%}
                 {% set var_name = prop.name + 'Value' -%}
-                let {{ var_name }} = try {{ prop.name }}.toCBORValue()
+                let {{ var_name }} = try {{ prop.name|sanitizeKeyword }}.toCBORValue()
                 map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
                 {%- endif %}
                 {%- endfor %}
@@ -515,7 +515,7 @@
             private enum CodingKeys: String, CodingKey {
                 case typeIdentifier = "$type"
                 {%- for prop in sub_struct.properties %}
-                case {{ prop.name }}
+                case {{ prop.name|sanitizeKeyword }}
                 {%- endfor %}
             }
         }
