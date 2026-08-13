@@ -353,6 +353,12 @@ class SwiftCodeGenerator:
             return ""
         
         schema = message_obj.get('schema', {})
+        if schema.get('type') == 'ref':
+            # Message schema delegating to a named def (usually a union def in
+            # the corpus's defs lexicon). The subscription client template
+            # references `<Lexicon>.Message`, so alias it to the target type.
+            target = self.type_converter.convert_ref(schema['ref'])
+            return f"\n    public typealias Message = {target}\n"
         if schema.get('type') != 'union':
             return ""
         
@@ -453,6 +459,20 @@ class SwiftCodeGenerator:
                 if enum_name not in self.generated_tokens:
                     known_values = def_schema['knownValues']
                     self.enum_generator.generate_enum_from_known_values(enum_name, known_values, self.token_descriptions)
+            elif def_schema.get('type', "") == "union":
+                # Named top-level union def (e.g. defs#signedTransition).
+                # convert_ref resolves refs to these as the bare CamelCase def
+                # name, so the enum must carry exactly that name.
+                self.enum_generator.generate_enum_for_union_def(name, def_schema.get('refs', []))
+            elif def_schema.get('type', "") in ("string", "bytes") and name != 'main':
+                # Plain named scalar def (no enum/knownValues). Local refs to
+                # bytes defs are inlined to Bytes by convert_ref; the typealias
+                # additionally satisfies cross-lexicon refs (Container.Name).
+                alias_name = convert_to_camel_case(name)
+                swift_type = self.type_converter.determine_swift_type(
+                    name, def_schema, [name], current_struct_name
+                )
+                self.enums += f"public typealias {alias_name} = {swift_type}\n\n"
 
         return self.template_manager.lex_definitions_template.render(
             lex_definitions=lex_definitions,

@@ -61,6 +61,45 @@ class EnumGenerator:
         
         return check_recursive(enum_name, set())
 
+    def generate_enum_for_union_def(self, def_name, refs):
+        """Union enum for a named top-level union definition.
+
+        Unlike property-level unions (named {Struct}{Prop}Union), refs resolve
+        these as the bare CamelCase def name — locally as `SignedTransition`,
+        cross-lexicon as `BlueCatbirdChatDefs.SignedTransition` — so the enum
+        must carry exactly that name, nested in the lexicon container.
+        """
+        unique_union_name = convert_to_camel_case(def_name)
+
+        if unique_union_name in self.swift_code_generator.generated_unions:
+            return
+
+        self.swift_code_generator.generated_unions.add(unique_union_name)
+
+        processed_variants = [
+            self.swift_code_generator.lexicon_id + ref if ref.startswith('#') else ref
+            for ref in refs
+        ]
+
+        self.swift_code_generator.enum_definitions[unique_union_name] = processed_variants
+
+        cycle_detector = self.swift_code_generator.cycle_detector
+        if cycle_detector:
+            swift_base = convert_to_camel_case(self.swift_code_generator.lexicon_id)
+            is_recursive = cycle_detector.should_be_indirect(f"{swift_base}.{unique_union_name}")
+        else:
+            is_recursive = self.is_enum_recursive(unique_union_name, processed_variants)
+
+        enum_template = self.swift_code_generator.template_manager.env.get_template('unionEnum.jinja')
+
+        enum_code = enum_template.render(
+            name=unique_union_name,
+            variants=processed_variants,
+            lexicon_id=self.swift_code_generator.lexicon_id,
+            is_recursive=is_recursive,
+        )
+        self.swift_code_generator.enums += enum_code + "\n\n"
+
     def generate_enum_for_union_array(self, context_struct_name, name, refs):
         unique_union_name = convert_to_camel_case(name)
         
