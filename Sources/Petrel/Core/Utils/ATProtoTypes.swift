@@ -33,8 +33,34 @@ public enum ATProtocolError: Error {
 
 public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let authority: String
+
+    /// The record's collection NSID. On a space URI this names the collection of
+    /// the record *within* the space — never the `space` marker itself.
     public let collection: String?
+
+    /// The record's key. On a space URI this is the key of the record within the
+    /// space, not the space's own `skey`.
     public let recordKey: String?
+
+    /// Whether this URI addresses permissioned space data. Space URIs carry extra
+    /// path segments the public grammar disallows, so they are parsed separately.
+    public let isSpace: Bool
+
+    /// The DID of the space's authority. Non-nil only on a space URI whose
+    /// authority is a well-formed DID.
+    public let spaceDID: String?
+
+    /// The space's type NSID. Non-nil only on a space URI.
+    public let spaceType: String?
+
+    /// The space's own key — the third component of a space ref. Non-nil only on
+    /// a space URI.
+    public let skey: String?
+
+    /// The DID of the account whose record this is. On a public URI that is the
+    /// authority itself; on a space URI the authority owns the space while the
+    /// record belongs to one of its members, so the two differ.
+    public let authorDID: String?
 
     /// Store the original string to avoid recomputing
     private let originalString: String
@@ -62,9 +88,15 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             throw ATProtocolError.invalidURI("Invalid AT URI: missing authority")
         }
 
-        authority = String(parts[0])
-        collection = parts.count > 1 ? (parts[1].isEmpty ? nil : String(parts[1])) : nil
-        recordKey = parts.count > 2 ? (parts[2].isEmpty ? nil : String(parts[2])) : nil
+        let parsed = ATProtocolURI.parseSegments(parts)
+        authority = parsed.authority
+        collection = parsed.collection
+        recordKey = parsed.recordKey
+        isSpace = parsed.isSpace
+        spaceDID = parsed.spaceDID
+        spaceType = parsed.spaceType
+        skey = parsed.skey
+        authorDID = parsed.authorDID
     }
 
     public init(uriString: String) throws {
@@ -87,9 +119,79 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             throw ATProtocolError.invalidURI("Invalid AT URI: missing or empty authority")
         }
 
-        authority = String(components[0])
-        collection = components.count > 1 ? (components[1].isEmpty ? nil : String(components[1])) : nil
-        recordKey = components.count > 2 ? (components[2].isEmpty ? nil : String(components[2])) : nil
+        let parsed = ATProtocolURI.parseSegments(components)
+        authority = parsed.authority
+        collection = parsed.collection
+        recordKey = parsed.recordKey
+        isSpace = parsed.isSpace
+        spaceDID = parsed.spaceDID
+        spaceType = parsed.spaceType
+        skey = parsed.skey
+        authorDID = parsed.authorDID
+    }
+
+    private struct ParsedURI {
+        let authority: String
+        let collection: String?
+        let recordKey: String?
+        let isSpace: Bool
+        let spaceDID: String?
+        let spaceType: String?
+        let skey: String?
+        let authorDID: String?
+    }
+
+    /// Assigns path segments to their roles, following `parsePath` in
+    /// `@atproto/syntax`. Two grammars share the `at://` scheme:
+    ///
+    ///     at://{authorDid}/{collection}/{rkey}                                        public
+    ///     at://{spaceDid}/space/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]  space
+    ///
+    /// Assigning positionally without checking for the `space` marker reports the
+    /// marker as the collection and silently discards the space's `skey`, so the
+    /// two are separated here. `segments[0]` is the authority.
+    private static func parseSegments(_ segments: [Substring]) -> ParsedURI {
+        let authority = String(segments[0])
+        let path = segments.dropFirst().map(String.init)
+
+        guard path.first == "space" else {
+            return ParsedURI(
+                authority: authority,
+                collection: path.count > 0 ? (path[0].isEmpty ? nil : path[0]) : nil,
+                recordKey: path.count > 1 ? (path[1].isEmpty ? nil : path[1]) : nil,
+                isSpace: false,
+                spaceDID: nil,
+                spaceType: nil,
+                skey: nil,
+                authorDID: DID.isValidDID(authority) ? authority : nil
+            )
+        }
+
+        // ["space", spaceType, skey, authorDid, collection, rkey]
+        let space = path.filter { !$0.isEmpty }
+        func segment(_ index: Int) -> String? {
+            return index < space.count ? space[index] : nil
+        }
+        let author = segment(3)
+
+        return ParsedURI(
+            authority: authority,
+            collection: segment(4),
+            recordKey: segment(5),
+            isSpace: true,
+            spaceDID: DID.isValidDID(authority) ? authority : nil,
+            spaceType: segment(1).flatMap { NSID.isValidNSID($0) ? $0 : nil },
+            skey: segment(2),
+            authorDID: author.flatMap { DID.isValidDID($0) ? $0 : nil }
+        )
+    }
+
+    /// The space this URI belongs to, whether it names the space itself or a
+    /// record within it. `nil` on a public URI, or on a space URI missing any of
+    /// the three parts a space ref requires.
+    public var spaceRef: SpaceRef? {
+        guard isSpace, let spaceDID, let spaceType, let skey else { return nil }
+        return try? SpaceRef(spaceDID: spaceDID, spaceType: spaceType, skey: skey)
     }
 
     public var description: String {
@@ -116,6 +218,110 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     }
 
     func asQueryItem(name: String) -> URLQueryItem? {
+        return URLQueryItem(name: name, value: uriString())
+    }
+
+    public func toCBORValue() throws -> Any {
+        return uriString()
+    }
+}
+
+// MARK: - Space Reference
+
+/// A reference to a permissioned-data space, as distinct from a record within one:
+///
+///     at://{spaceDid}/space/{spaceType}/{skey}
+///
+/// This is the lexicon string format `space-ref`. It is not a narrower `at-uri`:
+/// the public AT-URI grammar admits at most two path segments, so a space ref
+/// does not parse as one, and its authority must be a DID rather than any AT
+/// identifier — a space's identity and membership are keyed on DIDs.
+public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
+    /// The DID of the account that is the space's authority.
+    public let spaceDID: String
+
+    /// The NSID naming the space's type.
+    public let spaceType: String
+
+    /// The space's key, unique within its authority and type.
+    public let skey: String
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        try self.init(uriString: container.decode(String.self))
+    }
+
+    public init(spaceDID: String, spaceType: String, skey: String) throws {
+        _ = try DID(didString: spaceDID)
+        _ = try NSID(nsidString: spaceType)
+        _ = try RecordKey(keyString: skey)
+
+        self.spaceDID = spaceDID
+        self.spaceType = spaceType
+        self.skey = skey
+    }
+
+    /// Parses the three-part form only. A URI naming a record *within* a space
+    /// begins with a valid space ref but is not one, and is rejected — matching
+    /// `SpaceRef.parse` upstream, which requires its input to equal its own
+    /// canonical serialisation.
+    public init(uriString: String) throws {
+        guard uriString.hasPrefix("at://"),
+              uriString.utf8.count <= 8192
+        else {
+            throw ATProtocolError.invalidURI("Invalid space ref format or length")
+        }
+
+        let segments = uriString.dropFirst(5).split(separator: "/", omittingEmptySubsequences: false)
+        guard segments.count == 4, segments[1] == "space" else {
+            throw ATProtocolError.invalidURI("Invalid space ref: \(uriString)")
+        }
+
+        try self.init(
+            spaceDID: String(segments[0]),
+            spaceType: String(segments[2]),
+            skey: String(segments[3])
+        )
+    }
+
+    public var description: String {
+        return uriString()
+    }
+
+    public func uriString() -> String {
+        return "at://\(spaceDID)/space/\(spaceType)/\(skey)"
+    }
+
+    /// The URI of a record published inside this space by one of its members.
+    public func recordURI(
+        authorDID: String,
+        collection: String,
+        recordKey: String
+    ) throws -> ATProtocolURI {
+        _ = try DID(didString: authorDID)
+        _ = try NSID(nsidString: collection)
+        _ = try RecordKey(keyString: recordKey)
+
+        return try ATProtocolURI(
+            uriString: "\(uriString())/\(authorDID)/\(collection)/\(recordKey)"
+        )
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherRef = other as? SpaceRef else {
+            return false
+        }
+
+        return spaceDID == otherRef.spaceDID && spaceType == otherRef.spaceType
+            && skey == otherRef.skey
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(uriString())
+    }
+
+    public func asQueryItem(name: String) -> URLQueryItem? {
         return URLQueryItem(name: name, value: uriString())
     }
 
@@ -546,7 +752,9 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         segments = components.count > 2 ? components.dropFirst(2).map { String($0) } : []
     }
 
-    private static func isValidDID(_ did: String) -> Bool {
+    /// `fileprivate` so `ATProtocolURI` and `SpaceRef` can gate a space URI's
+    /// authority and author on being well-formed DIDs, as the space grammar requires.
+    fileprivate static func isValidDID(_ did: String) -> Bool {
         guard let regex = didRegex else {
             // Fallback validation without regex
             return did.hasPrefix("did:") && did.count > 4
@@ -773,7 +981,9 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
         authority = components.count > 1 ? components.dropLast().joined(separator: ".") : ""
     }
 
-    private static func isValidNSID(_ nsid: String) -> Bool {
+    /// `fileprivate` so `ATProtocolURI` and `SpaceRef` can gate a space URI's
+    /// type segment, as the space grammar requires.
+    fileprivate static func isValidNSID(_ nsid: String) -> Bool {
         // Basic validation before regex
         guard !nsid.isEmpty, nsid.count <= 584 else {
             return false

@@ -120,6 +120,9 @@ class KotlinTypeConverter(BaseTypeConverter):
             'datetime': 'ATProtocolDate',
             'uri': 'URI',
             'at-uri': 'ATProtocolURI',
+            # Distinct from at-uri: at://{did}/space/{type}/{skey} does not parse
+            # under the public AT-URI grammar.
+            'space-ref': 'SpaceRef',
             'at-identifier': 'ATIdentifier',
             'did': 'DID',
             'handle': 'Handle',

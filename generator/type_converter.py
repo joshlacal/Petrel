@@ -57,7 +57,13 @@ class TypeConverter:
             elif string_format == 'uri':
                 swift_type = "URI" 
             elif string_format == 'at-uri':
-                swift_type = "ATProtocolURI" 
+                swift_type = "ATProtocolURI"
+            elif string_format == 'space-ref':
+                # Not a narrower at-uri: the public AT-URI grammar admits at most
+                # two path segments, so at://{did}/space/{type}/{skey} does not
+                # parse as one. ATProtocolURI would report "space" as the
+                # collection and silently drop the skey.
+                swift_type = "SpaceRef"
             elif string_format == 'at-identifier':
                 swift_type = "ATIdentifier"
             elif string_format == 'cid':

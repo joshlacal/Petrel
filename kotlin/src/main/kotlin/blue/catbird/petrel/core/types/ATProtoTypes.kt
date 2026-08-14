@@ -439,3 +439,32 @@ object ATProtocolURISerializer : KSerializer<ATProtocolURI> {
         return ATProtocolURI(decoder.decodeString())
     }
 }
+
+// MARK: - Space Reference
+
+/**
+ * A reference to a permissioned-data space, as distinct from a record within one:
+ *
+ *     at://{spaceDid}/space/{spaceType}/{skey}
+ *
+ * The lexicon string format `space-ref`. Kept distinct from [ATProtocolURI]
+ * because the public AT-URI grammar admits at most two path segments, so a space
+ * ref does not parse as one.
+ */
+@Serializable(with = SpaceRefSerializer::class)
+data class SpaceRef(val value: String) {
+    override fun toString(): String = value
+}
+
+object SpaceRefSerializer : KSerializer<SpaceRef> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("SpaceRef", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: SpaceRef) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: Decoder): SpaceRef {
+        return SpaceRef(decoder.decodeString())
+    }
+}
