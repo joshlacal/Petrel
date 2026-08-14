@@ -18,6 +18,18 @@ class KotlinEnumGenerator:
     def generate_sealed_interface_for_union(self, current_struct_name: str, prop_name: str, refs: List[str], raw_refs: List[str] = None):
         """Generate a sealed interface for a union type property."""
         union_name = f"{current_struct_name}{convert_to_pascal_case(prop_name)}Union"
+        self.emit_sealed_interface(union_name, refs, raw_refs=raw_refs)
+
+    def generate_sealed_interface_for_union_def(self, union_name: str, refs: List[str], raw_refs: List[str] = None):
+        """Sealed interface for a named top-level union definition.
+
+        Unlike property-level unions (named {Struct}{Prop}Union), convert_ref
+        resolves refs to these as the bare {Class}{Def} name — locally and
+        cross-lexicon alike — so the interface must carry exactly that name.
+        """
+        self.emit_sealed_interface(union_name, refs, raw_refs=raw_refs)
+
+    def emit_sealed_interface(self, union_name: str, refs: List[str], raw_refs: List[str] = None):
         print(f"Generating union: {union_name}", flush=True)
 
         if union_name in self.generated_sealed_interfaces:

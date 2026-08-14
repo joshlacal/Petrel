@@ -304,6 +304,29 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
                 known_values = def_schema['knownValues']
                 self.enum_generator.generate_enum_class_from_known_values(class_name, known_values)
 
+            elif def_type == 'union':
+                # Named top-level union def (e.g. defs#signedTransition).
+                # convert_ref resolves refs to these as the bare {Class}{Def}
+                # name, so the sealed interface must carry exactly that name
+                # rather than the property-union {Struct}{Prop}Union form.
+                raw_refs = def_schema.get('refs', [])
+                converted_refs = [self.type_converter.convert_ref(r) for r in raw_refs]
+                self.enum_generator.generate_sealed_interface_for_union_def(
+                    class_name, converted_refs, raw_refs=raw_refs
+                )
+
+            elif def_type in ('string', 'bytes'):
+                # Plain named scalar def — no enum, no knownValues, so the
+                # branches above didn't claim it. convert_ref still resolves
+                # refs to it as {Class}{Def}, so alias that name to the
+                # underlying primitive.
+                definitions.append({
+                    'name': class_name,
+                    'type': 'type_alias',
+                    'target': self.type_converter._get_base_type(def_schema, name, class_name),
+                    'description': def_schema.get('description', ''),
+                })
+
             elif def_type == 'array':
                 # Generate type alias for array
                 item_type = self.type_converter._get_array_item_type(def_schema, name, class_name)
@@ -445,6 +468,14 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
 
         schema = message_obj.get('schema', {})
         schema_type = schema.get('type', '')
+
+        if schema_type == 'ref':
+            # Message schema delegating to a named def (a union def in the
+            # corpus's defs lexicon). Callers reference <Class>Message, so
+            # alias it to the target instead of emitting an empty class that
+            # would shadow the real variants.
+            target = self.type_converter.convert_ref(schema['ref'])
+            return f"typealias {self.class_name}Message = {target}\n"
 
         if schema_type == 'union':
             # For union messages the "type" is a sealed interface that the enum
@@ -589,14 +620,19 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
         has_parameters = 'parameters' in self.main_def
         parameters_type = f"{self.class_name}Parameters" if has_parameters else None
 
-        message_schema = self.main_def.get('message', {}).get('schema', {}) or {}
-        is_union = message_schema.get('type') == 'union'
+        union_type, union_refs = self._resolve_message_union()
+        is_union = union_type is not None
 
-        # When the schema is a union, the Flow element is the generated sealed
-        # interface <Class>MessageUnion. Otherwise fall back to the (often empty)
-        # <Class>Message data class so the emitted file compiles.
-        message_union = f"{self.class_name}MessageUnion"
-        message_type = message_union if is_union else f"{self.class_name}Message"
+        # When the schema is an inline union, the Flow element is the generated
+        # sealed interface <Class>MessageUnion. A ref schema instead aliases
+        # <Class>Message onto the named union def, so the alias is the stable
+        # signature type while the def's own name carries the variants.
+        message_union = union_type or f"{self.class_name}MessageUnion"
+        message_type = (
+            f"{self.class_name}MessageUnion"
+            if union_type == f"{self.class_name}MessageUnion"
+            else f"{self.class_name}Message"
+        )
 
         # Build variant metadata for the CBOR header dispatch. Each ref becomes
         # a `when (header.t)` branch that decodes the payload into the matching
@@ -606,7 +642,7 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
         # variants (and a comment is emitted in the template).
         variants = []
         if is_union:
-            raw_refs = message_schema.get('refs', [])
+            raw_refs = union_refs
             short_names_seen = set()
             for raw_ref in raw_refs:
                 if '#' in raw_ref:
@@ -658,6 +694,41 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
             endpoint=self.lexicon_id,
             description=self.description
         )
+
+    def _resolve_message_union(self):
+        """Resolve the subscription message schema to (union type, raw refs).
+
+        Handles an inline union schema and a `ref` schema delegating to a named
+        union def. Refs inside such a def are fragments of *its* lexicon, not
+        this one, so they're qualified before the caller converts them.
+        Returns (None, None) when the message is not union-shaped.
+        """
+        schema = (self.main_def.get('message') or {}).get('schema') or {}
+        schema_type = schema.get('type')
+
+        if schema_type == 'union':
+            return f"{self.class_name}MessageUnion", list(schema.get('refs', []))
+        if schema_type != 'ref':
+            return None, None
+
+        ref = schema['ref']
+        nsid, separator, fragment = ref.partition('#')
+        if not nsid or nsid == self.lexicon_id:
+            owner = self.lexicon_id
+            target = self.defs.get(fragment if separator else 'main')
+        else:
+            owner = nsid
+            registry = getattr(self.cycle_detector, 'schemas_by_ref', None)
+            target = registry.get(ref) if registry is not None else None
+
+        if not isinstance(target, dict) or target.get('type') != 'union':
+            return None, None
+
+        qualified_refs = [
+            f"{owner}{r}" if r.startswith('#') else r
+            for r in target.get('refs', [])
+        ]
+        return self.type_converter.convert_ref(ref), qualified_refs
 
     def _resolve_ref_def_type(self, ref: str) -> Optional[str]:
         """Return the lexicon def `type` for a ref, or None if unresolved."""
