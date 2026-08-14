@@ -33,8 +33,10 @@ swift test
 python3 run.py --manifest generator/manifests/petrel-core.json
 swiftformat Sources/Petrel/Generated
 
-# Overlay package (PetrelCatbird — Catbird's custom lexicons), run from this repo root
+# Overlay package (PetrelCatbird — Catbird's custom lexicons), run from this repo root,
+# then format from the OVERLAY repo — see the formatting note below
 python3 run.py --manifest ../PetrelCatbird/manifests/petrel-catbird.json
+cd ../PetrelCatbird && swiftformat Sources/PetrelCatbird/Generated
 
 # Legacy positional CLI still works:
 python3 run.py generator/lexicons Sources/Petrel/Generated --language both
@@ -42,6 +44,21 @@ python3 run.py generator/lexicons Sources/Petrel/Generated --language both
 The committed generated code is post-SwiftFormat; raw generator output differs
 until `swiftformat Sources/Petrel/Generated` runs (CI enforces the regen+format
 round-trip producing an empty diff).
+
+**The two packages format under different rules, and both rely on SwiftFormat's
+config auto-discovery — so run each pass from its own repo and pass no `--config`:**
+
+- **Core** picks up `Petrel/.swiftformat` (4-space, `--wraparguments before-first`).
+- **Overlay** picks up nothing — PetrelCatbird has no `.swiftformat`, so SwiftFormat
+  defaults apply, and that is what the committed overlay output was produced with.
+  Passing `--config ../Petrel/.swiftformat` to the overlay does **not** reproduce it:
+  it rewraps case tuples and leaves 8 files permanently dirty, which reads like a
+  generator bug and is not one. Verify a clean regen by round-tripping to an empty
+  `jj diff`, not by eyeballing.
+
+Kotlin output has **no** post-format step in either package — the generator's own
+output is the committed form and round-trips byte-identically. Don't go looking for
+a ktlint/spotless pass; there isn't one.
 
 ## Release Versioning
 
