@@ -142,10 +142,35 @@ class KotlinNamedDefGenerationTests(unittest.TestCase):
     def test_enum_bearing_string_defs_still_win_over_the_scalar_alias(self):
         # Branch ordering guard: `string` + enum/knownValues must keep emitting
         # enum classes rather than falling into the plain-scalar typealias.
+        # Note the asymmetry these names encode: `string` + enum declares under
+        # a DOUBLED `{Class}Defs{Def}` name while `string` + knownValues does
+        # not. Both match what convert_ref mints for their shape, which is the
+        # property that matters; the doubling itself is a pre-existing wart and
+        # deliberately not changed here.
         self.assertNotIn("typealias BlueCatbirdTestDefsClosedKind", self.source)
         self.assertNotIn("typealias BlueCatbirdTestDefsOpenKind", self.source)
         self.assertIn("BlueCatbirdTestDefsDefsClosedKind", self.source)
         self.assertIn("BlueCatbirdTestDefsOpenKind", self.source)
+
+    def test_token_defs_are_skipped_without_erroring(self):
+        lexicon = {
+            "lexicon": 1,
+            "id": "blue.catbird.test.tokens",
+            "defs": {"someToken": {"type": "token", "description": "A token."}},
+        }
+        source = KotlinCodeGenerator(lexicon).convert()
+        self.assertNotIn("BlueCatbirdTestTokensSomeToken", source)
+
+    def test_unknown_def_shape_raises_instead_of_minting_a_dangling_name(self):
+        lexicon = {
+            "lexicon": 1,
+            "id": "blue.catbird.test.future",
+            "defs": {"exotic": {"type": "someFutureShape"}},
+        }
+        with self.assertRaises(ValueError) as caught:
+            KotlinCodeGenerator(lexicon).convert()
+        self.assertIn("someFutureShape", str(caught.exception))
+        self.assertIn("BlueCatbirdTestFutureExotic", str(caught.exception))
 
     def test_every_name_minted_by_convert_ref_is_actually_declared(self):
         # The invariant the defect broke: a ref must never name a type that no
