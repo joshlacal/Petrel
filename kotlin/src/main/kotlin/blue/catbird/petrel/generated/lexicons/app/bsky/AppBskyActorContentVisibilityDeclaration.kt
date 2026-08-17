@@ -1,0 +1,28 @@
+// Lexicon: 1, ID: app.bsky.actor.contentVisibilityDeclaration
+// A declaration of an account's preferences for appearing in content discovery surfaces.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyActorContentVisibilityDeclarationDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.actor.contentVisibilityDeclaration"
+}
+
+    /**
+     * A declaration of an account's preferences for appearing in content discovery surfaces.
+     */
+    @Serializable
+    data class AppBskyActorContentVisibilityDeclaration(
+/** Whether the account requests that its posts be hidden from algorithmic recommendations. Consumers must treat a missing record as false. */        @SerialName("hideFromAlgorithmicRecommendations")
+        val hideFromAlgorithmicRecommendations: Boolean    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = ""
+        }
+    }
