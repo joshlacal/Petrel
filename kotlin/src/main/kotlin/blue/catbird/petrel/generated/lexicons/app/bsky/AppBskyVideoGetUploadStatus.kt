@@ -1,0 +1,60 @@
+// Lexicon: 1, ID: app.bsky.video.getUploadStatus
+// Get the authoritative status of the upload phase. Terminal states remain readable. completedJobId and jobStatus are present only for completed sessions; failureReason is present only for failed sessions.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyVideoGetUploadStatusDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.video.getUploadStatus"
+}
+
+@Serializable
+    data class AppBskyVideoGetUploadStatusParameters(
+        @SerialName("jobId")
+        val jobId: String    )
+
+    @Serializable
+    data class AppBskyVideoGetUploadStatusOutput(
+        @SerialName("jobId")
+        val jobId: String,        @SerialName("partSizeBytes")
+        val partSizeBytes: Int,        @SerialName("partCount")
+        val partCount: Int,        @SerialName("receivedParts")
+        val receivedParts: List<Int>,        @SerialName("expiresAt")
+        val expiresAt: ATProtocolDate,        @SerialName("state")
+        val state: String,// Present only when state is completed; may differ from jobId on deduplication.        @SerialName("completedJobId")
+        val completedJobId: String? = null,// Present only when state is completed.        @SerialName("jobStatus")
+        val jobStatus: AppBskyVideoDefsJobStatus? = null,// Present only when state is failed.        @SerialName("failureReason")
+        val failureReason: String? = null    )
+
+sealed class AppBskyVideoGetUploadStatusError(val name: String, val description: String?) {
+        object UploadNotFound: AppBskyVideoGetUploadStatusError("UploadNotFound", "The job ID is unknown or aged out of retention; known terminal sessions remain readable and are never reported as not found.")
+    }
+
+/**
+ * Get the authoritative status of the upload phase. Terminal states remain readable. completedJobId and jobStatus are present only for completed sessions; failureReason is present only for failed sessions.
+ *
+ * Endpoint: app.bsky.video.getUploadStatus
+ */
+suspend fun ATProtoClient.App.Bsky.Video.getUploadStatus(
+parameters: AppBskyVideoGetUploadStatusParameters): ATProtoResponse<AppBskyVideoGetUploadStatusOutput> {
+    val endpoint = "app.bsky.video.getUploadStatus"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

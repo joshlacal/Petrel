@@ -41,7 +41,7 @@ object AppBskyEmbedVideoDefs {
 
 @Serializable
 data class AppBskyEmbedVideo(
-// The mp4 video file. May be up to 100mb, formerly limited to 50mb.    @SerialName("video")
+// The mp4 video file. May be up to 300mb, formerly limited to 100mb.    @SerialName("video")
     val video: Blob,    @SerialName("captions")
     val captions: List<AppBskyEmbedVideoCaption>? = null,// Alt text description of the video, for accessibility.    @SerialName("alt")
     val alt: String? = null,    @SerialName("aspectRatio")
