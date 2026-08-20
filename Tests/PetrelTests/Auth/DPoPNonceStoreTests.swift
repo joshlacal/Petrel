@@ -490,4 +490,37 @@ struct DPoPNonceStoreTests {
             #expect(try nonceInProofString(secondProof) == "second-flow-nonce")
         }
     }
+    @Test("DPoP key and proof material are cached and invalidated on key clear")
+    func dpopMaterialCachingAndInvalidation() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryStorage(backend) {
+            let storage = KeychainStorage(namespace: "test.dpop.cache")
+            let core = makeCore(storage: storage)
+            let did = Self.did
+
+            let key1 = P256.Signing.PrivateKey()
+            try await storage.saveDPoPKeyRepresentation(key1.x963Representation, for: did)
+
+            // First fetch populates cache
+            let material1 = try await core.getOrCreateDPoPMaterial(for: did)
+            #expect(material1.privateKey.rawRepresentation == key1.rawRepresentation)
+
+            // Modify backend directly without notifying cache: cache hit returns material1
+            let key2 = P256.Signing.PrivateKey()
+            backend.plant(
+                key: "dpopKey.\(did)",
+                namespace: "dpopkeys",
+                data: key2.x963Representation
+            )
+
+            let cachedMaterial = try await core.getOrCreateDPoPMaterial(for: did)
+            #expect(cachedMaterial.privateKey.rawRepresentation == key1.rawRepresentation)
+
+            // Clear cache for did: next read retrieves key2 from storage
+            await core.clearDPoPKeyCache(for: did)
+            let freshMaterial = try await core.getOrCreateDPoPMaterial(for: did)
+            #expect(freshMaterial.privateKey.rawRepresentation == key2.rawRepresentation)
+        }
+    }
+
 }

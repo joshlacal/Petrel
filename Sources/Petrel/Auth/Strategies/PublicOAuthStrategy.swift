@@ -184,14 +184,14 @@ actor PublicOAuthStrategy: AuthStrategy {
         let didResolver = core.didResolver
         let (handle, actualPDS) = try await didResolver.resolveDIDToHandleAndPDSURL(did: did)
 
-        // Persist DPoP Key
+        // Persist DPoP Key and invalidate any prior cached key for this DID
         try await storage.saveDPoPKeyRepresentation(ephemeralKey.x963Representation, for: did)
+        await core.clearDPoPKeyCache(for: did)
 
         // The flow's ephemeral key is now this DID's DPoP key, so the nonces learned
         // during PAR/token exchange are still valid for it — hand them over instead of
         // re-learning each one through a wasted 400 on the first authenticated request.
         await core.transferOAuthFlowNonces(to: did)
-
         // Create Session
         let session = Session(
             accessToken: tokenResponse.accessToken,

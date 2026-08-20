@@ -51,6 +51,16 @@ actor OAuthCore {
     /// `noncesByThumbprint`. Bounds how often a proof re-reads the keychain.
     var lastPersistedNonceMerge: [String: Date] = [:]
 
+    /// Cached DPoP key and precomputed proof material per DID.
+    struct DPoPMaterial: Sendable {
+        let privateKey: P256.Signing.PrivateKey
+        let jwk: JWK
+        let thumbprint: String
+        let headerBase64: String
+    }
+
+    private var dpopMaterialCache: [String: DPoPMaterial] = [:]
+
     /// Which thumbprints hold cached nonces for which DID, so one account's logout
     /// clears exactly its own entries. Thumbprints are per-DID (each account has its
     /// own DPoP key), but `noncesByThumbprint` is keyed by thumbprint alone, so
@@ -220,6 +230,46 @@ actor OAuthCore {
         return Data(hash).base64URLEscaped()
     }
 
+    func precomputeDPoPMaterial(for privateKey: P256.Signing.PrivateKey) throws -> DPoPMaterial {
+        let jwk = try createJWK(from: privateKey)
+        let thumbprint = try calculateJWKThumbprint(jwk: jwk)
+        let header = DefaultJWSHeaderImpl(
+            algorithm: .ES256,
+            jwk: jwk,
+            type: "dpop+jwt"
+        )
+        let headerData = try JSONEncoder().encode(header)
+        let headerBase64 = headerData.base64URLEscaped()
+        return DPoPMaterial(
+            privateKey: privateKey,
+            jwk: jwk,
+            thumbprint: thumbprint,
+            headerBase64: headerBase64
+        )
+    }
+
+    func getOrCreateDPoPMaterial(for did: String) async throws -> DPoPMaterial {
+        if let cached = dpopMaterialCache[did] {
+            return cached
+        }
+        let key = try await getOrCreateDPoPKey(for: did)
+        if let cached = dpopMaterialCache[did] {
+            return cached
+        }
+        let material = try precomputeDPoPMaterial(for: key)
+        dpopMaterialCache[did] = material
+        return material
+    }
+
+    func clearDPoPKeyCache(for did: String) {
+        dpopMaterialCache.removeValue(forKey: did)
+    }
+
+    func clearAllDPoPKeyCaches() {
+        dpopMaterialCache.removeAll()
+    }
+
+
     // MARK: - DPoP Proof Creation
 
     func createDPoPProof(
@@ -237,16 +287,23 @@ actor OAuthCore {
         }
 
         let privateKey: P256.Signing.PrivateKey
+        let keyThumbprint: String
+        let headerBase64: String
+
         if let keyData = ephemeralKeyRawRepresentation {
-            privateKey = try P256.Signing.PrivateKey(rawRepresentation: keyData)
+            let key = try P256.Signing.PrivateKey(rawRepresentation: keyData)
+            let material = try precomputeDPoPMaterial(for: key)
+            privateKey = material.privateKey
+            keyThumbprint = material.thumbprint
+            headerBase64 = material.headerBase64
         } else if let currentDID = targetDID {
-            privateKey = try await getOrCreateDPoPKey(for: currentDID)
+            let material = try await getOrCreateDPoPMaterial(for: currentDID)
+            privateKey = material.privateKey
+            keyThumbprint = material.thumbprint
+            headerBase64 = material.headerBase64
         } else {
             throw AuthError.noActiveAccount
         }
-
-        let jwk = try createJWK(from: privateKey)
-        let keyThumbprint = try calculateJWKThumbprint(jwk: jwk)
 
         var ath: String?
         if type == .resourceAccess, let token = accessToken {
@@ -301,14 +358,6 @@ actor OAuthCore {
         )
 
         let jwtPayloadData = try JSONEncoder().encode(payload)
-
-        let header = DefaultJWSHeaderImpl(
-            algorithm: .ES256,
-            jwk: jwk, type: "dpop+jwt"
-        )
-        let headerData = try JSONEncoder().encode(header)
-        let headerBase64 = headerData.base64URLEscaped()
-
         let signingInput = "\(headerBase64).\(base64URLEncode(jwtPayloadData))"
         let signatureData = try privateKey.signature(for: Data(signingInput.utf8))
         let signatureBase64 = base64URLEncode(signatureData.rawRepresentation)
@@ -317,9 +366,16 @@ actor OAuthCore {
     }
 
     func getOrCreateDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey {
+        if let cached = dpopMaterialCache[did] {
+            return cached.privateKey
+        }
+
         do {
             if let representation = try await storage.getDPoPKeyRepresentation(for: did) {
-                return try P256.Signing.PrivateKey(x963Representation: representation)
+                let key = try P256.Signing.PrivateKey(x963Representation: representation)
+                let material = try precomputeDPoPMaterial(for: key)
+                dpopMaterialCache[did] = material
+                return key
             }
         } catch {
             throw AuthError.dpopKeyError
@@ -343,8 +399,11 @@ actor OAuthCore {
 
         let newKey = P256.Signing.PrivateKey()
         try await storage.saveDPoPKeyRepresentation(newKey.x963Representation, for: did)
+        let material = try precomputeDPoPMaterial(for: newKey)
+        dpopMaterialCache[did] = material
         return newKey
     }
+
 
     /// Records `nonce` in every store `createDPoPProof` reads for `did`: the in-memory
     /// JKT map, the persisted JKT-scoped map, and the persisted DID-scoped map.
@@ -420,8 +479,8 @@ actor OAuthCore {
     /// (e.g. a locked keychain) — the nonce stores are keyed by it.
     private func dpopKeyThumbprint(for did: String) async -> String? {
         do {
-            let key = try await getOrCreateDPoPKey(for: did)
-            return try calculateJWKThumbprint(jwk: createJWK(from: key))
+            let material = try await getOrCreateDPoPMaterial(for: did)
+            return material.thumbprint
         } catch {
             LogManager.logError(
                 "Failed to derive DPoP key thumbprint for DID: \(LogManager.logDID(did)): \(error)",
@@ -430,6 +489,7 @@ actor OAuthCore {
             return nil
         }
     }
+
 
     /// Applies a server-issued nonce for `domain` to all of `did`'s nonce stores.
     /// - Returns: `false` when the write could not reach the JKT-scoped stores, so a
@@ -477,7 +537,9 @@ actor OAuthCore {
         thumbprintsByDID.removeValue(forKey: did)
         lastPersistedNonceMerge.removeValue(forKey: did)
         didsWithUnpersistedNonces.remove(did)
+        clearDPoPKeyCache(for: did)
     }
+
 
     /// Upper bound on the number of in-flight OAuth flows holding a nonce. Flows are
     /// short-lived and user-driven, so anything past this is abandoned logins whose
@@ -812,12 +874,11 @@ actor OAuthCore {
             req.setValue("DPoP \(session.accessToken)", forHTTPHeaderField: "Authorization")
         }
 
-        // Get JKT for context
-        let key = try await getOrCreateDPoPKey(for: account.did)
-        let jwk = try createJWK(from: key)
-        let thumbprint = try calculateJWKThumbprint(jwk: jwk)
+        // Get JKT for context from cached material without re-fetching or re-deriving
+        let thumbprint = (try? await getOrCreateDPoPMaterial(for: account.did))?.thumbprint
 
         return (req, AuthContext(did: account.did, jkt: thumbprint))
+
     }
 
     // MARK: - Refresh Coordination
