@@ -1143,7 +1143,11 @@ public actor NetworkService: NetworkServiceProtocol {
             let requestStartTime = Date()
             if let url = requestToSend.url {
                 let bodySize = requestToSend.httpBody?.count ?? 0
-                let bodyShape = requestToSend.httpBody.flatMap { LogManager.jsonShape(from: $0) }
+                #if DEBUG
+                    let bodyShape = requestToSend.httpBody.flatMap { LogManager.jsonShape(from: $0) }
+                #else
+                    let bodyShape: String? = nil
+                #endif
                 LogManager.logStructuredRequest(
                     requestId: requestId,
                     method: requestToSend.httpMethod ?? "GET",
@@ -1197,7 +1201,11 @@ public actor NetworkService: NetworkServiceProtocol {
 
                 // Log structured response shape for BFF debugging
                 let elapsedMs = Int(Date().timeIntervalSince(requestStartTime) * 1000)
-                let responseShape = LogManager.jsonShape(from: decompressedData)
+                #if DEBUG
+                    let responseShape = LogManager.jsonShape(from: decompressedData)
+                #else
+                    let responseShape: String? = nil
+                #endif
                 LogManager.logStructuredResponse(
                     requestId: requestId,
                     status: httpResponse.statusCode,
