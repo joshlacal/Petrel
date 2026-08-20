@@ -265,6 +265,7 @@ actor PublicOAuthStrategy: AuthStrategy {
 
         try await storage.deleteSession(for: did)
         try await storage.deleteDPoPKey(for: did)
+        await core.clearDPoPKeyCache(for: did)
         // Every store `createDPoPProof` reads, or the next login inherits nonces bound
         // to the DPoP key just deleted. The in-memory clear is scoped to this DID, so a
         // second signed-in account keeps its cached nonces. OAuth flow nonces are keyed

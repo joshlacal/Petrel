@@ -105,10 +105,48 @@ private actor AuthContinuityMutationHub {
     }
 }
 
+/// Mutation hub for DPoP key invalidation across storage instances and actors.
+public final class DPoPKeyMutationHub: @unchecked Sendable {
+    private let lock = NSLock()
+    private var observers: [UUID: @Sendable (String?) async -> Void] = [:]
+
+    public init() {}
+
+    @discardableResult
+    public func addObserver(_ observer: @escaping @Sendable (String?) async -> Void) -> UUID {
+        let id = UUID()
+        lock.withLock {
+            observers[id] = observer
+        }
+        return id
+    }
+
+    public func removeObserver(_ id: UUID) {
+        lock.withLock {
+            _ = observers.removeValue(forKey: id)
+        }
+    }
+
+
+    public func notifyKeyMutation(for did: String?) {
+        let currentObservers: [@Sendable (String?) async -> Void] = lock.withLock {
+            Array(observers.values)
+        }
+        for observer in currentObservers {
+            Task {
+                await observer(did)
+            }
+        }
+    }
+}
+
 /// A centralized storage layer for securely storing all persistent data using the keychain.
 public actor KeychainStorage {
     let namespace: String
     private let accessGroup: String?
+    /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
+    public static let dpopKeyMutationHub = DPoPKeyMutationHub()
+
     private var authContinuityObserverToken: UUID?
 
     private var authContinuityScope: AuthContinuityMutationHub.Scope {
@@ -1173,6 +1211,9 @@ public actor KeychainStorage {
     /// Saves a DPoP key representation without moving CryptoKit key material
     /// across this actor's isolation boundary.
     func saveDPoPKeyRepresentation(_ representation: Data, for did: String) throws {
+        // Invalidate DPoP material cache for this DID
+        Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+
         // Validate inside the actor before persisting opaque bytes.
         let key = try P256.Signing.PrivateKey(x963Representation: representation)
         let keyTag = makeKey("dpopKey", did: did)
@@ -1192,6 +1233,7 @@ public actor KeychainStorage {
             throw error
         }
     }
+
 
     /// Retrieves a DPoP key as a Sendable representation so callers can
     /// reconstruct it inside their own isolation domain.
@@ -1251,9 +1293,13 @@ public actor KeychainStorage {
     /// Deletes a DPoP key from the keychain.
     /// - Parameter did: The DID associated with the key to delete
     public func deleteDPoPKey(for did: String) async throws {
+        // Invalidate DPoP material cache for this DID
+        Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+
         let keyTag = makeKey("dpopKey", did: did)
         try KeychainManager.deleteDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
     }
+
 
     // MARK: - DPoP Nonce Management
 

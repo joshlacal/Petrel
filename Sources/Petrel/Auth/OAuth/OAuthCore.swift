@@ -60,6 +60,9 @@ actor OAuthCore {
     }
 
     private var dpopMaterialCache: [String: DPoPMaterial] = [:]
+    private var activeDPoPLoadTasks: [String: Task<DPoPMaterial, Error>] = [:]
+    private var dpopKeyObserverToken: UUID?
+
 
     /// Which thumbprints hold cached nonces for which DID, so one account's logout
     /// clears exactly its own entries. Thumbprints are per-DID (each account has its
@@ -117,7 +120,30 @@ actor OAuthCore {
         self.networkService = networkService
         self.oauthConfig = oauthConfig
         self.didResolver = didResolver
+
+        // Register for DPoP key mutations across KeychainStorage instances
+        Task { [weak self] in
+            await self?.registerDPoPKeyObserver()
+        }
     }
+
+    private func registerDPoPKeyObserver() {
+        dpopKeyObserverToken = KeychainStorage.dpopKeyMutationHub.addObserver { [weak self] did in
+            guard let self else { return }
+            if let did {
+                await self.clearDPoPKeyCache(for: did)
+            } else {
+                await self.clearAllDPoPKeyCaches()
+            }
+        }
+    }
+
+    deinit {
+        if let token = dpopKeyObserverToken {
+            KeychainStorage.dpopKeyMutationHub.removeObserver(token)
+        }
+    }
+
 
     // MARK: - PKCE Helpers
 
@@ -252,22 +278,40 @@ actor OAuthCore {
         if let cached = dpopMaterialCache[did] {
             return cached
         }
-        let key = try await getOrCreateDPoPKey(for: did)
-        if let cached = dpopMaterialCache[did] {
-            return cached
+        if let existingTask = activeDPoPLoadTasks[did] {
+            return try await existingTask.value
         }
-        let material = try precomputeDPoPMaterial(for: key)
-        dpopMaterialCache[did] = material
-        return material
+
+        let loadTask = Task<DPoPMaterial, Error> {
+            let key = try await self.fetchOrGenerateDPoPKey(for: did)
+            return try self.precomputeDPoPMaterial(for: key)
+        }
+        activeDPoPLoadTasks[did] = loadTask
+
+        do {
+            let material = try await loadTask.value
+            activeDPoPLoadTasks.removeValue(forKey: did)
+            dpopMaterialCache[did] = material
+            return material
+        } catch {
+            activeDPoPLoadTasks.removeValue(forKey: did)
+            throw error
+        }
     }
 
     func clearDPoPKeyCache(for did: String) {
         dpopMaterialCache.removeValue(forKey: did)
+        activeDPoPLoadTasks.removeValue(forKey: did)?.cancel()
     }
 
     func clearAllDPoPKeyCaches() {
         dpopMaterialCache.removeAll()
+        for task in activeDPoPLoadTasks.values {
+            task.cancel()
+        }
+        activeDPoPLoadTasks.removeAll()
     }
+
 
 
     // MARK: - DPoP Proof Creation
@@ -281,6 +325,27 @@ actor OAuthCore {
         ephemeralKeyRawRepresentation: Data? = nil,
         nonce: String? = nil
     ) async throws -> String {
+        let (proof, _) = try await createDPoPProofWithMaterial(
+            for: method,
+            url: url,
+            type: type,
+            accessToken: accessToken,
+            did: did,
+            ephemeralKeyRawRepresentation: ephemeralKeyRawRepresentation,
+            nonce: nonce
+        )
+        return proof
+    }
+
+    func createDPoPProofWithMaterial(
+        for method: String,
+        url: String,
+        type: DPoPProofType,
+        accessToken: String? = nil,
+        did: String? = nil,
+        ephemeralKeyRawRepresentation: Data? = nil,
+        nonce: String? = nil
+    ) async throws -> (proof: String, thumbprint: String) {
         var targetDID: String? = did
         if targetDID == nil {
             targetDID = await accountManager.getCurrentAccount()?.did
@@ -362,20 +427,18 @@ actor OAuthCore {
         let signatureData = try privateKey.signature(for: Data(signingInput.utf8))
         let signatureBase64 = base64URLEncode(signatureData.rawRepresentation)
 
-        return "\(headerBase64).\(base64URLEncode(jwtPayloadData)).\(signatureBase64)"
+        let proof = "\(headerBase64).\(base64URLEncode(jwtPayloadData)).\(signatureBase64)"
+        return (proof, keyThumbprint)
     }
 
     func getOrCreateDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey {
-        if let cached = dpopMaterialCache[did] {
-            return cached.privateKey
-        }
+        try await getOrCreateDPoPMaterial(for: did).privateKey
+    }
 
+    private func fetchOrGenerateDPoPKey(for did: String) async throws -> P256.Signing.PrivateKey {
         do {
             if let representation = try await storage.getDPoPKeyRepresentation(for: did) {
-                let key = try P256.Signing.PrivateKey(x963Representation: representation)
-                let material = try precomputeDPoPMaterial(for: key)
-                dpopMaterialCache[did] = material
-                return key
+                return try P256.Signing.PrivateKey(x963Representation: representation)
             }
         } catch {
             throw AuthError.dpopKeyError
@@ -399,10 +462,9 @@ actor OAuthCore {
 
         let newKey = P256.Signing.PrivateKey()
         try await storage.saveDPoPKeyRepresentation(newKey.x963Representation, for: did)
-        let material = try precomputeDPoPMaterial(for: newKey)
-        dpopMaterialCache[did] = material
         return newKey
     }
+
 
 
     /// Records `nonce` in every store `createDPoPProof` reads for `did`: the in-memory
@@ -860,8 +922,8 @@ actor OAuthCore {
         let isTokenEndpoint = account.authorizationServerMetadata?.tokenEndpoint == request.url?.absoluteString
         let type: DPoPProofType = isTokenEndpoint ? .tokenRequest : .resourceAccess
 
-        // Generate DPoP
-        let proof = try await createDPoPProof(
+        // Generate DPoP and obtain its thumbprint atomically from the same material
+        let (proof, thumbprint) = try await createDPoPProofWithMaterial(
             for: request.httpMethod ?? "GET",
             url: request.url?.absoluteString ?? "",
             type: type,
@@ -873,9 +935,6 @@ actor OAuthCore {
         if !isTokenEndpoint {
             req.setValue("DPoP \(session.accessToken)", forHTTPHeaderField: "Authorization")
         }
-
-        // Get JKT for context from cached material without re-fetching or re-deriving
-        let thumbprint = (try? await getOrCreateDPoPMaterial(for: account.did))?.thumbprint
 
         return (req, AuthContext(did: account.did, jkt: thumbprint))
 

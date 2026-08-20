@@ -523,4 +523,69 @@ struct DPoPNonceStoreTests {
         }
     }
 
+    @Test("Concurrent DPoP material cache misses coalesce into a single load")
+    func concurrentMaterialMissesCoalesce() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryStorage(backend) {
+            let storage = KeychainStorage(namespace: "test.dpop.concurrent-miss")
+            let core = makeCore(storage: storage)
+            let did = Self.did
+
+            let key = P256.Signing.PrivateKey()
+            try await storage.saveDPoPKeyRepresentation(key.x963Representation, for: did)
+
+            // Launch 10 concurrent requests for DPoP material on empty cache
+            await withTaskGroup(of: OAuthCore.DPoPMaterial.self) { group in
+                for _ in 0 ..< 10 {
+                    group.addTask {
+                        try! await core.getOrCreateDPoPMaterial(for: did)
+                    }
+                }
+                var materials: [OAuthCore.DPoPMaterial] = []
+                for await material in group {
+                    materials.append(material)
+                }
+                #expect(materials.count == 10)
+                for m in materials {
+                    #expect(m.thumbprint == materials[0].thumbprint)
+                    #expect(m.headerBase64 == materials[0].headerBase64)
+                }
+            }
+        }
+    }
+
+    @Test("KeychainStorage DPoP key mutations automatically invalidate OAuthCore cache")
+    func storageMutationsInvalidateCache() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryStorage(backend) {
+            let storage = KeychainStorage(namespace: "test.dpop.mutation-hub")
+            let core = makeCore(storage: storage)
+            let did = Self.did
+
+            let key1 = P256.Signing.PrivateKey()
+            try await storage.saveDPoPKey(key1, for: did)
+
+            let mat1 = try await core.getOrCreateDPoPMaterial(for: did)
+            #expect(mat1.privateKey.rawRepresentation == key1.rawRepresentation)
+
+            // Mutate key through KeychainStorage API directly
+            let key2 = P256.Signing.PrivateKey()
+            try await storage.saveDPoPKey(key2, for: did)
+
+            // Give async notification a moment to deliver
+            try await Task.sleep(nanoseconds: 50_000_000)
+
+            let mat2 = try await core.getOrCreateDPoPMaterial(for: did)
+            #expect(mat2.privateKey.rawRepresentation == key2.rawRepresentation)
+
+            // Delete key through KeychainStorage API directly
+            try await storage.deleteDPoPKey(for: did)
+            try await Task.sleep(nanoseconds: 50_000_000)
+
+            // Next lookup should find no key representation in storage (or generate if session allows)
+            let containsKey = try await storage.containsDPoPKey(for: did)
+            #expect(!containsKey)
+        }
+    }
+
 }

@@ -105,7 +105,10 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         )
     }
 
-    func deleteDPoPKey(keyTag _: String, accessGroup _: String?) throws {}
+    func deleteDPoPKey(keyTag: String, accessGroup _: String?) throws {
+        try delete(key: keyTag, namespace: "dpopkeys", accessGroup: nil)
+    }
+
 
     /// Plants raw bytes at a storage key, bypassing validation — used to simulate
     /// corrupted keychain entries.
