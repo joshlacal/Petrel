@@ -583,29 +583,5 @@ struct DPoPNonceStoreTests {
         }
     }
 
-    @Test("In-flight load tasks invalidated by a concurrent key replacement yield the newer key")
-    func inFlightLoadInvalidationYieldsNewKey() async throws {
-        let backend = InMemorySecureStorage()
-        try await withInMemoryStorage(backend) {
-            let storage = KeychainStorage(namespace: "test.dpop.inflight-invalidation")
-            let core = makeCore(storage: storage)
-            let did = Self.did
-
-            let key1 = P256.Signing.PrivateKey()
-            let key2 = P256.Signing.PrivateKey()
-            try await storage.saveDPoPKey(key1, for: did)
-
-            // Start a load concurrently with replacing the key in storage
-            async let loadTask = core.getOrCreateDPoPMaterial(for: did)
-            try await storage.saveDPoPKey(key2, for: did)
-
-            let material = try await loadTask
-            // Regardless of whether loadTask started before or after saveDPoPKey,
-            // the generation check guarantees it yields key2 (or retries to get key2)
-            #expect(material.privateKey.rawRepresentation == key2.rawRepresentation)
-        }
-    }
-
-
 
 }

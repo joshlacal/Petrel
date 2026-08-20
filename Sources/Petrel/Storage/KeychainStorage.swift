@@ -105,10 +105,11 @@ private actor AuthContinuityMutationHub {
     }
 }
 
-/// Mutation hub for DPoP key invalidation across storage instances and actors.
+/// Mutation hub for synchronous DPoP generation bumps and awaited cache invalidation.
 public final class DPoPKeyMutationHub: @unchecked Sendable {
     private let lock = NSLock()
     private var observers: [UUID: @Sendable (String?) async -> Void] = [:]
+    private var generations: [String: UInt64] = [:]
 
     public init() {}
 
@@ -127,7 +128,20 @@ public final class DPoPKeyMutationHub: @unchecked Sendable {
         }
     }
 
+    /// Bumps synchronously, before storage mutation; no suspension is permitted between
+    /// this call and the underlying keychain operation.
+    public func bumpGeneration(for did: String) {
+        lock.withLock {
+            generations[did, default: 0] &+= 1
+        }
+    }
 
+    public func generation(for did: String) -> UInt64 {
+        lock.withLock { generations[did, default: 0] }
+    }
+
+    /// Delivers invalidation after storage has committed so readers cannot retain a
+    /// value installed while the mutation was suspended.
     public func notifyKeyMutation(for did: String?) async {
         let currentObservers: [@Sendable (String?) async -> Void] = lock.withLock {
             Array(observers.values)
@@ -136,8 +150,8 @@ public final class DPoPKeyMutationHub: @unchecked Sendable {
             await observer(did)
         }
     }
-
 }
+
 
 /// A centralized storage layer for securely storing all persistent data using the keychain.
 public actor KeychainStorage {
@@ -1210,12 +1224,9 @@ public actor KeychainStorage {
     /// Saves a DPoP key representation without moving CryptoKit key material
     /// across this actor's isolation boundary.
     func saveDPoPKeyRepresentation(_ representation: Data, for did: String) async throws {
-        // Await invalidation of DPoP material cache across all observers
-        await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
-
-        // Validate inside the actor before persisting opaque bytes.
         let key = try P256.Signing.PrivateKey(x963Representation: representation)
         let keyTag = makeKey("dpopKey", did: did)
+        Self.dpopKeyMutationHub.bumpGeneration(for: did)
         do {
             try KeychainManager.storeDPoPKeyRepresentation(
                 key.x963Representation,
@@ -1229,9 +1240,12 @@ public actor KeychainStorage {
             LogManager.logError(
                 "Failed to save DPoP key to Keychain (error: \(error)). This will likely cause authentication issues."
             )
+            await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
             throw error
         }
+        await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
     }
+
 
 
 
@@ -1292,12 +1306,17 @@ public actor KeychainStorage {
     }
 
     public func deleteDPoPKey(for did: String) async throws {
-        // Await invalidation of DPoP material cache across all observers
-        await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
-
         let keyTag = makeKey("dpopKey", did: did)
-        try KeychainManager.deleteDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
+        Self.dpopKeyMutationHub.bumpGeneration(for: did)
+        do {
+            try KeychainManager.deleteDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
+        } catch {
+            await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+            throw error
+        }
+        await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
     }
+
 
 
 

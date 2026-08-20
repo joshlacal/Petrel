@@ -25,6 +25,8 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     private var items: [String: Data] = [:]
     private var operationObserver: (@Sendable (Operation, String) -> Void)?
 
+
+
     /// Fail the next N store calls (any key), then succeed.
     var storeFailuresRemaining = 0
     /// Fail store calls whose (un-namespaced) key matches this predicate.
@@ -52,6 +54,7 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         items[fullKey(key, namespace)] = value
     }
 
+
     func retrieve(key: String, namespace: String, accessGroup _: String?) throws -> Data {
         lock.lock()
         let data = items[fullKey(key, namespace)]
@@ -67,6 +70,8 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         }
         return data
     }
+
+
 
     func delete(key: String, namespace: String, accessGroup _: String?) throws {
         lock.lock()
