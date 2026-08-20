@@ -58,10 +58,11 @@ actor OAuthCore {
         let thumbprint: String
         let headerBase64: String
     }
-
     private var dpopMaterialCache: [String: DPoPMaterial] = [:]
-    private var activeDPoPLoadTasks: [String: Task<DPoPMaterial, Error>] = [:]
-    private var dpopKeyObserverToken: UUID?
+    private var activeDPoPLoadTasks: [String: (generation: UInt64, task: Task<DPoPMaterial, Error>)] = [:]
+    private var dpopCacheGenerations: [String: UInt64] = [:]
+    /// Token for the DPoP key mutation observer. Initialized during init and cleaned up in deinit.
+    private nonisolated(unsafe) var dpopKeyObserverToken: UUID?
 
 
     /// Which thumbprints hold cached nonces for which DID, so one account's logout
@@ -105,9 +106,6 @@ actor OAuthCore {
     func setPerformActualRefresh(_ closure: @escaping @Sendable (Account, Session) async throws -> TokenRefreshResult) {
         performActualRefresh = closure
     }
-
-    // MARK: - Initialization
-
     init(
         storage: KeychainStorage,
         accountManager: AccountManaging,
@@ -121,14 +119,8 @@ actor OAuthCore {
         self.oauthConfig = oauthConfig
         self.didResolver = didResolver
 
-        // Register for DPoP key mutations across KeychainStorage instances
-        Task { [weak self] in
-            await self?.registerDPoPKeyObserver()
-        }
-    }
-
-    private func registerDPoPKeyObserver() {
-        dpopKeyObserverToken = KeychainStorage.dpopKeyMutationHub.addObserver { [weak self] did in
+        // Register synchronously on init so no storage mutation event can be missed
+        self.dpopKeyObserverToken = KeychainStorage.dpopKeyMutationHub.addObserver { [weak self] did in
             guard let self else { return }
             if let did {
                 await self.clearDPoPKeyCache(for: did)
@@ -143,6 +135,7 @@ actor OAuthCore {
             KeychainStorage.dpopKeyMutationHub.removeObserver(token)
         }
     }
+
 
 
     // MARK: - PKCE Helpers
@@ -275,42 +268,74 @@ actor OAuthCore {
     }
 
     func getOrCreateDPoPMaterial(for did: String) async throws -> DPoPMaterial {
-        if let cached = dpopMaterialCache[did] {
-            return cached
-        }
-        if let existingTask = activeDPoPLoadTasks[did] {
-            return try await existingTask.value
-        }
+        while true {
+            if let cached = dpopMaterialCache[did] {
+                return cached
+            }
+            let currentGen = dpopCacheGenerations[did, default: 0]
+            if let entry = activeDPoPLoadTasks[did], entry.generation == currentGen {
+                do {
+                    return try await entry.task.value
+                } catch {
+                    // If the task failed because of cancellation during invalidation, loop around to try again
+                    if Task.isCancelled || dpopCacheGenerations[did, default: 0] != currentGen {
+                        continue
+                    }
+                    throw error
+                }
+            }
 
-        let loadTask = Task<DPoPMaterial, Error> {
-            let key = try await self.fetchOrGenerateDPoPKey(for: did)
-            return try self.precomputeDPoPMaterial(for: key)
-        }
-        activeDPoPLoadTasks[did] = loadTask
+            let loadGen = currentGen
+            let loadTask = Task<DPoPMaterial, Error> {
+                let key = try await self.fetchOrGenerateDPoPKey(for: did)
+                return try self.precomputeDPoPMaterial(for: key)
+            }
+            activeDPoPLoadTasks[did] = (generation: loadGen, task: loadTask)
 
-        do {
-            let material = try await loadTask.value
-            activeDPoPLoadTasks.removeValue(forKey: did)
-            dpopMaterialCache[did] = material
-            return material
-        } catch {
-            activeDPoPLoadTasks.removeValue(forKey: did)
-            throw error
+            do {
+                let material = try await loadTask.value
+                // Only store and return if the generation hasn't changed since this task was created
+                if dpopCacheGenerations[did, default: 0] == loadGen {
+                    if activeDPoPLoadTasks[did]?.generation == loadGen {
+                        activeDPoPLoadTasks.removeValue(forKey: did)
+                    }
+                    dpopMaterialCache[did] = material
+                    return material
+                } else {
+                    // Generation changed (invalidated in-flight); retry
+                    continue
+                }
+            } catch {
+                if activeDPoPLoadTasks[did]?.generation == loadGen {
+                    activeDPoPLoadTasks.removeValue(forKey: did)
+                }
+                if dpopCacheGenerations[did, default: 0] != loadGen {
+                    // Invalidated; loop to retry
+                    continue
+                }
+                throw error
+            }
         }
     }
 
     func clearDPoPKeyCache(for did: String) {
+        dpopCacheGenerations[did, default: 0] &+= 1
         dpopMaterialCache.removeValue(forKey: did)
-        activeDPoPLoadTasks.removeValue(forKey: did)?.cancel()
+        if let entry = activeDPoPLoadTasks.removeValue(forKey: did) {
+            entry.task.cancel()
+        }
     }
 
     func clearAllDPoPKeyCaches() {
         dpopMaterialCache.removeAll()
-        for task in activeDPoPLoadTasks.values {
-            task.cancel()
+        for did in Array(activeDPoPLoadTasks.keys) {
+            dpopCacheGenerations[did, default: 0] &+= 1
+            if let entry = activeDPoPLoadTasks.removeValue(forKey: did) {
+                entry.task.cancel()
+            }
         }
-        activeDPoPLoadTasks.removeAll()
     }
+
 
 
 

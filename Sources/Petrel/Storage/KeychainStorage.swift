@@ -128,16 +128,15 @@ public final class DPoPKeyMutationHub: @unchecked Sendable {
     }
 
 
-    public func notifyKeyMutation(for did: String?) {
+    public func notifyKeyMutation(for did: String?) async {
         let currentObservers: [@Sendable (String?) async -> Void] = lock.withLock {
             Array(observers.values)
         }
         for observer in currentObservers {
-            Task {
-                await observer(did)
-            }
+            await observer(did)
         }
     }
+
 }
 
 /// A centralized storage layer for securely storing all persistent data using the keychain.
@@ -1210,9 +1209,9 @@ public actor KeychainStorage {
 
     /// Saves a DPoP key representation without moving CryptoKit key material
     /// across this actor's isolation boundary.
-    func saveDPoPKeyRepresentation(_ representation: Data, for did: String) throws {
-        // Invalidate DPoP material cache for this DID
-        Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+    func saveDPoPKeyRepresentation(_ representation: Data, for did: String) async throws {
+        // Await invalidation of DPoP material cache across all observers
+        await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
 
         // Validate inside the actor before persisting opaque bytes.
         let key = try P256.Signing.PrivateKey(x963Representation: representation)
@@ -1233,6 +1232,7 @@ public actor KeychainStorage {
             throw error
         }
     }
+
 
 
     /// Retrieves a DPoP key as a Sendable representation so callers can
@@ -1271,8 +1271,9 @@ public actor KeychainStorage {
     ///   - key: The private key to save
     ///   - did: The DID associated with the key
     public func saveDPoPKey(_ key: P256.Signing.PrivateKey, for did: String) async throws {
-        try saveDPoPKeyRepresentation(key.x963Representation, for: did)
+        try await saveDPoPKeyRepresentation(key.x963Representation, for: did)
     }
+
 
     /// Retrieves a DPoP key from the keychain.
     /// - Parameter did: The DID associated with the key to retrieve
@@ -1290,15 +1291,14 @@ public actor KeychainStorage {
         try getDPoPKeyRepresentation(for: did) != nil
     }
 
-    /// Deletes a DPoP key from the keychain.
-    /// - Parameter did: The DID associated with the key to delete
     public func deleteDPoPKey(for did: String) async throws {
-        // Invalidate DPoP material cache for this DID
-        Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+        // Await invalidation of DPoP material cache across all observers
+        await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
 
         let keyTag = makeKey("dpopKey", did: did)
         try KeychainManager.deleteDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
     }
+
 
 
     // MARK: - DPoP Nonce Management
