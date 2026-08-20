@@ -10,6 +10,47 @@ import Testing
     import FoundationNetworking
 #endif
 
+/// Blocks one synchronous storage retrieval until the test releases it.
+final class RetrievalGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private let releaseSemaphore = DispatchSemaphore(value: 0)
+    private var held = false
+    private var consumed = false
+    private var heldWaiter: CheckedContinuation<Void, Never>?
+
+    func enter() {
+        lock.lock()
+        if consumed {
+            lock.unlock()
+            return
+        }
+        consumed = true
+        held = true
+        let waiter = heldWaiter
+        heldWaiter = nil
+        lock.unlock()
+        waiter?.resume()
+        releaseSemaphore.wait()
+    }
+
+    func waitUntilHeld() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if held {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                heldWaiter = continuation
+                lock.unlock()
+            }
+        }
+    }
+
+    func release() {
+        releaseSemaphore.signal()
+    }
+}
+
 /// Runs `body` with an injected in-memory storage backend, always restoring the
 /// platform default afterwards.
 private func withInMemoryStorage<T>(
@@ -487,7 +528,29 @@ struct DPoPNonceStoreTests {
                 ephemeralKeyRawRepresentation: secondKey.rawRepresentation
             )
             #expect(try nonceInProofString(firstProof) == "first-flow-nonce")
+
             #expect(try nonceInProofString(secondProof) == "second-flow-nonce")
+        }
+    }
+    @Test("A persistently failing DPoP key store surfaces its storage error")
+    func persistentDPoPKeyStoreFailurePropagates() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryStorage(backend) {
+            let storage = KeychainStorage(namespace: "test.dpop.store-failure")
+            let core = makeCore(storage: storage)
+            backend.failStoreMatching = { $0 == "dpopKey.\(Self.did)" }
+
+            do {
+                _ = try await core.getOrCreateDPoPKey(for: Self.did)
+                Issue.record("Expected DPoP key creation to throw")
+            } catch let error as KeychainError {
+                guard case .itemStoreError(status: -1) = error else {
+                    Issue.record("Unexpected storage error: \(error)")
+                    return
+                }
+            } catch {
+                Issue.record("Unexpected error: \(error)")
+            }
         }
     }
     @Test("DPoP key and proof material are cached and invalidated on key clear")
@@ -523,34 +586,32 @@ struct DPoPNonceStoreTests {
         }
     }
 
-    @Test("Concurrent DPoP material cache misses coalesce into a single load")
-    func concurrentMaterialMissesCoalesce() async throws {
+    @Test("Coalesced waiters reject material invalidated during retrieval")
+    func invalidationDuringCoalescedLoadRejectsStaleMaterial() async throws {
         let backend = InMemorySecureStorage()
         try await withInMemoryStorage(backend) {
-            let storage = KeychainStorage(namespace: "test.dpop.concurrent-miss")
-            let core = makeCore(storage: storage)
+            let reader = KeychainStorage(namespace: "test.dpop.race")
+            let mutator = KeychainStorage(namespace: "test.dpop.race")
+            let core = makeCore(storage: reader)
             let did = Self.did
+            let key1 = P256.Signing.PrivateKey()
+            let key2 = P256.Signing.PrivateKey()
+            try await mutator.saveDPoPKey(key1, for: did)
 
-            let key = P256.Signing.PrivateKey()
-            try await storage.saveDPoPKeyRepresentation(key.x963Representation, for: did)
+            let gate = RetrievalGate()
+            backend.retrieveGate = gate
+            let first = Task { try await core.getOrCreateDPoPMaterial(for: did) }
+            await gate.waitUntilHeld()
+            let second = Task { try await core.getOrCreateDPoPMaterial(for: did) }
+            await Task.yield()
 
-            // Launch 10 concurrent requests for DPoP material on empty cache
-            await withTaskGroup(of: OAuthCore.DPoPMaterial.self) { group in
-                for _ in 0 ..< 10 {
-                    group.addTask {
-                        try! await core.getOrCreateDPoPMaterial(for: did)
-                    }
-                }
-                var materials: [OAuthCore.DPoPMaterial] = []
-                for await material in group {
-                    materials.append(material)
-                }
-                #expect(materials.count == 10)
-                for m in materials {
-                    #expect(m.thumbprint == materials[0].thumbprint)
-                    #expect(m.headerBase64 == materials[0].headerBase64)
-                }
-            }
+            try await mutator.saveDPoPKey(key2, for: did)
+            gate.release()
+
+            let firstMaterial = try await first.value
+            let secondMaterial = try await second.value
+            #expect(firstMaterial.privateKey.rawRepresentation == key2.rawRepresentation)
+            #expect(secondMaterial.privateKey.rawRepresentation == key2.rawRepresentation)
         }
     }
 
@@ -577,11 +638,9 @@ struct DPoPNonceStoreTests {
 
             // Delete key through KeychainStorage API directly - must be immediately visible without sleep
             try await storage.deleteDPoPKey(for: did)
-
-            let containsKey = try await storage.containsDPoPKey(for: did)
-            #expect(!containsKey)
+            // Deletion must invalidate OAuthCore, not merely remove persisted bytes.
+            let replacement = try await core.getOrCreateDPoPKey(for: did)
+            #expect(replacement.rawRepresentation != key2.rawRepresentation)
         }
     }
-
-
 }

@@ -266,7 +266,13 @@ actor OAuthCore {
         )
     }
 
+    /// A mutation can invalidate a load while the load itself is creating the key.
+    /// Three retries cover ordinary replacement races without allowing a persistently
+    /// failing store to spin forever.
+    private static let maxDPoPGenerationMismatchRetries = 3
+
     func getOrCreateDPoPMaterial(for did: String) async throws -> DPoPMaterial {
+        var generationMismatchRetries = 0
         while true {
             if let cached = dpopMaterialCache[did] {
                 return cached
@@ -281,6 +287,10 @@ actor OAuthCore {
                     continue
                 } catch {
                     if KeychainStorage.dpopKeyMutationHub.generation(for: did) != currentGen {
+                        generationMismatchRetries += 1
+                        if generationMismatchRetries > Self.maxDPoPGenerationMismatchRetries {
+                            throw error
+                        }
                         continue
                     }
                     throw error
@@ -309,6 +319,10 @@ actor OAuthCore {
                     activeDPoPLoadTasks.removeValue(forKey: did)
                 }
                 if KeychainStorage.dpopKeyMutationHub.generation(for: did) != loadGen {
+                    generationMismatchRetries += 1
+                    if generationMismatchRetries > Self.maxDPoPGenerationMismatchRetries {
+                        throw error
+                    }
                     continue
                 }
                 throw error

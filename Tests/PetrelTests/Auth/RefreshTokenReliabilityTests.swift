@@ -36,6 +36,9 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     var failRetrieveMatching: (@Sendable (String) -> Bool)?
     /// Fail delete calls whose (un-namespaced) key matches this predicate.
     var failDeleteMatching: (@Sendable (String) -> Bool)?
+    var retrieveGate: RetrievalGate?
+
+
 
     private func fullKey(_ key: String, _ namespace: String) -> String {
         "\(namespace)|\(key)"
@@ -61,6 +64,7 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         let observer = operationObserver
         let shouldFail = failRetrieveMatching?(key) ?? false
         lock.unlock()
+        retrieveGate?.enter()
         observer?(.retrieve, key)
         if shouldFail {
             throw KeychainError.itemRetrievalError(status: -25308)
