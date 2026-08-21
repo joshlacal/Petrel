@@ -15,16 +15,21 @@ import Foundation
 actor RequestDeduplicator {
     // MARK: - Types
 
-    /// Key for identifying unique requests
+    /// Key for identifying unique requests (only idempotent GET/HEAD)
     private struct RequestKey: Hashable {
         let method: String
         let url: String
-        let bodyHash: Int?
 
-        init(from request: URLRequest) {
-            method = request.httpMethod ?? "GET"
-            url = request.url?.absoluteString ?? ""
-            bodyHash = request.httpBody?.hashValue
+        init?(from request: URLRequest) {
+            let httpMethod = (request.httpMethod ?? "GET").uppercased()
+            guard httpMethod == "GET" || httpMethod == "HEAD" else {
+                return nil
+            }
+            guard let urlString = request.url?.absoluteString, !urlString.isEmpty else {
+                return nil
+            }
+            self.method = httpMethod
+            self.url = urlString
         }
     }
 
@@ -67,19 +72,21 @@ actor RequestDeduplicator {
         request: URLRequest,
         work: @escaping @Sendable () async throws -> (Data, URLResponse)
     ) async throws -> (Data, URLResponse) {
+        guard let key = RequestKey(from: request) else {
+            return try await work()
+        }
+
         // Start cleanup task on first use if needed
         if cleanupTask == nil {
-            cleanupTask = Task {
+            cleanupTask = Task { [weak self] in
                 while !Task.isCancelled {
                     // Wait 30 seconds between cleanup runs
                     try? await Task.sleep(nanoseconds: 30_000_000_000)
-
-                    cleanupExpiredRequests()
+                    guard let self else { break }
+                    await self.cleanupExpiredRequests()
                 }
             }
         }
-
-        let key = RequestKey(from: request)
 
         // Check if there's already an in-flight request
         if let existing = inFlightRequests[key] {
@@ -128,7 +135,9 @@ actor RequestDeduplicator {
     /// - Parameter request: The request to check
     /// - Returns: True if an identical request is in progress
     func isRequestInFlight(_ request: URLRequest) -> Bool {
-        let key = RequestKey(from: request)
+        guard let key = RequestKey(from: request) else {
+            return false
+        }
         if let existing = inFlightRequests[key] {
             // Check if it's not expired
             return Date().timeIntervalSince(existing.startTime) <= maxRequestAge

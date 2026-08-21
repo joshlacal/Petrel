@@ -346,6 +346,13 @@ public actor NetworkService: NetworkServiceProtocol {
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
     private(set) var authorizationServerMetadata: AuthorizationServerMetadata?
     private let requestDeduplicator = RequestDeduplicator()
+    private struct HostValidationEntry: Sendable {
+        let isValid: Bool
+        let expiration: Date
+    }
+    private var hostValidationCache: [String: HostValidationEntry] = [:]
+    private let hostValidationTTL: TimeInterval = 60.0
+    private let maxHostValidationCacheSize = 256
     private var authContinuityRevision: UInt64 = 0
     private var authContinuityRevisionExhausted = false
     private var authContinuityObserverProviderID: ObjectIdentifier?
@@ -1830,7 +1837,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
 
         // Validate URL for security
-        if !validateURL(resolvedURL) {
+        if !(await validateURL(resolvedURL)) {
             LogManager.logError("Security validation failed for URL: \(resolvedURL). This may be due to DNS resolution to private IP ranges or network configuration issues.")
             throw NetworkError.securityViolation
         }
@@ -2188,7 +2195,7 @@ public actor NetworkService: NetworkServiceProtocol {
     /// Validates the URL for security.
     /// - Parameter url: The URL to validate.
     /// - Returns: A boolean indicating whether the URL is valid.
-    private func validateURL(_ url: URL) -> Bool {
+    private func validateURL(_ url: URL) async -> Bool {
         // Ensure only http or https schemes are allowed
         guard url.scheme == "https" || url.scheme == "http" else {
             LogManager.logError("Invalid URL scheme: \(url.scheme ?? "nil")")
@@ -2198,43 +2205,78 @@ public actor NetworkService: NetworkServiceProtocol {
         // Resolve host and block private / loopback / link-local / unique-local ranges to mitigate SSRF
         guard let host = url.host, !host.isEmpty else { return false }
 
+        let normalizedHost = host.lowercased()
+
+        // Check cache first (actor-isolated, no locks needed)
+        let now = Date()
+        if let entry = hostValidationCache[normalizedHost], entry.expiration > now {
+            return entry.isValid
+        }
+
         // Quick check: if host is a literal IP, validate directly; otherwise resolve DNS
         let ips: [String]
         #if canImport(Network)
-            if IPv4Address(host) != nil || IPv6Address(host) != nil {
-                ips = [host]
+            if IPv4Address(normalizedHost) != nil || IPv6Address(normalizedHost) != nil {
+                ips = [normalizedHost]
             } else {
-                ips = resolveHostIPs(host: host)
+                ips = await Self.resolveHostIPsOffActor(host: normalizedHost)
             }
         #else
             // Linux: Simple regex check for IP literal
-            let isIPv4 = host.split(separator: ".").count == 4 && host.allSatisfy { $0.isNumber || $0 == "." }
-            let isIPv6 = host.contains(":")
+            let isIPv4 = normalizedHost.split(separator: ".").count == 4 && normalizedHost.allSatisfy { $0.isNumber || $0 == "." }
+            let isIPv6 = normalizedHost.contains(":")
             if isIPv4 || isIPv6 {
-                ips = [host]
+                ips = [normalizedHost]
             } else {
-                ips = resolveHostIPs(host: host)
+                ips = await Self.resolveHostIPsOffActor(host: normalizedHost)
             }
         #endif
 
         if ips.isEmpty {
-            LogManager.logError("Failed to resolve host: \(host)")
+            LogManager.logError("Failed to resolve host: \(normalizedHost)")
+            // Do not cache transient resolution failures so network recovery takes effect immediately
             return false
         }
 
         for ip in ips {
             if isPrivateOrReserved(ip: ip) {
-                LogManager.logError("Blocked request to private/reserved IP: \(ip) for host \(host)")
+                LogManager.logError("Blocked request to private/reserved IP: \(ip) for host \(normalizedHost)")
+                cacheValidationResult(host: normalizedHost, isValid: false, now: now)
                 return false
             }
         }
 
+        cacheValidationResult(host: normalizedHost, isValid: true, now: now)
         return true
+    }
+
+    private func cacheValidationResult(host: String, isValid: Bool, now: Date) {
+        if hostValidationCache.count >= maxHostValidationCacheSize {
+            hostValidationCache = hostValidationCache.filter { $0.value.expiration > now }
+            if hostValidationCache.count >= maxHostValidationCacheSize {
+                hostValidationCache.removeAll(keepingCapacity: true)
+            }
+        }
+        hostValidationCache[host] = HostValidationEntry(
+            isValid: isValid,
+            expiration: now.addingTimeInterval(hostValidationTTL)
+        )
+    }
+
+    private static func resolveHostIPsOffActor(host: String) async -> [String] {
+        let task = Task.detached {
+            resolveHostIPs(host: host)
+        }
+        return await withTaskCancellationHandler {
+            await task.value
+        } onCancel: {
+            task.cancel()
+        }
     }
 
     // MARK: - SSRF Hardeners
 
-    private func resolveHostIPs(host: String) -> [String] {
+    private static func resolveHostIPs(host: String) -> [String] {
         var results: [String] = []
         var hints = addrinfo()
         hints.ai_flags = AI_ADDRCONFIG
