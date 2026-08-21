@@ -17,6 +17,7 @@ import Testing
 /// refresh-persistence paths without touching the real keychain.
 final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     enum Operation {
+        case store
         case retrieve
         case delete
     }
@@ -36,6 +37,8 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     var failRetrieveMatching: (@Sendable (String) -> Bool)?
     /// Fail delete calls whose (un-namespaced) key matches this predicate.
     var failDeleteMatching: (@Sendable (String) -> Bool)?
+    /// Hook invoked before store write.
+    var beforeStore: (@Sendable (String) -> Void)?
     /// Hook invoked before items.removeValue during delete.
     var beforeDelete: (@Sendable (String) -> Void)?
     var retrieveGate: RetrievalGate?
@@ -48,15 +51,20 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
 
     func store(key: String, value: Data, namespace: String, accessGroup _: String?) throws {
         lock.lock()
-        defer { lock.unlock() }
-        if let matcher = failStoreMatching, matcher(key) {
+        let beforeHook = beforeStore
+        let shouldFail = failStoreMatching?(key) ?? false
+        let hasFailures = storeFailuresRemaining > 0
+        if hasFailures { storeFailuresRemaining -= 1 }
+        lock.unlock()
+        beforeHook?(key)
+        if shouldFail || hasFailures {
             throw KeychainError.itemStoreError(status: -1)
         }
-        if storeFailuresRemaining > 0 {
-            storeFailuresRemaining -= 1
-            throw KeychainError.itemStoreError(status: -1)
-        }
+        lock.lock()
         items[fullKey(key, namespace)] = value
+        let observer = operationObserver
+        lock.unlock()
+        observer?(.store, key)
     }
 
 

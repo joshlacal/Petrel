@@ -247,7 +247,7 @@ actor AccountManager: AccountManaging {
         let scopeDID = await storage.accountScopeDID(for: account.did)
         let beforeGen = AccountMutationHub.shared.generation(for: scopeDID)
         let mutationGen = try await storage.saveAccount(account, for: account.did)
-        if mutationGen == beforeGen &+ 1 && AccountMutationHub.shared.generation(for: scopeDID) == mutationGen {
+        if mutationGen == beforeGen + 2 && AccountMutationHub.shared.generation(for: scopeDID) == mutationGen {
             accountsCache[account.did] = (account: account, generation: mutationGen)
         }
         // If no current account is set, make this the current one
@@ -593,7 +593,7 @@ actor AccountManager: AccountManaging {
         account.bskyChatDID = bskyChatDID
 
         let mutationGen = try await storage.saveAccount(account, for: did)
-        if mutationGen == beforeGen &+ 1 && AccountMutationHub.shared.generation(for: scopeDID) == mutationGen {
+        if mutationGen == beforeGen + 2 && AccountMutationHub.shared.generation(for: scopeDID) == mutationGen {
             accountsCache[did] = (account: account, generation: mutationGen)
         }
         LogManager.logInfo(

@@ -132,7 +132,7 @@ public final class DPoPKeyMutationHub: @unchecked Sendable {
     /// this call and the underlying keychain operation.
     public func bumpGeneration(for did: String) {
         lock.withLock {
-            generations[did, default: 0] &+= 1
+            generations[did, default: 0] += 1
         }
     }
 
@@ -175,10 +175,17 @@ public final class AccountMutationHub: @unchecked Sendable {
 
     public init() {}
 
+    public func nextEpoch() -> UInt64 {
+        lock.withLock {
+            globalEpoch += 1
+            return globalEpoch
+        }
+    }
+
     @discardableResult
     public func bumpGeneration(for scopeDID: ScopeDID) -> UInt64 {
         lock.withLock {
-            globalEpoch &+= 1
+            globalEpoch += 1
             if generations.count >= 500 {
                 generations.removeAll()
             }
@@ -187,7 +194,17 @@ public final class AccountMutationHub: @unchecked Sendable {
         }
     }
     public func generation(for scopeDID: ScopeDID) -> UInt64 {
-        lock.withLock { generations[scopeDID, default: 0] }
+        lock.withLock {
+            if let gen = generations[scopeDID] {
+                return gen
+            }
+            globalEpoch += 1
+            if generations.count >= 500 {
+                generations.removeAll()
+            }
+            generations[scopeDID] = globalEpoch
+            return globalEpoch
+        }
     }
 
     @discardableResult
@@ -222,13 +239,24 @@ public actor KeychainStorage {
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
     private struct PendingSessionState {
-        var epoch: UInt64 = 0
         var knownGenerations: [String: UInt64] = [:]
     }
     private static let pendingSessionState = Mutex<PendingSessionState>(PendingSessionState())
     private static let inFlightMigrationClaims = Mutex<Set<String>>([])
     private static let completedMigrationHistory = Mutex<Set<String>>([])
     private static let maxMigrationHistorySize = 200
+
+    private static func retireMigrationClaim(_ gKey: String, completed: Bool) {
+        inFlightMigrationClaims.withLock { inFlight in
+            completedMigrationHistory.withLock { history in
+                inFlight.remove(gKey)
+                if completed {
+                    if history.count >= maxMigrationHistorySize { history.removeAll() }
+                    history.insert(gKey)
+                }
+            }
+        }
+    }
     private var authContinuityObserverToken: UUID?
     private var checkedPendingDIDs: Set<String> = []
     private func scopeKey(for did: String) -> String {
@@ -600,7 +628,6 @@ public actor KeychainStorage {
     /// Saves the gateway session for a specific account (per-DID storage for multi-account support)
     func saveGatewaySession(_ session: String, for did: String) async throws {
         let gKey = scopeKey(for: did)
-        Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
         Self.completedMigrationHistory.withLock { _ = $0.remove(gKey) }
         let key = makeKey("gatewaySession", did: did)
         let data = session.data(using: .utf8) ?? Data()
@@ -661,7 +688,7 @@ public actor KeychainStorage {
                     return migratedSession
                 }
             } catch {
-                Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
+                Self.retireMigrationClaim(gKey, completed: false)
                 throw error
             }
             LogManager.logWarning("KeychainStorage - No gateway session found for DID: \(did.prefix(20))... (including legacy locations)")
@@ -681,8 +708,12 @@ public actor KeychainStorage {
         }
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
         let gKey = scopeKey(for: did)
-        Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
-        Self.completedMigrationHistory.withLock { _ = $0.remove(gKey) }
+        Self.inFlightMigrationClaims.withLock { inFlight in
+            Self.completedMigrationHistory.withLock { history in
+                inFlight.remove(gKey)
+                history.remove(gKey)
+            }
+        }
     }
 
     private func shouldMigrateLegacyGatewaySession(for did: String) async throws -> Bool {
@@ -701,7 +732,7 @@ public actor KeychainStorage {
     private func migrateLegacyGatewaySessionIfNeeded(for did: String) async throws -> String? {
         guard try await shouldMigrateLegacyGatewaySession(for: did) else {
             let gKey = scopeKey(for: did)
-            Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
+            Self.retireMigrationClaim(gKey, completed: false)
             return nil
         }
         let gKey = scopeKey(for: did)
@@ -718,13 +749,9 @@ public actor KeychainStorage {
                         "KeychainStorage - Migrated legacy gateway session but failed to remove the source copy: \(error)"
                     )
                 }
-                Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
-                Self.completedMigrationHistory.withLock { history in
-                    if history.count >= Self.maxMigrationHistorySize { history.removeAll() }
-                    _ = history.insert(gKey)
-                }
+                Self.retireMigrationClaim(gKey, completed: true)
             } else {
-                Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
+                Self.retireMigrationClaim(gKey, completed: false)
             }
             return legacySession
         }
@@ -748,22 +775,14 @@ public actor KeychainStorage {
                         "KeychainStorage - Migrated global gateway session but failed to remove the source copy: \(error)"
                     )
                 }
-                Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
-                Self.completedMigrationHistory.withLock { history in
-                    if history.count >= Self.maxMigrationHistorySize { history.removeAll() }
-                    _ = history.insert(gKey)
-                }
+                Self.retireMigrationClaim(gKey, completed: true)
             } else {
-                Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
+                Self.retireMigrationClaim(gKey, completed: false)
             }
             return session
         }
 
-        Self.inFlightMigrationClaims.withLock { _ = $0.remove(gKey) }
-        Self.completedMigrationHistory.withLock { history in
-            if history.count >= Self.maxMigrationHistorySize { history.removeAll() }
-            _ = history.insert(gKey)
-        }
+        Self.retireMigrationClaim(gKey, completed: true)
         return nil
     }
 
@@ -1163,10 +1182,10 @@ public actor KeychainStorage {
                             }
                             checkedPendingDIDs.insert(did)
                         } catch {
+                            let token = AccountMutationHub.shared.nextEpoch()
                             Self.pendingSessionState.withLock { state in
                                 if state.knownGenerations[pKey] == nil {
-                                    state.epoch &+= 1
-                                    state.knownGenerations[pKey] = state.epoch
+                                    state.knownGenerations[pKey] = token
                                 }
                             }
                         }
@@ -1299,9 +1318,9 @@ public actor KeychainStorage {
         let data = try JSONEncoder().encode(session)
         try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         let pKey = scopeKey(for: did)
+        let token = AccountMutationHub.shared.nextEpoch()
         Self.pendingSessionState.withLock { state in
-            state.epoch &+= 1
-            state.knownGenerations[pKey] = state.epoch
+            state.knownGenerations[pKey] = token
         }
         checkedPendingDIDs.remove(did)
         LogManager.logInfo("KeychainStorage - Saved pending session for DID: \(LogManager.logDID(did))")

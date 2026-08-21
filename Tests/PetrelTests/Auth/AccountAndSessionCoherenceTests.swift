@@ -111,21 +111,27 @@ struct AccountAndSessionCoherenceTests {
         let backend = InMemorySecureStorage()
         try await withInMemoryBackend(backend) {
             let namespace = "test.coherence.failedsave"
-            let storage = KeychainStorage(namespace: namespace)
+            let storage1 = KeychainStorage(namespace: namespace)
+            let storage2 = KeychainStorage(namespace: namespace)
             let oldSession = makeSession(refreshToken: "rt-old", createdAt: Date(timeIntervalSinceNow: -600))
             let newSession = makeSession(refreshToken: "rt-new", createdAt: Date())
 
-            try await storage.saveSession(oldSession, for: testDID)
-            try await storage.savePendingSession(newSession, for: testDID)
+            try await storage1.saveSession(oldSession, for: testDID)
+            // Prime storage2's one-shot probe before saving the pending copy, so storage2 has checked pending
+            // and cached oldSession as primary.
+            let primed = try await storage2.getSession(for: testDID)
+            #expect(primed?.refreshToken == "rt-old")
+
+            try await storage1.savePendingSession(newSession, for: testDID)
             // 1. Attempt a stale write (refused before write)
             let staleSession = makeSession(refreshToken: "rt-stale", createdAt: Date(timeIntervalSinceNow: -1200))
-            try await storage.saveSession(staleSession, for: testDID)
+            try await storage1.saveSession(staleSession, for: testDID)
 
             // 2. Attempt a throwing standalone saveSession (failing during temporary save)
             let freshSession1 = makeSession(refreshToken: "rt-fresh1")
             backend.failStoreMatching = { key in key.contains("session.temp") }
             await #expect(throws: (any Error).self) {
-                try await storage.saveSession(freshSession1, for: testDID)
+                try await storage1.saveSession(freshSession1, for: testDID)
             }
             backend.failStoreMatching = nil
 
@@ -133,12 +139,13 @@ struct AccountAndSessionCoherenceTests {
             let freshSession2 = makeSession(refreshToken: "rt-fresh2")
             backend.failStoreMatching = { key in key.contains("session.temp") }
             await #expect(throws: (any Error).self) {
-                try await storage.saveAccountAndSession(makeAccount(), session: freshSession2, for: testDID)
+                try await storage1.saveAccountAndSession(makeAccount(), session: freshSession2, for: testDID)
             }
             backend.failStoreMatching = nil
 
-            // getSession must STILL find and promote the pending newSession
-            let result = try await storage.getSession(for: testDID)
+            // Reading through storage2 must STILL find and promote the pending newSession because the shared marker is preserved.
+            // (If the marker had been erroneously cleared, storage2's primed state would skip the pending probe and return oldSession).
+            let result = try await storage2.getSession(for: testDID)
             #expect(result?.refreshToken == "rt-new", "Pending marker must be preserved across stale, throwing saveSession, and failed saveAccountAndSession")
         }
     }
@@ -281,6 +288,59 @@ struct AccountAndSessionCoherenceTests {
             let nonces3 = try await storage.getDPoPNonces(for: testDID)
             #expect(nonces3?["auth.example.com"] == "nonce-123")
             #expect(retrievalCounter.withLock { $0 } == 1, "Read of stored nonce must hit positive cache with 0 backend queries")
+        }
+    }
+
+    @Test("Concurrent getGatewaySession during in-flight migration does not duplicate migration probes")
+    func concurrentGatewaySessionReadDuringMigrationDoesNotDuplicateProbes() async throws {
+        let backend = InMemorySecureStorage()
+        try await withInMemoryBackend(backend) {
+            let namespace = "test.coherence.concurrentmigration"
+            let storage1 = KeychainStorage(namespace: namespace)
+            let storage2 = KeychainStorage(namespace: namespace)
+            let account = makeAccount(did: testDID, handle: "migration.test")
+
+            try await storage1.saveAccount(account, for: testDID)
+            try await storage1.saveCurrentDID(testDID)
+
+            // Plant legacy gateway session in backend
+            backend.plant(key: "gatewaySession", namespace: namespace, data: Data("legacy-secret-session".utf8))
+            KeychainManager.clearCache()
+
+            let storeStarted = TestAsyncGate()
+            let storeContinue = DispatchSemaphore(value: 0)
+
+            backend.beforeStore = { key in
+                if key == "gatewaySession.\(testDID)" {
+                    storeStarted.open()
+                    storeContinue.wait()
+                }
+            }
+
+            let storage2Result = Mutex<String?>(nil)
+            try await withThrowingTaskGroup(of: Void.self) { group in
+                group.addTask {
+                    let res1 = try await storage1.getGatewaySession(for: testDID)
+                    #expect(res1 == "legacy-secret-session")
+                }
+                group.addTask {
+                    await storeStarted.wait()
+                    // While storage1 is persisting the migrated session (active claim in flight),
+                    // storage2 calls getGatewaySession. It must NOT start a concurrent migration attempt.
+                    let res2 = try await storage2.getGatewaySession(for: testDID)
+                    storage2Result.withLock { $0 = res2 }
+                    storeContinue.signal()
+                }
+                try await group.waitForAll()
+            }
+            backend.beforeStore = nil
+
+            // While migration was in flight, storage2 saw the in-flight claim and returned nil
+            #expect(storage2Result.withLock { $0 } == nil, "Concurrent read while migration is in-flight must respect active claim and return nil")
+
+            // After storage1 commits migration to per-DID storage, subsequent reads on storage2 return the migrated session
+            let postMigrationRead = try await storage2.getGatewaySession(for: testDID)
+            #expect(postMigrationRead == "legacy-secret-session", "Subsequent read retrieves the migrated per-DID session")
         }
     }
 }
