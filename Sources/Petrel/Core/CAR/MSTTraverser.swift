@@ -9,6 +9,13 @@ import Foundation
 // MARK: - MSTTraverser
 
 public class MSTTraverser {
+    /// Maximum allowable depth when traversing an MST.
+    ///
+    /// AT Protocol Merkle Search Trees use a fanout of 4 (2 bits per level) over SHA-256 digests
+    /// (256 bits). The theoretical maximum height for any key's prefix is 256 / 2 = 128 layers.
+    /// Any tree traversal exceeding 128 levels indicates a synthetic or cyclic structure.
+    private static let maxMSTDepth = 128
+
     private let reader: CARReader
 
     public init(reader: CARReader) {
@@ -26,9 +33,7 @@ public class MSTTraverser {
     /// keys are prefix-compressed against the previous entry, so one bad entry corrupts every
     /// key after it in the node.
     public func walkRepository(commitCID: CID, onRecord: (String, CID) throws -> Void) throws {
-        let commitHex = CARReader.cidHex(from: commitCID)
-
-        guard let commitNode = try reader.decodeBlock(for: commitHex) as? [String: Any] else {
+        guard let commitNode = try reader.decodeBlock(for: commitCID.bytes) as? [String: Any] else {
             throw CARReaderError.decodingFailed("Failed to decode commit node")
         }
 
@@ -37,70 +42,132 @@ public class MSTTraverser {
             throw CARReaderError.decodingFailed("Commit node missing 'data' CID")
         }
 
-        try walkMSTNode(cid: dataCID, prefix: "", onRecord: onRecord)
+        var visited = Set<CID>()
+        var stack: [MSTFrame] = [
+            try makeFrame(cid: dataCID, depth: 0, visited: &visited),
+        ]
+
+        while let frameIndex = stack.indices.last {
+            // 1. Process left subtree if not yet processed
+            if !stack[frameIndex].processedLeft {
+                stack[frameIndex].processedLeft = true
+                if let leftCID = stack[frameIndex].leftCID {
+                    let nextDepth = stack[frameIndex].depth + 1
+                    stack.append(try makeFrame(cid: leftCID, depth: nextDepth, visited: &visited))
+                    continue
+                }
+            }
+
+            // 2. Process next entry
+            let entryIndex = stack[frameIndex].nextEntryIndex
+            if entryIndex < stack[frameIndex].entries.count {
+                stack[frameIndex].nextEntryIndex += 1
+
+                guard let entry = stack[frameIndex].entries[entryIndex] as? [String: Any] else {
+                    throw CARReaderError.decodingFailed(
+                        "MST node \(CARReader.cidHex(from: stack[frameIndex].cid)) entry \(entryIndex) is not a map"
+                    )
+                }
+
+                // "p" — how many bytes of the previous key to keep as prefix
+                let prefixCount = try entryPrefixCount(entry, cid: stack[frameIndex].cid, index: entryIndex)
+                guard prefixCount <= stack[frameIndex].keyBytes.count else {
+                    throw CARReaderError.decodingFailed(
+                        "MST node \(CARReader.cidHex(from: stack[frameIndex].cid)) entry \(entryIndex) prefix count \(prefixCount) exceeds previous key length \(stack[frameIndex].keyBytes.count)"
+                    )
+                }
+
+                // Truncate running key buffer to prefixCount bytes
+                if stack[frameIndex].keyBytes.count > prefixCount {
+                    stack[frameIndex].keyBytes.removeSubrange(prefixCount ..< stack[frameIndex].keyBytes.count)
+                }
+
+                // "k" — key suffix as bytes
+                try appendEntryKeySuffix(from: entry, to: &stack[frameIndex].keyBytes, cid: stack[frameIndex].cid, index: entryIndex)
+
+                // Validate UTF-8 and materialize full key String once for onRecord
+                guard let fullKey = String(bytes: stack[frameIndex].keyBytes, encoding: .utf8) else {
+                    throw CARReaderError.decodingFailed(
+                        "MST node \(CARReader.cidHex(from: stack[frameIndex].cid)) entry \(entryIndex) key suffix is not valid UTF-8"
+                    )
+                }
+
+                // "v" — value CID (the record)
+                guard let valueCID = entry["v"] as? CID else {
+                    throw CARReaderError.decodingFailed(
+                        "MST node \(CARReader.cidHex(from: stack[frameIndex].cid)) entry \(entryIndex) is missing its required 'v' value CID"
+                    )
+                }
+
+                try onRecord(fullKey, valueCID)
+
+                // If this entry has a right subtree 't', push it to the stack
+                if let treeCID = entry["t"] as? CID {
+                    let nextDepth = stack[frameIndex].depth + 1
+                    stack.append(try makeFrame(cid: treeCID, depth: nextDepth, visited: &visited))
+                    continue
+                }
+            } else {
+                // Node entries completed: pop frame
+                stack.removeLast()
+            }
+        }
     }
 
-    // MARK: - MST Node Walking
+    // MARK: - Frame Construction
 
-    private func walkMSTNode(
+    private struct MSTFrame {
+        let cid: CID
+        let depth: Int
+        let leftCID: CID?
+        let entries: [Any]
+        var nextEntryIndex: Int
+        var keyBytes: [UInt8]
+        var processedLeft: Bool
+    }
+
+    private func makeFrame(
         cid: CID,
-        prefix: String,
-        onRecord: (String, CID) throws -> Void
-    ) throws {
-        let nodeHex = CARReader.cidHex(from: cid)
-
-        guard let node = try reader.decodeBlock(for: nodeHex) as? [String: Any] else {
-            throw CARReaderError.decodingFailed("Failed to decode MST node \(nodeHex)")
+        depth: Int,
+        visited: inout Set<CID>
+    ) throws -> MSTFrame {
+        guard depth <= Self.maxMSTDepth else {
+            throw CARReaderError.decodingFailed(
+                "MST depth limit exceeded (\(depth) > \(Self.maxMSTDepth)) at node \(CARReader.cidHex(from: cid))"
+            )
         }
 
-        // "l" — optional left subtree CID
-        if let leftCID = node["l"] as? CID {
-            try walkMSTNode(cid: leftCID, prefix: prefix, onRecord: onRecord)
+        guard visited.insert(cid).inserted else {
+            throw CARReaderError.decodingFailed(
+                "Cycle detected in MST: node \(CARReader.cidHex(from: cid)) has already been visited"
+            )
         }
+
+        guard let node = try reader.decodeBlock(for: cid.bytes) as? [String: Any] else {
+            throw CARReaderError.decodingFailed("Failed to decode MST node \(CARReader.cidHex(from: cid))")
+        }
+
+        let leftCID = node["l"] as? CID
 
         // "e" — entries array. Required; a node with no entries serializes as an empty array.
         guard let entries = node["e"] as? [Any] else {
             throw CARReaderError.decodingFailed(
-                "MST node \(nodeHex) is missing its required 'e' entries array"
+                "MST node \(CARReader.cidHex(from: cid)) is missing its required 'e' entries array"
             )
         }
 
-        var lastKey = prefix
+        var keyBytes = [UInt8]()
+        keyBytes.reserveCapacity(64)
 
-        for (index, rawEntry) in entries.enumerated() {
-            guard let entry = rawEntry as? [String: Any] else {
-                throw CARReaderError.decodingFailed("MST node \(nodeHex) entry \(index) is not a map")
-            }
-
-            // "p" — how many characters of the previous key to keep as prefix
-            let prefixCount = try entryPrefixCount(entry, nodeHex: nodeHex, index: index)
-            guard prefixCount <= lastKey.count else {
-                throw CARReaderError.decodingFailed(
-                    "MST node \(nodeHex) entry \(index) prefix count \(prefixCount) exceeds previous key length \(lastKey.count)"
-                )
-            }
-
-            // "k" — key suffix as bytes
-            let keySuffix = try entryKeySuffix(entry, nodeHex: nodeHex, index: index)
-
-            // Build full key: take `prefixCount` chars from previous key + suffix
-            let prefixPart = String(lastKey.prefix(prefixCount))
-            let fullKey = prefixPart + keySuffix
-            lastKey = fullKey
-
-            // "v" — value CID (the record)
-            guard let valueCID = entry["v"] as? CID else {
-                throw CARReaderError.decodingFailed(
-                    "MST node \(nodeHex) entry \(index) is missing its required 'v' value CID"
-                )
-            }
-            try onRecord(fullKey, valueCID)
-
-            // "t" — optional right subtree
-            if let treeCID = entry["t"] as? CID {
-                try walkMSTNode(cid: treeCID, prefix: prefix, onRecord: onRecord)
-            }
-        }
+        return MSTFrame(
+            cid: cid,
+            depth: depth,
+            leftCID: leftCID,
+            entries: entries,
+            nextEntryIndex: 0,
+            keyBytes: keyBytes,
+            processedLeft: false
+        )
     }
 
     // MARK: - Entry Fields
@@ -109,13 +176,13 @@ public class MSTTraverser {
     /// intermediate that already narrowed the value.
     private func entryPrefixCount(
         _ entry: [String: Any],
-        nodeHex: String,
+        cid: CID,
         index: Int
     ) throws -> Int {
         if let p = entry["p"] as? UInt64 {
             guard p <= UInt64(Int.max) else {
                 throw CARReaderError.decodingFailed(
-                    "MST node \(nodeHex) entry \(index) prefix count \(p) is out of range"
+                    "MST node \(CARReader.cidHex(from: cid)) entry \(index) prefix count \(p) is out of range"
                 )
             }
             return Int(p)
@@ -124,37 +191,40 @@ public class MSTTraverser {
         if let p = entry["p"] as? Int {
             guard p >= 0 else {
                 throw CARReaderError.decodingFailed(
-                    "MST node \(nodeHex) entry \(index) prefix count \(p) is negative"
+                    "MST node \(CARReader.cidHex(from: cid)) entry \(index) prefix count \(p) is negative"
                 )
             }
             return p
         }
 
         throw CARReaderError.decodingFailed(
-            "MST node \(nodeHex) entry \(index) is missing its required integer 'p' prefix count"
+            "MST node \(CARReader.cidHex(from: cid)) entry \(index) is missing its required integer 'p' prefix count"
         )
     }
 
-    private func entryKeySuffix(
-        _ entry: [String: Any],
-        nodeHex: String,
+    private func appendEntryKeySuffix(
+        from entry: [String: Any],
+        to buffer: inout [UInt8],
+        cid: CID,
         index: Int
-    ) throws -> String {
+    ) throws {
         if let kData = entry["k"] as? Data {
-            guard let keySuffix = String(data: kData, encoding: .utf8) else {
-                throw CARReaderError.decodingFailed(
-                    "MST node \(nodeHex) entry \(index) key suffix is not valid UTF-8"
-                )
-            }
-            return keySuffix
+            buffer.append(contentsOf: kData)
+            return
+        }
+
+        if let kBytes = entry["k"] as? [UInt8] {
+            buffer.append(contentsOf: kBytes)
+            return
         }
 
         if let kString = entry["k"] as? String {
-            return kString
+            buffer.append(contentsOf: kString.utf8)
+            return
         }
 
         throw CARReaderError.decodingFailed(
-            "MST node \(nodeHex) entry \(index) is missing its required 'k' key suffix"
+            "MST node \(CARReader.cidHex(from: cid)) entry \(index) is missing its required 'k' key suffix"
         )
     }
 }

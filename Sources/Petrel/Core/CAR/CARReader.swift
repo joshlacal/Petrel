@@ -44,8 +44,8 @@ public class CARReader {
     private let data: Data
     private var offset: Int = 0
 
-    /// Maps CID hex string → block location in the data
-    public private(set) var blockIndex: [String: BlockLocation] = [:]
+    /// Maps raw CID bytes → block location in the data
+    public private(set) var blockIndex: [Data: BlockLocation] = [:]
 
     /// CID roots from the CAR header
     public private(set) var roots: [CID] = []
@@ -59,7 +59,7 @@ public class CARReader {
     }
 
     public convenience init(fileURL: URL) throws {
-        let data = try Data(contentsOf: fileURL)
+        let data = try Data(contentsOf: fileURL, options: .alwaysMapped)
         try self.init(data: data)
     }
 
@@ -189,11 +189,9 @@ public class CARReader {
                 offset += digestLen
 
                 let cidData = data[cidStart ..< offset]
-                let cidHex = cidData.map { String(format: "%02x", $0) }.joined()
-
                 let dataOffset = offset
                 let dataLength = totalLength - (offset - blockDataStart)
-                blockIndex[cidHex] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
+                blockIndex[Data(cidData)] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
                 offset = blockEnd
                 continue
             }
@@ -217,12 +215,9 @@ public class CARReader {
             offset += digestLen
 
             let cidData = data[cidStart ..< offset]
-            let cidHex = cidData.map { String(format: "%02x", $0) }.joined()
-
             let dataOffset = offset
             let dataLength = totalLength - (offset - blockDataStart)
-
-            blockIndex[cidHex] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
+            blockIndex[Data(cidData)] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
 
             offset = blockEnd
         }
@@ -230,31 +225,102 @@ public class CARReader {
 
     // MARK: - Block Access
 
-    /// Retrieves and decodes the CBOR block for a given CID hex key.
-    public func decodeBlock(for key: String) throws -> Any? {
-        guard let location = blockIndex[key] else {
-            throw CARReaderError.blockNotFound(key)
+    /// Retrieves and decodes the CBOR block for a given CID bytes key.
+    public func decodeBlock(for cidBytes: Data) throws -> Any? {
+        guard let location = blockIndex[cidBytes] else {
+            throw CARReaderError.blockNotFound(cidBytes.hexEncodedString())
         }
 
         let blockData = data[location.dataOffset ..< (location.dataOffset + location.dataLength)]
 
         guard let cbor = try? CBOR.decode([UInt8](blockData)) else {
-            throw CARReaderError.decodingFailed("Failed to decode CBOR for block \(key)")
+            throw CARReaderError.decodingFailed("Failed to decode CBOR for block \(cidBytes.hexEncodedString())")
         }
 
         return try DAGCBOR.decodeCBORItem(cbor)
     }
 
-    /// Returns raw block data for a given CID hex key.
-    public func rawBlockData(for key: String) throws -> Data {
-        guard let location = blockIndex[key] else {
-            throw CARReaderError.blockNotFound(key)
+    /// Retrieves and decodes the CBOR block for a given CID.
+    public func decodeBlock(for cid: CID) throws -> Any? {
+        try decodeBlock(for: cid.bytes)
+    }
+
+    /// Retrieves and decodes the CBOR block for a given CID hex string key (compatibility entry point).
+    public func decodeBlock(for key: String) throws -> Any? {
+        if let hexData = Data(hexString: key), let location = blockIndex[hexData] {
+            let blockData = data[location.dataOffset ..< (location.dataOffset + location.dataLength)]
+            guard let cbor = try? CBOR.decode([UInt8](blockData)) else {
+                throw CARReaderError.decodingFailed("Failed to decode CBOR for block \(key)")
+            }
+            return try DAGCBOR.decodeCBORItem(cbor)
+        }
+        throw CARReaderError.blockNotFound(key)
+    }
+
+    /// Returns raw block data for a given CID bytes key.
+    public func rawBlockData(for cidBytes: Data) throws -> Data {
+        guard let location = blockIndex[cidBytes] else {
+            throw CARReaderError.blockNotFound(cidBytes.hexEncodedString())
         }
         return Data(data[location.dataOffset ..< (location.dataOffset + location.dataLength)])
     }
 
-    /// Returns the CID hex string for a CID struct by encoding its bytes.
+    /// Returns raw block data for a given CID.
+    public func rawBlockData(for cid: CID) throws -> Data {
+        try rawBlockData(for: cid.bytes)
+    }
+
+    /// Returns raw block data for a given CID hex string key (compatibility entry point).
+    public func rawBlockData(for key: String) throws -> Data {
+        if let hexData = Data(hexString: key), let location = blockIndex[hexData] {
+            return Data(data[location.dataOffset ..< (location.dataOffset + location.dataLength)])
+        }
+        throw CARReaderError.blockNotFound(key)
+    }
+
+    /// Returns the CID hex string for a CID struct by encoding its bytes into a single preallocated buffer.
     public static func cidHex(from cid: CID) -> String {
-        cid.bytes.map { String(format: "%02x", $0) }.joined()
+        cid.bytes.hexEncodedString()
+    }
+}
+
+// MARK: - Fast Hex Helpers
+
+extension Data {
+    func hexEncodedString() -> String {
+        let hexDigits: [UInt8] = Array("0123456789abcdef".utf8)
+        var buffer = [UInt8](repeating: 0, count: count * 2)
+        for (i, byte) in enumerated() {
+            buffer[i * 2] = hexDigits[Int(byte >> 4)]
+            buffer[i * 2 + 1] = hexDigits[Int(byte & 0x0F)]
+        }
+        return String(decoding: buffer, as: UTF8.self)
+    }
+
+    init?(hexString: String) {
+        let utf8 = Array(hexString.utf8)
+        guard utf8.count.isMultiple(of: 2) else { return nil }
+        var data = Data(capacity: utf8.count / 2)
+        for i in stride(from: 0, to: utf8.count, by: 2) {
+            guard let hi = Self.hexNibble(utf8[i]),
+                  let lo = Self.hexNibble(utf8[i + 1]) else {
+                return nil
+            }
+            data.append((hi << 4) | lo)
+        }
+        self = data
+    }
+
+    private static func hexNibble(_ byte: UInt8) -> UInt8? {
+        switch byte {
+        case UInt8(ascii: "0")...UInt8(ascii: "9"):
+            return byte - UInt8(ascii: "0")
+        case UInt8(ascii: "a")...UInt8(ascii: "f"):
+            return byte - UInt8(ascii: "a") + 10
+        case UInt8(ascii: "A")...UInt8(ascii: "F"):
+            return byte - UInt8(ascii: "A") + 10
+        default:
+            return nil
+        }
     }
 }

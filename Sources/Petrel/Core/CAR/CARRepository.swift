@@ -222,10 +222,8 @@ public enum CARRepository {
             let collection = parts.count > 0 ? String(parts[0]) : ""
             let rkey = parts.count > 1 ? String(parts[1]) : ""
 
-            let cidHex = CARReader.cidHex(from: recordCID)
-
             do {
-                let rawData = try reader.rawBlockData(for: cidHex)
+                let rawData = try reader.rawBlockData(for: recordCID.bytes)
                 let value = try decodeRecordCBOR(rawData)
 
                 let record = Record(
