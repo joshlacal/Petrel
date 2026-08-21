@@ -8,11 +8,25 @@
 import Foundation
 
 public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
-    let context: [String]
-    let id: String
-    let alsoKnownAs: [String]
-    let verificationMethod: [VerificationMethod]
-    let service: [Service]
+    public let context: [String]
+    public let id: String
+    public let alsoKnownAs: [String]
+    public let verificationMethod: [VerificationMethod]
+    public let service: [Service]
+
+    public init(
+        context: [String] = [],
+        id: String,
+        alsoKnownAs: [String] = [],
+        verificationMethod: [VerificationMethod] = [],
+        service: [Service] = []
+    ) {
+        self.context = context
+        self.id = id
+        self.alsoKnownAs = alsoKnownAs
+        self.verificationMethod = verificationMethod
+        self.service = service
+    }
 
     enum CodingKeys: String, CodingKey {
         case context = "@context"
@@ -54,10 +68,15 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
 }
 
 public struct Service: ATProtocolCodable, ATProtocolValue {
-    let id: String
-    let type: String
-    let serviceEndpoint: String
+    public let id: String
+    public let type: String
+    public let serviceEndpoint: String
 
+    public init(id: String, type: String, serviceEndpoint: String) {
+        self.id = id
+        self.type = type
+        self.serviceEndpoint = serviceEndpoint
+    }
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let otherService = other as? Service else { return false }
         return id == otherService.id && type == otherService.type
@@ -74,11 +93,17 @@ public struct Service: ATProtocolCodable, ATProtocolValue {
 }
 
 public struct VerificationMethod: ATProtocolCodable, ATProtocolValue {
-    let id: String
-    let type: String
-    let controller: String
-    let publicKeyMultibase: String
+    public let id: String
+    public let type: String
+    public let controller: String
+    public let publicKeyMultibase: String
 
+    public init(id: String, type: String, controller: String, publicKeyMultibase: String) {
+        self.id = id
+        self.type = type
+        self.controller = controller
+        self.publicKeyMultibase = publicKeyMultibase
+    }
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let otherVerificationMethod = other as? VerificationMethod else { return false }
         return id == otherVerificationMethod.id && type == otherVerificationMethod.type
