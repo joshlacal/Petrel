@@ -27,6 +27,14 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
         self.verificationMethod = verificationMethod
         self.service = service
     }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.context = try container.decodeIfPresent([String].self, forKey: .context) ?? []
+        self.id = try container.decode(String.self, forKey: .id)
+        self.alsoKnownAs = try container.decodeIfPresent([String].self, forKey: .alsoKnownAs) ?? []
+        self.verificationMethod = try container.decodeIfPresent([VerificationMethod].self, forKey: .verificationMethod) ?? []
+        self.service = try container.decodeIfPresent([Service].self, forKey: .service) ?? []
+    }
 
     enum CodingKeys: String, CodingKey {
         case context = "@context"
@@ -77,6 +85,17 @@ public struct Service: ATProtocolCodable, ATProtocolValue {
         self.type = type
         self.serviceEndpoint = serviceEndpoint
     }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.serviceEndpoint = try container.decode(String.self, forKey: .serviceEndpoint)
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, serviceEndpoint
+    }
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let otherService = other as? Service else { return false }
         return id == otherService.id && type == otherService.type
@@ -104,6 +123,18 @@ public struct VerificationMethod: ATProtocolCodable, ATProtocolValue {
         self.controller = controller
         self.publicKeyMultibase = publicKeyMultibase
     }
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try container.decode(String.self, forKey: .id)
+        self.type = try container.decode(String.self, forKey: .type)
+        self.controller = try container.decode(String.self, forKey: .controller)
+        self.publicKeyMultibase = try container.decodeIfPresent(String.self, forKey: .publicKeyMultibase) ?? ""
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case id, type, controller, publicKeyMultibase
+    }
+
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let otherVerificationMethod = other as? VerificationMethod else { return false }
         return id == otherVerificationMethod.id && type == otherVerificationMethod.type
