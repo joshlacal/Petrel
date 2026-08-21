@@ -11,7 +11,7 @@
     @preconcurrency import Crypto
 #endif
 import Foundation
-
+import Synchronization
 enum AuthContinuityStorageMutationEvent {
     case willMutate(UUID)
     case didMutate(UUID)
@@ -152,6 +152,62 @@ public final class DPoPKeyMutationHub: @unchecked Sendable {
     }
 }
 
+/// Mutation hub for synchronous Account generation bumps and awaited cache invalidation across AccountManager instances.
+public final class AccountMutationHub: @unchecked Sendable {
+    public struct ScopeDID: Hashable, Sendable {
+        public let namespace: String
+        public let accessGroup: String?
+        public let did: String
+
+        public init(namespace: String, accessGroup: String? = nil, did: String) {
+            self.namespace = namespace
+            self.accessGroup = accessGroup
+            self.did = did
+        }
+    }
+
+    private let lock = NSLock()
+    private var observers: [UUID: @Sendable (ScopeDID?) async -> Void] = [:]
+    private var generations: [ScopeDID: UInt64] = [:]
+
+    public static let shared = AccountMutationHub()
+
+    public init() {}
+
+    public func bumpGeneration(for scopeDID: ScopeDID) {
+        lock.withLock {
+            generations[scopeDID, default: 0] &+= 1
+        }
+    }
+
+    public func generation(for scopeDID: ScopeDID) -> UInt64 {
+        lock.withLock { generations[scopeDID, default: 0] }
+    }
+
+    @discardableResult
+    public func addObserver(_ observer: @escaping @Sendable (ScopeDID?) async -> Void) -> UUID {
+        let id = UUID()
+        lock.withLock {
+            observers[id] = observer
+        }
+        return id
+    }
+
+    public func removeObserver(_ id: UUID) {
+        lock.withLock {
+            _ = observers.removeValue(forKey: id)
+        }
+    }
+
+    public func notifyMutation(for scopeDID: ScopeDID?) async {
+        let currentObservers: [@Sendable (ScopeDID?) async -> Void] = lock.withLock {
+            Array(observers.values)
+        }
+        for observer in currentObservers {
+            await observer(scopeDID)
+        }
+    }
+}
 
 /// A centralized storage layer for securely storing all persistent data using the keychain.
 public actor KeychainStorage {
@@ -160,14 +216,23 @@ public actor KeychainStorage {
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
 
+    private static let pendingSessionCheckedState = Mutex<Set<String>>([])
+    private static let pendingSessionKnownState = Mutex<Set<String>>([])
+    private static let legacyGatewayMigrationState = Mutex<Set<String>>([])
+
     private var authContinuityObserverToken: UUID?
-    private var pendingSessionDIDs: Set<String> = []
-    private var attemptedLegacyGatewayMigrationDIDs: Set<String> = []
+
+    private func scopeKey(for did: String) -> String {
+        "\(namespace)|\(accessGroup ?? "")|\(did)"
+    }
+
+    public func accountScopeDID(for did: String) -> AccountMutationHub.ScopeDID {
+        AccountMutationHub.ScopeDID(namespace: namespace, accessGroup: accessGroup, did: did)
+    }
 
     private var authContinuityScope: AuthContinuityMutationHub.Scope {
         AuthContinuityMutationHub.Scope(namespace: namespace, accessGroup: accessGroup)
     }
-
     /// Initializes a new KeychainStorage instance.
     /// - Parameters:
     ///   - namespace: A unique identifier for this application's keychain items
@@ -218,12 +283,18 @@ public actor KeychainStorage {
     ///   - account: The account to save
     ///   - did: The DID of the account
     public func saveAccount(_ account: Account, for did: String) async throws {
+        let scopeDID = accountScopeDID(for: did)
+        AccountMutationHub.shared.bumpGeneration(for: scopeDID)
         let key = makeKey("account", did: did)
         let data = try JSONEncoder().encode(account)
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
-
-        // Add to the accounts list if not already present
-        try await addToAccountsList(did)
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            try await addToAccountsList(did)
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
+        } catch {
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
+            throw error
+        }
     }
 
     /// Atomically saves both account and session data to prevent inconsistent authentication states.
@@ -233,7 +304,8 @@ public actor KeychainStorage {
     ///   - session: The session to save
     ///   - did: The DID associated with both account and session
     func saveAccountAndSession(_ account: Account, session: Session, for did: String) async throws {
-        pendingSessionDIDs.remove(did)
+        let scopeDID = accountScopeDID(for: did)
+        AccountMutationHub.shared.bumpGeneration(for: scopeDID)
         let accountKey = makeKey("account", did: did)
         let sessionKey = makeKey("session", did: did)
         let tempAccountKey = makeKey("account.temp", did: did)
@@ -250,6 +322,7 @@ public actor KeychainStorage {
             LogManager.logWarning(
                 "Refusing to overwrite newer stored session with stale one (createdAt \(session.createdAt)) for DID: \(LogManager.logDID(did))"
             )
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
             return
         }
 
@@ -268,9 +341,9 @@ public actor KeychainStorage {
             LogManager.logWarning(
                 "Newer session committed while suspended; skipping stale save for DID: \(LogManager.logDID(did))"
             )
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
             return
         }
-
         do {
             // Step 1: Create backups of existing data if they exist
             if let existingAccountData = try? KeychainManager.retrieve(
@@ -334,8 +407,13 @@ public actor KeychainStorage {
             LogManager.logDebug(
                 "Account+session saved atomically and verified for DID: \(LogManager.logDID(did))"
             )
+            let pKey = scopeKey(for: did)
+            Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
+            Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
 
         } catch {
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
             LogManager.logError(
                 "Atomic account+session save failed for DID: \(LogManager.logDID(did)), error: \(error)"
             )
@@ -425,11 +503,17 @@ public actor KeychainStorage {
     /// Deletes an account from the keychain.
     /// - Parameter did: The DID of the account to delete
     public func deleteAccount(for did: String) async throws {
+        let scopeDID = accountScopeDID(for: did)
+        AccountMutationHub.shared.bumpGeneration(for: scopeDID)
         let key = makeKey("account", did: did)
-        try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
-
-        // Remove from the accounts list
-        try await removeFromAccountsList(did)
+        do {
+            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            try await removeFromAccountsList(did)
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
+        } catch {
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
+            throw error
+        }
     }
 
     /// Lists all account DIDs stored in the keychain.
@@ -495,7 +579,8 @@ public actor KeychainStorage {
 
     /// Saves the gateway session for a specific account (per-DID storage for multi-account support)
     func saveGatewaySession(_ session: String, for did: String) async throws {
-        attemptedLegacyGatewayMigrationDIDs.remove(did)
+        let gKey = scopeKey(for: did)
+        Self.legacyGatewayMigrationState.withLock { _ = $0.remove(gKey) }
         let key = makeKey("gatewaySession", did: did)
         let data = session.data(using: .utf8) ?? Data()
         LogManager.logInfo("KeychainStorage - Saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
@@ -534,7 +619,9 @@ public actor KeychainStorage {
                 )
                 throw error
             }
-            guard !attemptedLegacyGatewayMigrationDIDs.contains(did) else {
+            let gKey = scopeKey(for: did)
+            let alreadyAttempted = Self.legacyGatewayMigrationState.withLock { $0.contains(gKey) }
+            guard !alreadyAttempted else {
                 LogManager.logWarning("KeychainStorage - No gateway session found for DID: \(did.prefix(20))... (legacy migration already attempted)")
                 return nil
             }
@@ -560,7 +647,8 @@ public actor KeychainStorage {
             throw error
         }
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
-        attemptedLegacyGatewayMigrationDIDs.remove(did)
+        let gKey = scopeKey(for: did)
+        Self.legacyGatewayMigrationState.withLock { _ = $0.remove(gKey) }
     }
 
     private func shouldMigrateLegacyGatewaySession(for did: String) async throws -> Bool {
@@ -576,12 +664,11 @@ public actor KeychainStorage {
 
     /// - Throws: The underlying storage error when a legacy location could not be
     ///   read. Swallowing it would report "no gateway session" for an account whose
-    ///   session exists, sending startup validation down the re-authentication path.
     private func migrateLegacyGatewaySessionIfNeeded(for did: String) async throws -> String? {
         guard try await shouldMigrateLegacyGatewaySession(for: did) else {
-            attemptedLegacyGatewayMigrationDIDs.insert(did)
             return nil
         }
+        let gKey = scopeKey(for: did)
 
         if let legacySession = try await getLegacyGatewaySession(), !legacySession.isEmpty {
             LogManager.logInfo(
@@ -595,7 +682,7 @@ public actor KeychainStorage {
                         "KeychainStorage - Migrated legacy gateway session but failed to remove the source copy: \(error)"
                     )
                 }
-                attemptedLegacyGatewayMigrationDIDs.insert(did)
+                Self.legacyGatewayMigrationState.withLock { _ = $0.insert(gKey) }
             }
             return legacySession
         }
@@ -619,13 +706,27 @@ public actor KeychainStorage {
                         "KeychainStorage - Migrated global gateway session but failed to remove the source copy: \(error)"
                     )
                 }
-                attemptedLegacyGatewayMigrationDIDs.insert(did)
+                Self.legacyGatewayMigrationState.withLock { _ = $0.insert(gKey) }
             }
             return session
         }
 
-        attemptedLegacyGatewayMigrationDIDs.insert(did)
+        Self.legacyGatewayMigrationState.withLock { _ = $0.insert(gKey) }
         return nil
+    }
+
+    private func saveLegacyGatewaySession(_ session: String) async throws {
+        Self.legacyGatewayMigrationState.withLock { $0.removeAll() }
+        let key = makeKey("gatewaySession")
+        let data = session.data(using: .utf8) ?? Data()
+        let continuityTicket = await beginAuthContinuityMutation()
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            await endAuthContinuityMutation(continuityTicket)
+        } catch {
+            await endAuthContinuityMutation(continuityTicket)
+            throw error
+        }
     }
 
     /// Reads the pre-multi-account gateway session from its global namespace.
@@ -688,20 +789,6 @@ public actor KeychainStorage {
         try await deleteLegacyGatewaySession()
     }
 
-    private func saveLegacyGatewaySession(_ session: String) async throws {
-        attemptedLegacyGatewayMigrationDIDs.removeAll()
-        let key = makeKey("gatewaySession")
-        let data = session.data(using: .utf8) ?? Data()
-        let continuityTicket = await beginAuthContinuityMutation()
-        do {
-            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
-            await endAuthContinuityMutation(continuityTicket)
-        } catch {
-            await endAuthContinuityMutation(continuityTicket)
-            throw error
-        }
-    }
-
     private func getLegacyGatewaySession() async throws -> String? {
         let key = makeKey("gatewaySession")
         do {
@@ -733,7 +820,6 @@ public actor KeychainStorage {
     ///   - session: The session to save
     ///   - did: The DID associated with the session
     public func saveSession(_ session: Session, for did: String) async throws {
-        pendingSessionDIDs.remove(did)
         let key = makeKey("session", did: did)
         let tempKey = makeKey("session.temp", did: did)
         let backupKey = makeKey("session.backup", did: did)
@@ -841,7 +927,9 @@ public actor KeychainStorage {
             LogManager.logDebug(
                 "Session saved atomically and verified for DID: \(LogManager.logDID(did))"
             )
-
+            let pKey = scopeKey(for: did)
+            Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
+            Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
         } catch let sessionSaveError as SessionSaveError {
             LogManager.logError(
                 "Session save failed for DID: \(LogManager.logDID(did)): \(sessionSaveError)"
@@ -1006,9 +1094,12 @@ public actor KeychainStorage {
         // A pending session exists only if a refresh succeeded but the atomic save
         // failed. The server has already rotated the refresh token, so the pending
         // copy is authoritative when newer: promote it to primary.
-        // We only probe the pending copy when the primary is absent (crash recovery)
-        // or when a pending save was recorded for this DID.
-        if primary == nil || pendingSessionDIDs.contains(did) {
+        let pKey = scopeKey(for: did)
+        let hasChecked = Self.pendingSessionCheckedState.withLock { $0.contains(pKey) }
+        let isKnown = Self.pendingSessionKnownState.withLock { $0.contains(pKey) }
+        let shouldCheckPending = bypassCache || (primary == nil) || isKnown || !hasChecked
+
+        if shouldCheckPending {
             let pendingRead = await readSessionCopy(pendingKey, for: did, bypassCache: bypassCache)
             if let error = pendingRead.error { readErrors.append(error) }
             if let pending = decodeSession(pendingRead.data) {
@@ -1016,19 +1107,25 @@ public actor KeychainStorage {
                     LogManager.logInfo(
                         "Promoting pending session to primary for DID: \(LogManager.logDID(did))"
                     )
-                    if let data = try? JSONEncoder().encode(pending),
-                       (try? await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)) != nil
-                    {
-                        try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
-                        pendingSessionDIDs.remove(did)
+                    if let data = try? JSONEncoder().encode(pending) {
+                        do {
+                            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+                            try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
+                            Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
+                            Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
+                        } catch {
+                            Self.pendingSessionKnownState.withLock { _ = $0.insert(pKey) }
+                        }
                     }
                     return pending
                 } else {
                     try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
-                    pendingSessionDIDs.remove(did)
+                    Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
+                    Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
                 }
             } else if pendingRead.data == nil && pendingRead.error == nil {
-                pendingSessionDIDs.remove(did)
+                Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
+                Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
             }
         }
         if let primary {
@@ -1137,24 +1234,18 @@ public actor KeychainStorage {
 
     /// Persists a refreshed session with a single keychain write, for use when the
     /// multi-step atomic save fails after the server has already rotated the refresh
-    /// token. `getSession` prefers this copy when it is newer than the primary.
     public func savePendingSession(_ session: Session, for did: String) async throws {
         let key = makeKey("session.pending", did: did)
         let data = try JSONEncoder().encode(session)
         try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
-        pendingSessionDIDs.insert(did)
+        let pKey = scopeKey(for: did)
+        Self.pendingSessionKnownState.withLock { _ = $0.insert(pKey) }
+        Self.pendingSessionCheckedState.withLock { _ = $0.remove(pKey) }
         LogManager.logInfo("KeychainStorage - Saved pending session for DID: \(LogManager.logDID(did))")
     }
 
     /// Deletes a session from the keychain, including pending/temp/backup copies
-    /// so no recovery path can resurrect it.
-    ///
-    /// Every copy is attempted, but a copy left behind is reported: `getSession`
-    /// promotes pending/temp/backup copies, so a best-effort deletion here means a
-    /// logged-out session comes back on the next read.
-    /// - Parameter did: The DID associated with the session to delete
     public func deleteSession(for did: String) async throws {
-        pendingSessionDIDs.remove(did)
         var failures: [Error] = []
         for suffix in ["session", "session.pending", "session.temp", "session.backup"] {
             do {
@@ -1176,6 +1267,10 @@ public actor KeychainStorage {
             )
             throw first
         }
+
+        let pKey = scopeKey(for: did)
+        Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
+        Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
     }
 
     // MARK: - Session Backup and Recovery

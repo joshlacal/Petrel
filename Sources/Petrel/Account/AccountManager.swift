@@ -57,9 +57,9 @@ actor AccountManager: AccountManaging {
     /// The current active DID
     private var currentDID: String?
 
-    /// In-memory cache of accounts keyed by DID
-    private var accountsCache: [String: Account] = [:]
-    /// Whether to automatically switch to another account when the current one is removed.
+    /// In-memory cache of accounts keyed by DID with their observed storage generation
+    private var accountsCache: [String: (account: Account, generation: UInt64)] = [:]
+    private var accountMutationObserverToken: UUID?
     /// Defaults to true to preserve existing behavior. Can be toggled by higher-level services
     /// (e.g., AuthenticationService) to prevent unexpected account switching after logout.
     var autoSwitchOnRemoval: Bool = true
@@ -68,6 +68,11 @@ actor AccountManager: AccountManaging {
     /// - Parameter storage: The KeychainStorage instance to use for account data.
     init(storage: KeychainStorage) async {
         self.storage = storage
+        // Register for cross-instance account mutation events
+        accountMutationObserverToken = AccountMutationHub.shared.addObserver { [weak self] scopeDID in
+            guard let self else { return }
+            await self.invalidateAccountCache(for: scopeDID?.did)
+        }
 
         // Attempt to load the last active DID
         do {
@@ -82,6 +87,19 @@ actor AccountManager: AccountManaging {
         }
     }
 
+    deinit {
+        if let token = accountMutationObserverToken {
+            AccountMutationHub.shared.removeObserver(token)
+        }
+    }
+
+    func invalidateAccountCache(for did: String? = nil) {
+        if let did {
+            accountsCache.removeValue(forKey: did)
+        } else {
+            accountsCache.removeAll()
+        }
+    }
     /// Performs startup recovery to detect and clean up inconsistent authentication states
     /// This method is called during initialization to ensure the authentication state is consistent
     private func performStartupRecovery() async {
@@ -215,8 +233,10 @@ actor AccountManager: AccountManaging {
     /// - Parameter account: The account to add.
     func addAccount(_ account: Account) async throws {
         LogManager.logInfo("AccountManager - Adding account with DID: \(account.did)")
-        accountsCache[account.did] = account
         try await storage.saveAccount(account, for: account.did)
+        let scopeDID = await storage.accountScopeDID(for: account.did)
+        let gen = AccountMutationHub.shared.generation(for: scopeDID)
+        accountsCache[account.did] = (account: account, generation: gen)
         // If no current account is set, make this the current one
         if currentDID == nil {
             try await setCurrentAccount(did: account.did)
@@ -228,17 +248,18 @@ actor AccountManager: AccountManaging {
     /// - Parameter did: The DID of the account to update from storage.
     func updateAccountFromStorage(did: String) async throws {
         LogManager.logDebug("AccountManager - Updating internal state for DID from storage: \(did)")
-
-        // Verify the account exists in storage and update cache
+        let scopeDID = await storage.accountScopeDID(for: did)
+        let loadGen = AccountMutationHub.shared.generation(for: scopeDID)
         guard let account = try await storage.getAccount(for: did) else {
-            accountsCache.removeValue(forKey: did)
+            if AccountMutationHub.shared.generation(for: scopeDID) == loadGen {
+                accountsCache.removeValue(forKey: did)
+            }
             LogManager.logError("AccountManager - Cannot update from storage, DID not found: \(did)")
             throw AccountError.accountNotFound
         }
-        accountsCache[did] = account
-        // Add the DID to accounts list if not already present (atomic save handles this)
-        // This is mainly for consistency with the existing AccountManager state
-
+        if AccountMutationHub.shared.generation(for: scopeDID) == loadGen {
+            accountsCache[did] = (account: account, generation: loadGen)
+        }
         LogManager.logDebug("AccountManager - Successfully updated state for DID: \(did)")
     }
 
@@ -246,15 +267,23 @@ actor AccountManager: AccountManaging {
     /// - Parameter did: The DID of the account to retrieve.
     /// - Returns: The account if found, or nil if not found.
     func getAccount(did: String) async -> Account? {
-        if let cached = accountsCache[did] {
-            return cached
+        let scopeDID = await storage.accountScopeDID(for: did)
+        let currentGen = AccountMutationHub.shared.generation(for: scopeDID)
+        if let cached = accountsCache[did], cached.generation == currentGen {
+            return cached.account
         }
+        let loadGen = currentGen
         do {
-            if let account = try await storage.getAccount(for: did) {
-                accountsCache[did] = account
-                return account
+            guard let account = try await storage.getAccount(for: did) else {
+                if AccountMutationHub.shared.generation(for: scopeDID) == loadGen {
+                    accountsCache.removeValue(forKey: did)
+                }
+                return nil
             }
-            return nil
+            if AccountMutationHub.shared.generation(for: scopeDID) == loadGen {
+                accountsCache[did] = (account: account, generation: loadGen)
+            }
+            return account
         } catch {
             LogManager.logError("AccountManager - Failed to get account for DID \(did): \(error)")
             return nil
@@ -265,11 +294,14 @@ actor AccountManager: AccountManaging {
     /// - Parameter did: The DID of the account to remove.
     func removeAccount(did: String) async throws {
         LogManager.logInfo("AccountManager - Removing account with DID: \(did)")
-
-        // Delete the account from storage and cache
         accountsCache.removeValue(forKey: did)
-        try await storage.deleteAccount(for: did)
-        // If this was the current account, reset current DID
+        do {
+            try await storage.deleteAccount(for: did)
+            accountsCache.removeValue(forKey: did)
+        } catch {
+            accountsCache.removeValue(forKey: did)
+            throw error
+        }
         if currentDID == did {
             currentDID = nil
 
@@ -546,7 +578,9 @@ actor AccountManager: AccountManaging {
 
         // Save back to storage and update cache
         try await storage.saveAccount(account, for: did)
-        accountsCache[did] = account
+        let scopeDID = await storage.accountScopeDID(for: did)
+        let gen = AccountMutationHub.shared.generation(for: scopeDID)
+        accountsCache[did] = (account: account, generation: gen)
         LogManager.logInfo(
             "AccountManager - Updated service DIDs for account \(LogManager.logDID(did)): bskyAppViewDID=\(bskyAppViewDID), bskyChatDID=\(bskyChatDID)"
         )
