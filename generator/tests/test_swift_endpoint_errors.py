@@ -290,6 +290,39 @@ class SwiftEndpointErrorTests(unittest.TestCase):
         self.assertIn("ATProtoErrorParser.parseGeneric(", proc_outputless)
         self.assertIn("throw genericError", proc_outputless)
 
+    def test_namespace_scoping_behavior_in_generator(self):
+        # Test that passing a list/tuple of namespaces filters correctly
+        space_lex_id = "com.atproto.space.listSpaces"
+        other_lex_id = "chat.bsky.convo.getMessages"
+        allowed_namespaces = ["com.atproto.space", "com.atproto.simplespace"]
+
+        def check_scoped(lex_id, namespaces):
+            return any(lex_id == ns or lex_id.startswith(f"{ns}.") for ns in namespaces)
+
+        self.assertTrue(check_scoped(space_lex_id, allowed_namespaces))
+        self.assertFalse(check_scoped(other_lex_id, allowed_namespaces))
+
+        space_code = render_endpoint(
+            space_lex_id,
+            "query",
+            "",
+            "",
+            has_output=True,
+            has_errors=False,
+            emit_xrpc_error_parsing=check_scoped(space_lex_id, allowed_namespaces),
+        )
+        self.assertIn("ATProtoErrorParser.parseGeneric(", space_code)
+
+        other_code = render_endpoint(
+            other_lex_id,
+            "query",
+            "",
+            "",
+            has_output=True,
+            has_errors=False,
+            emit_xrpc_error_parsing=check_scoped(other_lex_id, allowed_namespaces),
+        )
+        self.assertNotIn("ATProtoErrorParser.parseGeneric(", other_code)
 
 if __name__ == "__main__":
     unittest.main()

@@ -5,6 +5,10 @@
 # SHA on upstream Thursday alpha drops.
 set -euo pipefail
 SHA="${1:?usage: vendor-space-lexicons.sh <atproto-commit-sha>}"
+if [[ ! "$SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
+  echo "Error: Commit SHA must be a full 40-character hexadecimal commit hash (got: '$SHA')" >&2
+  exit 1
+fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT

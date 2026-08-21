@@ -274,13 +274,21 @@ async def generate_swift_from_lexicons_recursive(
                 type_key = f"{lexicon_id}#{type_name}" if type_name != 'main' else lexicon_id
                 type_dict[type_key] = f"{swift_lex_id}{swift_type_name}"
 
+        should_emit_xrpc_error_parsing = False
+        if isinstance(emit_xrpc_error_parsing, bool):
+            should_emit_xrpc_error_parsing = emit_xrpc_error_parsing
+        elif isinstance(emit_xrpc_error_parsing, (list, tuple, set)):
+            should_emit_xrpc_error_parsing = any(
+                lexicon_id == ns or lexicon_id.startswith(f"{ns}.")
+                for ns in emit_xrpc_error_parsing
+            )
+
         swift_code = SwiftCodeGenerator(
             lexicon,
             cycle_detector,
             emit_server_contracts=emit_server_contracts,
-            emit_xrpc_error_parsing=emit_xrpc_error_parsing,
+            emit_xrpc_error_parsing=should_emit_xrpc_error_parsing,
         ).convert()
-
         if overlay:
             # Overlay files compile in a separate module and need the core import.
             swift_code = swift_code.replace('import Foundation', 'import Foundation\nimport Petrel', 1)
@@ -735,7 +743,7 @@ async def run_manifest(manifest_path, language='both', graph_path=None):
             overlay=overlay, package_name=package_name,
             core_namespace_roots=core_namespace_roots,
             emit_server_contracts=bool(swift_cfg.get('emit_server_contracts', False)),
-            emit_xrpc_error_parsing=bool(swift_cfg.get('emit_xrpc_error_parsing', False)),
+            emit_xrpc_error_parsing=swift_cfg.get('emit_xrpc_error_parsing', False),
         ))
     kotlin_cfg = manifest.get('kotlin')
     if kotlin_cfg and language in ('kotlin', 'both'):

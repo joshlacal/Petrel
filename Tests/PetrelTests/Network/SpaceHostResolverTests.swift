@@ -161,6 +161,32 @@ struct SpaceHostResolverTests {
         #expect(e.spaceHost == URL(string: "https://pds.test")!)
     }
 
+    @Test("falls back to #atproto_pds when #atproto_space_host is insecure non-loopback http")
+    func fallbackWhenSpaceHostIsInsecureHTTP() throws {
+        let d = doc(
+            services: [
+                ("#atproto_space_host", "http://insecure-space.example.com"),
+                ("#atproto_pds", "https://pds.example.com")
+            ],
+            verificationMethods: ["#atproto"]
+        )
+        let e = try SpaceAuthorityEndpoints.extract(from: d)
+        #expect(e.spaceHost == URL(string: "https://pds.example.com")!)
+    }
+
+    @Test("accepts loopback http for #atproto_space_host")
+    func acceptsLoopbackHTTP() throws {
+        let d = doc(
+            services: [
+                ("#atproto_space_host", "http://127.0.0.1:8080"),
+                ("#atproto_pds", "https://pds.example.com")
+            ],
+            verificationMethods: ["#atproto"]
+        )
+        let e = try SpaceAuthorityEndpoints.extract(from: d)
+        #expect(e.spaceHost == URL(string: "http://127.0.0.1:8080")!)
+    }
+
     @Test("throws when service matches type but not #atproto_space_host or #atproto_pds id")
     func throwsOnTypeMatchOnly() {
         let d = DIDDocument(

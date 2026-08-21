@@ -12,7 +12,7 @@
   },
   "swift": {
     "output": "Sources/Petrel/Generated",
-    "emit_xrpc_error_parsing": true
+    "emit_xrpc_error_parsing": ["com.atproto.space", "com.atproto.simplespace"]
   },
   "kotlin": {
     "output": "kotlin/src/main/kotlin/blue/catbird/petrel/generated"

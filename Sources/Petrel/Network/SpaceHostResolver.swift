@@ -29,13 +29,18 @@ public struct SpaceAuthorityEndpoints: Sendable, Equatable {
 extension SpaceAuthorityEndpoints {
     /// Pure extraction per spec: #atproto_space_host → #atproto_pds fallback;
     /// #atproto_space → #atproto fallback. Throws if no host at all.
+    /// Filters candidates to authenticated-request-safe absolute hosts (https or loopback http).
     public static func extract(from doc: DIDDocument) throws -> SpaceAuthorityEndpoints {
         let spaceHostURL = doc.service.lazy
             .filter { service in
                 service.id == "#atproto_space_host" || service.id.hasSuffix("#atproto_space_host")
             }
-            .compactMap { service in
-                URL(string: service.serviceEndpoint)
+            .compactMap { service -> URL? in
+                guard let url = URL(string: service.serviceEndpoint),
+                      isSecureOrLoopback(url) else {
+                    return nil
+                }
+                return url
             }
             .first
 
@@ -43,8 +48,12 @@ extension SpaceAuthorityEndpoints {
             .filter { service in
                 service.id == "#atproto_pds" || service.id.hasSuffix("#atproto_pds")
             }
-            .compactMap { service in
-                URL(string: service.serviceEndpoint)
+            .compactMap { service -> URL? in
+                guard let url = URL(string: service.serviceEndpoint),
+                      isSecureOrLoopback(url) else {
+                    return nil
+                }
+                return url
             }
             .first
 
@@ -62,6 +71,15 @@ extension SpaceAuthorityEndpoints {
             spaceHost: hostURL,
             signingKeyFragment: signingKeyFragment
         )
+    }
+
+    private static func isSecureOrLoopback(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        if scheme == "https" { return true }
+        if scheme == "http", let host = url.host?.lowercased() {
+            return host == "127.0.0.1" || host == "localhost" || host == "::1"
+        }
+        return false
     }
 }
 

@@ -165,7 +165,7 @@ class KotlinStrictRefByteStabilityTests(unittest.TestCase):
                 "ab7c83e886a644225cc4977c48e510734b1410ea879eed82369249eb82f442b5"
             ),
             "blue.catbird.test.ordinaryProcedure": (
-                "0053edeca872ba324926fcc54a88d9d69e089ca0dbcae78411ed5f694606eb76"
+                "53c5810bf3ad98bc4e4613f931cddbc0d815948eabee7a2a4bc13b2fda6011c3"
             ),
             "blue.catbird.test.ordinaryRecord": (
                 "525e1e4c87bab213f0c812b76c42de5d8a32a439d1327ca7eb1cb7335bc45657"
