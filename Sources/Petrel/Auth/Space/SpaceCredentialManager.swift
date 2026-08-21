@@ -15,29 +15,32 @@ import Foundation
 
 // MARK: - SpaceCredential
 
-public struct SpaceCredential: Sendable, Equatable {
+public struct SpaceCredential: Sendable {
     public let token: String
     public let expiresAt: Date
     public let keyRawRepresentation: Data
 
-    public init(token: String, expiresAt: Date, keyRawRepresentation: Data) {
+    init(token: String, expiresAt: Date, keyRawRepresentation: Data) {
         self.token = token
         self.expiresAt = expiresAt
         self.keyRawRepresentation = keyRawRepresentation
     }
 }
 
+extension SpaceCredential: Equatable {}
+
 // MARK: - SpaceCredentialError
 
-public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
+enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     case missingDelegationToken
     case exchangeFailed(statusCode: Int, message: String)
     case invalidToken(String)
     case invalidResponse
     case invalidKey
     case invalidSpaceRef(String)
+    case insecureURL(String)
 
-    public var errorDescription: String? {
+    var errorDescription: String? {
         switch self {
         case .missingDelegationToken:
             return "Failed to obtain delegation token for space"
@@ -51,6 +54,8 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
             return "Failed to initialize cryptographic key"
         case .invalidSpaceRef(let ref):
             return "Invalid space reference: \(ref)"
+        case .insecureURL(let url):
+            return "Refusing authenticated request to insecure non-HTTPS URL: \(url)"
         }
     }
 }
@@ -115,9 +120,13 @@ enum SpaceDPoP {
 
     /// Decode a JWT payload without verification (for exp extraction).
     static func payload(ofJWT jwt: String) throws -> [String: Any] {
-        let parts = jwt.split(separator: ".")
-        guard parts.count >= 2 else {
-            throw SpaceCredentialError.invalidToken("Malformed JWT: expected at least 2 parts")
+        let parts = jwt.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              !parts[0].isEmpty,
+              !parts[1].isEmpty,
+              !parts[2].isEmpty
+        else {
+            throw SpaceCredentialError.invalidToken("Malformed JWT: expected exactly 3 non-empty parts")
         }
 
         var s = String(parts[1])
@@ -142,7 +151,7 @@ enum SpaceDPoP {
 // MARK: - SpaceCredentialManager
 
 public actor SpaceCredentialManager {
-    public typealias DelegationTokenProvider = @Sendable (SpaceRef) async throws -> String
+    typealias DelegationTokenProvider = @Sendable (SpaceRef) async throws -> String
 
     private let client: ATProtoClient
     private let resolver: SpaceHostResolver
@@ -151,6 +160,7 @@ public actor SpaceCredentialManager {
 
     private var cache: [SpaceRef: SpaceCredential] = [:]
     private var inFlight: [SpaceRef: Task<SpaceCredential, Error>] = [:]
+    private var generations: [SpaceRef: UInt64] = [:]
 
     public init(
         client: ATProtoClient,
@@ -196,22 +206,35 @@ public actor SpaceCredentialManager {
             return try await inFlightTask.value
         }
 
+        let currentGeneration = generations[space, default: 0]
         let task = Task { [weak self] () -> SpaceCredential in
             guard let self else {
                 throw SpaceCredentialError.invalidResponse
             }
-            return try await self.exchangeCredential(for: space)
+            let cred = try await self.exchangeCredential(for: space)
+            try Task.checkCancellation()
+            return cred
         }
 
         inFlight[space] = task
-        defer { inFlight.removeValue(forKey: space) }
+        defer {
+            if inFlight[space] == task {
+                inFlight.removeValue(forKey: space)
+            }
+        }
 
         do {
             let credential = try await task.value
+            try Task.checkCancellation()
+            guard generations[space, default: 0] == currentGeneration else {
+                throw CancellationError()
+            }
             cache[space] = credential
             return credential
         } catch {
-            cache.removeValue(forKey: space)
+            if generations[space, default: 0] == currentGeneration {
+                cache.removeValue(forKey: space)
+            }
             throw error
         }
     }
@@ -219,12 +242,18 @@ public actor SpaceCredentialManager {
     /// Drop cached credential (e.g. on SpaceDeleted).
     public func invalidate(_ space: SpaceRef) {
         cache.removeValue(forKey: space)
+        generations[space, default: 0] += 1
+        inFlight.removeValue(forKey: space)?.cancel()
     }
 
     /// Performs an authenticated GET against an arbitrary repo host:
     /// Authorization: DPoP <credential> plus a per-request DPoP proof with
     /// htm/htu/iat/jti and ath = base64url(SHA256(credential)).
     public func get(url: URL, space: SpaceRef) async throws -> (Data, HTTPURLResponse) {
+        guard Self.isSecureOrLoopback(url) else {
+            throw SpaceCredentialError.insecureURL(url.absoluteString)
+        }
+
         let cred = try await credential(for: space)
         guard let privateKey = try? P256.Signing.PrivateKey(rawRepresentation: cred.keyRawRepresentation) else {
             throw SpaceCredentialError.invalidKey
@@ -252,6 +281,15 @@ public actor SpaceCredentialManager {
 
     // MARK: - Private Helpers
 
+    private static func isSecureOrLoopback(_ url: URL) -> Bool {
+        guard let scheme = url.scheme?.lowercased() else { return false }
+        if scheme == "https" { return true }
+        if scheme == "http", let host = url.host?.lowercased() {
+            return host == "127.0.0.1" || host == "localhost" || host == "::1"
+        }
+        return false
+    }
+
     private func exchangeCredential(for space: SpaceRef) async throws -> SpaceCredential {
         let authorityDID = space.spaceDID
         guard !authorityDID.isEmpty else {
@@ -268,6 +306,10 @@ public actor SpaceCredentialManager {
             exchangeURL = endpoints.spaceHost.appending(path: "xrpc/com.atproto.space.getSpaceCredential")
         } else {
             exchangeURL = endpoints.spaceHost.appendingPathComponent("xrpc/com.atproto.space.getSpaceCredential")
+        }
+
+        guard Self.isSecureOrLoopback(exchangeURL) else {
+            throw SpaceCredentialError.insecureURL(exchangeURL.absoluteString)
         }
 
         let htu = canonicalHTU(exchangeURL)

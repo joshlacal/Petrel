@@ -236,9 +236,7 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
 /// the public AT-URI grammar admits at most two path segments, so a space ref
 /// does not parse as one, and its authority must be a DID rather than any AT
 /// identifier — a space's identity and membership are keyed on DIDs.
-public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible,
-    ExpressibleByStringLiteral
-{
+public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     /// The DID of the account that is the space's authority.
     public let spaceDID: String
 
@@ -329,15 +327,6 @@ public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameter
 
     public func toCBORValue() throws -> Any {
         return uriString()
-    }
-    public init(stringLiteral value: String) {
-        if let ref = try? SpaceRef(uriString: value) {
-            self = ref
-        } else {
-            self.spaceDID = value
-            self.spaceType = ""
-            self.skey = ""
-        }
     }
 }
 public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible,

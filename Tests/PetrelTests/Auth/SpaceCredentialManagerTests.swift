@@ -9,6 +9,9 @@
     @preconcurrency import Crypto
 #endif
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 import Synchronization
 import Testing
 @testable import Petrel
@@ -125,6 +128,37 @@ struct SpaceDPoPTests {
             .replacingOccurrences(of: "/", with: "_")
             .replacingOccurrences(of: "=", with: "")
         #expect(payload["ath"] as? String == expected)
+    }
+
+    @Test("payload(ofJWT:) throws on malformed JWT segments")
+    func malformedJWTPayload() throws {
+        // 1 part
+        #expect(throws: SpaceCredentialError.self) {
+            _ = try SpaceDPoP.payload(ofJWT: "onlyonepart")
+        }
+
+        // 2 parts
+        #expect(throws: SpaceCredentialError.self) {
+            _ = try SpaceDPoP.payload(ofJWT: "header.payload")
+        }
+
+        // 4 parts
+        #expect(throws: SpaceCredentialError.self) {
+            _ = try SpaceDPoP.payload(ofJWT: "header.payload.sig.extra")
+        }
+
+        // Empty parts
+        #expect(throws: SpaceCredentialError.self) {
+            _ = try SpaceDPoP.payload(ofJWT: "header..sig")
+        }
+
+        #expect(throws: SpaceCredentialError.self) {
+            _ = try SpaceDPoP.payload(ofJWT: ".payload.sig")
+        }
+
+        #expect(throws: SpaceCredentialError.self) {
+            _ = try SpaceDPoP.payload(ofJWT: "header.payload.")
+        }
     }
 }
 
@@ -329,6 +363,28 @@ struct SpaceCredentialManagerTests {
         #expect(proofPayload["ath"] as? String == expectedATH)
     }
 
+    @Test("get() rejects non-HTTPS non-loopback URLs")
+    func rejectsInsecureURLs() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token" }
+        )
+
+        let insecureURL = URL(string: "http://insecure.repo.test/xrpc/com.atproto.space.getRecord")!
+        await #expect(throws: SpaceCredentialError.self) {
+            _ = try await manager.get(url: insecureURL, space: space)
+        }
+    }
+
     @Test("invalidate drops cache; next call re-exchanges")
     func invalidation() async throws {
         let session = makeMockSession()
@@ -389,6 +445,89 @@ struct SpaceCredentialManagerTests {
 
         _ = try await manager.credential(for: space)
         #expect(exchangeCount.withLock { $0 } == 2)
+    }
+
+    @Test("invalidation while exchange is in flight discards the stale exchange result")
+    func invalidationDuringInFlightExchange() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+        let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+        let credentialJWT = makeMockCredentialJWT(exp: expTime)
+
+        let exchangeCount = Mutex<Int>(0)
+        let delegationAttempts = Mutex<Int>(0)
+        let slowExchangeGate = Mutex<Bool>(false)
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+
+            if urlString.contains("plc.directory") || urlString.contains(".well-known/did.json") {
+                let resp = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (resp, Data(self.didDocJSON.utf8))
+            }
+
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                exchangeCount.withLock { $0 += 1 }
+                let resp = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                let body = try! JSONEncoder().encode(["credential": credentialJWT])
+                return (resp, body)
+            }
+
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in
+                delegationAttempts.withLock { $0 += 1 }
+                // Pause if gate is enabled
+                if slowExchangeGate.withLock({ $0 }) {
+                    try await Task.sleep(nanoseconds: 100_000_000)
+                }
+                return "mock-delegation-token"
+            }
+        )
+
+        slowExchangeGate.withLock { $0 = true }
+
+        // Start first exchange in background
+        async let backgroundCred: SpaceCredential = manager.credential(for: space)
+
+        // Invalidate while in-flight
+        try await Task.sleep(nanoseconds: 10_000_000)
+        await manager.invalidate(space)
+
+        // The background task that was invalidated should throw (CancellationError)
+        do {
+            _ = try await backgroundCred
+            // If it didn't throw before completion, next call must still re-exchange
+        } catch {
+            // Expected cancellation
+        }
+
+        slowExchangeGate.withLock { $0 = false }
+
+        // Subsequent call must perform a fresh exchange, not use a stale cached result
+        let cred = try await manager.credential(for: space)
+        #expect(cred.token == credentialJWT)
+        #expect(delegationAttempts.withLock { $0 } == 2)
     }
 
     @Test("renews credential when within 60s of expiry")
