@@ -274,6 +274,15 @@ async def generate_swift_from_lexicons_recursive(
                 type_key = f"{lexicon_id}#{type_name}" if type_name != 'main' else lexicon_id
                 type_dict[type_key] = f"{swift_lex_id}{swift_type_name}"
 
+        should_emit_server_contracts = False
+        if isinstance(emit_server_contracts, bool):
+            should_emit_server_contracts = emit_server_contracts
+        elif isinstance(emit_server_contracts, (list, tuple, set)):
+            should_emit_server_contracts = any(
+                lexicon_id == ns or lexicon_id.startswith(f"{ns}.")
+                for ns in emit_server_contracts
+            )
+
         should_emit_xrpc_error_parsing = False
         if isinstance(emit_xrpc_error_parsing, bool):
             should_emit_xrpc_error_parsing = emit_xrpc_error_parsing
@@ -286,7 +295,7 @@ async def generate_swift_from_lexicons_recursive(
         swift_code = SwiftCodeGenerator(
             lexicon,
             cycle_detector,
-            emit_server_contracts=emit_server_contracts,
+            emit_server_contracts=should_emit_server_contracts,
             emit_xrpc_error_parsing=should_emit_xrpc_error_parsing,
         ).convert()
         if overlay:
@@ -742,7 +751,7 @@ async def run_manifest(manifest_path, language='both', graph_path=None):
             exclude_namespaces=exclude, reference_dirs=reference_dirs,
             overlay=overlay, package_name=package_name,
             core_namespace_roots=core_namespace_roots,
-            emit_server_contracts=bool(swift_cfg.get('emit_server_contracts', False)),
+            emit_server_contracts=swift_cfg.get('emit_server_contracts', False),
             emit_xrpc_error_parsing=swift_cfg.get('emit_xrpc_error_parsing', False),
         ))
     kotlin_cfg = manifest.get('kotlin')

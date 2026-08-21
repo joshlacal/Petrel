@@ -1,4 +1,6 @@
+import asyncio
 import hashlib
+import json
 import pathlib
 import subprocess
 import sys
@@ -6,13 +8,13 @@ import tempfile
 import textwrap
 import unittest
 
-
 GENERATOR_DIR = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(GENERATOR_DIR))
 
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
 
+from main import generate_swift_from_lexicons_recursive
 
 SPACE_LEXICON = {
     "lexicon": 1,
@@ -47,6 +49,30 @@ QUERY_LEXICON = {
                 },
             },
             "errors": [{"name": "RecordNotFound"}],
+        }
+    },
+}
+
+BSKY_QUERY_LEXICON = {
+    "lexicon": 1,
+    "id": "app.bsky.feed.getPostThread",
+    "defs": {
+        "main": {
+            "type": "query",
+            "parameters": {
+                "type": "params",
+                "required": ["uri"],
+                "properties": {"uri": {"type": "string"}},
+            },
+            "output": {
+                "encoding": "application/json",
+                "schema": {
+                    "type": "object",
+                    "required": ["thread"],
+                    "properties": {"thread": {"type": "string"}},
+                },
+            },
+            "errors": [{"name": "NotFound"}],
         }
     },
 }
@@ -162,6 +188,46 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         self.assertIn("public protocol ServerHandler", generated)
         self.assertIn("parameters: Parameters, input: Void", generated)
         self.assertIn("async throws -> Output", generated)
+
+    def test_server_contracts_are_namespace_scoped(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = pathlib.Path(temp_dir)
+            lexicons_dir = temp_path / "lexicons"
+            output_dir = temp_path / "output"
+            lexicons_dir.mkdir()
+            output_dir.mkdir()
+
+            (lexicons_dir / "com.atproto.space.getRecord.json").write_text(
+                json.dumps(QUERY_LEXICON),
+                encoding="utf-8",
+            )
+            (lexicons_dir / "app.bsky.feed.getPostThread.json").write_text(
+                json.dumps(BSKY_QUERY_LEXICON),
+                encoding="utf-8",
+            )
+
+            asyncio.run(
+                generate_swift_from_lexicons_recursive(
+                    str(lexicons_dir),
+                    str(output_dir),
+                    emit_server_contracts=["com.atproto.space", "com.atproto.simplespace"],
+                )
+            )
+
+            space_file = output_dir / "Lexicons/Com/Atproto/ComAtprotoSpaceGetRecord.swift"
+            bsky_file = output_dir / "Lexicons/App/Bsky/AppBskyFeedGetPostThread.swift"
+
+            self.assertTrue(space_file.exists(), f"Expected {space_file} to exist")
+            self.assertTrue(bsky_file.exists(), f"Expected {bsky_file} to exist")
+
+            space_code = space_file.read_text(encoding="utf-8")
+            bsky_code = bsky_file.read_text(encoding="utf-8")
+
+            self.assertIn("public protocol ServerHandler", space_code)
+            self.assertIn("public static let endpointDescriptor", space_code)
+
+            self.assertNotIn("public protocol ServerHandler", bsky_code)
+            self.assertNotIn("public static let endpointDescriptor", bsky_code)
 
     def test_server_contract_input_reachable_optional_field_is_presence_aware(self):
         generated = SwiftCodeGenerator(
