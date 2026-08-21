@@ -290,6 +290,6 @@ public enum CARRepository {
             unsignedIntegerPolicy: .stringifyAboveIntMax
         )
 
-        return try JSONCoders.defaultDecoder.decode(CARJSONValue.self, from: jsonData).value
+        return try JSONCoders.decode(CARJSONValue.self, from: jsonData).value
     }
 }

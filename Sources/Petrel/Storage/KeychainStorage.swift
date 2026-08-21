@@ -324,7 +324,7 @@ public actor KeychainStorage {
         let scopeDID = accountScopeDID(for: did)
         AccountMutationHub.shared.bumpGeneration(for: scopeDID)
         let key = makeKey("account", did: did)
-        let data = try JSONCoders.defaultEncoder.encode(account)
+        let data = try JSONCoders.encode(account)
         do {
             try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
             try await addToAccountsList(did)
@@ -354,8 +354,8 @@ public actor KeychainStorage {
         let backupAccountKey = makeKey("account.backup", did: did)
         let backupSessionKey = makeKey("session.backup", did: did)
 
-        let accountData = try JSONCoders.defaultEncoder.encode(account)
-        let sessionData = try JSONCoders.defaultEncoder.encode(session)
+        let accountData = try JSONCoders.encode(account)
+        let sessionData = try JSONCoders.encode(session)
 
         // Newest-wins guard: refresh tokens are single-use and rotate on every refresh,
         // so overwriting a newer session with an older one bricks the account.
@@ -427,8 +427,8 @@ public actor KeychainStorage {
                 key: sessionKey, namespace: namespace, accessGroup: accessGroup
             )
 
-            let verifiedAccount = try JSONCoders.defaultDecoder.decode(Account.self, from: verificationAccountData)
-            let verifiedSession = try JSONCoders.defaultDecoder.decode(Session.self, from: verificationSessionData)
+            let verifiedAccount = try JSONCoders.decode(Account.self, from: verificationAccountData)
+            let verifiedSession = try JSONCoders.decode(Session.self, from: verificationSessionData)
 
             // Basic verification that both have required fields
             guard !verifiedAccount.did.isEmpty, !verifiedSession.accessToken.isEmpty else {
@@ -536,7 +536,7 @@ public actor KeychainStorage {
         let key = makeKey("account", did: did)
         do {
             let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
-            return try JSONCoders.defaultDecoder.decode(Account.self, from: data)
+            return try JSONCoders.decode(Account.self, from: data)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
             LogManager.logError(
@@ -580,7 +580,7 @@ public actor KeychainStorage {
             throw error
         }
         do {
-            return try JSONCoders.defaultDecoder.decode([String].self, from: data)
+            return try JSONCoders.decode([String].self, from: data)
         } catch {
             // Reported as a distinct error so the write paths can rebuild the list;
             // a storage failure above must never be repaired by overwriting.
@@ -905,7 +905,7 @@ public actor KeychainStorage {
 
         let data: Data
         do {
-            data = try JSONCoders.defaultEncoder.encode(session)
+            data = try JSONCoders.encode(session)
         } catch {
             LogManager.logError(
                 "Failed to encode session for DID: \(LogManager.logDID(did)), error: \(error)"
@@ -965,7 +965,7 @@ public actor KeychainStorage {
             // Step 4: Verify the save was successful by reading it back
             do {
                 let verificationData = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
-                let verifiedSession = try JSONCoders.defaultDecoder.decode(Session.self, from: verificationData)
+                let verifiedSession = try JSONCoders.decode(Session.self, from: verificationData)
 
                 // Comprehensive verification that the session has required fields
                 guard !verifiedSession.accessToken.isEmpty,
@@ -1171,7 +1171,7 @@ public actor KeychainStorage {
                     LogManager.logInfo(
                         "Promoting pending session to primary for DID: \(LogManager.logDID(did))"
                     )
-                    if let data = try? JSONCoders.defaultEncoder.encode(pending) {
+                    if let data = try? JSONCoders.encode(pending) {
                         do {
                             try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
                             try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
@@ -1245,7 +1245,7 @@ public actor KeychainStorage {
         LogManager.logInfo(
             "Session recovered from \(label) location for DID: \(LogManager.logDID(did))"
         )
-        if let data = try? JSONCoders.defaultEncoder.encode(recovered),
+        if let data = try? JSONCoders.encode(recovered),
            (try? await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)) != nil
         {
             try? await KeychainManager.deleteAsync(key: sourceKey, namespace: namespace, accessGroup: accessGroup)
@@ -1278,7 +1278,7 @@ public actor KeychainStorage {
     /// Decodes a session from optional raw keychain data, returning nil on any failure.
     private func decodeSession(_ data: Data?) -> Session? {
         guard let data else { return nil }
-        return try? JSONCoders.defaultDecoder.decode(Session.self, from: data)
+        return try? JSONCoders.decode(Session.self, from: data)
     }
 
     /// Returns true if a decodable stored session for `did` is newer than `session`.
@@ -1303,7 +1303,7 @@ public actor KeychainStorage {
             )
             throw error
         }
-        guard let existing = try? JSONCoders.defaultDecoder.decode(Session.self, from: data) else {
+        guard let existing = try? JSONCoders.decode(Session.self, from: data) else {
             LogManager.logError(
                 "KeychainStorage - Stored session for DID: \(LogManager.logDID(did)) could not be decoded; allowing the write to replace it."
             )
@@ -1315,7 +1315,7 @@ public actor KeychainStorage {
     /// Persists a refreshed session with a single keychain write, for use when the
     public func savePendingSession(_ session: Session, for did: String) async throws {
         let key = makeKey("session.pending", did: did)
-        let data = try JSONCoders.defaultEncoder.encode(session)
+        let data = try JSONCoders.encode(session)
         try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         let pKey = scopeKey(for: did)
         let token = AccountMutationHub.shared.nextEpoch()
@@ -1362,7 +1362,7 @@ public actor KeychainStorage {
     ///   - did: The DID associated with the session
     public func saveSessionBackup(_ session: Session, for did: String) async throws {
         let key = makeKey("session.backup", did: did)
-        let data = try JSONCoders.defaultEncoder.encode(session)
+        let data = try JSONCoders.encode(session)
         try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         LogManager.logDebug("KeychainStorage - Saved session backup for DID: \(LogManager.logDID(did))")
     }
@@ -1373,7 +1373,7 @@ public actor KeychainStorage {
     ///   - did: The DID associated with the session
     public func saveSessionToTemp(_ session: Session, for did: String) async throws {
         let key = makeKey("session.temp", did: did)
-        let data = try JSONCoders.defaultEncoder.encode(session)
+        let data = try JSONCoders.encode(session)
         try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         LogManager.logDebug("KeychainStorage - Saved session to temp for DID: \(LogManager.logDID(did))")
     }
@@ -1387,7 +1387,7 @@ public actor KeychainStorage {
         // Try backup location first
         do {
             let data = try KeychainManager.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup)
-            let session = try JSONCoders.defaultDecoder.decode(Session.self, from: data)
+            let session = try JSONCoders.decode(Session.self, from: data)
             LogManager.logInfo("KeychainStorage - Recovered session from backup for DID: \(LogManager.logDID(did))")
             return session
         } catch {
@@ -1398,7 +1398,7 @@ public actor KeychainStorage {
         let tempKey = makeKey("session.temp", did: did)
         do {
             let data = try KeychainManager.retrieve(key: tempKey, namespace: namespace, accessGroup: accessGroup)
-            let session = try JSONCoders.defaultDecoder.decode(Session.self, from: data)
+            let session = try JSONCoders.decode(Session.self, from: data)
             LogManager.logInfo("KeychainStorage - Recovered session from temp for DID: \(LogManager.logDID(did))")
             return session
         } catch {
@@ -1531,7 +1531,7 @@ public actor KeychainStorage {
     ///   - did: The DID associated with the nonces
     public func saveDPoPNonces(_ nonces: [String: String], for did: String) async throws {
         let key = makeKey("dpopNonces", did: did)
-        let data = try JSONCoders.defaultEncoder.encode(nonces)
+        let data = try JSONCoders.encode(nonces)
         try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
@@ -1555,7 +1555,7 @@ public actor KeychainStorage {
             throw error
         }
         do {
-            return try JSONCoders.defaultDecoder.decode([String: String].self, from: data)
+            return try JSONCoders.decode([String: String].self, from: data)
         } catch {
             LogManager.logError(
                 "KeychainStorage - Stored DPoP nonces for DID: \(LogManager.logDID(did)) could not be decoded (\(error)); treating them as empty so the next update rewrites the store"
@@ -1572,7 +1572,7 @@ public actor KeychainStorage {
         async throws
     {
         let key = makeKey("dpopNoncesByJKT", did: did)
-        let data = try JSONCoders.defaultEncoder.encode(noncesByJKT)
+        let data = try JSONCoders.encode(noncesByJKT)
         try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
@@ -1595,7 +1595,7 @@ public actor KeychainStorage {
             throw error
         }
         do {
-            return try JSONCoders.defaultDecoder.decode([String: [String: String]].self, from: data)
+            return try JSONCoders.decode([String: [String: String]].self, from: data)
         } catch {
             LogManager.logError(
                 "KeychainStorage - Stored JKT-scoped DPoP nonces for DID: \(LogManager.logDID(did)) could not be decoded (\(error)); treating them as empty so the next update rewrites the store"
@@ -1610,7 +1610,7 @@ public actor KeychainStorage {
     /// - Parameter state: The OAuth state to save
     public func saveOAuthState(_ state: OAuthState) async throws {
         let key = makeKey("oauthState", stateToken: state.stateToken)
-        let data = try JSONCoders.defaultEncoder.encode(state)
+        let data = try JSONCoders.encode(state)
         try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
@@ -1621,7 +1621,7 @@ public actor KeychainStorage {
         let key = makeKey("oauthState", stateToken: stateToken)
         do {
             let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
-            return try JSONCoders.defaultDecoder.decode(OAuthState.self, from: data)
+            return try JSONCoders.decode(OAuthState.self, from: data)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
             LogManager.logError("KeychainStorage - Failed to read OAuth state: \(error)")
@@ -1732,7 +1732,7 @@ public actor KeychainStorage {
         // Try temporary location first
         if let tempData = try? KeychainManager.retrieve(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup) {
             do {
-                let session = try JSONCoders.defaultDecoder.decode(Session.self, from: tempData)
+                let session = try JSONCoders.decode(Session.self, from: tempData)
                 guard !session.accessToken.isEmpty else { return false }
 
                 try KeychainManager.store(key: sessionKey, value: tempData, namespace: namespace, accessGroup: accessGroup)
@@ -1750,7 +1750,7 @@ public actor KeychainStorage {
         // Try backup location
         if let backupData = try? KeychainManager.retrieve(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup) {
             do {
-                let session = try JSONCoders.defaultDecoder.decode(Session.self, from: backupData)
+                let session = try JSONCoders.decode(Session.self, from: backupData)
                 guard !session.accessToken.isEmpty else { return false }
 
                 try KeychainManager.store(key: sessionKey, value: backupData, namespace: namespace, accessGroup: accessGroup)
@@ -1853,7 +1853,7 @@ public actor KeychainStorage {
 
         if !dids.contains(did) {
             dids.append(did)
-            let data = try JSONCoders.defaultEncoder.encode(dids)
+            let data = try JSONCoders.encode(dids)
             try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         }
     }
@@ -1879,7 +1879,7 @@ public actor KeychainStorage {
         var dids = try await accountDIDsForRewrite()
 
         dids.removeAll { $0 == did }
-        let data = try JSONCoders.defaultEncoder.encode(dids)
+        let data = try JSONCoders.encode(dids)
         try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 }

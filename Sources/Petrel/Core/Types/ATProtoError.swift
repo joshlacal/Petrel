@@ -68,7 +68,7 @@ public enum ATProtoErrorParser {
         errorType: ErrorType.Type
     ) -> ATProtoError<ErrorType>? {
         // Try to decode the error response
-        guard let errorResponse = try? JSONCoders.defaultDecoder.decode(ATProtoErrorResponse.self, from: data) else {
+        guard let errorResponse = try? JSONCoders.decode(ATProtoErrorResponse.self, from: data) else {
             return nil
         }
 

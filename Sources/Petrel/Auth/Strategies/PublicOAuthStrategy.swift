@@ -477,7 +477,7 @@ actor PublicOAuthStrategy: AuthStrategy {
             else {
                 throw AuthError.tokenRefreshFailed
             }
-            return try JSONCoders.defaultDecoder.decode(TokenResponse.self, from: data)
+            return try JSONCoders.decode(TokenResponse.self, from: data)
         }
     }
 
@@ -512,7 +512,7 @@ actor PublicOAuthStrategy: AuthStrategy {
 
             if (200 ..< 300).contains(httpResponse.statusCode) {
                 await recordFlowNonce(from: httpResponse, endpoint: tokenEndpoint, key: key)
-                return try JSONCoders.defaultDecoder.decode(TokenResponse.self, from: data)
+                return try JSONCoders.decode(TokenResponse.self, from: data)
             } else if httpResponse.statusCode == 400 {
                 // Handle use_dpop_nonce error. The PAR nonce carried in via `nonce` can
                 // already have rotated by the time the code is exchanged, so this single
@@ -520,7 +520,7 @@ actor PublicOAuthStrategy: AuthStrategy {
                 // `nonce == nil` failed the login outright on a rotated PAR nonce.
                 let dpopNonceHeader = await core.extractNonceFromHeaders(httpResponse.allHeaderFields)
                 var isNonceError = false
-                if let errorResponse = try? JSONCoders.defaultDecoder.decode(OAuthErrorResponse.self, from: data),
+                if let errorResponse = try? JSONCoders.decode(OAuthErrorResponse.self, from: data),
                    errorResponse.error == "use_dpop_nonce"
                 {
                     isNonceError = true
@@ -555,7 +555,7 @@ actor PublicOAuthStrategy: AuthStrategy {
                         throw AuthError.tokenRefreshFailed
                     }
                     await recordFlowNonce(from: retryHttpResponse, endpoint: tokenEndpoint, key: key)
-                    return try JSONCoders.defaultDecoder.decode(TokenResponse.self, from: retryData)
+                    return try JSONCoders.decode(TokenResponse.self, from: retryData)
                 } else {
                     throw AuthError.invalidCredentials
                 }
@@ -598,7 +598,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         }
 
         if (200 ..< 300).contains(response.statusCode) {
-            let tokenResponse = try JSONCoders.defaultDecoder.decode(TokenResponse.self, from: data)
+            let tokenResponse = try JSONCoders.decode(TokenResponse.self, from: data)
             let newSession = Session(
                 accessToken: tokenResponse.accessToken,
                 refreshToken: tokenResponse.refreshToken,
@@ -620,7 +620,7 @@ actor PublicOAuthStrategy: AuthStrategy {
         // Distinguish a definitive rejection (token consumed/revoked — never retry it)
         // from transient server trouble (safe to retry with the same token).
         if response.statusCode == 400 || response.statusCode == 401,
-           let errorResponse = try? JSONCoders.defaultDecoder.decode(OAuthErrorResponse.self, from: data),
+           let errorResponse = try? JSONCoders.decode(OAuthErrorResponse.self, from: data),
            errorResponse.error == "invalid_grant"
         {
             LogManager.logError(
@@ -674,7 +674,7 @@ actor PublicOAuthStrategy: AuthStrategy {
 
         // Handle nonce mismatch with retry
         if httpResponse.statusCode == 400 {
-            if let errorResponse = try? JSONCoders.defaultDecoder.decode(OAuthErrorResponse.self, from: data),
+            if let errorResponse = try? JSONCoders.decode(OAuthErrorResponse.self, from: data),
                errorResponse.error == "use_dpop_nonce",
                let receivedNonce = await core.extractNonceFromHeaders(httpResponse.allHeaderFields)
             {

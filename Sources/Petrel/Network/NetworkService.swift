@@ -329,8 +329,6 @@ public actor NetworkService: NetworkServiceProtocol {
     private var headers: [String: String] = [:]
     private let session: URLSession
     private let exactAuthSession: URLSession
-    private let jsonEncoder = JSONCoders.iso8601Encoder
-    private let jsonDecoder = JSONCoders.iso8601Decoder
     private let maxRetries = 3
     private var userAgent: String?
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
@@ -1338,7 +1336,7 @@ public actor NetworkService: NetworkServiceProtocol {
                         }
                     }
 
-                    if let errorResponse = try? jsonDecoder.decode(OAuthErrorResponse.self, from: decompressedData),
+                    if let errorResponse = try? JSONCoders.decodeISO8601(OAuthErrorResponse.self, from: decompressedData),
                        errorResponse.error == "use_dpop_nonce"
                     {
                         isNonceError = true
@@ -1705,7 +1703,7 @@ public actor NetworkService: NetworkServiceProtocol {
         let (data, _) = try await request(urlRequest, additionalHeaders: additionalHeaders)
 
         do {
-            return try jsonDecoder.decode(T.self, from: data)
+            return try JSONCoders.decodeISO8601(T.self, from: data)
         } catch {
             // DIAGNOSTIC: Log raw response bytes to debug ANSI escape code issue
             let hexPrefix = data.prefix(40).map { String(format: "%02x", $0) }.joined(separator: " ")
@@ -1733,7 +1731,7 @@ public actor NetworkService: NetworkServiceProtocol {
     ) async throws -> T {
         var bodyData: Data? = nil
         if let body = body {
-            bodyData = try jsonEncoder.encode(body)
+            bodyData = try JSONCoders.encodeISO8601(body)
         }
 
         let urlRequest = try await createURLRequest(
@@ -1747,7 +1745,7 @@ public actor NetworkService: NetworkServiceProtocol {
         let (data, _) = try await request(urlRequest, additionalHeaders: additionalHeaders)
 
         do {
-            return try jsonDecoder.decode(T.self, from: data)
+            return try JSONCoders.decodeISO8601(T.self, from: data)
         } catch {
             // DIAGNOSTIC: Log raw response bytes to debug ANSI escape code issue
             let hexPrefix = data.prefix(40).map { String(format: "%02x", $0) }.joined(separator: " ")
@@ -2133,7 +2131,7 @@ public actor NetworkService: NetworkServiceProtocol {
     ) throws -> Message {
         let decoded = try ATProtoWebSocketFrameDecoder.decodeFrame(data, defaultLexicon: endpoint)
         do {
-            return try jsonDecoder.decode(Message.self, from: decoded.jsonData)
+            return try JSONCoders.decodeISO8601(Message.self, from: decoded.jsonData)
         } catch {
             if let jsonString = String(data: decoded.jsonData, encoding: .utf8) {
                 LogManager.logError("Failed to decode JSON for message type \(decoded.messageType): \(jsonString)")

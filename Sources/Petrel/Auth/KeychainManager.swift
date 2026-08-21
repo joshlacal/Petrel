@@ -489,7 +489,7 @@ enum KeychainManager {
         namespace: String,
         accessGroup: String? = nil
     ) throws {
-        let data = try JSONCoders.defaultEncoder.encode(object)
+        let data = try JSONCoders.encode(object)
         try store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
@@ -499,7 +499,7 @@ enum KeychainManager {
         accessGroup: String? = nil
     ) throws -> T {
         let data = try retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
-        return try JSONCoders.defaultDecoder.decode(T.self, from: data)
+        return try JSONCoders.decode(T.self, from: data)
     }
 
     /// Deletes data from the keychain for a specified key and namespace.

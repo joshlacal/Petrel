@@ -42,7 +42,7 @@ func classifyUnauthorizedGatewayResponse(_ data: Data) -> UnauthorizedDispositio
         return .transient(reason: "invalid_audience")
     }
 
-    let payload = try? JSONCoders.defaultDecoder.decode(GatewayErrorResponse.self, from: data)
+    let payload = try? JSONCoders.decode(GatewayErrorResponse.self, from: data)
     let errorCode = (payload?.error ?? "").lowercased()
     let message = (payload?.message ?? responseBody).lowercased()
 
@@ -472,7 +472,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         switch httpResponse.statusCode {
         case 200:
             do {
-                return try JSONCoders.defaultDecoder.decode(GatewaySessionInfo.self, from: data)
+                return try JSONCoders.decode(GatewaySessionInfo.self, from: data)
             } catch {
                 throw GatewayError.invalidSession
             }

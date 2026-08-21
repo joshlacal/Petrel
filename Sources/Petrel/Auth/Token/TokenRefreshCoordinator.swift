@@ -188,7 +188,7 @@ actor TokenRefreshCoordinator {
                             // Success: Decode the raw data as our internal `RefreshResult`
                             // Try OAuth format first, then fall back to legacy AT Proto format
                             // Try OAuth format (access_token, refresh_token, expires_in)
-                            if let tokenResponse = try? JSONCoders.defaultDecoder.decode(TokenResponse.self, from: data) {
+                            if let tokenResponse = try? JSONCoders.decode(TokenResponse.self, from: data) {
                                 let result = RefreshResult(
                                     accessToken: tokenResponse.accessToken,
                                     refreshToken: tokenResponse.refreshToken,
@@ -202,7 +202,7 @@ actor TokenRefreshCoordinator {
                             }
 
                             // Try legacy AT Proto format (accessJwt, refreshJwt)
-                            if let legacyResponse = try? JSONCoders.defaultDecoder.decode(LegacyRefreshResponse.self, from: data) {
+                            if let legacyResponse = try? JSONCoders.decode(LegacyRefreshResponse.self, from: data) {
                                 // Legacy tokens typically expire in 2 hours (7200s) for access,
                                 // but we use 1 hour as a safe default since it's not in the response
                                 let result = RefreshResult(
@@ -290,7 +290,7 @@ actor TokenRefreshCoordinator {
         }
 
         // Try decoding as standard OAuth error first
-        if let errorResponse = try? JSONCoders.defaultDecoder.decode(OAuthErrorResponse.self, from: data) {
+        if let errorResponse = try? JSONCoders.decode(OAuthErrorResponse.self, from: data) {
             LogManager.logError(
                 "TokenRefreshCoordinator: Decoded OAuth error: \(errorResponse.error) - \(errorResponse.errorDescription ?? "no server description")"
             )
@@ -341,7 +341,7 @@ actor TokenRefreshCoordinator {
 
         // Try decoding as legacy AT Proto error format (used by com.atproto.server.refreshSession)
         // Legacy format: { "error": "AuthenticationRequired", "message": "..." }
-        if let legacyError = try? JSONCoders.defaultDecoder.decode(LegacyATProtoError.self, from: data) {
+        if let legacyError = try? JSONCoders.decode(LegacyATProtoError.self, from: data) {
             LogManager.logError(
                 "TokenRefreshCoordinator: Decoded legacy AT Proto error: \(legacyError.error) - \(legacyError.message ?? "no message")"
             )

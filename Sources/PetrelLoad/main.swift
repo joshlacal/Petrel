@@ -370,7 +370,7 @@ enum PetrelLoadCLI {
         guard mediaType == "application/json" else {
             throw OAuthMetadataError.invalidContentType(response.contentType)
         }
-        guard let metadata = try? JSONCoders.defaultDecoder.decode(OAuthClientMetadata.self, from: response.data) else {
+        guard let metadata = try? JSONCoders.decode(OAuthClientMetadata.self, from: response.data) else {
             throw OAuthMetadataError.invalidDocument
         }
         guard metadata.clientID == configuration.clientId else {

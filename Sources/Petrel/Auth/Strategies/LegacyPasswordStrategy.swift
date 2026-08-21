@@ -133,7 +133,7 @@ actor LegacyPasswordStrategy: AuthStrategy {
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.httpBody = try JSONCoders.defaultEncoder.encode(sessionInput)
+            request.httpBody = try JSONCoders.encode(sessionInput)
 
             let (data, response) = try await URLSession.shared.data(for: request)
             guard let httpResponse = response as? HTTPURLResponse else {
@@ -142,7 +142,7 @@ actor LegacyPasswordStrategy: AuthStrategy {
             responseCode = httpResponse.statusCode
 
             if responseCode == 200 {
-                sessionOutput = try JSONCoders.defaultDecoder.decode(ComAtprotoServerCreateSession.Output.self, from: data)
+                sessionOutput = try JSONCoders.decode(ComAtprotoServerCreateSession.Output.self, from: data)
             } else {
                 // Log error response body for debugging
                 if let errorBody = String(data: data, encoding: .utf8) {
@@ -454,7 +454,7 @@ actor LegacyPasswordStrategy: AuthStrategy {
                 LogManager.logInfo("✅ performLegacyTokenRefresh: Success (HTTP \(httpResponse.statusCode))")
 
                 // Parse the refresh response
-                let refreshResponse = try JSONCoders.defaultDecoder.decode(LegacyRefreshSessionResponse.self, from: data)
+                let refreshResponse = try JSONCoders.decode(LegacyRefreshSessionResponse.self, from: data)
 
                 // Parse actual expiration from the refreshed JWT
                 let actualExpiresIn = parseJWTExpiration(refreshResponse.accessJwt) ?? 3600
