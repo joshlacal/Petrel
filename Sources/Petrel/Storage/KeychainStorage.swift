@@ -176,6 +176,9 @@ public final class AccountMutationHub: @unchecked Sendable {
 
     public func bumpGeneration(for scopeDID: ScopeDID) {
         lock.withLock {
+            if generations.count >= 500 {
+                generations.removeAll()
+            }
             generations[scopeDID, default: 0] &+= 1
         }
     }
@@ -215,13 +218,12 @@ public actor KeychainStorage {
     private let accessGroup: String?
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
-
-    private static let pendingSessionCheckedState = Mutex<Set<String>>([])
-    private static let pendingSessionKnownState = Mutex<Set<String>>([])
+    private static let pendingSessionKnownGenerations = Mutex<[String: UInt64]>([:])
     private static let legacyGatewayMigrationState = Mutex<Set<String>>([])
+    private static let maxStateSize = 200
 
     private var authContinuityObserverToken: UUID?
-
+    private var checkedPendingDIDs: Set<String> = []
     private func scopeKey(for did: String) -> String {
         "\(namespace)|\(accessGroup ?? "")|\(did)"
     }
@@ -408,12 +410,11 @@ public actor KeychainStorage {
                 "Account+session saved atomically and verified for DID: \(LogManager.logDID(did))"
             )
             let pKey = scopeKey(for: did)
-            Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
-            Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
+            Self.pendingSessionKnownGenerations.withLock { _ = $0.removeValue(forKey: pKey) }
+            checkedPendingDIDs.insert(did)
             await AccountMutationHub.shared.notifyMutation(for: scopeDID)
 
         } catch {
-            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
             LogManager.logError(
                 "Atomic account+session save failed for DID: \(LogManager.logDID(did)), error: \(error)"
             )
@@ -442,6 +443,11 @@ public actor KeychainStorage {
                     "Keeping backup copies for DID: \(LogManager.logDID(did)) because a restore did not complete (account restored: \(accountRestored), session restored: \(sessionRestored))"
                 )
             }
+
+            if accountRestored {
+                AccountMutationHub.shared.bumpGeneration(for: scopeDID)
+            }
+            await AccountMutationHub.shared.notifyMutation(for: scopeDID)
 
             throw error
         }
@@ -620,21 +626,28 @@ public actor KeychainStorage {
                 throw error
             }
             let gKey = scopeKey(for: did)
-            let alreadyAttempted = Self.legacyGatewayMigrationState.withLock { $0.contains(gKey) }
-            guard !alreadyAttempted else {
-                LogManager.logWarning("KeychainStorage - No gateway session found for DID: \(did.prefix(20))... (legacy migration already attempted)")
+            let claimed = Self.legacyGatewayMigrationState.withLock { set -> Bool in
+                if set.count >= Self.maxStateSize { set.removeAll() }
+                return set.insert(gKey).inserted
+            }
+            guard claimed else {
+                LogManager.logWarning("KeychainStorage - No gateway session found for DID: \(did.prefix(20))... (legacy migration already attempted or in flight)")
                 return nil
             }
             LogManager.logWarning("KeychainStorage - Gateway session not found for key \(namespace).\(key). Attempting legacy migration...")
-            if let migratedSession = try await migrateLegacyGatewaySessionIfNeeded(for: did) {
-                LogManager.logInfo("KeychainStorage - Successfully migrated legacy gateway session for DID: \(did.prefix(20))...")
-                return migratedSession
+            do {
+                if let migratedSession = try await migrateLegacyGatewaySessionIfNeeded(for: did) {
+                    LogManager.logInfo("KeychainStorage - Successfully migrated legacy gateway session for DID: \(did.prefix(20))...")
+                    return migratedSession
+                }
+            } catch {
+                Self.legacyGatewayMigrationState.withLock { _ = $0.remove(gKey) }
+                throw error
             }
             LogManager.logWarning("KeychainStorage - No gateway session found for DID: \(did.prefix(20))... (including legacy locations)")
             return nil
         }
     }
-
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
@@ -666,6 +679,8 @@ public actor KeychainStorage {
     ///   read. Swallowing it would report "no gateway session" for an account whose
     private func migrateLegacyGatewaySessionIfNeeded(for did: String) async throws -> String? {
         guard try await shouldMigrateLegacyGatewaySession(for: did) else {
+            let gKey = scopeKey(for: did)
+            Self.legacyGatewayMigrationState.withLock { _ = $0.remove(gKey) }
             return nil
         }
         let gKey = scopeKey(for: did)
@@ -683,6 +698,8 @@ public actor KeychainStorage {
                     )
                 }
                 Self.legacyGatewayMigrationState.withLock { _ = $0.insert(gKey) }
+            } else {
+                Self.legacyGatewayMigrationState.withLock { _ = $0.remove(gKey) }
             }
             return legacySession
         }
@@ -707,6 +724,8 @@ public actor KeychainStorage {
                     )
                 }
                 Self.legacyGatewayMigrationState.withLock { _ = $0.insert(gKey) }
+            } else {
+                Self.legacyGatewayMigrationState.withLock { _ = $0.remove(gKey) }
             }
             return session
         }
@@ -923,13 +942,13 @@ public actor KeychainStorage {
             // Step 5: Cleanup temporary files
             try? KeychainManager.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
             try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
-
             LogManager.logDebug(
                 "Session saved atomically and verified for DID: \(LogManager.logDID(did))"
             )
             let pKey = scopeKey(for: did)
-            Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
-            Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
+            Self.pendingSessionKnownGenerations.withLock { _ = $0.removeValue(forKey: pKey) }
+            checkedPendingDIDs.insert(did)
+
         } catch let sessionSaveError as SessionSaveError {
             LogManager.logError(
                 "Session save failed for DID: \(LogManager.logDID(did)): \(sessionSaveError)"
@@ -1095,8 +1114,9 @@ public actor KeychainStorage {
         // failed. The server has already rotated the refresh token, so the pending
         // copy is authoritative when newer: promote it to primary.
         let pKey = scopeKey(for: did)
-        let hasChecked = Self.pendingSessionCheckedState.withLock { $0.contains(pKey) }
-        let isKnown = Self.pendingSessionKnownState.withLock { $0.contains(pKey) }
+        let hasChecked = checkedPendingDIDs.contains(did)
+        let knownGen = Self.pendingSessionKnownGenerations.withLock { $0[pKey] }
+        let isKnown = knownGen != nil
         let shouldCheckPending = bypassCache || (primary == nil) || isKnown || !hasChecked
 
         if shouldCheckPending {
@@ -1111,27 +1131,43 @@ public actor KeychainStorage {
                         do {
                             try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
                             try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
-                            Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
-                            Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
+                            Self.pendingSessionKnownGenerations.withLock { map in
+                                if let gen = knownGen, map[pKey] == gen {
+                                    map.removeValue(forKey: pKey)
+                                }
+                            }
+                            checkedPendingDIDs.insert(did)
                         } catch {
-                            Self.pendingSessionKnownState.withLock { _ = $0.insert(pKey) }
+                            Self.pendingSessionKnownGenerations.withLock { map in
+                                if map[pKey] == nil {
+                                    map[pKey] = 1
+                                }
+                            }
                         }
                     }
                     return pending
                 } else {
                     try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
-                    Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
-                    Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
+                    Self.pendingSessionKnownGenerations.withLock { map in
+                        if let gen = knownGen, map[pKey] == gen {
+                            map.removeValue(forKey: pKey)
+                        }
+                    }
+                    checkedPendingDIDs.insert(did)
                 }
             } else if pendingRead.data == nil && pendingRead.error == nil {
-                Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
-                Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
+                Self.pendingSessionKnownGenerations.withLock { map in
+                    if let gen = knownGen, map[pKey] == gen {
+                        map.removeValue(forKey: pKey)
+                    }
+                }
+                checkedPendingDIDs.insert(did)
             }
         }
+
         if let primary {
             return primary
         }
-
         LogManager.logDebug(
             "Failed to retrieve session from primary location for DID: \(LogManager.logDID(did)), attempting recovery"
         )
@@ -1239,11 +1275,13 @@ public actor KeychainStorage {
         let data = try JSONEncoder().encode(session)
         try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         let pKey = scopeKey(for: did)
-        Self.pendingSessionKnownState.withLock { _ = $0.insert(pKey) }
-        Self.pendingSessionCheckedState.withLock { _ = $0.remove(pKey) }
+        Self.pendingSessionKnownGenerations.withLock { map in
+            if map.count >= Self.maxStateSize { map.removeAll() }
+            map[pKey, default: 0] &+= 1
+        }
+        checkedPendingDIDs.remove(did)
         LogManager.logInfo("KeychainStorage - Saved pending session for DID: \(LogManager.logDID(did))")
     }
-
     /// Deletes a session from the keychain, including pending/temp/backup copies
     public func deleteSession(for did: String) async throws {
         var failures: [Error] = []
@@ -1267,10 +1305,9 @@ public actor KeychainStorage {
             )
             throw first
         }
-
         let pKey = scopeKey(for: did)
-        Self.pendingSessionKnownState.withLock { _ = $0.remove(pKey) }
-        Self.pendingSessionCheckedState.withLock { _ = $0.insert(pKey) }
+        Self.pendingSessionKnownGenerations.withLock { _ = $0.removeValue(forKey: pKey) }
+        checkedPendingDIDs.insert(did)
     }
 
     // MARK: - Session Backup and Recovery

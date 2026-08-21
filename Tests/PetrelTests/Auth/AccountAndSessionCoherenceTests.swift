@@ -5,6 +5,7 @@
 
 import Foundation
 @testable import Petrel
+import Synchronization
 import Testing
 
 private let testDID = "did:plc:coherencetest"
@@ -18,10 +19,11 @@ private func makeSession(
     refreshToken: String,
     createdAt: Date = Date(),
     expiresIn: TimeInterval = 3600,
-    did: String = testDID
+    did: String = testDID,
+    accessToken: String = "test-access-token"
 ) -> Session {
     Session(
-        accessToken: "access-\(refreshToken)",
+        accessToken: accessToken,
         refreshToken: refreshToken,
         createdAt: createdAt,
         expiresIn: expiresIn,
@@ -41,31 +43,65 @@ private func withInMemoryBackend<T>(
     }
 }
 
+private final class TestAsyncGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpened = false
+    private var continuations: [CheckedContinuation<Void, Never>] = []
+
+    func open() {
+        let toResume: [CheckedContinuation<Void, Never>] = lock.withLock {
+            isOpened = true
+            let list = continuations
+            continuations.removeAll()
+            return list
+        }
+        for c in toResume { c.resume() }
+    }
+
+    func wait() async {
+        let shouldWait: Bool = lock.withLock {
+            !isOpened
+        }
+        if shouldWait {
+            await withCheckedContinuation { continuation in
+                lock.withLock {
+                    if isOpened {
+                        continuation.resume()
+                    } else {
+                        continuations.append(continuation)
+                    }
+                }
+            }
+        }
+    }
+}
+
 @Suite("Account and session coherence", .serialized)
 struct AccountAndSessionCoherenceTests {
 
-    @Test("Restart with stale primary and pending copy promotes on first getSession")
+    @Test("Restart with stale primary and pending copy promotes on first getSession via cold actor probe")
     func restartWithStalePrimaryPromotesPending() async throws {
         let backend = InMemorySecureStorage()
         try await withInMemoryBackend(backend) {
             let namespace = "test.coherence.restart"
-            let storage1 = KeychainStorage(namespace: namespace)
             let oldSession = makeSession(refreshToken: "rt-stale", createdAt: Date(timeIntervalSinceNow: -600))
             let newSession = makeSession(refreshToken: "rt-promoted", createdAt: Date())
 
-            // Plant old primary in backend and save pending session
-            try await storage1.saveSession(oldSession, for: testDID)
-            try await storage1.savePendingSession(newSession, for: testDID)
-
-            // Clear in-memory cache to simulate fresh actor / restart
+            // Plant old primary AND pending copy directly in backend without calling savePendingSession,
+            // so process-wide pendingSessionKnownGenerations is NOT populated.
+            let oldData = try JSONEncoder().encode(oldSession)
+            let newData = try JSONEncoder().encode(newSession)
+            backend.plant(key: "session.\(testDID)", namespace: namespace, data: oldData)
+            backend.plant(key: "session.pending.\(testDID)", namespace: namespace, data: newData)
             KeychainManager.clearCache()
 
-            // Fresh storage instance (simulating restart)
-            let storage2 = KeychainStorage(namespace: namespace)
-            let result = try await storage2.getSession(for: testDID)
-            #expect(result?.refreshToken == "rt-promoted", "Pending session must be promoted over stale primary on first read after restart")
+            // Fresh storage instance (simulating restart): checkedPendingDIDs is empty on this actor
+            let storage = KeychainStorage(namespace: namespace)
+            let result = try await storage.getSession(for: testDID)
+            #expect(result?.refreshToken == "rt-promoted", "Pending session must be promoted over stale primary on first read after actor init")
 
-            let secondRead = try await storage2.getSession(for: testDID)
+            // Second read serves the promoted session from memory/primary
+            let secondRead = try await storage.getSession(for: testDID)
             #expect(secondRead?.refreshToken == "rt-promoted")
         }
     }
@@ -82,24 +118,33 @@ struct AccountAndSessionCoherenceTests {
             try await storage.saveSession(oldSession, for: testDID)
             try await storage.savePendingSession(newSession, for: testDID)
 
-            // Attempt a stale write (createdAt older than existing session)
+            // 1. Attempt a stale write (refused before write)
             let staleSession = makeSession(refreshToken: "rt-stale", createdAt: Date(timeIntervalSinceNow: -1200))
             try await storage.saveSession(staleSession, for: testDID)
 
-            // getSession must still promote the pending newSession
+            // 3. Attempt a throwing saveAccountAndSession (failing during temporary save)
+            let freshSession = makeSession(refreshToken: "rt-fresh")
+            backend.failStoreMatching = { key in key.contains("session.temp") }
+            await #expect(throws: (any Error).self) {
+                try await storage.saveAccountAndSession(makeAccount(), session: freshSession, for: testDID)
+            }
+            backend.failStoreMatching = nil
+
+            // getSession must STILL find and promote the pending newSession
             let result = try await storage.getSession(for: testDID)
-            #expect(result?.refreshToken == "rt-new", "Pending marker must be preserved after refused stale write")
+            #expect(result?.refreshToken == "rt-new", "Pending marker must be preserved across stale, throwing, and failed saves")
         }
     }
-
     @Test("Cross-instance account cache invalidation keeps multiple managers in sync")
     func crossInstanceAccountCacheInvalidation() async throws {
         let backend = InMemorySecureStorage()
         try await withInMemoryBackend(backend) {
             let namespace = "test.coherence.crossinstance"
-            let storage = KeychainStorage(namespace: namespace)
-            let managerA = await AccountManager(storage: storage)
-            let managerB = await AccountManager(storage: storage)
+            // Use TWO separate storage actor instances
+            let storageA = KeychainStorage(namespace: namespace)
+            let storageB = KeychainStorage(namespace: namespace)
+            let managerA = await AccountManager(storage: storageA)
+            let managerB = await AccountManager(storage: storageB)
 
             let account = makeAccount(handle: "original.handle")
             try await managerA.addAccount(account)
@@ -113,7 +158,7 @@ struct AccountAndSessionCoherenceTests {
             updated.handle = "updated.handle"
             try await managerA.addAccount(updated)
 
-            // Manager B must observe the update
+            // Manager B must observe the update across storage instances
             let freshB = await managerB.getAccount(did: account.did)
             #expect(freshB?.handle == "updated.handle", "Manager B must observe account update from Manager A")
 
@@ -125,6 +170,7 @@ struct AccountAndSessionCoherenceTests {
             #expect(deletedB == nil, "Manager B must observe account deletion from Manager A")
         }
     }
+
     @Test("Concurrent getAccount during account deletion does not repopulate the cache with stale data")
     func concurrentGetDuringDeletionDoesNotRepopulateCache() async throws {
         let backend = InMemorySecureStorage()
@@ -136,25 +182,37 @@ struct AccountAndSessionCoherenceTests {
             let account = makeAccount(handle: "to-delete.handle")
             try await manager.addAccount(account)
 
-            // Ensure cached
             let initial = await manager.getAccount(did: account.did)
             #expect(initial != nil)
 
-            // Concurrently delete and get
+            let deletionStarted = TestAsyncGate()
+            let deletionContinue = DispatchSemaphore(value: 0)
+
+            backend.setOperationObserver { op, key in
+                if op == .delete && key == "account.\(account.did)" {
+                    deletionStarted.open()
+                    deletionContinue.wait()
+                }
+            }
+
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
                     try await manager.removeAccount(did: account.did)
                 }
                 group.addTask {
-                    await Task.yield()
+                    await deletionStarted.wait()
+                    // Concurrently fetch account while deletion is suspended inside backend
                     _ = await manager.getAccount(did: account.did)
+                    deletionContinue.signal()
                 }
                 try await group.waitForAll()
             }
 
-            // After deletion completes, cache must not contain the deleted account
+            backend.setOperationObserver(nil)
+
+            // After deletion finishes, cache must NOT contain the deleted account
             let finalAccount = await manager.getAccount(did: account.did)
-            #expect(finalAccount == nil, "Account must be absent after deletion, regardless of concurrent read interleaving")
+            #expect(finalAccount == nil, "Account must be absent after deletion, even if read raced the deletion")
         }
     }
 
@@ -195,20 +253,30 @@ struct AccountAndSessionCoherenceTests {
             let namespace = "test.coherence.nonces"
             let storage = KeychainStorage(namespace: namespace)
 
-            // First read: absent in backend, caches negative result
+            let retrievalCounter = Mutex<Int>(0)
+            backend.setOperationObserver { op, key in
+                if op == .retrieve && key.hasPrefix("dpopNonces") {
+                    retrievalCounter.withLock { $0 += 1 }
+                }
+            }
+
+            // 1. First read: absent in backend, queries backend (retrievalCount becomes 1), caches negative entry
             let nonces1 = try await storage.getDPoPNonces(for: testDID)
             #expect(nonces1 == nil)
+            #expect(retrievalCounter.withLock { $0 } == 1, "First read of absent nonce must query backend once")
 
-            // Verify negative cache in KeychainManager avoids backend retrieve
+            // 2. Second read: negative cache hit, 0 backend retrievals (retrievalCount remains 1)
             let nonces2 = try await storage.getDPoPNonces(for: testDID)
             #expect(nonces2 == nil)
+            #expect(retrievalCounter.withLock { $0 } == 1, "Second read must hit negative cache with 0 backend queries")
 
-            // Save nonces (invalidates negative cache)
+            // 3. Save nonces (invalidates negative cache and populates positive cache)
             try await storage.saveDPoPNonces(["auth.example.com": "nonce-123"], for: testDID)
 
-            // Read nonces (positive cache hit)
+            // 4. Read nonces (positive cache hit, 0 backend retrievals)
             let nonces3 = try await storage.getDPoPNonces(for: testDID)
             #expect(nonces3?["auth.example.com"] == "nonce-123")
+            #expect(retrievalCounter.withLock { $0 } == 1, "Read of stored nonce must hit positive cache with 0 backend queries")
         }
     }
 }

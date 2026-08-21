@@ -197,7 +197,16 @@ enum KeychainManager {
         return cache
     }()
     private static let cachedKeysState = Mutex<Set<String>>([])
-    private static let negativeCacheState = Mutex<Set<String>>([])
+    private static let nonceNegativeCacheState = Mutex<Set<String>>([])
+    private static let maxNegativeCacheSize = 200
+
+    private static func isHotNonceKey(_ key: String) -> Bool {
+        key.hasPrefix("dpopNonces.") || key.hasPrefix("dpopNoncesByJKT.")
+    }
+
+    private static func negativeCacheKey(key: String, namespace: String, accessGroup: String?) -> String {
+        "\(namespace)|\(accessGroup ?? "")|\(key)"
+    }
     private static let defaultAccessGroupState = Mutex<String?>(nil)
 
     /// Configures the keychain accessibility level applied to new writes on Apple
@@ -272,7 +281,7 @@ enum KeychainManager {
     private static func clearCacheStorage() {
         dataCache.removeAllObjects()
         cachedKeysState.withLock { $0.removeAll() }
-        negativeCacheState.withLock { $0.removeAll() }
+        nonceNegativeCacheState.withLock { $0.removeAll() }
     }
 
     /// Clears all cached items
@@ -294,8 +303,8 @@ enum KeychainManager {
         for key in keysToRemove {
             dataCache.removeObject(forKey: key as NSString)
         }
-        negativeCacheState.withLock { negKeys in
-            let prefix = "\(namespace)."
+        nonceNegativeCacheState.withLock { negKeys in
+            let prefix = "\(namespace)|"
             let matching = negKeys.filter { $0.hasPrefix(prefix) }
             for key in matching {
                 negKeys.remove(key)
@@ -323,7 +332,6 @@ enum KeychainManager {
         // Remove from cache
         dataCache.removeObject(forKey: exactKey as NSString)
         cachedKeysState.withLock { _ = $0.remove(exactKey) }
-        negativeCacheState.withLock { _ = $0.insert(exactKey) }
     }
 
     /// Stores data in the keychain with a specified key and namespace.
@@ -345,7 +353,10 @@ enum KeychainManager {
         let namespacedKey = "\(namespace).\(key)"
         dataCache.setObject(value as NSData, forKey: namespacedKey as NSString)
         cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
-        negativeCacheState.withLock { _ = $0.remove(namespacedKey) }
+        if isHotNonceKey(key) {
+            let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
+            nonceNegativeCacheState.withLock { _ = $0.remove(negKey) }
+        }
         LogManager.logDebug("KeychainManager - Successfully stored item for key \(namespace).\(key).")
     }
 
@@ -361,6 +372,7 @@ enum KeychainManager {
         bypassCache: Bool = false
     ) throws -> Data {
         let namespacedKey = "\(namespace).\(key)"
+        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
 
         // Check cache first
         if !bypassCache {
@@ -368,13 +380,15 @@ enum KeychainManager {
                 LogManager.logDebug("KeychainManager - Retrieved item from cache for key \(namespacedKey).")
                 return cachedData as Data
             }
-            let isNegative = negativeCacheState.withLock { $0.contains(namespacedKey) }
-            if isNegative {
-                LogManager.logDebug("KeychainManager - Negative cache hit for key \(namespacedKey).")
-                throw KeychainError.itemRetrievalError(status: itemNotFoundStatus)
+            if isHotNonceKey(key) {
+                let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
+                let isNegative = nonceNegativeCacheState.withLock { $0.contains(negKey) }
+                if isNegative {
+                    LogManager.logDebug("KeychainManager - Negative cache hit for hot nonce key \(namespacedKey).")
+                    throw KeychainError.itemRetrievalError(status: itemNotFoundStatus)
+                }
             }
         }
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
 
         if let resolvedAccessGroup {
             do {
@@ -385,7 +399,10 @@ enum KeychainManager {
                 )
                 dataCache.setObject(data as NSData, forKey: namespacedKey as NSString)
                 cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
-                negativeCacheState.withLock { _ = $0.remove(namespacedKey) }
+                if isHotNonceKey(key) {
+                    let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
+                    nonceNegativeCacheState.withLock { _ = $0.remove(negKey) }
+                }
                 return data
             } catch {
                 if !isItemNotFound(error) {
@@ -401,14 +418,21 @@ enum KeychainManager {
                     accessGroup: nil
                 )
             } catch {
-                if isItemNotFound(error) {
-                    negativeCacheState.withLock { _ = $0.insert(namespacedKey) }
+                if isItemNotFound(error) && isHotNonceKey(key) {
+                    let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
+                    nonceNegativeCacheState.withLock { set in
+                        if set.count >= maxNegativeCacheSize { set.removeAll() }
+                        _ = set.insert(negKey)
+                    }
                 }
                 throw error
             }
             dataCache.setObject(legacyData as NSData, forKey: namespacedKey as NSString)
             cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
-            negativeCacheState.withLock { _ = $0.remove(namespacedKey) }
+            if isHotNonceKey(key) {
+                let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
+                nonceNegativeCacheState.withLock { _ = $0.remove(negKey) }
+            }
             do {
                 try storage.store(
                     key: key,
@@ -438,8 +462,12 @@ enum KeychainManager {
         do {
             data = try storage.retrieve(key: key, namespace: namespace, accessGroup: nil)
         } catch {
-            if isItemNotFound(error) {
-                negativeCacheState.withLock { _ = $0.insert(namespacedKey) }
+            if isItemNotFound(error) && isHotNonceKey(key) {
+                let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: nil)
+                nonceNegativeCacheState.withLock { set in
+                    if set.count >= maxNegativeCacheSize { set.removeAll() }
+                    _ = set.insert(negKey)
+                }
             }
             throw error
         }
@@ -447,7 +475,10 @@ enum KeychainManager {
         // Store in cache
         dataCache.setObject(data as NSData, forKey: namespacedKey as NSString)
         cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
-        negativeCacheState.withLock { _ = $0.remove(namespacedKey) }
+        if isHotNonceKey(key) {
+            let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: nil)
+            nonceNegativeCacheState.withLock { _ = $0.remove(negKey) }
+        }
         LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
         return data
     }
@@ -484,12 +515,19 @@ enum KeychainManager {
         // deleted item readable from memory.
         dataCache.removeObject(forKey: namespacedKey as NSString)
         cachedKeysState.withLock { _ = $0.remove(namespacedKey) }
-        negativeCacheState.withLock { _ = $0.insert(namespacedKey) }
         do {
             try storage.delete(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
         } catch {
             LogManager.logError("KeychainManager - Failed to delete item for key \(namespacedKey): \(error)")
             throw error
+        }
+
+        if isHotNonceKey(key) {
+            let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
+            nonceNegativeCacheState.withLock { set in
+                if set.count >= maxNegativeCacheSize { set.removeAll() }
+                _ = set.insert(negKey)
+            }
         }
 
         if resolvedAccessGroup != nil {

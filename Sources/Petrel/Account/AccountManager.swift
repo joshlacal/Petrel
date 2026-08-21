@@ -71,7 +71,7 @@ actor AccountManager: AccountManaging {
         // Register for cross-instance account mutation events
         accountMutationObserverToken = AccountMutationHub.shared.addObserver { [weak self] scopeDID in
             guard let self else { return }
-            await self.invalidateAccountCache(for: scopeDID?.did)
+            await self.handleAccountMutation(scopeDID)
         }
 
         // Attempt to load the last active DID
@@ -90,6 +90,17 @@ actor AccountManager: AccountManaging {
     deinit {
         if let token = accountMutationObserverToken {
             AccountMutationHub.shared.removeObserver(token)
+        }
+    }
+
+    private func handleAccountMutation(_ scopeDID: AccountMutationHub.ScopeDID?) async {
+        if let scopeDID {
+            let myScopeDID = await storage.accountScopeDID(for: scopeDID.did)
+            if scopeDID.namespace == myScopeDID.namespace && scopeDID.accessGroup == myScopeDID.accessGroup {
+                accountsCache.removeValue(forKey: scopeDID.did)
+            }
+        } else {
+            accountsCache.removeAll()
         }
     }
 
@@ -233,10 +244,12 @@ actor AccountManager: AccountManaging {
     /// - Parameter account: The account to add.
     func addAccount(_ account: Account) async throws {
         LogManager.logInfo("AccountManager - Adding account with DID: \(account.did)")
-        try await storage.saveAccount(account, for: account.did)
         let scopeDID = await storage.accountScopeDID(for: account.did)
-        let gen = AccountMutationHub.shared.generation(for: scopeDID)
-        accountsCache[account.did] = (account: account, generation: gen)
+        let beforeGen = AccountMutationHub.shared.generation(for: scopeDID)
+        try await storage.saveAccount(account, for: account.did)
+        if AccountMutationHub.shared.generation(for: scopeDID) == beforeGen &+ 1 {
+            accountsCache[account.did] = (account: account, generation: beforeGen &+ 1)
+        }
         // If no current account is set, make this the current one
         if currentDID == nil {
             try await setCurrentAccount(did: account.did)
@@ -577,10 +590,12 @@ actor AccountManager: AccountManaging {
         account.bskyChatDID = bskyChatDID
 
         // Save back to storage and update cache
-        try await storage.saveAccount(account, for: did)
         let scopeDID = await storage.accountScopeDID(for: did)
-        let gen = AccountMutationHub.shared.generation(for: scopeDID)
-        accountsCache[did] = (account: account, generation: gen)
+        let beforeGen = AccountMutationHub.shared.generation(for: scopeDID)
+        try await storage.saveAccount(account, for: did)
+        if AccountMutationHub.shared.generation(for: scopeDID) == beforeGen &+ 1 {
+            accountsCache[did] = (account: account, generation: beforeGen &+ 1)
+        }
         LogManager.logInfo(
             "AccountManager - Updated service DIDs for account \(LogManager.logDID(did)): bskyAppViewDID=\(bskyAppViewDID), bskyChatDID=\(bskyChatDID)"
         )
