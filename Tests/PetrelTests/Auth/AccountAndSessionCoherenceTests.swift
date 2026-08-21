@@ -117,22 +117,29 @@ struct AccountAndSessionCoherenceTests {
 
             try await storage.saveSession(oldSession, for: testDID)
             try await storage.savePendingSession(newSession, for: testDID)
-
             // 1. Attempt a stale write (refused before write)
             let staleSession = makeSession(refreshToken: "rt-stale", createdAt: Date(timeIntervalSinceNow: -1200))
             try await storage.saveSession(staleSession, for: testDID)
 
-            // 3. Attempt a throwing saveAccountAndSession (failing during temporary save)
-            let freshSession = makeSession(refreshToken: "rt-fresh")
+            // 2. Attempt a throwing standalone saveSession (failing during temporary save)
+            let freshSession1 = makeSession(refreshToken: "rt-fresh1")
             backend.failStoreMatching = { key in key.contains("session.temp") }
             await #expect(throws: (any Error).self) {
-                try await storage.saveAccountAndSession(makeAccount(), session: freshSession, for: testDID)
+                try await storage.saveSession(freshSession1, for: testDID)
+            }
+            backend.failStoreMatching = nil
+
+            // 3. Attempt a throwing saveAccountAndSession (failing during temporary save)
+            let freshSession2 = makeSession(refreshToken: "rt-fresh2")
+            backend.failStoreMatching = { key in key.contains("session.temp") }
+            await #expect(throws: (any Error).self) {
+                try await storage.saveAccountAndSession(makeAccount(), session: freshSession2, for: testDID)
             }
             backend.failStoreMatching = nil
 
             // getSession must STILL find and promote the pending newSession
             let result = try await storage.getSession(for: testDID)
-            #expect(result?.refreshToken == "rt-new", "Pending marker must be preserved across stale, throwing, and failed saves")
+            #expect(result?.refreshToken == "rt-new", "Pending marker must be preserved across stale, throwing saveSession, and failed saveAccountAndSession")
         }
     }
     @Test("Cross-instance account cache invalidation keeps multiple managers in sync")
@@ -188,13 +195,12 @@ struct AccountAndSessionCoherenceTests {
             let deletionStarted = TestAsyncGate()
             let deletionContinue = DispatchSemaphore(value: 0)
 
-            backend.setOperationObserver { op, key in
-                if op == .delete && key == "account.\(account.did)" {
+            backend.beforeDelete = { key in
+                if key == "account.\(account.did)" {
                     deletionStarted.open()
                     deletionContinue.wait()
                 }
             }
-
             try await withThrowingTaskGroup(of: Void.self) { group in
                 group.addTask {
                     try await manager.removeAccount(did: account.did)
@@ -207,9 +213,7 @@ struct AccountAndSessionCoherenceTests {
                 }
                 try await group.waitForAll()
             }
-
-            backend.setOperationObserver(nil)
-
+            backend.beforeDelete = nil
             // After deletion finishes, cache must NOT contain the deleted account
             let finalAccount = await manager.getAccount(did: account.did)
             #expect(finalAccount == nil, "Account must be absent after deletion, even if read raced the deletion")

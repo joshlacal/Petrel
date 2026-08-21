@@ -36,6 +36,8 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     var failRetrieveMatching: (@Sendable (String) -> Bool)?
     /// Fail delete calls whose (un-namespaced) key matches this predicate.
     var failDeleteMatching: (@Sendable (String) -> Bool)?
+    /// Hook invoked before items.removeValue during delete.
+    var beforeDelete: (@Sendable (String) -> Void)?
     var retrieveGate: RetrievalGate?
 
 
@@ -79,7 +81,11 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
 
     func delete(key: String, namespace: String, accessGroup _: String?) throws {
         lock.lock()
+        let beforeHook = beforeDelete
         let shouldFail = failDeleteMatching?(key) ?? false
+        lock.unlock()
+        beforeHook?(key)
+        lock.lock()
         if !shouldFail {
             items.removeValue(forKey: fullKey(key, namespace))
         }

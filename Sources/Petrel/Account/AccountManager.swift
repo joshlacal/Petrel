@@ -246,9 +246,9 @@ actor AccountManager: AccountManaging {
         LogManager.logInfo("AccountManager - Adding account with DID: \(account.did)")
         let scopeDID = await storage.accountScopeDID(for: account.did)
         let beforeGen = AccountMutationHub.shared.generation(for: scopeDID)
-        try await storage.saveAccount(account, for: account.did)
-        if AccountMutationHub.shared.generation(for: scopeDID) == beforeGen &+ 1 {
-            accountsCache[account.did] = (account: account, generation: beforeGen &+ 1)
+        let mutationGen = try await storage.saveAccount(account, for: account.did)
+        if mutationGen == beforeGen &+ 1 && AccountMutationHub.shared.generation(for: scopeDID) == mutationGen {
+            accountsCache[account.did] = (account: account, generation: mutationGen)
         }
         // If no current account is set, make this the current one
         if currentDID == nil {
@@ -578,6 +578,9 @@ actor AccountManager: AccountManaging {
             throw AccountError.noActiveAccount
         }
 
+        let scopeDID = await storage.accountScopeDID(for: did)
+        let beforeGen = AccountMutationHub.shared.generation(for: scopeDID)
+
         guard var account = try await storage.getAccount(for: did) else {
             LogManager.logError(
                 "AccountManager - Cannot update service DIDs: Account not found for DID \(did)"
@@ -589,12 +592,9 @@ actor AccountManager: AccountManaging {
         account.bskyAppViewDID = bskyAppViewDID
         account.bskyChatDID = bskyChatDID
 
-        // Save back to storage and update cache
-        let scopeDID = await storage.accountScopeDID(for: did)
-        let beforeGen = AccountMutationHub.shared.generation(for: scopeDID)
-        try await storage.saveAccount(account, for: did)
-        if AccountMutationHub.shared.generation(for: scopeDID) == beforeGen &+ 1 {
-            accountsCache[did] = (account: account, generation: beforeGen &+ 1)
+        let mutationGen = try await storage.saveAccount(account, for: did)
+        if mutationGen == beforeGen &+ 1 && AccountMutationHub.shared.generation(for: scopeDID) == mutationGen {
+            accountsCache[did] = (account: account, generation: mutationGen)
         }
         LogManager.logInfo(
             "AccountManager - Updated service DIDs for account \(LogManager.logDID(did)): bskyAppViewDID=\(bskyAppViewDID), bskyChatDID=\(bskyChatDID)"

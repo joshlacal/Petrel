@@ -522,6 +522,9 @@ enum KeychainManager {
             throw error
         }
 
+        // Evict any entry that a concurrent retrieve may have installed while delete was in flight
+        dataCache.removeObject(forKey: namespacedKey as NSString)
+        cachedKeysState.withLock { _ = $0.remove(namespacedKey) }
         if isHotNonceKey(key) {
             let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
             nonceNegativeCacheState.withLock { set in
