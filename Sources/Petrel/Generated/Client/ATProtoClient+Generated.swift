@@ -1268,6 +1268,28 @@ public actor ATProtoClient {
                 }
             }
 
+            public var simplespace: Simplespace {
+                Simplespace(networkService: networkService)
+            }
+
+            public struct Simplespace: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public var space: Space {
+                Space(networkService: networkService)
+            }
+
+            public struct Space: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
             public var sync: Sync {
                 Sync(networkService: networkService)
             }
