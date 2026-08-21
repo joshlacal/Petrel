@@ -246,7 +246,7 @@ actor AccountManager: AccountManaging {
         LogManager.logInfo("AccountManager - Adding account with DID: \(account.did)")
         let scopeDID = await storage.accountScopeDID(for: account.did)
         let beforeGen = AccountMutationHub.shared.generation(for: scopeDID)
-        let mutationGen = try await storage.saveAccount(account, for: account.did)
+        let mutationGen = try await storage.saveAccountReturningGeneration(account, for: account.did)
         if mutationGen == beforeGen + 2 && AccountMutationHub.shared.generation(for: scopeDID) == mutationGen {
             accountsCache[account.did] = (account: account, generation: mutationGen)
         }
@@ -592,7 +592,7 @@ actor AccountManager: AccountManaging {
         account.bskyAppViewDID = bskyAppViewDID
         account.bskyChatDID = bskyChatDID
 
-        let mutationGen = try await storage.saveAccount(account, for: did)
+        let mutationGen = try await storage.saveAccountReturningGeneration(account, for: did)
         if mutationGen == beforeGen + 2 && AccountMutationHub.shared.generation(for: scopeDID) == mutationGen {
             accountsCache[did] = (account: account, generation: mutationGen)
         }

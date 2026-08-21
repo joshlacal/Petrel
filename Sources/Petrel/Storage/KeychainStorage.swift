@@ -321,8 +321,12 @@ public actor KeychainStorage {
     /// - Parameters:
     ///   - account: The account to save
     ///   - did: The DID of the account
-    @discardableResult
-    public func saveAccount(_ account: Account, for did: String) async throws -> UInt64 {
+    public func saveAccount(_ account: Account, for did: String) async throws {
+        _ = try await saveAccountReturningGeneration(account, for: did)
+    }
+
+    /// Internal helper that saves an account and returns the post-mutation commit generation.
+    func saveAccountReturningGeneration(_ account: Account, for did: String) async throws -> UInt64 {
         let scopeDID = accountScopeDID(for: did)
         AccountMutationHub.shared.bumpGeneration(for: scopeDID)
         let key = makeKey("account", did: did)

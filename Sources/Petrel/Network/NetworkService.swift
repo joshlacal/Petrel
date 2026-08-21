@@ -355,6 +355,7 @@ public actor NetworkService: NetworkServiceProtocol {
     }()
     #if DEBUG
         nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
+        nonisolated(unsafe) static var dnsResolverOverride: (@Sendable (String) -> [String]?)?
     #endif
     private var authContinuityRevision: UInt64 = 0
     private var authContinuityRevisionExhausted = false
@@ -2328,6 +2329,11 @@ public actor NetworkService: NetworkServiceProtocol {
     // MARK: - SSRF Hardeners
 
     private static func resolveHostIPs(host: String) -> [String] {
+        #if DEBUG
+            if let override = dnsResolverOverride, let ips = override(host) {
+                return ips
+            }
+        #endif
         var results: [String] = []
         var hints = addrinfo()
         hints.ai_flags = AI_ADDRCONFIG

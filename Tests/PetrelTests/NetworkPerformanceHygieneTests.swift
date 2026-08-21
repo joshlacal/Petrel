@@ -3,8 +3,8 @@ import Foundation
     import FoundationNetworking
 #endif
 @testable import Petrel
+import Synchronization
 import Testing
-
 private actor Counter {
     var count = 0
     func increment() {
@@ -300,6 +300,16 @@ struct NetworkPerformanceHygieneTests {
 
     @Test("NetworkService creates request for legitimate hostnames")
     func networkServiceValidatesLegitimateHost() async throws {
+        NetworkService.dnsResolverOverride = { host in
+            if host == "bsky.social" {
+                return ["104.244.42.1"]
+            }
+            return nil
+        }
+        defer {
+            NetworkService.dnsResolverOverride = nil
+        }
+
         let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
 
         let req1 = try await service.createURLRequest(
@@ -317,13 +327,11 @@ struct NetworkPerformanceHygieneTests {
         let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
 
         let cancellationHost = "cancellation-test.bsky.social"
-        let enteredOperation = Flag()
+        let enteredOperation = AsyncBarrier()
 
         NetworkService.dnsResolutionHook = { host, isCancelled in
             guard host == cancellationHost else { return }
-            Task {
-                await enteredOperation.setTrue()
-            }
+            enteredOperation.signal()
             while !isCancelled() {
                 Thread.sleep(forTimeInterval: 0.002)
             }
@@ -342,25 +350,47 @@ struct NetworkPerformanceHygieneTests {
             )
         }
 
-        // Wait until the BlockOperation has actually been dequeued and started on the OperationQueue thread
-        while !(await enteredOperation.get()) {
-            try await Task.sleep(nanoseconds: 5_000_000)
-        }
+        // Wait with a bounded timeout until the BlockOperation has actually been dequeued and started
+        try await enteredOperation.waitUntilSignaled(timeoutNanoseconds: 5_000_000_000)
 
         let cancelStartTime = ContinuousClock.now
 
         // Cancel while the operation is actively running on dnsResolutionQueue
         task.cancel()
 
-        // Assert that CancellationError reaches caller promptly (within 200ms)
-        do {
-            _ = try await task.value
-            Issue.record("Expected CancellationError, but task.value completed successfully")
-        } catch is CancellationError {
-            let elapsed = ContinuousClock.now - cancelStartTime
-            #expect(elapsed < .milliseconds(200))
-        } catch {
+        // Assert that CancellationError reaches caller promptly (within 200ms) with a bounded race against a clock deadline
+        let completionBarrier = AsyncBarrier()
+        let resultHolder = Mutex<(result: Result<URLRequest, any Error>?, elapsed: Duration?)>((nil, nil))
+
+        Task {
+            do {
+                let req = try await task.value
+                resultHolder.withLock {
+                    $0 = (.success(req), ContinuousClock.now - cancelStartTime)
+                }
+            } catch {
+                resultHolder.withLock {
+                    $0 = (.failure(error), ContinuousClock.now - cancelStartTime)
+                }
+            }
+            completionBarrier.signal()
+        }
+
+        let completed = try await completionBarrier.wait(timeoutNanoseconds: 2_000_000_000)
+        #expect(completed, "Timed out waiting for cancelled DNS resolution to complete")
+        guard completed else { return }
+        let (result, elapsed) = resultHolder.withLock { $0 }
+        switch result {
+        case .failure(is CancellationError):
+            if let elapsed {
+                #expect(elapsed < .milliseconds(200))
+            }
+        case .failure(let error):
             Issue.record("Expected CancellationError, but got: \(error)")
+        case .success:
+            Issue.record("Expected CancellationError, but task.value completed successfully")
+        case nil:
+            Issue.record("Task result was missing")
         }
     }
 }
