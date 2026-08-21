@@ -615,8 +615,8 @@ struct SpaceCredentialManagerTests {
         #expect(cred2.expiresAt > cred1.expiresAt)
     }
 
-    @Test("exchange classifies 401 InvalidDelegationToken as tokenRejected naming host")
-    func exchangeClassifiesTokenRejected() async throws {
+    @Test("exchange classifies 401 InvalidDelegationToken as tokenRejected with plain message when probe returns nothing")
+    func exchangeClassifiesTokenRejectedProbeFailed() async throws {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
@@ -632,6 +632,67 @@ struct SpaceCredentialManagerTests {
             if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
                 let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                 let body = #"{"error":"InvalidDelegationToken","message":"Delegation token signature invalid"}"#.data(using: .utf8)!
+                return (resp, body)
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.server.describeServer" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+                return (resp, Data())
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token" }
+        )
+
+        do {
+            _ = try await manager.credential(for: space)
+            Issue.record("Expected credential to throw tokenRejected")
+        } catch let err as SpaceCredentialError {
+            guard case .tokenRejected(let host, let error, let msg, let evidence) = err else {
+                Issue.record("Expected .tokenRejected, got \(err)")
+                return
+            }
+            #expect(host == "space.test")
+            #expect(error == "InvalidDelegationToken")
+            #expect(msg == "Delegation token signature invalid")
+            #expect(evidence == nil)
+            let desc = err.errorDescription ?? ""
+            #expect(desc == "space.test rejected the delegation token as invalid (not an access denial; membership is unaffected).")
+            #expect(!desc.contains("usually means"))
+            #expect(!desc.contains("different permissioned-data profile"))
+        } catch {
+            Issue.record("Expected SpaceCredentialError, got \(error)")
+        }
+    }
+
+    @Test("exchange classifies 401 InvalidDelegationToken and cites identifying evidence when probe succeeds")
+    func exchangeClassifiesTokenRejectedProbeSucceeded() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString.contains("plc.directory") || urlString.contains(".well-known/did.json") {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                return (resp, Data(self.didDocJSON.utf8))
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let body = #"{"error":"InvalidDelegationToken","message":"Delegation token signature invalid"}"#.data(using: .utf8)!
+                return (resp, body)
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.server.describeServer" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let body = #"{"did":"did:web:space.test","availableUserDomains":[],"inviteCodeRequired":true,"swanProfile":"permissioned-data-0016-2026-07-30"}"#.data(using: .utf8)!
                 return (resp, body)
             }
             let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
@@ -650,16 +711,70 @@ struct SpaceCredentialManagerTests {
             _ = try await manager.credential(for: space)
             Issue.record("Expected credential to throw tokenRejected")
         } catch let err as SpaceCredentialError {
-            guard case .tokenRejected(let host, let error, let msg) = err else {
+            guard case .tokenRejected(let host, let error, let msg, let evidence) = err else {
                 Issue.record("Expected .tokenRejected, got \(err)")
                 return
             }
             #expect(host == "space.test")
             #expect(error == "InvalidDelegationToken")
             #expect(msg == "Delegation token signature invalid")
+            #expect(evidence == "swanProfile=permissioned-data-0016-2026-07-30")
             let desc = err.errorDescription ?? ""
-            #expect(desc.contains("space.test"))
-            #expect(desc.contains("rejected the delegation token as invalid (not an access denial)"))
+            #expect(desc == "space.test rejected the delegation token as invalid (not an access denial; membership is unaffected). space.test reports: swanProfile=permissioned-data-0016-2026-07-30.")
+            #expect(!desc.contains("usually means"))
+        } catch {
+            Issue.record("Expected SpaceCredentialError, got \(error)")
+        }
+    }
+
+    @Test("exchange tokenRejected probe timeout does not fail or hang error path")
+    func exchangeClassifiesTokenRejectedProbeTimeout() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString.contains("plc.directory") || urlString.contains(".well-known/did.json") {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                return (resp, Data(self.didDocJSON.utf8))
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let body = #"{"error":"InvalidDelegationToken","message":"Expired delegation token"}"#.data(using: .utf8)!
+                return (resp, body)
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.server.describeServer" {
+                // Simulate network error / connection dropped
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!
+                return (resp, Data("server error".utf8))
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token" }
+        )
+
+        do {
+            _ = try await manager.credential(for: space)
+            Issue.record("Expected credential to throw tokenRejected")
+        } catch let err as SpaceCredentialError {
+            guard case .tokenRejected(let host, _, _, let evidence) = err else {
+                Issue.record("Expected .tokenRejected, got \(err)")
+                return
+            }
+            #expect(host == "space.test")
+            #expect(evidence == nil)
+            let desc = err.errorDescription ?? ""
+            #expect(desc == "space.test rejected the delegation token as invalid (not an access denial; membership is unaffected).")
         } catch {
             Issue.record("Expected SpaceCredentialError, got \(error)")
         }

@@ -33,7 +33,7 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     case missingDelegationToken
     case spaceDeleted(host: String, message: String?)
     case authorizationRefused(host: String, error: String, message: String?)
-    case tokenRejected(host: String, error: String, message: String?)
+    case tokenRejected(host: String, error: String, message: String?, evidence: String? = nil)
     case exchangeFailed(statusCode: Int, message: String)
     case invalidToken(String)
     case invalidResponse
@@ -55,8 +55,11 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
                 return "You no longer have access to this space (\(host) refused authorization: \(message))"
             }
             return "You no longer have access to this space (\(host) refused authorization: \(error))"
-        case .tokenRejected(let host, _, _):
-            return "\(host) rejected the delegation token as invalid (not an access denial). This usually means \(host) is running a different permissioned-data profile than the token issuer."
+        case .tokenRejected(let host, _, _, let evidence):
+            if let evidence, !evidence.isEmpty {
+                return "\(host) rejected the delegation token as invalid (not an access denial; membership is unaffected). \(host) reports: \(evidence)."
+            }
+            return "\(host) rejected the delegation token as invalid (not an access denial; membership is unaffected)."
         case .exchangeFailed(let statusCode, let message):
             return "Space credential exchange failed with status \(statusCode): \(message)"
         case .invalidToken(let reason):
@@ -362,7 +365,13 @@ public actor SpaceCredentialManager {
                 rawBody.localizedCaseInsensitiveContains("InvalidToken")
             )
             if isTokenRejected {
-                throw SpaceCredentialError.tokenRejected(host: host, error: errorName ?? "InvalidDelegationToken", message: serverMessage)
+                let evidence = await probeServerEvidence(spaceHost: endpoints.spaceHost)
+                throw SpaceCredentialError.tokenRejected(
+                    host: host,
+                    error: errorName ?? "InvalidDelegationToken",
+                    message: serverMessage,
+                    evidence: evidence
+                )
             }
 
             let isAuthRefused = httpResponse.statusCode == 403 ||
@@ -420,5 +429,109 @@ public actor SpaceCredentialManager {
         comps.fragment = nil
         comps.query = nil
         return comps.string ?? url.absoluteString
+    }
+
+    private func probeServerEvidence(spaceHost: URL) async -> String? {
+        guard Self.isSecureOrLoopback(spaceHost) else { return nil }
+        let describeURL: URL
+        if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
+            describeURL = spaceHost.appending(path: "xrpc/com.atproto.server.describeServer")
+        } else {
+            describeURL = spaceHost.appendingPathComponent("xrpc/com.atproto.server.describeServer")
+        }
+        guard Self.isSecureOrLoopback(describeURL) else { return nil }
+
+        var request = URLRequest(url: describeURL, cachePolicy: .reloadIgnoringLocalCacheData, timeoutInterval: 2.0)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        do {
+            let (data, response) = try await withThrowingTaskGroup(of: (Data, URLResponse).self) { group in
+                group.addTask { [request, urlSession] in
+                    try await urlSession.data(for: request)
+                }
+                group.addTask {
+                    try await Task.sleep(nanoseconds: 2_000_000_000)
+                    throw URLError(.timedOut)
+                }
+                guard let firstResult = try await group.next() else {
+                    throw URLError(.cancelled)
+                }
+                group.cancelAll()
+                return firstResult
+            }
+
+            guard let httpResponse = response as? HTTPURLResponse,
+                  (200...299).contains(httpResponse.statusCode) else {
+                return nil
+            }
+
+            guard let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+                return nil
+            }
+
+            return Self.extractIdentifyingEvidence(from: json)
+        } catch {
+            return nil
+        }
+    }
+
+    private static func extractIdentifyingEvidence(from json: [String: Any]) -> String? {
+        let standardKeys: Set<String> = [
+            "did",
+            "availableUserDomains",
+            "inviteCodeRequired",
+            "phoneVerificationRequired",
+            "blobUploadLimit",
+            "links",
+            "contact",
+        ]
+
+        var citations: [String] = []
+        let prioritizedKeys = [
+            "swanProfile",
+            "profile",
+            "serverProfile",
+            "version",
+            "serverVersion",
+            "protocolVersion",
+            "implementation",
+            "software",
+            "build",
+            "revision",
+        ]
+
+        for key in prioritizedKeys {
+            if let val = json[key], !(val is NSNull) {
+                let valStr = String(describing: val).trimmingCharacters(in: .whitespacesAndNewlines)
+                if !valStr.isEmpty {
+                    citations.append("\(key)=\(valStr)")
+                }
+            }
+        }
+
+        if citations.isEmpty {
+            let sortedKeys = json.keys.sorted()
+            for key in sortedKeys {
+                guard !standardKeys.contains(key) else { continue }
+                let lower = key.lowercased()
+                if lower.contains("profile") ||
+                    lower.contains("version") ||
+                    lower.contains("revision") ||
+                    lower.contains("build") ||
+                    lower.contains("software") ||
+                    lower.contains("impl") {
+                    if let val = json[key], !(val is NSNull) {
+                        let valStr = String(describing: val).trimmingCharacters(in: .whitespacesAndNewlines)
+                        if !valStr.isEmpty {
+                            citations.append("\(key)=\(valStr)")
+                        }
+                    }
+                }
+            }
+        }
+
+        guard !citations.isEmpty else { return nil }
+        return citations.joined(separator: ", ")
     }
 }
