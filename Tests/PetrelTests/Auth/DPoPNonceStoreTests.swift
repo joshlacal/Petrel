@@ -33,24 +33,106 @@ final class RetrievalGate: @unchecked Sendable {
         releaseSemaphore.wait()
     }
 
-    func waitUntilHeld() async {
-        await withCheckedContinuation { continuation in
-            lock.lock()
-            if held {
-                lock.unlock()
-                continuation.resume()
-            } else {
-                heldWaiter = continuation
-                lock.unlock()
+    func waitUntilHeld(timeoutNanoseconds: UInt64 = 5_000_000_000) async throws {
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            group.addTask {
+                await withCheckedContinuation { continuation in
+                    self.lock.lock()
+                    if self.held {
+                        self.lock.unlock()
+                        continuation.resume()
+                    } else {
+                        self.heldWaiter = continuation
+                        self.lock.unlock()
+                    }
+                }
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                throw TimeoutError()
+            }
+            do {
+                try await group.next()
+                group.cancelAll()
+            } catch {
+                self.release()
+                group.cancelAll()
+                throw error
             }
         }
     }
 
     func release() {
+        lock.lock()
         releaseSemaphore.signal()
+        lock.unlock()
     }
 }
 
+struct TimeoutError: Error, CustomStringConvertible {
+    var description: String { "Timed out waiting for synchronization point" }
+}
+
+/// Single-shot asynchronous barrier with bounded wait.
+final class AsyncBarrier: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isSignaled = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func signal() {
+        lock.lock()
+        isSignaled = true
+        let list = waiters
+        waiters.removeAll()
+        lock.unlock()
+        for w in list {
+            w.resume()
+        }
+    }
+
+    func wait(timeoutNanoseconds: UInt64 = 5_000_000_000, onTimeout: (@Sendable () -> Void)? = nil) async throws -> Bool {
+        try await withThrowingTaskGroup(of: Bool.self) { group in
+            group.addTask {
+                await self.awaitSignal()
+                return true
+            }
+            group.addTask {
+                try await Task.sleep(nanoseconds: timeoutNanoseconds)
+                self.cancelWaiters()
+                return false
+            }
+            let result = try await group.next() ?? false
+            if !result {
+                onTimeout?()
+            }
+            group.cancelAll()
+            return result
+        }
+    }
+
+    private func awaitSignal() async {
+        await withCheckedContinuation { continuation in
+            self.lock.lock()
+            if self.isSignaled {
+                self.lock.unlock()
+                continuation.resume()
+            } else {
+                self.waiters.append(continuation)
+                self.lock.unlock()
+            }
+        }
+    }
+
+    private func cancelWaiters() {
+        lock.lock()
+        let list = waiters
+        waiters.removeAll()
+        lock.unlock()
+        for w in list {
+            w.resume()
+        }
+    }
+}
 /// Runs `body` with an injected in-memory storage backend, always restoring the
 /// platform default afterwards.
 private func withInMemoryStorage<T>(
@@ -589,6 +671,8 @@ struct DPoPNonceStoreTests {
     @Test("Coalesced waiters reject material invalidated during retrieval")
     func invalidationDuringCoalescedLoadRejectsStaleMaterial() async throws {
         let backend = InMemorySecureStorage()
+        let gate = RetrievalGate()
+        defer { gate.release() }
         try await withInMemoryStorage(backend) {
             let reader = KeychainStorage(namespace: "test.dpop.race")
             let mutator = KeychainStorage(namespace: "test.dpop.race")
@@ -598,23 +682,30 @@ struct DPoPNonceStoreTests {
             let key2 = P256.Signing.PrivateKey()
             try await mutator.saveDPoPKey(key1, for: did)
 
-            let gate = RetrievalGate()
+            let coalescedWaiterReached = AsyncBarrier()
+            await core.setCoalescedWaiterHook {
+                coalescedWaiterReached.signal()
+            }
+
             backend.retrieveGate = gate
             let first = Task { try await core.getOrCreateDPoPMaterial(for: did) }
-            await gate.waitUntilHeld()
+            try await gate.waitUntilHeld()
+
             let second = Task { try await core.getOrCreateDPoPMaterial(for: did) }
-            await Task.yield()
+            let enteredCoalescedBranch = try await coalescedWaiterReached.wait(timeoutNanoseconds: 2_000_000_000, onTimeout: {
+                gate.release()
+            })
+            #expect(enteredCoalescedBranch, "Expected second task to enter coalesced-waiter branch before mutation")
+            guard enteredCoalescedBranch else { return }
 
             try await mutator.saveDPoPKey(key2, for: did)
             gate.release()
-
             let firstMaterial = try await first.value
             let secondMaterial = try await second.value
             #expect(firstMaterial.privateKey.rawRepresentation == key2.rawRepresentation)
             #expect(secondMaterial.privateKey.rawRepresentation == key2.rawRepresentation)
         }
     }
-
     @Test("KeychainStorage DPoP key mutations synchronously invalidate OAuthCore cache without sleep")
     func storageMutationsInvalidateCache() async throws {
         let backend = InMemorySecureStorage()

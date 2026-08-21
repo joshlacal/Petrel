@@ -62,6 +62,9 @@ actor OAuthCore {
     private var activeDPoPLoadTasks: [String: (generation: UInt64, task: Task<DPoPMaterial, Error>)] = [:]
     /// Token for the DPoP key mutation observer. Initialized during init and cleaned up in deinit.
     private nonisolated(unsafe) var dpopKeyObserverToken: UUID?
+    /// Test-only hook invoked when entering the coalesced-waiter branch of `getOrCreateDPoPMaterial`.
+    var onCoalescedDPoPWaiterAwaited: (@Sendable () -> Void)?
+
 
 
     /// Which thumbprints hold cached nonces for which DID, so one account's logout
@@ -279,6 +282,7 @@ actor OAuthCore {
             }
             let currentGen = KeychainStorage.dpopKeyMutationHub.generation(for: did)
             if let entry = activeDPoPLoadTasks[did], entry.generation == currentGen {
+                onCoalescedDPoPWaiterAwaited?()
                 do {
                     let material = try await entry.task.value
                     if KeychainStorage.dpopKeyMutationHub.generation(for: did) == currentGen {
@@ -328,6 +332,11 @@ actor OAuthCore {
                 throw error
             }
         }
+    }
+
+    /// Injects a test hook invoked whenever a concurrent caller awaits an active in-flight load task.
+    func setCoalescedWaiterHook(_ hook: (@Sendable () -> Void)?) {
+        self.onCoalescedDPoPWaiterAwaited = hook
     }
 
     func clearDPoPKeyCache(for did: String) {
