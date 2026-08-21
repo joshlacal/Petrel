@@ -58,6 +58,28 @@ public struct ATProtoError<ErrorType: ATProtoErrorType>: Error, LocalizedError {
         return error.errorName
     }
 }
+/// An XRPC error returned by an AT Protocol service, preserving the exact server-provided error code and message.
+public struct ATProtoXRPCError: Error, LocalizedError, Sendable, Equatable {
+    /// The error code string from the server (e.g. "InvalidRequest", "ExpiredToken", "SpaceNotFound").
+    public let error: String
+    /// The human-readable message from the server, if provided.
+    public let message: String?
+    /// The HTTP status code.
+    public let statusCode: Int
+
+    public init(error: String, message: String? = nil, statusCode: Int) {
+        self.error = error
+        self.message = message
+        self.statusCode = statusCode
+    }
+
+    public var errorDescription: String? {
+        if let message = message, !message.isEmpty {
+            return "\(error): \(message)"
+        }
+        return error
+    }
+}
 
 /// Helper for parsing error responses
 public enum ATProtoErrorParser {
@@ -79,5 +101,19 @@ public enum ATProtoErrorParser {
         }
 
         return ATProtoError(error: matchedError, message: errorResponse.message, statusCode: statusCode)
+    }
+
+    /// Attempts to parse any generic XRPC error response { "error": "...", "message": "..." } or non-empty error text.
+    public static func parseGeneric(
+        data: Data,
+        statusCode: Int
+    ) -> ATProtoXRPCError? {
+        if let errorResponse = try? JSONDecoder().decode(ATProtoErrorResponse.self, from: data) {
+            return ATProtoXRPCError(error: errorResponse.error, message: errorResponse.message, statusCode: statusCode)
+        }
+        if let text = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines), !text.isEmpty {
+            return ATProtoXRPCError(error: "HTTP \(statusCode)", message: text, statusCode: statusCode)
+        }
+        return nil
     }
 }

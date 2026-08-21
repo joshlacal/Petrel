@@ -54,4 +54,65 @@ final class ATProtoErrorTests: XCTestCase {
 
         XCTAssertNil(parsed)
     }
+
+    func testParseGenericReturnsXRPCErrorWithCodeAndMessage() throws {
+        let data = Data(
+            #"{"error":"InvalidToken","message":"Token has expired"}"#.utf8
+        )
+
+        let parsed = try XCTUnwrap(
+            ATProtoErrorParser.parseGeneric(
+                data: data,
+                statusCode: 400
+            )
+        )
+
+        XCTAssertEqual(parsed.error, "InvalidToken")
+        XCTAssertEqual(parsed.message, "Token has expired")
+        XCTAssertEqual(parsed.statusCode, 400)
+        XCTAssertEqual(parsed.errorDescription, "InvalidToken: Token has expired")
+    }
+
+    func testParseGenericReturnsXRPCErrorWithoutMessage() throws {
+        let data = Data(
+            #"{"error":"RateLimitExceeded"}"#.utf8
+        )
+
+        let parsed = try XCTUnwrap(
+            ATProtoErrorParser.parseGeneric(
+                data: data,
+                statusCode: 429
+            )
+        )
+
+        XCTAssertEqual(parsed.error, "RateLimitExceeded")
+        XCTAssertNil(parsed.message)
+        XCTAssertEqual(parsed.statusCode, 429)
+        XCTAssertEqual(parsed.errorDescription, "RateLimitExceeded")
+    }
+
+    func testParseGenericFallbackToPlainText() throws {
+        let data = Data("Internal Server Error".utf8)
+
+        let parsed = try XCTUnwrap(
+            ATProtoErrorParser.parseGeneric(
+                data: data,
+                statusCode: 500
+            )
+        )
+
+        XCTAssertEqual(parsed.error, "HTTP 500")
+        XCTAssertEqual(parsed.message, "Internal Server Error")
+        XCTAssertEqual(parsed.statusCode, 500)
+        XCTAssertEqual(parsed.errorDescription, "HTTP 500: Internal Server Error")
+    }
+
+    func testParseGenericEmptyDataReturnsNil() {
+        let parsed = ATProtoErrorParser.parseGeneric(
+            data: Data(),
+            statusCode: 502
+        )
+
+        XCTAssertNil(parsed)
+    }
 }
