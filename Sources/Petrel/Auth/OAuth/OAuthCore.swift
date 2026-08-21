@@ -64,6 +64,8 @@ actor OAuthCore {
     private nonisolated(unsafe) var dpopKeyObserverToken: UUID?
     /// Test-only hook invoked when entering the coalesced-waiter branch of `getOrCreateDPoPMaterial`.
     var onCoalescedDPoPWaiterAwaited: (@Sendable () -> Void)?
+    private let encoder = JSONEncoder()
+    private let decoder = JSONDecoder()
 
 
 
@@ -259,7 +261,7 @@ actor OAuthCore {
             jwk: jwk,
             type: "dpop+jwt"
         )
-        let headerData = try JSONCoders.encode(header)
+        let headerData = try encoder.encode(header)
         let headerBase64 = headerData.base64URLEscaped()
         return DPoPMaterial(
             privateKey: privateKey,
@@ -467,7 +469,7 @@ actor OAuthCore {
             nonce: finalNonce
         )
 
-        let jwtPayloadData = try JSONCoders.encode(payload)
+        let jwtPayloadData = try encoder.encode(payload)
         let signingInput = "\(headerBase64).\(base64URLEncode(jwtPayloadData))"
         let signatureData = try privateKey.signature(for: Data(signingInput.utf8))
         let signatureBase64 = base64URLEncode(signatureData.rawRepresentation)
@@ -726,7 +728,7 @@ actor OAuthCore {
         for attempt in 1 ... maxRetries {
             do {
                 let (data, _) = try await networkService.request(request)
-                return try JSONCoders.decode(ProtectedResourceMetadata.self, from: data)
+                return try decoder.decode(ProtectedResourceMetadata.self, from: data)
             } catch {
                 lastError = error
                 if attempt < maxRetries {
@@ -750,7 +752,7 @@ actor OAuthCore {
         for attempt in 1 ... maxRetries {
             do {
                 let (data, _) = try await networkService.request(request)
-                return try JSONCoders.decode(AuthorizationServerMetadata.self, from: data)
+                return try decoder.decode(AuthorizationServerMetadata.self, from: data)
             } catch {
                 lastError = error
                 if attempt < maxRetries {
@@ -847,7 +849,7 @@ actor OAuthCore {
         guard let httpResponse = response as? HTTPURLResponse else { throw AuthError.invalidResponse }
 
         if (200 ... 299).contains(httpResponse.statusCode) {
-            guard let parResponse = try? JSONCoders.decode(PARResponse.self, from: data) else {
+            guard let parResponse = try? decoder.decode(PARResponse.self, from: data) else {
                 throw AuthError.invalidResponse
             }
             let requestURI = parResponse.requestURI
@@ -861,7 +863,7 @@ actor OAuthCore {
         } else if httpResponse.statusCode == 400 {
             let dpopNonceHeader = extractNonceFromHeaders(httpResponse.allHeaderFields)
             var isNonceError = false
-            if let errorResponse = try? JSONCoders.decode(OAuthErrorResponse.self, from: data),
+            if let errorResponse = try? decoder.decode(OAuthErrorResponse.self, from: data),
                errorResponse.error == "use_dpop_nonce"
             {
                 isNonceError = true
@@ -888,7 +890,7 @@ actor OAuthCore {
                 }
 
                 if (200 ... 299).contains(retryHttpResponse.statusCode) {
-                    guard let parResponse = try? JSONCoders.decode(PARResponse.self, from: retryData) else {
+                    guard let parResponse = try? decoder.decode(PARResponse.self, from: retryData) else {
                         throw AuthError.invalidResponse
                     }
                     let parNonce = extractNonceFromHeaders(retryHttpResponse.allHeaderFields)
