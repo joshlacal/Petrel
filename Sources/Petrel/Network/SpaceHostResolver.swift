@@ -109,7 +109,8 @@ public actor SpaceHostResolver {
         return try SpaceAuthorityEndpoints.extract(from: doc)
     }
 
-    private func fetchDIDDocument(for did: String) async throws -> DIDDocument {
+    /// Pure helper to construct the canonical DID document URL for `did:plc:` and `did:web:` per specifications.
+    public static func didDocumentURL(for did: String) throws -> URL {
         let endpoint: String
         if did.starts(with: "did:plc:") {
             endpoint = "https://plc.directory/\(did)"
@@ -132,7 +133,12 @@ public actor SpaceHostResolver {
         guard let url = URL(string: endpoint) else {
             throw SpaceHostResolutionError.invalidDID(did)
         }
+        return url
+    }
 
+    /// Fetches and decodes the DID document using a given URLSession.
+    public static func fetchDIDDocument(for did: String, urlSession: URLSession = .shared) async throws -> DIDDocument {
+        let url = try didDocumentURL(for: did)
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -156,5 +162,9 @@ public actor SpaceHostResolver {
         } catch {
             throw SpaceHostResolutionError.decodingError(error.localizedDescription)
         }
+    }
+
+    public func fetchDIDDocument(for did: String) async throws -> DIDDocument {
+        try await Self.fetchDIDDocument(for: did, urlSession: urlSession)
     }
 }
