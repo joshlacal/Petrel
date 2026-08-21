@@ -29,8 +29,11 @@ public struct SpaceCredential: Sendable {
 
 // MARK: - SpaceCredentialError
 
-enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
+public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     case missingDelegationToken
+    case spaceDeleted(host: String, message: String?)
+    case authorizationRefused(host: String, error: String, message: String?)
+    case tokenRejected(host: String, error: String, message: String?)
     case exchangeFailed(statusCode: Int, message: String)
     case invalidToken(String)
     case invalidResponse
@@ -38,10 +41,22 @@ enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     case invalidSpaceRef(String)
     case insecureURL(String)
 
-    var errorDescription: String? {
+    public var errorDescription: String? {
         switch self {
         case .missingDelegationToken:
             return "Failed to obtain delegation token for space"
+        case .spaceDeleted(let host, let message):
+            if let message, !message.isEmpty {
+                return "SpaceDeleted: \(message)"
+            }
+            return "SpaceDeleted: The space was deleted by authority at \(host)"
+        case .authorizationRefused(let host, let error, let message):
+            if let message, !message.isEmpty {
+                return "You no longer have access to this space (\(host) refused authorization: \(message))"
+            }
+            return "You no longer have access to this space (\(host) refused authorization: \(error))"
+        case .tokenRejected(let host, _, _):
+            return "\(host) rejected the delegation token as invalid (not an access denial). This usually means \(host) is running a different permissioned-data profile than the token issuer."
         case .exchangeFailed(let statusCode, let message):
             return "Space credential exchange failed with status \(statusCode): \(message)"
         case .invalidToken(let reason):
@@ -149,7 +164,7 @@ enum SpaceDPoP {
 // MARK: - SpaceCredentialManager
 
 public actor SpaceCredentialManager {
-    typealias DelegationTokenProvider = @Sendable (SpaceRef) async throws -> String
+    public typealias DelegationTokenProvider = @Sendable (SpaceRef) async throws -> String
 
     private let client: ATProtoClient
     private let resolver: SpaceHostResolver
@@ -163,12 +178,13 @@ public actor SpaceCredentialManager {
     public init(
         client: ATProtoClient,
         resolver: SpaceHostResolver,
-        urlSession: URLSession = .shared
+        urlSession: URLSession = .shared,
+        delegationTokenProvider: (@Sendable (SpaceRef) async throws -> String)? = nil
     ) {
         self.client = client
         self.resolver = resolver
         self.urlSession = urlSession
-        self.delegationTokenProvider = { [client] space in
+        self.delegationTokenProvider = delegationTokenProvider ?? { [client] space in
             let (_, output) = try await client.com.atproto.space.getDelegationToken(
                 input: .init(space: space)
             )
@@ -177,19 +193,6 @@ public actor SpaceCredentialManager {
             }
             return token
         }
-    }
-
-    /// Internal initializer with injectable delegation token provider for tests.
-    init(
-        client: ATProtoClient,
-        resolver: SpaceHostResolver,
-        urlSession: URLSession = .shared,
-        delegationTokenProvider: @escaping DelegationTokenProvider
-    ) {
-        self.client = client
-        self.resolver = resolver
-        self.urlSession = urlSession
-        self.delegationTokenProvider = delegationTokenProvider
     }
 
     /// Cached credential for the space, exchanging a fresh one when absent
@@ -335,7 +338,45 @@ public actor SpaceCredentialManager {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            let message = String(data: data, encoding: .utf8) ?? "HTTP \(httpResponse.statusCode)"
+            let host = endpoints.spaceHost.host ?? endpoints.spaceHost.absoluteString
+            let parsed = ATProtoErrorParser.parseGeneric(data: data, statusCode: httpResponse.statusCode)
+            let errorName = parsed?.error
+            let serverMessage = parsed?.message
+            let rawBody = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let message = serverMessage ?? (rawBody.isEmpty ? "HTTP \(httpResponse.statusCode)" : rawBody)
+
+            let isSpaceDeleted = errorName == "SpaceDeleted" ||
+                rawBody.localizedCaseInsensitiveContains("SpaceDeleted")
+            if isSpaceDeleted {
+                throw SpaceCredentialError.spaceDeleted(host: host, message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
+            }
+
+            let isTokenRejected = httpResponse.statusCode == 401 && (
+                errorName == "InvalidDelegationToken" ||
+                errorName == "InvalidToken" ||
+                errorName == "ExpiredToken" ||
+                errorName == "invalid_token" ||
+                errorName == "InvalidClientAttestation" ||
+                rawBody.localizedCaseInsensitiveContains("InvalidDelegationToken") ||
+                rawBody.localizedCaseInsensitiveContains("invalid_token") ||
+                rawBody.localizedCaseInsensitiveContains("InvalidToken")
+            )
+            if isTokenRejected {
+                throw SpaceCredentialError.tokenRejected(host: host, error: errorName ?? "InvalidDelegationToken", message: serverMessage)
+            }
+
+            let isAuthRefused = httpResponse.statusCode == 403 ||
+                errorName == "UserNotAuthorized" ||
+                errorName == "AppNotAuthorized" ||
+                errorName == "NotAuthorized" ||
+                errorName == "AccessDenied" ||
+                errorName == "Forbidden" ||
+                errorName == "PermissionDenied" ||
+                errorName == "AuthError"
+            if isAuthRefused {
+                throw SpaceCredentialError.authorizationRefused(host: host, error: errorName ?? "HTTP 403", message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
+            }
+
             throw SpaceCredentialError.exchangeFailed(statusCode: httpResponse.statusCode, message: message)
         }
 

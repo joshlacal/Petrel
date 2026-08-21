@@ -614,4 +614,201 @@ struct SpaceCredentialManagerTests {
         #expect(exchangeCount.withLock { $0 } == 2)
         #expect(cred2.expiresAt > cred1.expiresAt)
     }
+
+    @Test("exchange classifies 401 InvalidDelegationToken as tokenRejected naming host")
+    func exchangeClassifiesTokenRejected() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString.contains("plc.directory") || urlString.contains(".well-known/did.json") {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                return (resp, Data(self.didDocJSON.utf8))
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let body = #"{"error":"InvalidDelegationToken","message":"Delegation token signature invalid"}"#.data(using: .utf8)!
+                return (resp, body)
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token" }
+        )
+
+        do {
+            _ = try await manager.credential(for: space)
+            Issue.record("Expected credential to throw tokenRejected")
+        } catch let err as SpaceCredentialError {
+            guard case .tokenRejected(let host, let error, let msg) = err else {
+                Issue.record("Expected .tokenRejected, got \(err)")
+                return
+            }
+            #expect(host == "space.test")
+            #expect(error == "InvalidDelegationToken")
+            #expect(msg == "Delegation token signature invalid")
+            let desc = err.errorDescription ?? ""
+            #expect(desc.contains("space.test"))
+            #expect(desc.contains("rejected the delegation token as invalid (not an access denial)"))
+        } catch {
+            Issue.record("Expected SpaceCredentialError, got \(error)")
+        }
+    }
+
+    @Test("exchange classifies 403 UserNotAuthorized as authorizationRefused")
+    func exchangeClassifiesAuthorizationRefused() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString.contains("plc.directory") || urlString.contains(".well-known/did.json") {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                return (resp, Data(self.didDocJSON.utf8))
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 403, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let body = #"{"error":"UserNotAuthorized","message":"User is not a member of this space"}"#.data(using: .utf8)!
+                return (resp, body)
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token" }
+        )
+
+        do {
+            _ = try await manager.credential(for: space)
+            Issue.record("Expected credential to throw authorizationRefused")
+        } catch let err as SpaceCredentialError {
+            guard case .authorizationRefused(let host, let error, let msg) = err else {
+                Issue.record("Expected .authorizationRefused, got \(err)")
+                return
+            }
+            #expect(host == "space.test")
+            #expect(error == "UserNotAuthorized")
+            #expect(msg == "User is not a member of this space")
+            let desc = err.errorDescription ?? ""
+            #expect(desc.contains("You no longer have access to this space"))
+            #expect(desc.contains("space.test"))
+        } catch {
+            Issue.record("Expected SpaceCredentialError, got \(error)")
+        }
+    }
+
+    @Test("exchange classifies SpaceDeleted error as spaceDeleted")
+    func exchangeClassifiesSpaceDeleted() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString.contains("plc.directory") || urlString.contains(".well-known/did.json") {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                return (resp, Data(self.didDocJSON.utf8))
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let body = #"{"error":"SpaceDeleted","message":"The space was deleted"}"#.data(using: .utf8)!
+                return (resp, body)
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token" }
+        )
+
+        do {
+            _ = try await manager.credential(for: space)
+            Issue.record("Expected credential to throw spaceDeleted")
+        } catch let err as SpaceCredentialError {
+            guard case .spaceDeleted(let host, let msg) = err else {
+                Issue.record("Expected .spaceDeleted, got \(err)")
+                return
+            }
+            #expect(host == "space.test")
+            #expect(msg == "The space was deleted")
+            let desc = err.errorDescription ?? ""
+            #expect(desc.contains("SpaceDeleted"))
+        } catch {
+            Issue.record("Expected SpaceCredentialError, got \(error)")
+        }
+    }
+
+    @Test("exchange preserves opaque 500 error as exchangeFailed")
+    func exchangeClassifiesOpaque500() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString.contains("plc.directory") || urlString.contains(".well-known/did.json") {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                return (resp, Data(self.didDocJSON.utf8))
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: ["Content-Type": "text/plain"])!
+                let body = "Internal Server Error".data(using: .utf8)!
+                return (resp, body)
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token" }
+        )
+
+        do {
+            _ = try await manager.credential(for: space)
+            Issue.record("Expected credential to throw exchangeFailed")
+        } catch let err as SpaceCredentialError {
+            guard case .exchangeFailed(let statusCode, let message) = err else {
+                Issue.record("Expected .exchangeFailed, got \(err)")
+                return
+            }
+            #expect(statusCode == 500)
+            #expect(message == "Internal Server Error")
+            let desc = err.errorDescription ?? ""
+            #expect(desc.contains("500"))
+            #expect(desc.contains("Internal Server Error"))
+        } catch {
+            Issue.record("Expected SpaceCredentialError, got \(error)")
+        }
+    }
 }
