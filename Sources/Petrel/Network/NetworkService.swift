@@ -346,13 +346,11 @@ public actor NetworkService: NetworkServiceProtocol {
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
     private(set) var authorizationServerMetadata: AuthorizationServerMetadata?
     private let requestDeduplicator = RequestDeduplicator()
-    private struct HostValidationEntry: Sendable {
-        let isValid: Bool
-        let expiration: Date
-    }
-    private var hostValidationCache: [String: HostValidationEntry] = [:]
-    private let hostValidationTTL: TimeInterval = 60.0
-    private let maxHostValidationCacheSize = 256
+    private static let dnsResolutionQueue = DispatchQueue(
+        label: "com.joshlacalamito.Petrel.DNSResolution",
+        qos: .userInitiated,
+        attributes: .concurrent
+    )
     private var authContinuityRevision: UInt64 = 0
     private var authContinuityRevisionExhausted = false
     private var authContinuityObserverProviderID: ObjectIdentifier?
@@ -854,6 +852,7 @@ public actor NetworkService: NetworkServiceProtocol {
     /// Sets the authentication provider for authenticated requests
     /// - Parameter provider: The authentication provider
     public func setAuthenticationProvider(_ provider: AuthenticationProvider) async {
+        await requestDeduplicator.cancelAllRequests()
         if let continuityProvider = provider as? any AuthContinuityProviding,
            let currentProvider = authProvider as? any AuthContinuityProviding,
            currentProvider === continuityProvider
@@ -1174,8 +1173,9 @@ public actor NetworkService: NetworkServiceProtocol {
                 let request = requestToSend
 
                 // Use deduplicator for non-refresh requests to prevent concurrent identical calls
+                let authIdentity = authCtx?.did ?? request.value(forHTTPHeaderField: "Authorization")
                 let (data, response) = if !skipTokenRefresh {
-                    try await requestDeduplicator.deduplicate(request: request) { @Sendable in
+                    try await requestDeduplicator.deduplicate(request: request, authIdentity: authIdentity) { @Sendable in
                         return try await self.session.data(for: request)
                     }
                 } else {
@@ -1837,7 +1837,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
 
         // Validate URL for security
-        if !(await validateURL(resolvedURL)) {
+        if !(try await validateURL(resolvedURL)) {
             LogManager.logError("Security validation failed for URL: \(resolvedURL). This may be due to DNS resolution to private IP ranges or network configuration issues.")
             throw NetworkError.securityViolation
         }
@@ -2195,7 +2195,7 @@ public actor NetworkService: NetworkServiceProtocol {
     /// Validates the URL for security.
     /// - Parameter url: The URL to validate.
     /// - Returns: A boolean indicating whether the URL is valid.
-    private func validateURL(_ url: URL) async -> Bool {
+    private func validateURL(_ url: URL) async throws -> Bool {
         // Ensure only http or https schemes are allowed
         guard url.scheme == "https" || url.scheme == "http" else {
             LogManager.logError("Invalid URL scheme: \(url.scheme ?? "nil")")
@@ -2207,19 +2207,13 @@ public actor NetworkService: NetworkServiceProtocol {
 
         let normalizedHost = host.lowercased()
 
-        // Check cache first (actor-isolated, no locks needed)
-        let now = Date()
-        if let entry = hostValidationCache[normalizedHost], entry.expiration > now {
-            return entry.isValid
-        }
-
         // Quick check: if host is a literal IP, validate directly; otherwise resolve DNS
         let ips: [String]
         #if canImport(Network)
             if IPv4Address(normalizedHost) != nil || IPv6Address(normalizedHost) != nil {
                 ips = [normalizedHost]
             } else {
-                ips = await Self.resolveHostIPsOffActor(host: normalizedHost)
+                ips = try await Self.resolveHostIPsOffActor(host: normalizedHost)
             }
         #else
             // Linux: Simple regex check for IP literal
@@ -2228,49 +2222,82 @@ public actor NetworkService: NetworkServiceProtocol {
             if isIPv4 || isIPv6 {
                 ips = [normalizedHost]
             } else {
-                ips = await Self.resolveHostIPsOffActor(host: normalizedHost)
+                ips = try await Self.resolveHostIPsOffActor(host: normalizedHost)
             }
         #endif
 
         if ips.isEmpty {
             LogManager.logError("Failed to resolve host: \(normalizedHost)")
-            // Do not cache transient resolution failures so network recovery takes effect immediately
             return false
         }
 
         for ip in ips {
             if isPrivateOrReserved(ip: ip) {
                 LogManager.logError("Blocked request to private/reserved IP: \(ip) for host \(normalizedHost)")
-                cacheValidationResult(host: normalizedHost, isValid: false, now: now)
                 return false
             }
         }
 
-        cacheValidationResult(host: normalizedHost, isValid: true, now: now)
         return true
     }
 
-    private func cacheValidationResult(host: String, isValid: Bool, now: Date) {
-        if hostValidationCache.count >= maxHostValidationCacheSize {
-            hostValidationCache = hostValidationCache.filter { $0.value.expiration > now }
-            if hostValidationCache.count >= maxHostValidationCacheSize {
-                hostValidationCache.removeAll(keepingCapacity: true)
+    private static func resolveHostIPsOffActor(host: String) async throws -> [String] {
+        try Task.checkCancellation()
+
+        final class ResolutionState: @unchecked Sendable {
+            private let lock = NSLock()
+            private var continuation: CheckedContinuation<[String], Error>?
+            private var isFinished = false
+
+            func registerContinuation(_ cont: CheckedContinuation<[String], Error>) {
+                lock.lock()
+                defer { lock.unlock() }
+                if isFinished {
+                    cont.resume(throwing: CancellationError())
+                } else {
+                    self.continuation = cont
+                }
+            }
+
+            func finish(with ips: [String]) {
+                lock.lock()
+                guard !isFinished else {
+                    lock.unlock()
+                    return
+                }
+                isFinished = true
+                let cont = continuation
+                continuation = nil
+                lock.unlock()
+                cont?.resume(returning: ips)
+            }
+
+            func cancel() {
+                lock.lock()
+                guard !isFinished else {
+                    lock.unlock()
+                    return
+                }
+                isFinished = true
+                let cont = continuation
+                continuation = nil
+                lock.unlock()
+                cont?.resume(throwing: CancellationError())
             }
         }
-        hostValidationCache[host] = HostValidationEntry(
-            isValid: isValid,
-            expiration: now.addingTimeInterval(hostValidationTTL)
-        )
-    }
 
-    private static func resolveHostIPsOffActor(host: String) async -> [String] {
-        let task = Task.detached {
-            resolveHostIPs(host: host)
-        }
-        return await withTaskCancellationHandler {
-            await task.value
+        let state = ResolutionState()
+
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                state.registerContinuation(continuation)
+                dnsResolutionQueue.async {
+                    let ips = resolveHostIPs(host: host)
+                    state.finish(with: ips)
+                }
+            }
         } onCancel: {
-            task.cancel()
+            state.cancel()
         }
     }
 

@@ -15,19 +15,22 @@ import Foundation
 actor RequestDeduplicator {
     // MARK: - Types
 
-    /// Key for identifying unique requests (only idempotent GET/HEAD)
+    /// Key for identifying unique requests (only idempotent exact GET/HEAD, partitioned by auth identity)
     private struct RequestKey: Hashable {
+        let authIdentity: String?
         let method: String
         let url: String
 
-        init?(from request: URLRequest) {
-            let httpMethod = (request.httpMethod ?? "GET").uppercased()
-            guard httpMethod == "GET" || httpMethod == "HEAD" else {
+        init?(from request: URLRequest, authIdentity: String? = nil) {
+            guard let httpMethod = request.httpMethod,
+                  httpMethod == "GET" || httpMethod == "HEAD"
+            else {
                 return nil
             }
             guard let urlString = request.url?.absoluteString, !urlString.isEmpty else {
                 return nil
             }
+            self.authIdentity = authIdentity ?? request.value(forHTTPHeaderField: "Authorization")
             self.method = httpMethod
             self.url = urlString
         }
@@ -66,13 +69,15 @@ actor RequestDeduplicator {
     /// executes at a time. Subsequent identical requests wait for the first to complete.
     /// - Parameters:
     ///   - request: The URLRequest to deduplicate
+    ///   - authIdentity: Optional auth identity (e.g. account DID or authorization token)
     ///   - work: The async work to perform if this is the first request
     /// - Returns: The result of the network request
     func deduplicate(
         request: URLRequest,
+        authIdentity: String? = nil,
         work: @escaping @Sendable () async throws -> (Data, URLResponse)
     ) async throws -> (Data, URLResponse) {
-        guard let key = RequestKey(from: request) else {
+        guard let key = RequestKey(from: request, authIdentity: authIdentity) else {
             return try await work()
         }
 
@@ -132,10 +137,12 @@ actor RequestDeduplicator {
     }
 
     /// Checks if a request matching the given URLRequest is currently in flight
-    /// - Parameter request: The request to check
+    /// - Parameters:
+    ///   - request: The request to check
+    ///   - authIdentity: Optional auth identity
     /// - Returns: True if an identical request is in progress
-    func isRequestInFlight(_ request: URLRequest) -> Bool {
-        guard let key = RequestKey(from: request) else {
+    func isRequestInFlight(_ request: URLRequest, authIdentity: String? = nil) -> Bool {
+        guard let key = RequestKey(from: request, authIdentity: authIdentity) else {
             return false
         }
         if let existing = inFlightRequests[key] {

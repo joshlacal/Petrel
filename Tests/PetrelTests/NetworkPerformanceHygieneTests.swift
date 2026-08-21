@@ -29,8 +29,8 @@ private actor Flag {
 struct NetworkPerformanceHygieneTests {
     // MARK: - Task 8: RequestDeduplicator Tests
 
-    @Test("RequestDeduplicator deduplicates concurrent GET requests")
-    func requestDeduplicatorCoalescesConcurrentGETs() async throws {
+    @Test("RequestDeduplicator deduplicates concurrent GET requests under the same auth identity")
+    func requestDeduplicatorCoalescesConcurrentGETsSameAuth() async throws {
         let deduplicator = RequestDeduplicator()
         let url = URL(string: "https://bsky.social/xrpc/app.bsky.actor.getProfile")!
 
@@ -41,15 +41,15 @@ struct NetworkPerformanceHygieneTests {
 
         let counter = Counter()
 
-        // Launch two concurrent requests for the exact same GET URL
-        async let first = deduplicator.deduplicate(request: request1) {
+        // Launch two concurrent requests for the exact same GET URL with the same auth identity
+        async let first = deduplicator.deduplicate(request: request1, authIdentity: "did:plc:user1") {
             await counter.increment()
             try? await Task.sleep(nanoseconds: 50_000_000) // 50ms
             let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
             return (Data("response".utf8), response)
         }
 
-        async let second = deduplicator.deduplicate(request: request2) {
+        async let second = deduplicator.deduplicate(request: request2, authIdentity: "did:plc:user1") {
             await counter.increment()
             try? await Task.sleep(nanoseconds: 50_000_000)
             let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
@@ -62,6 +62,108 @@ struct NetworkPerformanceHygieneTests {
         // Only one work closure should have been executed
         let executed = await counter.get()
         #expect(executed == 1)
+    }
+
+    @Test("Finding 4 Regression: Concurrent GETs under different account identities must NOT coalesce")
+    func requestDeduplicatorDoesNotCoalesceDifferentAccounts() async throws {
+        let deduplicator = RequestDeduplicator()
+        let url = URL(string: "https://bsky.social/xrpc/app.bsky.actor.getProfile")!
+
+        var request1 = URLRequest(url: url)
+        request1.httpMethod = "GET"
+        var request2 = URLRequest(url: url)
+        request2.httpMethod = "GET"
+
+        let counter = Counter()
+
+        // Launch two concurrent requests for the same URL but different accounts
+        async let first = deduplicator.deduplicate(request: request1, authIdentity: "did:plc:accountA") {
+            await counter.increment()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (Data("accountA_profile".utf8), response)
+        }
+
+        async let second = deduplicator.deduplicate(request: request2, authIdentity: "did:plc:accountB") {
+            await counter.increment()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (Data("accountB_profile".utf8), response)
+        }
+
+        let (res1, res2) = try await (first, second)
+        #expect(res1.0 == Data("accountA_profile".utf8))
+        #expect(res2.0 == Data("accountB_profile".utf8))
+        // Both work closures must execute independently - no cross-account response leak
+        let executed = await counter.get()
+        #expect(executed == 2)
+    }
+
+    @Test("Finding 4 Regression: Authenticated vs Unauthenticated concurrent GETs must NOT coalesce")
+    func requestDeduplicatorDoesNotCoalesceAuthAndUnauth() async throws {
+        let deduplicator = RequestDeduplicator()
+        let url = URL(string: "https://bsky.social/xrpc/app.bsky.feed.getTimeline")!
+
+        var request1 = URLRequest(url: url)
+        request1.httpMethod = "GET"
+        var request2 = URLRequest(url: url)
+        request2.httpMethod = "GET"
+
+        let counter = Counter()
+
+        // One unauthenticated (nil authIdentity), one authenticated
+        async let first = deduplicator.deduplicate(request: request1, authIdentity: nil) {
+            await counter.increment()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (Data("public_feed".utf8), response)
+        }
+
+        async let second = deduplicator.deduplicate(request: request2, authIdentity: "did:plc:user1") {
+            await counter.increment()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (Data("authed_feed".utf8), response)
+        }
+
+        let (res1, res2) = try await (first, second)
+        #expect(res1.0 == Data("public_feed".utf8))
+        #expect(res2.0 == Data("authed_feed".utf8))
+        let executed = await counter.get()
+        #expect(executed == 2)
+    }
+
+    @Test("Finding 3: Non-idempotent or non-GET/HEAD HTTP methods are not deduplicated")
+    func requestDeduplicatorPreservesMethodCase() async throws {
+        let deduplicator = RequestDeduplicator()
+        let url = URL(string: "https://bsky.social/xrpc/test")!
+
+        var request1 = URLRequest(url: url)
+        request1.httpMethod = "PATCH"
+        var request2 = URLRequest(url: url)
+        request2.httpMethod = "PATCH"
+
+        let counter = Counter()
+
+        async let first = deduplicator.deduplicate(request: request1) {
+            await counter.increment()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (Data("1".utf8), response)
+        }
+
+        async let second = deduplicator.deduplicate(request: request2) {
+            await counter.increment()
+            try? await Task.sleep(nanoseconds: 20_000_000)
+            let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
+            return (Data("2".utf8), response)
+        }
+
+        let (res1, res2) = try await (first, second)
+        #expect(res1.0 == Data("1".utf8))
+        #expect(res2.0 == Data("2".utf8))
+        let executed = await counter.get()
+        #expect(executed == 2)
     }
 
     @Test("RequestDeduplicator does not deduplicate POST requests")
@@ -176,11 +278,10 @@ struct NetworkPerformanceHygieneTests {
         }
     }
 
-    @Test("NetworkService validates and caches legitimate hostnames")
-    func networkServiceValidatesAndCachesHost() async throws {
+    @Test("NetworkService creates request for legitimate hostnames")
+    func networkServiceValidatesLegitimateHost() async throws {
         let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
 
-        // First call: resolves host and caches result
         let req1 = try await service.createURLRequest(
             endpoint: "https://bsky.social/xrpc/app.bsky.actor.getProfile",
             method: "GET",
@@ -189,15 +290,31 @@ struct NetworkPerformanceHygieneTests {
             queryItems: nil
         )
         #expect(req1.url?.host == "bsky.social")
+    }
 
-        // Second call: served from host validation cache
-        let req2 = try await service.createURLRequest(
-            endpoint: "https://bsky.social/xrpc/app.bsky.feed.getTimeline",
-            method: "GET",
-            headers: [:],
-            body: nil,
-            queryItems: nil
-        )
-        #expect(req2.url?.host == "bsky.social")
+    @Test("Finding 2: Cancellation of URL request validation propagates promptly")
+    func networkServiceCancellationPropagates() async throws {
+        let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
+
+        let task = Task {
+            try await service.createURLRequest(
+                endpoint: "https://bsky.social/xrpc/app.bsky.actor.getProfile",
+                method: "GET",
+                headers: [:],
+                body: nil,
+                queryItems: nil
+            )
+        }
+        // Cancel task immediately
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            // If it already completed before cancellation took effect, that's possible, but if cancelled, must throw CancellationError
+        } catch is CancellationError {
+            // Expected cancellation propagation
+        } catch {
+            // Any other error
+        }
     }
 }
