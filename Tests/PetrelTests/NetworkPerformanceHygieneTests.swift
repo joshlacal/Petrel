@@ -25,7 +25,7 @@ private actor Flag {
     }
 }
 
-@Suite("Network Performance Hygiene Tests")
+@Suite("Network Performance Hygiene Tests", .serialized)
 struct NetworkPerformanceHygieneTests {
     // MARK: - Task 8: RequestDeduplicator Tests
 
@@ -292,29 +292,50 @@ struct NetworkPerformanceHygieneTests {
         #expect(req1.url?.host == "bsky.social")
     }
 
-    @Test("Finding 2: Cancellation of URL request validation propagates promptly")
+    @Test("Finding 3: In-flight DNS resolution cancellation propagates CancellationError promptly")
     func networkServiceCancellationPropagates() async throws {
         let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
 
+        let enteredResolution = Flag()
+        let cancellationHost = "cancellation-test.bsky.social"
+
+        NetworkService.dnsResolutionHook = { host in
+            guard host == cancellationHost else { return }
+            await enteredResolution.setTrue()
+            while !Task.isCancelled {
+                try? await Task.sleep(nanoseconds: 10_000_000)
+            }
+        }
+        defer {
+            NetworkService.dnsResolutionHook = nil
+        }
+
         let task = Task {
             try await service.createURLRequest(
-                endpoint: "https://bsky.social/xrpc/app.bsky.actor.getProfile",
+                endpoint: "https://\(cancellationHost)/xrpc/app.bsky.actor.getProfile",
                 method: "GET",
                 headers: [:],
                 body: nil,
                 queryItems: nil
             )
         }
-        // Cancel task immediately
+
+        // Wait until DNS resolution is actively in-flight
+        while !(await enteredResolution.get()) {
+            try await Task.sleep(nanoseconds: 5_000_000)
+        }
+
+        // Cancel while in-flight
         task.cancel()
 
+        // Assert that CancellationError is thrown to the caller promptly
         do {
             _ = try await task.value
-            // If it already completed before cancellation took effect, that's possible, but if cancelled, must throw CancellationError
+            Issue.record("Expected CancellationError, but task.value completed successfully")
         } catch is CancellationError {
-            // Expected cancellation propagation
+            // Success: CancellationError propagated promptly to caller
         } catch {
-            // Any other error
+            Issue.record("Expected CancellationError, but got: \(error)")
         }
     }
 }

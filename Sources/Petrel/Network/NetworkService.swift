@@ -346,11 +346,16 @@ public actor NetworkService: NetworkServiceProtocol {
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
     private(set) var authorizationServerMetadata: AuthorizationServerMetadata?
     private let requestDeduplicator = RequestDeduplicator()
-    private static let dnsResolutionQueue = DispatchQueue(
-        label: "com.joshlacalamito.Petrel.DNSResolution",
-        qos: .userInitiated,
-        attributes: .concurrent
-    )
+    private static let dnsResolutionQueue: OperationQueue = {
+        let queue = OperationQueue()
+        queue.name = "com.joshlacalamito.Petrel.DNSResolution"
+        queue.qualityOfService = .userInitiated
+        queue.maxConcurrentOperationCount = 6
+        return queue
+    }()
+    #if DEBUG
+        nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String) async -> Void)?
+    #endif
     private var authContinuityRevision: UInt64 = 0
     private var authContinuityRevisionExhausted = false
     private var authContinuityObserverProviderID: ObjectIdentifier?
@@ -2244,18 +2249,28 @@ public actor NetworkService: NetworkServiceProtocol {
     private static func resolveHostIPsOffActor(host: String) async throws -> [String] {
         try Task.checkCancellation()
 
+        #if DEBUG
+            if let hook = dnsResolutionHook {
+                await hook(host)
+                try Task.checkCancellation()
+            }
+        #endif
+
         final class ResolutionState: @unchecked Sendable {
             private let lock = NSLock()
             private var continuation: CheckedContinuation<[String], Error>?
+            private weak var operation: Operation?
             private var isFinished = false
 
-            func registerContinuation(_ cont: CheckedContinuation<[String], Error>) {
+            func attach(continuation cont: CheckedContinuation<[String], Error>, operation op: Operation) {
                 lock.lock()
                 defer { lock.unlock() }
                 if isFinished {
                     cont.resume(throwing: CancellationError())
+                    op.cancel()
                 } else {
                     self.continuation = cont
+                    self.operation = op
                 }
             }
 
@@ -2268,6 +2283,7 @@ public actor NetworkService: NetworkServiceProtocol {
                 isFinished = true
                 let cont = continuation
                 continuation = nil
+                operation = nil
                 lock.unlock()
                 cont?.resume(returning: ips)
             }
@@ -2281,7 +2297,10 @@ public actor NetworkService: NetworkServiceProtocol {
                 isFinished = true
                 let cont = continuation
                 continuation = nil
+                let op = operation
+                operation = nil
                 lock.unlock()
+                op?.cancel()
                 cont?.resume(throwing: CancellationError())
             }
         }
@@ -2290,11 +2309,15 @@ public actor NetworkService: NetworkServiceProtocol {
 
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                state.registerContinuation(continuation)
-                dnsResolutionQueue.async {
+                let operation = BlockOperation()
+                operation.addExecutionBlock { [weak operation] in
+                    guard let operation, !operation.isCancelled else { return }
                     let ips = resolveHostIPs(host: host)
+                    guard !operation.isCancelled else { return }
                     state.finish(with: ips)
                 }
+                state.attach(continuation: continuation, operation: operation)
+                dnsResolutionQueue.addOperation(operation)
             }
         } onCancel: {
             state.cancel()
