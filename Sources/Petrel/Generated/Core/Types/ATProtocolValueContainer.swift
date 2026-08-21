@@ -3430,6 +3430,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         guard case .knownType = typedValue else {
             return rawFallback
         }
+        if !isSpecTolerantMatch(typed: typedValue, raw: rawObject) {
+            return rawFallback
+        }
         return typedValue
     }
 
@@ -3720,6 +3723,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 return rawFallback
             }
             guard case .knownType = typedValue else {
+                return rawFallback
+            }
+            if !isSpecTolerantMatch(typed: typedValue, raw: rawObject) {
                 return rawFallback
             }
             return typedValue

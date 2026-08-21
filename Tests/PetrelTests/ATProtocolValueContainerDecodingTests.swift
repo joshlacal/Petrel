@@ -647,6 +647,45 @@ struct ATProtocolValueContainerDecodingTests {
         #expect(unknownObj["title"] == .string("custom"))
     }
 
+    @Test("Production lossless-decode guard demotes to unknownType when decoder normalizes field content")
+    func productionLosslessGuardDemotesOnNormalizedFieldContent() throws {
+        let type = ComAtprotoLabelDefs.Label.typeIdentifier
+        let spacedURI = " https://example.com/item "
+        let rawObject = ATProtocolValueContainer.object([
+            "$type": .string(type),
+            "src": .string("did:plc:example1234567890abcdef"),
+            "uri": .string(spacedURI),
+            "val": .string("test-label"),
+            "cts": .string("2026-08-21T12:00:00.000Z"),
+        ])
+        let encoded = try rawObject.encodedDAGCBOR()
+
+        // Decoded via production DAG-CBOR path (fromCBOR)
+        let decodedDAG = try ATProtocolValueContainer.decodedFromDAGCBOR(encoded)
+        guard case let .unknownType(typeName, .object(decodedRaw)) = decodedDAG else {
+            Issue.record("Expected production guard to fall back to .unknownType due to whitespace trimming, got \(decodedDAG)")
+            return
+        }
+        #expect(typeName == type)
+        #expect(decodedRaw["uri"] == .string(spacedURI))
+
+        // Decoded via production JSON path (decodeValue / decodeObjectValue)
+        let jsonData = try JSONSerialization.data(withJSONObject: [
+            "$type": type,
+            "src": "did:plc:example1234567890abcdef",
+            "uri": spacedURI,
+            "val": "test-label",
+            "cts": "2026-08-21T12:00:00.000Z",
+        ])
+        let decodedJSON = try JSONDecoder().decode(ATProtocolValueContainer.self, from: jsonData)
+        guard case let .unknownType(jsonTypeName, .object(jsonDecodedRaw)) = decodedJSON else {
+            Issue.record("Expected production JSON guard to fall back to .unknownType, got \(decodedJSON)")
+            return
+        }
+        #expect(jsonTypeName == type)
+        #expect(jsonDecodedRaw["uri"] == .string(spacedURI))
+    }
+
     @Test("Direct spec-tolerant comparison detects lossy field mutation and tolerates unknown fields")
     func specTolerantComparisonDetectsLossyDecodeDirectly() throws {
         let type = AppBskyFeedPost.typeIdentifier

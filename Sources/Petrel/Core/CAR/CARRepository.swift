@@ -130,8 +130,8 @@ public enum CARRepository {
             stringifyUnsignedAboveIntMax: true
         )
 
-        switch container {
-        case .object, .array, .knownType, .unknownType:
+        switch cborItem {
+        case .map, .array:
             return container
         default:
             throw CARReaderError.decodingFailed("CBOR root is not a map or array")
