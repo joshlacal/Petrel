@@ -122,25 +122,19 @@ public enum CARRepository {
         guard !data.isEmpty else {
             throw CARReaderError.decodingFailed("Empty CBOR data")
         }
-
         guard let cborItem = try? CBOR.decode([UInt8](data)) else {
             throw CARReaderError.decodingFailed("Failed to parse CBOR")
         }
+        let container = try ATProtocolValueContainer.fromCBOR(
+            cborItem,
+            stringifyUnsignedAboveIntMax: true
+        )
 
-        switch cborItem {
-        case .map, .array:
-            break
+        switch container {
+        case .object, .array, .knownType, .unknownType:
+            return container
         default:
             throw CARReaderError.decodingFailed("CBOR root is not a map or array")
-        }
-
-        do {
-            return try ATProtocolValueContainer.fromCBOR(
-                cborItem,
-                stringifyUnsignedAboveIntMax: true
-            )
-        } catch let error as DAGCBORError {
-            throw CARReaderError.decodingFailed(error.localizedDescription)
         }
     }
 }

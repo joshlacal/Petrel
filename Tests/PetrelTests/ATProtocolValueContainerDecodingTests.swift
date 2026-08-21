@@ -647,6 +647,40 @@ struct ATProtocolValueContainerDecodingTests {
         #expect(unknownObj["title"] == .string("custom"))
     }
 
+    @Test("Direct spec-tolerant comparison detects lossy field mutation and tolerates unknown fields")
+    func specTolerantComparisonDetectsLossyDecodeDirectly() throws {
+        let type = AppBskyFeedPost.typeIdentifier
+        let postA = AppBskyFeedPost(
+            text: "Hello World",
+            entities: nil,
+            facets: nil,
+            reply: nil,
+            embed: nil,
+            langs: nil,
+            labels: nil,
+            tags: nil,
+            createdAt: try #require(ATProtocolDate(iso8601String: "2026-08-21T12:00:00.000Z"))
+        )
+        let typedContainerA = ATProtocolValueContainer.knownType(postA)
+
+        // Divergent raw object (text is different)
+        let divergentRaw = ATProtocolValueContainer.object([
+            "$type": .string(type),
+            "text": .string("Different Text"),
+            "createdAt": .string("2026-08-21T12:00:00.000Z"),
+        ])
+        #expect(!ATProtocolValueContainer.isSpecTolerantMatch(typed: typedContainerA, raw: divergentRaw))
+
+        // Compatible raw object with unknown field
+        let compatibleRawWithUnknown = ATProtocolValueContainer.object([
+            "$type": .string(type),
+            "text": .string("Hello World"),
+            "createdAt": .string("2026-08-21T12:00:00.000Z"),
+            "via": .string("ThirdPartyClient"),
+        ])
+        #expect(ATProtocolValueContainer.isSpecTolerantMatch(typed: typedContainerA, raw: compatibleRawWithUnknown))
+    }
+
     @Test("CAR record decode falls back to unknownType when typed decode is lossy")
     func carRecordDecodeFallsBackOnLossyDecode() throws {
         let lossyMap = OrderedCBORMap(entries: [
@@ -666,13 +700,48 @@ struct ATProtocolValueContainerDecodingTests {
 
     @Test("CAR record decode rejects empty and non-map/array root CBOR")
     func carRecordDecodeRejectsMalformedRoots() {
-        #expect(throws: CARReaderError.self) {
-            try CARRepository.decodeRecordCBOR(Data())
+        do {
+            _ = try CARRepository.decodeRecordCBOR(Data())
+            Issue.record("Expected CARReaderError for empty data")
+        } catch let error as CARReaderError {
+            guard case let .decodingFailed(message) = error, message == "Empty CBOR data" else {
+                Issue.record("Expected decodingFailed(\"Empty CBOR data\"), got \(error)")
+                return
+            }
+        } catch {
+            Issue.record("Expected CARReaderError, got \(error)")
         }
 
         let primitiveCBOR = Data([0x65, 0x68, 0x65, 0x6c, 0x6c, 0x6f]) // "hello"
-        #expect(throws: CARReaderError.self) {
-            try CARRepository.decodeRecordCBOR(primitiveCBOR)
+        do {
+            _ = try CARRepository.decodeRecordCBOR(primitiveCBOR)
+            Issue.record("Expected CARReaderError for non-map/array root")
+        } catch let error as CARReaderError {
+            guard case let .decodingFailed(message) = error, message == "CBOR root is not a map or array" else {
+                Issue.record("Expected decodingFailed(\"CBOR root is not a map or array\"), got \(error)")
+                return
+            }
+        } catch {
+            Issue.record("Expected CARReaderError, got \(error)")
+        }
+    }
+
+    @Test("DAG-CBOR decoding rejects malformed 1-key $link and $bytes maps")
+    func dagCBORDecodingRejectsMalformedSpecialMaps() throws {
+        let invalidLinkMap = OrderedCBORMap(entries: [
+            (key: "$link", value: 12345),
+        ])
+        let invalidLinkCBOR = try DAGCBOR.encodeValue(invalidLinkMap)
+        #expect(throws: DAGCBORError.self) {
+            try ATProtocolValueContainer.decodedFromDAGCBOR(invalidLinkCBOR)
+        }
+
+        let invalidBytesMap = OrderedCBORMap(entries: [
+            (key: "$bytes", value: 12345),
+        ])
+        let invalidBytesCBOR = try DAGCBOR.encodeValue(invalidBytesMap)
+        #expect(throws: DAGCBORError.self) {
+            try ATProtocolValueContainer.decodedFromDAGCBOR(invalidBytesCBOR)
         }
     }
 }

@@ -336,7 +336,6 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         func decode(_ type: String.Type, forKey key: Key) throws -> String {
             let val = try getValue(forKey: key)
             if case let .string(s) = val { return s }
-            if case let .link(link) = val { return link.cid.string }
             throw DecodingError.typeMismatch(type, DecodingError.Context(
                 codingPath: nestedPath(key),
                 debugDescription: "Expected String for \(key.stringValue), got \(val)"
@@ -364,7 +363,6 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         func decode(_ type: Int.Type, forKey key: Key) throws -> Int {
             let val = try getValue(forKey: key)
             if case let .number(n) = val { return n }
-            if case let .string(s) = val, let n = Int(s) { return n }
             throw DecodingError.typeMismatch(type, DecodingError.Context(
                 codingPath: nestedPath(key),
                 debugDescription: "Expected Int for \(key.stringValue), got \(val)"
@@ -398,7 +396,6 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         func decode(_ type: Int64.Type, forKey key: Key) throws -> Int64 {
             let val = try getValue(forKey: key)
             if case let .number(n) = val { return Int64(n) }
-            if case let .string(s) = val, let n = Int64(s) { return n }
             throw DecodingError.typeMismatch(type, DecodingError.Context(
                 codingPath: nestedPath(key),
                 debugDescription: "Expected Int64 for \(key.stringValue), got \(val)"
@@ -408,7 +405,6 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         func decode(_ type: UInt.Type, forKey key: Key) throws -> UInt {
             let val = try getValue(forKey: key)
             if case let .number(n) = val, n >= 0 { return UInt(n) }
-            if case let .string(s) = val, let u = UInt(s) { return u }
             throw DecodingError.typeMismatch(type, DecodingError.Context(
                 codingPath: nestedPath(key),
                 debugDescription: "Expected UInt for \(key.stringValue), got \(val)"
@@ -430,7 +426,6 @@ public struct ATProtocolValueContainerDecoder: Decoder {
             }
             return result
         }
-
         func decode(_ type: UInt32.Type, forKey key: Key) throws -> UInt32 {
             let u = try decode(UInt.self, forKey: key)
             guard let result = UInt32(exactly: u) else {
@@ -442,7 +437,6 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
             let val = try getValue(forKey: key)
             if case let .number(n) = val, n >= 0 { return UInt64(n) }
-            if case let .string(s) = val, let u = UInt64(s) { return u }
             throw DecodingError.typeMismatch(type, DecodingError.Context(
                 codingPath: nestedPath(key),
                 debugDescription: "Expected UInt64 for \(key.stringValue), got \(val)"
@@ -578,10 +572,8 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         mutating func decode(_ type: String.Type) throws -> String {
             let val = try nextValue()
             if case let .string(s) = val { return s }
-            if case let .link(link) = val { return link.cid.string }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected String, got \(val)"))
         }
-
         mutating func decode(_ type: Double.Type) throws -> Double {
             let val = try nextValue()
             if case let .number(n) = val { return Double(n) }
@@ -597,10 +589,8 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         mutating func decode(_ type: Int.Type) throws -> Int {
             let val = try nextValue()
             if case let .number(n) = val { return n }
-            if case let .string(s) = val, let n = Int(s) { return n }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Int, got \(val)"))
         }
-
         mutating func decode(_ type: Int8.Type) throws -> Int8 {
             let n = try decode(Int.self)
             guard let result = Int8(exactly: n) else {
@@ -628,14 +618,12 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         mutating func decode(_ type: Int64.Type) throws -> Int64 {
             let val = try nextValue()
             if case let .number(n) = val { return Int64(n) }
-            if case let .string(s) = val, let n = Int64(s) { return n }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Int64, got \(val)"))
         }
 
         mutating func decode(_ type: UInt.Type) throws -> UInt {
             let val = try nextValue()
             if case let .number(n) = val, n >= 0 { return UInt(n) }
-            if case let .string(s) = val, let u = UInt(s) { return u }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected UInt, got \(val)"))
         }
 
@@ -666,7 +654,6 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         mutating func decode(_ type: UInt64.Type) throws -> UInt64 {
             let val = try nextValue()
             if case let .number(n) = val, n >= 0 { return UInt64(n) }
-            if case let .string(s) = val, let u = UInt64(s) { return u }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected UInt64, got \(val)"))
         }
 
@@ -751,10 +738,8 @@ public struct ATProtocolValueContainerDecoder: Decoder {
 
         func decode(_ type: String.Type) throws -> String {
             if case let .string(s) = decoder.value { return s }
-            if case let .link(link) = decoder.value { return link.cid.string }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected String, got \(decoder.value)"))
         }
-
         func decode(_ type: Double.Type) throws -> Double {
             if case let .number(n) = decoder.value { return Double(n) }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Double, got \(decoder.value)"))
@@ -767,10 +752,8 @@ public struct ATProtocolValueContainerDecoder: Decoder {
 
         func decode(_ type: Int.Type) throws -> Int {
             if case let .number(n) = decoder.value { return n }
-            if case let .string(s) = decoder.value, let n = Int(s) { return n }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Int, got \(decoder.value)"))
         }
-
         func decode(_ type: Int8.Type) throws -> Int8 {
             let n = try decode(Int.self)
             guard let result = Int8(exactly: n) else {
@@ -797,13 +780,11 @@ public struct ATProtocolValueContainerDecoder: Decoder {
 
         func decode(_ type: Int64.Type) throws -> Int64 {
             if case let .number(n) = decoder.value { return Int64(n) }
-            if case let .string(s) = decoder.value, let n = Int64(s) { return n }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected Int64, got \(decoder.value)"))
         }
 
         func decode(_ type: UInt.Type) throws -> UInt {
             if case let .number(n) = decoder.value, n >= 0 { return UInt(n) }
-            if case let .string(s) = decoder.value, let u = UInt(s) { return u }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected UInt, got \(decoder.value)"))
         }
 
@@ -833,10 +814,8 @@ public struct ATProtocolValueContainerDecoder: Decoder {
 
         func decode(_ type: UInt64.Type) throws -> UInt64 {
             if case let .number(n) = decoder.value, n >= 0 { return UInt64(n) }
-            if case let .string(s) = decoder.value, let u = UInt64(s) { return u }
             throw DecodingError.typeMismatch(type, DecodingError.Context(codingPath: codingPath, debugDescription: "Expected UInt64, got \(decoder.value)"))
         }
-
         func decode<T: Decodable>(_ type: T.Type) throws -> T {
             if T.self == ATProtocolValueContainer.self {
                 return decoder.value as! T

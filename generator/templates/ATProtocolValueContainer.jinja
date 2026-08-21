@@ -179,10 +179,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         guard case .knownType = typedValue else {
             return rawFallback
         }
-
-        if !isSpecTolerantMatch(typed: typedValue, raw: rawObject) {
-            return rawFallback
-        }
         return typedValue
     }
 
@@ -272,23 +268,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         case let (.bytes(a), .bytes(b)):
             return a.data == b.data
 
-        case let (.link(a), .string(b)):
-            return a.cid.string == b
-
-        case let (.string(a), .link(b)):
-            return a == b.cid.string
-
-        case let (.bytes(a), .string(b)):
-            return a.data == Data(base64Encoded: b)
-
-        case let (.string(a), .bytes(b)):
-            return Data(base64Encoded: a) == b.data
-
-        case let (.number(a), .string(b)):
-            return String(a) == b
-
-        case let (.string(a), .number(b)):
-            return a == String(b)
 
         case let (.knownType(a), _):
             guard let cbor = try? a.toCBORValue() else { return false }
@@ -454,10 +433,17 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             }
 
             if decodedDict.count == 1 {
-                if let cidStringContainer = decodedDict["$link"], case let .string(cidString) = cidStringContainer {
-                    return try .link(ATProtoLink(cidString: cidString))
+                if let linkVal = decodedDict["$link"] {
+                    guard case let .string(cidString) = linkVal else {
+                        throw DAGCBORError.decodingFailed("Invalid $link value; expected string")
+                    }
+                    let cid = try CID.parse(cidString)
+                    return .link(ATProtoLink(cid: cid))
                 }
-                if let base64Container = decodedDict["$bytes"], case let .string(base64String) = base64Container {
+                if let bytesVal = decodedDict["$bytes"] {
+                    guard case let .string(base64String) = bytesVal else {
+                        throw DAGCBORError.decodingFailed("Invalid $bytes value; expected base64 string")
+                    }
                     guard let data = Data(base64Encoded: base64String) else {
                         throw DAGCBORError.decodingFailed("Invalid base64 in exact $bytes object")
                     }
@@ -483,10 +469,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 return rawFallback
             }
             guard case .knownType = typedValue else {
-                return rawFallback
-            }
-
-            if !isSpecTolerantMatch(typed: typedValue, raw: rawObject) {
                 return rawFallback
             }
             return typedValue
