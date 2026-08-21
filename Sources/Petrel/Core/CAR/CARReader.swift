@@ -45,7 +45,7 @@ public class CARReader {
     private var offset: Int = 0
 
     /// Internal raw byte-keyed index mapping raw CID bytes → block location in the data
-    public private(set) var rawBlockIndex: [Data: BlockLocation] = [:]
+    private(set) var rawBlockIndex: [Data: BlockLocation] = [:]
 
     /// Maps CID hex string → block location in the data (public compatibility view)
     public var blockIndex: [String: BlockLocation] {
