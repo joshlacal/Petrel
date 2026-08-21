@@ -16,23 +16,30 @@ actor RequestDeduplicator {
     // MARK: - Types
 
     /// Key for identifying unique requests (only idempotent exact GET/HEAD, partitioned by auth identity)
-    private struct RequestKey: Hashable {
+    struct RequestKey: Hashable, Sendable {
         let authIdentity: String?
         let method: String
         let url: String
 
         init?(from request: URLRequest, authIdentity: String? = nil) {
-            guard let httpMethod = request.httpMethod,
-                  httpMethod == "GET" || httpMethod == "HEAD"
-            else {
+            guard let httpMethod = request.httpMethod else { return nil }
+            self.init(
+                method: httpMethod,
+                url: request.url?.absoluteString ?? "",
+                authIdentity: authIdentity ?? request.value(forHTTPHeaderField: "Authorization")
+            )
+        }
+
+        init?(method: String, url: String, authIdentity: String? = nil) {
+            guard method == "GET" || method == "HEAD" else {
                 return nil
             }
-            guard let urlString = request.url?.absoluteString, !urlString.isEmpty else {
+            guard !url.isEmpty else {
                 return nil
             }
-            self.authIdentity = authIdentity ?? request.value(forHTTPHeaderField: "Authorization")
-            self.method = httpMethod
-            self.url = urlString
+            self.authIdentity = authIdentity
+            self.method = method
+            self.url = url
         }
     }
 

@@ -133,35 +133,55 @@ struct NetworkPerformanceHygieneTests {
         #expect(executed == 2)
     }
 
-    @Test("Finding 3: Non-idempotent or non-GET/HEAD HTTP methods are not deduplicated")
-    func requestDeduplicatorPreservesMethodCase() async throws {
+    @Test("Finding 1: RequestKey rejects lowercase 'get' and preserves exact case matching")
+    func requestKeyRejectsLowercaseMethod() {
+        let getKey = RequestDeduplicator.RequestKey(
+            method: "GET",
+            url: "https://bsky.social/xrpc/test",
+            authIdentity: "did:plc:user1"
+        )
+        #expect(getKey != nil)
+        #expect(getKey?.method == "GET")
+
+        let lowerGetKey = RequestDeduplicator.RequestKey(
+            method: "get",
+            url: "https://bsky.social/xrpc/test",
+            authIdentity: "did:plc:user1"
+        )
+        // Fixed code rejects non-exact lowercase method; old uppercasing code normalized and accepted it
+        #expect(lowerGetKey == nil)
+    }
+
+    @Test("Finding 1: Distinct HTTP methods (HEAD vs GET) to same URL do not coalesce")
+    func requestDeduplicatorDoesNotCoalesceDistinctMethods() async throws {
         let deduplicator = RequestDeduplicator()
         let url = URL(string: "https://bsky.social/xrpc/test")!
 
         var request1 = URLRequest(url: url)
-        request1.httpMethod = "PATCH"
+        request1.httpMethod = "HEAD"
+
         var request2 = URLRequest(url: url)
-        request2.httpMethod = "PATCH"
+        request2.httpMethod = "GET"
 
         let counter = Counter()
 
-        async let first = deduplicator.deduplicate(request: request1) {
+        async let first = deduplicator.deduplicate(request: request1, authIdentity: "did:plc:user1") {
             await counter.increment()
             try? await Task.sleep(nanoseconds: 20_000_000)
             let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (Data("1".utf8), response)
+            return (Data("head".utf8), response)
         }
 
-        async let second = deduplicator.deduplicate(request: request2) {
+        async let second = deduplicator.deduplicate(request: request2, authIdentity: "did:plc:user1") {
             await counter.increment()
             try? await Task.sleep(nanoseconds: 20_000_000)
             let response = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!
-            return (Data("2".utf8), response)
+            return (Data("get".utf8), response)
         }
 
         let (res1, res2) = try await (first, second)
-        #expect(res1.0 == Data("1".utf8))
-        #expect(res2.0 == Data("2".utf8))
+        #expect(res1.0 == Data("head".utf8))
+        #expect(res2.0 == Data("get".utf8))
         let executed = await counter.get()
         #expect(executed == 2)
     }
@@ -292,18 +312,20 @@ struct NetworkPerformanceHygieneTests {
         #expect(req1.url?.host == "bsky.social")
     }
 
-    @Test("Finding 3: In-flight DNS resolution cancellation propagates CancellationError promptly")
+    @Test("Finding 2: In-flight DNS resolution cancellation propagates CancellationError promptly")
     func networkServiceCancellationPropagates() async throws {
         let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
 
-        let enteredResolution = Flag()
         let cancellationHost = "cancellation-test.bsky.social"
+        let enteredOperation = Flag()
 
-        NetworkService.dnsResolutionHook = { host in
+        NetworkService.dnsResolutionHook = { host, isCancelled in
             guard host == cancellationHost else { return }
-            await enteredResolution.setTrue()
-            while !Task.isCancelled {
-                try? await Task.sleep(nanoseconds: 10_000_000)
+            Task {
+                await enteredOperation.setTrue()
+            }
+            while !isCancelled() {
+                Thread.sleep(forTimeInterval: 0.002)
             }
         }
         defer {
@@ -320,20 +342,23 @@ struct NetworkPerformanceHygieneTests {
             )
         }
 
-        // Wait until DNS resolution is actively in-flight
-        while !(await enteredResolution.get()) {
+        // Wait until the BlockOperation has actually been dequeued and started on the OperationQueue thread
+        while !(await enteredOperation.get()) {
             try await Task.sleep(nanoseconds: 5_000_000)
         }
 
-        // Cancel while in-flight
+        let cancelStartTime = ContinuousClock.now
+
+        // Cancel while the operation is actively running on dnsResolutionQueue
         task.cancel()
 
-        // Assert that CancellationError is thrown to the caller promptly
+        // Assert that CancellationError reaches caller promptly (within 200ms)
         do {
             _ = try await task.value
             Issue.record("Expected CancellationError, but task.value completed successfully")
         } catch is CancellationError {
-            // Success: CancellationError propagated promptly to caller
+            let elapsed = ContinuousClock.now - cancelStartTime
+            #expect(elapsed < .milliseconds(200))
         } catch {
             Issue.record("Expected CancellationError, but got: \(error)")
         }

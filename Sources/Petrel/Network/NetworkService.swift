@@ -354,7 +354,7 @@ public actor NetworkService: NetworkServiceProtocol {
         return queue
     }()
     #if DEBUG
-        nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String) async -> Void)?
+        nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
     #endif
     private var authContinuityRevision: UInt64 = 0
     private var authContinuityRevisionExhausted = false
@@ -2249,13 +2249,6 @@ public actor NetworkService: NetworkServiceProtocol {
     private static func resolveHostIPsOffActor(host: String) async throws -> [String] {
         try Task.checkCancellation()
 
-        #if DEBUG
-            if let hook = dnsResolutionHook {
-                await hook(host)
-                try Task.checkCancellation()
-            }
-        #endif
-
         final class ResolutionState: @unchecked Sendable {
             private let lock = NSLock()
             private var continuation: CheckedContinuation<[String], Error>?
@@ -2312,6 +2305,14 @@ public actor NetworkService: NetworkServiceProtocol {
                 let operation = BlockOperation()
                 operation.addExecutionBlock { [weak operation] in
                     guard let operation, !operation.isCancelled else { return }
+
+                    #if DEBUG
+                        if let hook = dnsResolutionHook {
+                            hook(host) { operation.isCancelled }
+                        }
+                    #endif
+
+                    guard !operation.isCancelled else { return }
                     let ips = resolveHostIPs(host: host)
                     guard !operation.isCancelled else { return }
                     state.finish(with: ips)
