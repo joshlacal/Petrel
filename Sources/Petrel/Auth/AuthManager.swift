@@ -199,6 +199,18 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             bskyChatDID: bskyChatDID
         )
     }
+    func startOAuthFlowWithState(
+        identifier: String?,
+        bskyAppViewDID: String?,
+        bskyChatDID: String?
+    ) async throws -> (url: URL, state: String) {
+        try await activeStrategy.startOAuthFlowWithState(
+            identifier: identifier,
+            bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID
+        )
+    }
+
 
     func startOAuthFlowForSignUp(
         pdsURL: URL?,

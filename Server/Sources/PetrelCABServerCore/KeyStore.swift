@@ -1,7 +1,7 @@
 #if canImport(CryptoKit)
-  import CryptoKit
+  @preconcurrency import CryptoKit
 #else
-  import Crypto
+  @preconcurrency import Crypto
 #endif
 import Foundation
 import JSONWebAlgorithms

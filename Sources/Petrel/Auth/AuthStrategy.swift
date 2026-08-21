@@ -13,6 +13,10 @@ public protocol AuthStrategy: AuthenticationProvider, Sendable {
     func startOAuthFlow(identifier: String?, bskyAppViewDID: String?, bskyChatDID: String?) async throws
         -> URL
 
+    /// Starts the OAuth flow for an existing user and returns both the authorization URL and state token.
+    func startOAuthFlowWithState(identifier: String?, bskyAppViewDID: String?, bskyChatDID: String?) async throws
+        -> (url: URL, state: String)
+
     /// Starts the OAuth flow for account creation.
     func startOAuthFlowForSignUp(pdsURL: URL?, bskyAppViewDID: String?, bskyChatDID: String?) async throws
         -> URL
@@ -45,4 +49,12 @@ public protocol AuthStrategy: AuthenticationProvider, Sendable {
 
     /// Attempts to recover from catastrophic auth failures.
     func attemptRecoveryFromServerFailures(for did: String?) async throws
+}
+
+extension AuthStrategy {
+    public func startOAuthFlowWithState(identifier: String?, bskyAppViewDID: String?, bskyChatDID: String?) async throws
+        -> (url: URL, state: String) {
+        let url = try await startOAuthFlow(identifier: identifier, bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
+        return (url, "")
+    }
 }

@@ -56,7 +56,7 @@ actor CABOAuthStrategy: AuthStrategy {
 
     // OAuth flow deduplication state
     private var oauthStartInProgress = false
-    private var oauthStartTasks: [String: Task<URL, Error>] = [:]
+    private var oauthStartTasks: [String: Task<(url: URL, state: String), Error>] = [:]
 
     // MARK: - Initialization
 
@@ -95,6 +95,18 @@ actor CABOAuthStrategy: AuthStrategy {
         bskyAppViewDID: String?,
         bskyChatDID: String?
     ) async throws -> URL {
+        try await startOAuthFlowWithState(
+            identifier: identifier,
+            bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID
+        ).url
+    }
+
+    func startOAuthFlowWithState(
+        identifier: String?,
+        bskyAppViewDID: String?,
+        bskyChatDID: String?
+    ) async throws -> (url: URL, state: String) {
         await ensureRefreshClosure()
 
         let key = identifier?.lowercased() ?? "__signup__"
@@ -103,7 +115,7 @@ actor CABOAuthStrategy: AuthStrategy {
             return try await existing.value
         }
 
-        let task = Task.detached(priority: .userInitiated) { [weak self] () throws -> URL in
+        let task = Task.detached(priority: .userInitiated) { [weak self] () throws -> (url: URL, state: String) in
             guard let self else { throw AuthError.invalidOAuthConfiguration }
             return try await self._startOAuthFlowImpl(
                 identifier: identifier,
@@ -340,7 +352,7 @@ actor CABOAuthStrategy: AuthStrategy {
         }
     }
 
-    private func _startOAuthFlowImpl(identifier: String?, bskyAppViewDID: String?, bskyChatDID: String?) async throws -> URL {
+    private func _startOAuthFlowImpl(identifier: String?, bskyAppViewDID: String?, bskyChatDID: String?) async throws -> (url: URL, state: String) {
         if oauthStartInProgress {
             try? await Task.sleep(nanoseconds: 100_000_000)
         }
@@ -413,7 +425,7 @@ actor CABOAuthStrategy: AuthStrategy {
         ]
 
         guard let url = components.url else { throw AuthError.authorizationFailed }
-        return url
+        return (url, stateToken)
     }
 
     // MARK: - Client Assertion Fetch

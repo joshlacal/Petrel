@@ -157,11 +157,71 @@ struct ClientServerIntegrationTests {
     let jkt = try deviceKey.publicKey.jwkRepresentation.thumbprint()
     try await withRunningServer(mutateConfig: { $0.deniedJkts = [jkt] }) { port, _ in
       let strategy = makeStrategy(port: port, namespace: "integration.denied")
-      await #expect(throws: AuthError.clientAssertionBackendError(403, "access_denied")) {
+      await #expect(throws: ClientAssertionBackendError(statusCode: 403, code: "access_denied")) {
         _ = try await strategy.fetchClientAssertion(
           aud: "https://auth.example", ephemeralKey: deviceKey
         )
       }
     }
+  }
+
+  @Test("Public cab.swan.place fetch round trip")
+  func publicServerFetch() async throws {
+    let strategy = CABOAuthStrategy(
+      backendURL: URL(string: "https://cab.swan.place")!,
+      storage: KeychainStorage(namespace: "test.public"),
+      accountManager: IntegrationAccountManager(
+        account: Account(
+          did: "did:plc:test",
+          handle: "test.example",
+          pdsURL: URL(string: "https://pds.test")!
+        )
+      ),
+      networkService: NetworkService(baseURL: URL(string: "https://pds.test")!),
+      oauthConfig: OAuthConfig(
+        clientId: "https://cab.swan.place/oauth-client-metadata.json",
+        redirectUri: "place.swan.cab:/callback",
+        scope: "atproto"
+      ),
+      didResolver: IntegrationDIDResolver()
+    )
+    let deviceKey = P256.Signing.PrivateKey()
+    let response = try await strategy.fetchClientAssertion(
+      aud: "https://swan.place", ephemeralKey: deviceKey
+    )
+    #expect(response.clientId == "https://cab.swan.place/oauth-client-metadata.json")
+    #expect(!response.clientAssertion.isEmpty)
+  }
+
+  @Test("Live PAR against swan.place with cab.swan.place assertion")
+  func swanPlacePAR() async throws {
+    let client = try await ATProtoClient(
+      oauthConfig: OAuthConfig(
+        clientId: "https://cab.swan.place/oauth-client-metadata.json",
+        redirectUri: "place.swan.cab:/callback",
+        scope: "atproto"
+      ),
+      namespace: "test.swan.par",
+      authMode: .cab(backendURL: URL(string: "https://cab.swan.place")!)
+    )
+    let authURL = try await client.startOAuthFlow(identifier: "josh.swan.place")
+    print("SWAN.PLACE AUTH URL: \(authURL.absoluteString)")
+    #expect(authURL.absoluteString.starts(with: "https://swan.place/oauth/authorize"))
+  }
+
+  @Test("Live PAR against bsky.social with public-client metadata")
+  func bskySocialPublicOAuthPAR() async throws {
+    let client = try await ATProtoClient(
+      oauthConfig: OAuthConfig(
+        clientId: "https://cab.swan.place/public-client-metadata.json",
+        redirectUri: "place.swan.cab:/callback",
+        scope: "atproto"
+      ),
+      namespace: "test.bsky.public",
+      authMode: .publicOAuth
+    )
+    let authURL = try await client.startOAuthFlow(identifier: "jay.bsky.team")
+    print("BSKY.SOCIAL PUBLIC AUTH URL: \(authURL.absoluteString)")
+    #expect(authURL.absoluteString.starts(with: "https://bsky.social/oauth/authorize"))
   }
 }

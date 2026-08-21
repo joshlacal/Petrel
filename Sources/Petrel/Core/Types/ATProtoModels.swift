@@ -14,33 +14,32 @@ import Foundation
 
 public struct AuthorizationServerMetadata: Codable, Sendable, Hashable {
     let issuer: String
-    let scopesSupported: [String]
-    let subjectTypesSupported: [String]
-    let responseTypesSupported: [String]
-    let responseModesSupported: [String]
-    let grantTypesSupported: [String]
-    let codeChallengeMethodsSupported: [String]
-    let uiLocalesSupported: [String]
-    let displayValuesSupported: [String]
-    let authorizationResponseIssParameterSupported: Bool
-    let requestObjectSigningAlgValuesSupported: [String]
-    let requestObjectEncryptionAlgValuesSupported: [String]
-    let requestObjectEncryptionEncValuesSupported: [String]
-    let requestParameterSupported: Bool
-    let requestUriParameterSupported: Bool
-    let requireRequestUriRegistration: Bool
-    let jwksUri: String
+    let scopesSupported: [String]?
+    let subjectTypesSupported: [String]?
+    let responseTypesSupported: [String]?
+    let responseModesSupported: [String]?
+    let grantTypesSupported: [String]?
+    let codeChallengeMethodsSupported: [String]?
+    let uiLocalesSupported: [String]?
+    let displayValuesSupported: [String]?
+    let authorizationResponseIssParameterSupported: Bool?
+    let requestObjectSigningAlgValuesSupported: [String]?
+    let requestObjectEncryptionAlgValuesSupported: [String]?
+    let requestObjectEncryptionEncValuesSupported: [String]?
+    let requestParameterSupported: Bool?
+    let requestUriParameterSupported: Bool?
+    let requireRequestUriRegistration: Bool?
+    let jwksUri: String?
     let authorizationEndpoint: String
     let tokenEndpoint: String
-    let tokenEndpointAuthMethodsSupported: [String]
-    let tokenEndpointAuthSigningAlgValuesSupported: [String]
-    let revocationEndpoint: String
+    let tokenEndpointAuthMethodsSupported: [String]?
+    let tokenEndpointAuthSigningAlgValuesSupported: [String]?
+    let revocationEndpoint: String?
     let introspectionEndpoint: String?
     let pushedAuthorizationRequestEndpoint: String
-    let requirePushedAuthorizationRequests: Bool
-    let dpopSigningAlgValuesSupported: [String]
-    let clientIdMetadataDocumentSupported: Bool
-
+    let requirePushedAuthorizationRequests: Bool?
+    let dpopSigningAlgValuesSupported: [String]?
+    let clientIdMetadataDocumentSupported: Bool?
     enum CodingKeys: String, CodingKey {
         case issuer
         case scopesSupported = "scopes_supported"

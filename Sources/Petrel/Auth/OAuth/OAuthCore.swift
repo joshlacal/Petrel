@@ -847,7 +847,6 @@ actor OAuthCore {
         let (data, response) = try await networkService.request(request)
 
         guard let httpResponse = response as? HTTPURLResponse else { throw AuthError.invalidResponse }
-
         if (200 ... 299).contains(httpResponse.statusCode) {
             guard let parResponse = try? decoder.decode(PARResponse.self, from: data) else {
                 throw AuthError.invalidResponse
@@ -901,12 +900,30 @@ actor OAuthCore {
                     }
                     return (parResponse.requestURI, parNonce)
                 } else {
+                    if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: retryData) {
+                        if errorResponse.error == "invalid_client_metadata" {
+                            throw AuthError.invalidClientMetadata(errorResponse.errorDescription)
+                        }
+                        throw AuthError.serverError(retryHttpResponse.statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? "")")
+                    }
                     throw AuthError.authorizationFailed
                 }
             } else {
+                if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                    if errorResponse.error == "invalid_client_metadata" {
+                        throw AuthError.invalidClientMetadata(errorResponse.errorDescription)
+                    }
+                    throw AuthError.serverError(httpResponse.statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? "")")
+                }
                 throw AuthError.authorizationFailed
             }
         } else {
+            if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+                if errorResponse.error == "invalid_client_metadata" {
+                    throw AuthError.invalidClientMetadata(errorResponse.errorDescription)
+                }
+                throw AuthError.serverError(httpResponse.statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? "")")
+            }
             throw AuthError.authorizationFailed
         }
     }

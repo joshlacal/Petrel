@@ -80,6 +80,7 @@ public enum AuthError: Error, LocalizedError, Equatable {
     case rateLimited
     case serverError(Int, String?)
     case serviceMaintenance
+    case invalidClientMetadata(String?)
 
     public var errorDescription: String? {
         switch self {
@@ -121,6 +122,8 @@ public enum AuthError: Error, LocalizedError, Equatable {
             }
         case .serviceMaintenance:
             return "The service is temporarily under maintenance. Please try again later."
+        case let .invalidClientMetadata(description):
+            return "The authorization server rejected client metadata: \(description ?? "invalid_client_metadata")"
         }
     }
 
@@ -192,6 +195,8 @@ public enum AuthError: Error, LocalizedError, Equatable {
             return lhs == rhs
         case let (.serverError(lhsCode, lhsMsg), .serverError(rhsCode, rhsMsg)):
             return lhsCode == rhsCode && lhsMsg == rhsMsg
+        case let (.invalidClientMetadata(lhs), .invalidClientMetadata(rhs)):
+            return lhs == rhs
         default:
             return false
         }
