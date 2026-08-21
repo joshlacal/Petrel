@@ -103,9 +103,9 @@ actor CABOAuthStrategy: AuthStrategy {
     }
 
     func startOAuthFlowWithState(
-        identifier: String?,
-        bskyAppViewDID: String?,
-        bskyChatDID: String?
+        identifier: String? = nil,
+        bskyAppViewDID: String? = nil,
+        bskyChatDID: String? = nil
     ) async throws -> (url: URL, state: String) {
         await ensureRefreshClosure()
 

@@ -81,7 +81,8 @@ public enum AuthError: Error, LocalizedError, Equatable {
     case serverError(Int, String?)
     case serviceMaintenance
     case invalidClientMetadata(String?)
-
+    case nativeClientNoneAuthRequired(String?)
+    case oauthFlowStateUnavailable
     public var errorDescription: String? {
         switch self {
         case .noActiveAccount:
@@ -124,6 +125,10 @@ public enum AuthError: Error, LocalizedError, Equatable {
             return "The service is temporarily under maintenance. Please try again later."
         case let .invalidClientMetadata(description):
             return "The authorization server rejected client metadata: \(description ?? "invalid_client_metadata")"
+        case let .nativeClientNoneAuthRequired(description):
+            return "The authorization server requires native clients to authenticate using 'none' method: \(description ?? "invalid_client_metadata")"
+        case .oauthFlowStateUnavailable:
+            return "This authentication strategy does not support OAuth flow routing state."
         }
     }
 
@@ -185,7 +190,8 @@ public enum AuthError: Error, LocalizedError, Equatable {
              (.cancelled, .cancelled),
              (.timeout, .timeout),
              (.rateLimited, .rateLimited),
-             (.serviceMaintenance, .serviceMaintenance):
+             (.serviceMaintenance, .serviceMaintenance),
+             (.oauthFlowStateUnavailable, .oauthFlowStateUnavailable):
             return true
         case let (.invalidHandle(lhs), .invalidHandle(rhs)):
             return lhs == rhs
@@ -196,6 +202,8 @@ public enum AuthError: Error, LocalizedError, Equatable {
         case let (.serverError(lhsCode, lhsMsg), .serverError(rhsCode, rhsMsg)):
             return lhsCode == rhsCode && lhsMsg == rhsMsg
         case let (.invalidClientMetadata(lhs), .invalidClientMetadata(rhs)):
+            return lhs == rhs
+        case let (.nativeClientNoneAuthRequired(lhs), .nativeClientNoneAuthRequired(rhs)):
             return lhs == rhs
         default:
             return false

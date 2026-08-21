@@ -900,32 +900,31 @@ actor OAuthCore {
                     }
                     return (parResponse.requestURI, parNonce)
                 } else {
-                    if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: retryData) {
-                        if errorResponse.error == "invalid_client_metadata" {
-                            throw AuthError.invalidClientMetadata(errorResponse.errorDescription)
-                        }
-                        throw AuthError.serverError(retryHttpResponse.statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? "")")
-                    }
-                    throw AuthError.authorizationFailed
+                    throw parseOAuthError(from: retryData, statusCode: retryHttpResponse.statusCode)
                 }
             } else {
-                if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
-                    if errorResponse.error == "invalid_client_metadata" {
-                        throw AuthError.invalidClientMetadata(errorResponse.errorDescription)
-                    }
-                    throw AuthError.serverError(httpResponse.statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? "")")
-                }
-                throw AuthError.authorizationFailed
+                throw parseOAuthError(from: data, statusCode: httpResponse.statusCode)
             }
         } else {
-            if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
-                if errorResponse.error == "invalid_client_metadata" {
-                    throw AuthError.invalidClientMetadata(errorResponse.errorDescription)
-                }
-                throw AuthError.serverError(httpResponse.statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? "")")
-            }
-            throw AuthError.authorizationFailed
+            throw parseOAuthError(from: data, statusCode: httpResponse.statusCode)
         }
+    }
+
+    private func parseOAuthError(from data: Data, statusCode: Int) -> AuthError {
+        if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
+            let desc = errorResponse.errorDescription ?? ""
+            let isNativeNone = (errorResponse.error == "invalid_client_metadata" || errorResponse.error == "invalid_client")
+                && (desc.localizedCaseInsensitiveContains("none method")
+                    || desc.localizedCaseInsensitiveContains("must authenticate using none")
+                    || (desc.localizedCaseInsensitiveContains("native") && desc.localizedCaseInsensitiveContains("none")))
+            if isNativeNone {
+                return .nativeClientNoneAuthRequired(errorResponse.errorDescription)
+            } else if errorResponse.error == "invalid_client_metadata" {
+                return .invalidClientMetadata(errorResponse.errorDescription)
+            }
+            return .serverError(statusCode, "\(errorResponse.error): \(desc)")
+        }
+        return .authorizationFailed
     }
 
     func revokeToken(refreshToken: String, endpoint: String, did: String) async {

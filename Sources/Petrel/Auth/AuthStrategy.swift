@@ -52,9 +52,13 @@ public protocol AuthStrategy: AuthenticationProvider, Sendable {
 }
 
 extension AuthStrategy {
-    public func startOAuthFlowWithState(identifier: String?, bskyAppViewDID: String?, bskyChatDID: String?) async throws
+    public func startOAuthFlow(identifier: String? = nil, bskyAppViewDID: String? = nil, bskyChatDID: String? = nil) async throws
+        -> URL {
+        try await startOAuthFlow(identifier: identifier, bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
+    }
+
+    public func startOAuthFlowWithState(identifier: String? = nil, bskyAppViewDID: String? = nil, bskyChatDID: String? = nil) async throws
         -> (url: URL, state: String) {
-        let url = try await startOAuthFlow(identifier: identifier, bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
-        return (url, "")
+        throw AuthError.oauthFlowStateUnavailable
     }
 }

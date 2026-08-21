@@ -14,12 +14,12 @@ import Foundation
 
 public struct AuthorizationServerMetadata: Codable, Sendable, Hashable {
     let issuer: String
-    let scopesSupported: [String]?
+    let scopesSupported: [String]
     let subjectTypesSupported: [String]?
-    let responseTypesSupported: [String]?
+    let responseTypesSupported: [String]
     let responseModesSupported: [String]?
-    let grantTypesSupported: [String]?
-    let codeChallengeMethodsSupported: [String]?
+    let grantTypesSupported: [String]
+    let codeChallengeMethodsSupported: [String]
     let uiLocalesSupported: [String]?
     let displayValuesSupported: [String]?
     let authorizationResponseIssParameterSupported: Bool?
