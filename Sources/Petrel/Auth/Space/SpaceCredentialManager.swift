@@ -27,8 +27,6 @@ public struct SpaceCredential: Sendable {
     }
 }
 
-extension SpaceCredential: Equatable {}
-
 // MARK: - SpaceCredentialError
 
 enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {

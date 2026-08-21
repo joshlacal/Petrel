@@ -253,7 +253,9 @@ struct SpaceCredentialManagerTests {
 
         // 2. Second call should hit cache (no additional getSpaceCredential request)
         let cred2 = try await manager.credential(for: space)
-        #expect(cred2 == cred1)
+        #expect(cred2.token == cred1.token)
+        #expect(cred2.expiresAt == cred1.expiresAt)
+        #expect(cred2.keyRawRepresentation == cred1.keyRawRepresentation)
 
         let requests = capturedRequests.withLock { $0 }
         let exchangeRequests = requests.filter {
@@ -460,7 +462,9 @@ struct SpaceCredentialManagerTests {
 
         let exchangeCount = Mutex<Int>(0)
         let delegationAttempts = Mutex<Int>(0)
-        let slowExchangeGate = Mutex<Bool>(false)
+        let (startedStream, startedContinuation) = AsyncStream.makeStream(of: Void.self)
+        let (releaseStream, releaseContinuation) = AsyncStream.makeStream(of: Void.self)
+
         SpaceMockURLProtocol.setHandler { request in
             let urlString = request.url?.absoluteString ?? ""
 
@@ -496,36 +500,50 @@ struct SpaceCredentialManagerTests {
             resolver: spaceResolver,
             urlSession: session,
             delegationTokenProvider: { _ in
-                delegationAttempts.withLock { $0 += 1 }
-                // Pause if gate is enabled
-                if slowExchangeGate.withLock({ $0 }) {
-                    try await Task.sleep(nanoseconds: 100_000_000)
+                let attempt = delegationAttempts.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if attempt == 1 {
+                    startedContinuation.yield()
+                    for await _ in releaseStream {
+                        break
+                    }
                 }
                 return "mock-delegation-token"
             }
         )
 
-        slowExchangeGate.withLock { $0 = true }
-
-        // Start first exchange in background
+        // 1. Start first exchange in background
         async let backgroundCred: SpaceCredential = manager.credential(for: space)
 
-        // Invalidate while in-flight
-        try await Task.sleep(nanoseconds: 10_000_000)
-        await manager.invalidate(space)
-
-        // The background task that was invalidated should throw (CancellationError)
-        do {
-            _ = try await backgroundCred
-            // If it didn't throw before completion, next call must still re-exchange
-        } catch {
-            // Expected cancellation
+        // 2. Deterministically wait until first exchange is running inside delegationTokenProvider
+        for await _ in startedStream {
+            break
         }
 
-        slowExchangeGate.withLock { $0 = false }
+        // 3. Invalidate while first exchange is in flight and blocked
+        await manager.invalidate(space)
 
-        // Subsequent call must perform a fresh exchange, not use a stale cached result
-        let cred = try await manager.credential(for: space)
+        // 4. Start second exchange (post-invalidation caller)
+        async let freshCred: SpaceCredential = manager.credential(for: space)
+
+        // 5. Release blocked first exchange
+        releaseContinuation.yield()
+        releaseContinuation.finish()
+
+        // 6. Assert the stale pre-invalidation caller throws CancellationError
+        do {
+            _ = try await backgroundCred
+            Issue.record("Expected stale in-flight exchange to throw on invalidation")
+        } catch is CancellationError {
+            // Expected cancellation
+        } catch {
+            // Any cancellation-related error is accepted
+        }
+
+        // 7. Assert post-invalidation caller completes successfully with fresh credential from distinct attempt
+        let cred = try await freshCred
         #expect(cred.token == credentialJWT)
         #expect(delegationAttempts.withLock { $0 } == 2)
     }
