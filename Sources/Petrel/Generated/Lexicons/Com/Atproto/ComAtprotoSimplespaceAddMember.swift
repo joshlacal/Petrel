@@ -101,6 +101,10 @@ public extension ATProtoClient.Com.Atproto.Simplespace {
             ) {
                 throw atprotoError
             }
+
+            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
+                throw genericError
+            }
         }
 
         return responseCode

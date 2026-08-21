@@ -6,7 +6,7 @@ from enum_generator import EnumGenerator
 from type_converter import TypeConverter
 
 class SwiftCodeGenerator:
-    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None, emit_server_contracts=False):
+    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None, emit_server_contracts=False, emit_xrpc_error_parsing=False):
         self.lexicon = lexicon
         self.defs = lexicon.get('defs', {})
         self.lexicon_id = lexicon.get('id', '')
@@ -22,6 +22,7 @@ class SwiftCodeGenerator:
         self.is_blob_upload = self.check_if_blob_upload(lexicon)
         self.cycle_detector = cycle_detector
         self.emit_server_contracts = emit_server_contracts
+        self.emit_xrpc_error_parsing = emit_xrpc_error_parsing
 
         self.token_descriptions = {}
         self.generated_tokens = set()
@@ -700,6 +701,7 @@ class SwiftCodeGenerator:
             output_encoding=output_encoding,  # Pass the output encoding to the template
             has_errors=bool(main_def.get('errors')),
             struct_name=self.struct_name,
+            emit_xrpc_error_parsing=self.emit_xrpc_error_parsing,
         )
 
     def generate_procedure_function(self, lexicon_id, main_def):
@@ -758,6 +760,7 @@ class SwiftCodeGenerator:
             parameters_struct_name=parameters_struct_name,
             has_errors=bool(main_def.get('errors')),
             struct_name=self.struct_name,
+            emit_xrpc_error_parsing=self.emit_xrpc_error_parsing,
         )
 
     def generate_subscription_function(self, lexicon_id, main_def):

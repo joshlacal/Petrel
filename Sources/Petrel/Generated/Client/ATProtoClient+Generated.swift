@@ -477,19 +477,19 @@ public actor ATProtoClient {
         }
         return try await authManager.startOAuthFlow(identifier: identifier, bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
     }
-    /// Starts the OAuth flow for authentication and returns both the authorization URL and state token.
+
+    /// Starts the OAuth flow for authentication, returning both the authorization URL and state token.
     /// - Parameters:
     ///   - identifier: The user identifier (handle), optional for sign-up.
     ///   - bskyAppViewDID: Optional custom AppView DID to use for this account
     ///   - bskyChatDID: Optional custom Chat DID to use for this account
-    /// - Returns: A tuple containing the authorization URL and the state token.
+    /// - Returns: A tuple containing the authorization URL to present to the user and the state token.
     public func startOAuthFlowWithState(identifier: String? = nil, bskyAppViewDID: String? = nil, bskyChatDID: String? = nil) async throws -> (url: URL, state: String) {
         guard let authManager else {
             throw APIError.unauthenticatedClient("Cannot start OAuth flow on an unauthenticated client")
         }
         return try await authManager.startOAuthFlowWithState(identifier: identifier, bskyAppViewDID: bskyAppViewDID, bskyChatDID: bskyChatDID)
     }
-
 
     /// Authenticates using legacy password-based authentication.
     /// - Parameters:

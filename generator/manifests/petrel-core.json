@@ -11,7 +11,8 @@
     "exclude_namespaces": ["tools.ozone", "internal.bsky"]
   },
   "swift": {
-    "output": "Sources/Petrel/Generated"
+    "output": "Sources/Petrel/Generated",
+    "emit_xrpc_error_parsing": true
   },
   "kotlin": {
     "output": "kotlin/src/main/kotlin/blue/catbird/petrel/generated"

@@ -17,16 +17,19 @@ def render_endpoint(
     error_description: str,
     *,
     has_output: bool,
+    emit_xrpc_error_parsing: bool = False,
+    has_errors: bool = True,
 ) -> str:
     main = {
         "type": endpoint_type,
-        "errors": [
+    }
+    if has_errors:
+        main["errors"] = [
             {
                 "name": error_name,
                 "description": error_description,
             }
-        ],
-    }
+        ]
     if has_output:
         main["output"] = {
             "encoding": "application/json",
@@ -42,7 +45,8 @@ def render_endpoint(
             "lexicon": 1,
             "id": lexicon_id,
             "defs": {"main": main},
-        }
+        },
+        emit_xrpc_error_parsing=emit_xrpc_error_parsing,
     ).convert()
 
 
@@ -215,6 +219,76 @@ class SwiftEndpointErrorTests(unittest.TestCase):
             "throw atprotoError",
             self.outputless_procedure[parser_index:fallback_index],
         )
+
+    def test_xrpc_error_parsing_not_emitted_when_option_disabled(self):
+        query_no_errors = render_endpoint(
+            "blue.catbird.test.listItems",
+            "query",
+            "",
+            "",
+            has_output=True,
+            has_errors=False,
+            emit_xrpc_error_parsing=False,
+        )
+        self.assertNotIn("ATProtoErrorParser.parseGeneric(", query_no_errors)
+        self.assertIn("networkService.performRequest(", query_no_errors)
+        self.assertNotIn("networkService.performRequestReturningHTTPErrorResponses(", query_no_errors)
+
+    def test_xrpc_error_parsing_emitted_when_option_enabled(self):
+        # Query without declared errors
+        query_no_errors = render_endpoint(
+            "blue.catbird.test.listItems",
+            "query",
+            "",
+            "",
+            has_output=True,
+            has_errors=False,
+            emit_xrpc_error_parsing=True,
+        )
+        self.assertIn("ATProtoErrorParser.parseGeneric(", query_no_errors)
+        self.assertIn("throw genericError", query_no_errors)
+        self.assertIn("networkService.performRequestReturningHTTPErrorResponses(", query_no_errors)
+
+        # Query WITH declared errors
+        query_with_errors = render_endpoint(
+            "blue.catbird.test.lookupEmoji",
+            "query",
+            "EmojiNotFound",
+            "No matching emoji exists.",
+            has_output=True,
+            has_errors=True,
+            emit_xrpc_error_parsing=True,
+        )
+        self.assertIn("ATProtoErrorParser.parse(", query_with_errors)
+        self.assertIn("ATProtoErrorParser.parseGeneric(", query_with_errors)
+        self.assertIn("throw atprotoError", query_with_errors)
+        self.assertIn("throw genericError", query_with_errors)
+
+        # Procedure with output
+        proc_with_output = render_endpoint(
+            "blue.catbird.test.saveDestination",
+            "procedure",
+            "",
+            "",
+            has_output=True,
+            has_errors=False,
+            emit_xrpc_error_parsing=True,
+        )
+        self.assertIn("ATProtoErrorParser.parseGeneric(", proc_with_output)
+        self.assertIn("throw genericError", proc_with_output)
+
+        # Outputless procedure
+        proc_outputless = render_endpoint(
+            "blue.catbird.test.invalidateToken",
+            "procedure",
+            "",
+            "",
+            has_output=False,
+            has_errors=False,
+            emit_xrpc_error_parsing=True,
+        )
+        self.assertIn("ATProtoErrorParser.parseGeneric(", proc_outputless)
+        self.assertIn("throw genericError", proc_outputless)
 
 
 if __name__ == "__main__":

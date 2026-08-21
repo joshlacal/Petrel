@@ -235,6 +235,10 @@ public extension ATProtoClient.Com.Atproto.Space {
                 throw atprotoError
             }
 
+            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
+                throw genericError
+            }
+
             // Don't try to decode unknown or malformed error responses as success types
             return (responseCode, nil)
         }

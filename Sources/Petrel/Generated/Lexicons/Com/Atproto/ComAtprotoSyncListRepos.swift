@@ -242,7 +242,7 @@ public extension ATProtoClient.Com.Atproto.Sync {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.sync.listRepos")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
         // Only validate Content-Type and decode on success. Error responses
@@ -268,6 +268,10 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, nil)
             }
         } else {
+            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
+                throw genericError
+            }
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)

@@ -113,6 +113,10 @@ public extension ATProtoClient.Com.Atproto.Server {
             ) {
                 throw atprotoError
             }
+
+            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
+                throw genericError
+            }
         }
 
         return responseCode

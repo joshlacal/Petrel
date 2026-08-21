@@ -202,6 +202,7 @@ async def generate_swift_from_lexicons_recursive(
     package_name='Petrel',
     core_namespace_roots: Sequence[str] = (),
     emit_server_contracts=False,
+    emit_xrpc_error_parsing=False,
 ):
     type_dict = {}
     namespace_hierarchy = {}
@@ -274,7 +275,10 @@ async def generate_swift_from_lexicons_recursive(
                 type_dict[type_key] = f"{swift_lex_id}{swift_type_name}"
 
         swift_code = SwiftCodeGenerator(
-            lexicon, cycle_detector, emit_server_contracts=emit_server_contracts
+            lexicon,
+            cycle_detector,
+            emit_server_contracts=emit_server_contracts,
+            emit_xrpc_error_parsing=emit_xrpc_error_parsing,
         ).convert()
 
         if overlay:
@@ -731,6 +735,7 @@ async def run_manifest(manifest_path, language='both', graph_path=None):
             overlay=overlay, package_name=package_name,
             core_namespace_roots=core_namespace_roots,
             emit_server_contracts=bool(swift_cfg.get('emit_server_contracts', False)),
+            emit_xrpc_error_parsing=bool(swift_cfg.get('emit_xrpc_error_parsing', False)),
         ))
     kotlin_cfg = manifest.get('kotlin')
     if kotlin_cfg and language in ('kotlin', 'both'):

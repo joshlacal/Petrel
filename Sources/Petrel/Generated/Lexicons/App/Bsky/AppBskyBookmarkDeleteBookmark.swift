@@ -94,6 +94,10 @@ public extension ATProtoClient.App.Bsky.Bookmark {
             ) {
                 throw atprotoError
             }
+
+            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
+                throw genericError
+            }
         }
 
         return responseCode

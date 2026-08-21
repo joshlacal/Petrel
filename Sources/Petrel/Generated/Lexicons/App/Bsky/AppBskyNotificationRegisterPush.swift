@@ -101,7 +101,15 @@ public extension ATProtoClient.App.Bsky.Notification {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.registerPush")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        if !(200 ... 299).contains(responseCode) {
+            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
+                throw genericError
+            }
+        }
+
+        return responseCode
     }
 }

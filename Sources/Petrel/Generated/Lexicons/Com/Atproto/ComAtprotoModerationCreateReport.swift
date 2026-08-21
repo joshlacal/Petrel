@@ -560,7 +560,7 @@ public extension ATProtoClient.Com.Atproto.Moderation {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.moderation.createReport")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
         // Only validate Content-Type and decode on success. Error responses
@@ -586,6 +586,10 @@ public extension ATProtoClient.Com.Atproto.Moderation {
                 return (responseCode, nil)
             }
         } else {
+            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
+                throw genericError
+            }
+
             // Don't try to decode unknown or malformed error responses as success types
             return (responseCode, nil)
         }

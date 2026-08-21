@@ -153,6 +153,10 @@ public extension ATProtoClient.Com.Atproto.Lexicon {
                 throw atprotoError
             }
 
+            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
+                throw genericError
+            }
+
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
             return (responseCode, nil)
