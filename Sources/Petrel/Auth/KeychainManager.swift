@@ -196,6 +196,7 @@ enum KeychainManager {
         cache.countLimit = 100
         return cache
     }()
+    private static let cachedKeysState = Mutex<Set<String>>([])
 
     private static let defaultAccessGroupState = Mutex<String?>(nil)
 
@@ -271,6 +272,7 @@ enum KeychainManager {
 
     private static func clearCacheStorage() {
         dataCache.removeAllObjects()
+        cachedKeysState.withLock { $0.removeAll() }
     }
 
     /// Clears all cached items
@@ -281,35 +283,17 @@ enum KeychainManager {
 
     /// Clears cached items for a specific namespace
     static func clearCache(forNamespace namespace: String) {
-        #if canImport(Security)
-            // Since NSCache doesn't support partial clearing based on key prefix,
-            // we need a separate approach for namespace-specific clearing
-
-            // Get all keychain items for the namespace and remove them from cache
-            let query: [String: Any] = [
-                kSecClass as String: kSecClassGenericPassword,
-                kSecMatchLimit as String: kSecMatchLimitAll,
-                kSecReturnAttributes as String: true,
-            ]
-
-            var result: AnyObject?
-            let status = SecItemCopyMatching(query as CFDictionary, &result)
-
-            if status == errSecSuccess, let items = result as? [[String: Any]] {
-                for item in items {
-                    if let account = item[kSecAttrAccount as String] as? String,
-                       account.hasPrefix("\(namespace).")
-                    {
-                        // Remove from data cache
-                        dataCache.removeObject(forKey: account as NSString)
-                    }
-                }
+        let keysToRemove = cachedKeysState.withLock { cachedKeys -> [String] in
+            let prefix = "\(namespace)."
+            let matching = cachedKeys.filter { $0.hasPrefix(prefix) }
+            for key in matching {
+                cachedKeys.remove(key)
             }
-
-        #else
-            clearCacheStorage()
-        #endif
-
+            return Array(matching)
+        }
+        for key in keysToRemove {
+            dataCache.removeObject(forKey: key as NSString)
+        }
         LogManager.logDebug("KeychainManager - Cache cleared for namespace: \(namespace).")
     }
 
@@ -331,6 +315,7 @@ enum KeychainManager {
 
         // Remove from cache
         dataCache.removeObject(forKey: exactKey as NSString)
+        cachedKeysState.withLock { _ = $0.remove(exactKey) }
     }
 
     /// Stores data in the keychain with a specified key and namespace.
@@ -351,7 +336,7 @@ enum KeychainManager {
         // Update cache
         let namespacedKey = "\(namespace).\(key)"
         dataCache.setObject(value as NSData, forKey: namespacedKey as NSString)
-
+        cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
         LogManager.logDebug("KeychainManager - Successfully stored item for key \(namespace).\(key).")
     }
 
@@ -384,7 +369,7 @@ enum KeychainManager {
                     accessGroup: resolvedAccessGroup
                 )
                 dataCache.setObject(data as NSData, forKey: namespacedKey as NSString)
-                LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
+                cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
                 return data
             } catch {
                 if !isItemNotFound(error) {
@@ -399,6 +384,7 @@ enum KeychainManager {
             )
 
             dataCache.setObject(legacyData as NSData, forKey: namespacedKey as NSString)
+            cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
 
             do {
                 try storage.store(
@@ -429,7 +415,7 @@ enum KeychainManager {
 
         // Store in cache
         dataCache.setObject(data as NSData, forKey: namespacedKey as NSString)
-
+        cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
         LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
         return data
     }
@@ -465,7 +451,7 @@ enum KeychainManager {
         // Remove from cache before either delete so a failure below cannot leave a
         // deleted item readable from memory.
         dataCache.removeObject(forKey: namespacedKey as NSString)
-
+        cachedKeysState.withLock { _ = $0.remove(namespacedKey) }
         do {
             try storage.delete(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
         } catch {
@@ -661,6 +647,7 @@ enum KeychainManager {
 
         // Remove from cache
         dataCache.removeObject(forKey: bindingsKey as NSString)
+        cachedKeysState.withLock { _ = $0.remove(bindingsKey) }
 
         LogManager.logDebug(
             "KeychainManager - Successfully deleted DPoP key bindings for namespace \(namespace)."
@@ -678,6 +665,7 @@ enum KeychainManager {
 
         // Remove from cache
         dataCache.removeObject(forKey: bindingsKey as NSString)
+        cachedKeysState.withLock { _ = $0.remove(bindingsKey) }
 
         LogManager.logDebug("KeychainManager - Successfully deleted DPoP key bindings for DID \(did).")
     }

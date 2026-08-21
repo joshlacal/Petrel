@@ -161,6 +161,8 @@ public actor KeychainStorage {
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
 
     private var authContinuityObserverToken: UUID?
+    private var pendingSessionDIDs: Set<String> = []
+    private var attemptedLegacyGatewayMigrationDIDs: Set<String> = []
 
     private var authContinuityScope: AuthContinuityMutationHub.Scope {
         AuthContinuityMutationHub.Scope(namespace: namespace, accessGroup: accessGroup)
@@ -231,6 +233,7 @@ public actor KeychainStorage {
     ///   - session: The session to save
     ///   - did: The DID associated with both account and session
     func saveAccountAndSession(_ account: Account, session: Session, for did: String) async throws {
+        pendingSessionDIDs.remove(did)
         let accountKey = makeKey("account", did: did)
         let sessionKey = makeKey("session", did: did)
         let tempAccountKey = makeKey("account.temp", did: did)
@@ -492,6 +495,7 @@ public actor KeychainStorage {
 
     /// Saves the gateway session for a specific account (per-DID storage for multi-account support)
     func saveGatewaySession(_ session: String, for did: String) async throws {
+        attemptedLegacyGatewayMigrationDIDs.remove(did)
         let key = makeKey("gatewaySession", did: did)
         let data = session.data(using: .utf8) ?? Data()
         LogManager.logInfo("KeychainStorage - Saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
@@ -530,6 +534,10 @@ public actor KeychainStorage {
                 )
                 throw error
             }
+            guard !attemptedLegacyGatewayMigrationDIDs.contains(did) else {
+                LogManager.logWarning("KeychainStorage - No gateway session found for DID: \(did.prefix(20))... (legacy migration already attempted)")
+                return nil
+            }
             LogManager.logWarning("KeychainStorage - Gateway session not found for key \(namespace).\(key). Attempting legacy migration...")
             if let migratedSession = try await migrateLegacyGatewaySessionIfNeeded(for: did) {
                 LogManager.logInfo("KeychainStorage - Successfully migrated legacy gateway session for DID: \(did.prefix(20))...")
@@ -552,6 +560,7 @@ public actor KeychainStorage {
             throw error
         }
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
+        attemptedLegacyGatewayMigrationDIDs.remove(did)
     }
 
     private func shouldMigrateLegacyGatewaySession(for did: String) async throws -> Bool {
@@ -569,7 +578,10 @@ public actor KeychainStorage {
     ///   read. Swallowing it would report "no gateway session" for an account whose
     ///   session exists, sending startup validation down the re-authentication path.
     private func migrateLegacyGatewaySessionIfNeeded(for did: String) async throws -> String? {
-        guard try await shouldMigrateLegacyGatewaySession(for: did) else { return nil }
+        guard try await shouldMigrateLegacyGatewaySession(for: did) else {
+            attemptedLegacyGatewayMigrationDIDs.insert(did)
+            return nil
+        }
 
         if let legacySession = try await getLegacyGatewaySession(), !legacySession.isEmpty {
             LogManager.logInfo(
@@ -583,6 +595,7 @@ public actor KeychainStorage {
                         "KeychainStorage - Migrated legacy gateway session but failed to remove the source copy: \(error)"
                     )
                 }
+                attemptedLegacyGatewayMigrationDIDs.insert(did)
             }
             return legacySession
         }
@@ -606,10 +619,12 @@ public actor KeychainStorage {
                         "KeychainStorage - Migrated global gateway session but failed to remove the source copy: \(error)"
                     )
                 }
+                attemptedLegacyGatewayMigrationDIDs.insert(did)
             }
             return session
         }
 
+        attemptedLegacyGatewayMigrationDIDs.insert(did)
         return nil
     }
 
@@ -674,6 +689,7 @@ public actor KeychainStorage {
     }
 
     private func saveLegacyGatewaySession(_ session: String) async throws {
+        attemptedLegacyGatewayMigrationDIDs.removeAll()
         let key = makeKey("gatewaySession")
         let data = session.data(using: .utf8) ?? Data()
         let continuityTicket = await beginAuthContinuityMutation()
@@ -717,10 +733,10 @@ public actor KeychainStorage {
     ///   - session: The session to save
     ///   - did: The DID associated with the session
     public func saveSession(_ session: Session, for did: String) async throws {
+        pendingSessionDIDs.remove(did)
         let key = makeKey("session", did: did)
         let tempKey = makeKey("session.temp", did: did)
         let backupKey = makeKey("session.backup", did: did)
-
         // Validate session before attempting to save
         guard !session.accessToken.isEmpty else {
             LogManager.logError(
@@ -990,22 +1006,31 @@ public actor KeychainStorage {
         // A pending session exists only if a refresh succeeded but the atomic save
         // failed. The server has already rotated the refresh token, so the pending
         // copy is authoritative when newer: promote it to primary.
-        let pendingRead = await readSessionCopy(pendingKey, for: did, bypassCache: bypassCache)
-        if let error = pendingRead.error { readErrors.append(error) }
-        if let pending = decodeSession(pendingRead.data),
-           primary == nil || pending.createdAt > primary!.createdAt
-        {
-            LogManager.logInfo(
-                "Promoting pending session to primary for DID: \(LogManager.logDID(did))"
-            )
-            if let data = try? JSONEncoder().encode(pending),
-               (try? await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)) != nil
-            {
-                try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
+        // We only probe the pending copy when the primary is absent (crash recovery)
+        // or when a pending save was recorded for this DID.
+        if primary == nil || pendingSessionDIDs.contains(did) {
+            let pendingRead = await readSessionCopy(pendingKey, for: did, bypassCache: bypassCache)
+            if let error = pendingRead.error { readErrors.append(error) }
+            if let pending = decodeSession(pendingRead.data) {
+                if primary == nil || pending.createdAt > primary!.createdAt {
+                    LogManager.logInfo(
+                        "Promoting pending session to primary for DID: \(LogManager.logDID(did))"
+                    )
+                    if let data = try? JSONEncoder().encode(pending),
+                       (try? await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)) != nil
+                    {
+                        try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
+                        pendingSessionDIDs.remove(did)
+                    }
+                    return pending
+                } else {
+                    try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
+                    pendingSessionDIDs.remove(did)
+                }
+            } else if pendingRead.data == nil && pendingRead.error == nil {
+                pendingSessionDIDs.remove(did)
             }
-            return pending
         }
-
         if let primary {
             return primary
         }
@@ -1117,6 +1142,7 @@ public actor KeychainStorage {
         let key = makeKey("session.pending", did: did)
         let data = try JSONEncoder().encode(session)
         try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        pendingSessionDIDs.insert(did)
         LogManager.logInfo("KeychainStorage - Saved pending session for DID: \(LogManager.logDID(did))")
     }
 
@@ -1128,6 +1154,7 @@ public actor KeychainStorage {
     /// logged-out session comes back on the next read.
     /// - Parameter did: The DID associated with the session to delete
     public func deleteSession(for did: String) async throws {
+        pendingSessionDIDs.remove(did)
         var failures: [Error] = []
         for suffix in ["session", "session.pending", "session.temp", "session.backup"] {
             do {
