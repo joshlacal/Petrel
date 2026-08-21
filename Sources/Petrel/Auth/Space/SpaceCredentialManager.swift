@@ -202,21 +202,23 @@ public actor SpaceCredentialManager {
             return cached
         }
 
-        if let inFlightTask = inFlight[space] {
-            return try await inFlightTask.value
-        }
-
         let currentGeneration = generations[space, default: 0]
-        let task = Task { [weak self] () -> SpaceCredential in
-            guard let self else {
-                throw SpaceCredentialError.invalidResponse
+        let task: Task<SpaceCredential, Error>
+        if let existing = inFlight[space] {
+            task = existing
+        } else {
+            let newTask = Task { [weak self] () -> SpaceCredential in
+                guard let self else {
+                    throw SpaceCredentialError.invalidResponse
+                }
+                let cred = try await self.exchangeCredential(for: space)
+                try Task.checkCancellation()
+                return cred
             }
-            let cred = try await self.exchangeCredential(for: space)
-            try Task.checkCancellation()
-            return cred
+            inFlight[space] = newTask
+            task = newTask
         }
 
-        inFlight[space] = task
         defer {
             if inFlight[space] == task {
                 inFlight.removeValue(forKey: space)
