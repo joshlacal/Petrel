@@ -659,7 +659,7 @@ public extension DAGCBORDecodable where Self: Decodable {
         }
         let intermediateValue = try DAGCBOR.decodeCBORItem(cborItem)
         let jsonData = try DAGCBORJSONBridge.jsonData(from: intermediateValue)
-        return try JSONDecoder().decode(Self.self, from: jsonData)
+        return try JSONCoders.defaultDecoder.decode(Self.self, from: jsonData)
     }
 }
 

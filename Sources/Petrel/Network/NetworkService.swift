@@ -329,8 +329,8 @@ public actor NetworkService: NetworkServiceProtocol {
     private var headers: [String: String] = [:]
     private let session: URLSession
     private let exactAuthSession: URLSession
-    private let jsonEncoder = JSONEncoder()
-    private let jsonDecoder = JSONDecoder()
+    private let jsonEncoder = JSONCoders.iso8601Encoder
+    private let jsonDecoder = JSONCoders.iso8601Decoder
     private let maxRetries = 3
     private var userAgent: String?
     private(set) var protectedResourceMetadata: ProtectedResourceMetadata?
@@ -690,14 +690,6 @@ public actor NetworkService: NetworkServiceProtocol {
             delegate: HardenedURLSessionDelegate(allowsRedirects: false),
             delegateQueue: nil
         )
-
-        // Set JSON encoder settings
-        jsonEncoder.keyEncodingStrategy = .useDefaultKeys
-        jsonEncoder.dateEncodingStrategy = .iso8601
-
-        // Set JSON decoder settings
-        jsonDecoder.keyDecodingStrategy = .useDefaultKeys
-        jsonDecoder.dateDecodingStrategy = .iso8601
 
         LogManager.logDebug("Network Service initialized")
     }

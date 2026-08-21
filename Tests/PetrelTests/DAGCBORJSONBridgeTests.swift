@@ -326,6 +326,32 @@ struct DAGCBORJSONBridgeTests {
             #expect(Bool(false), "Expected DAGCBORError.decodingFailed, got \(error)")
         }
     }
+    @Test("OrderedCBORMap mutating builder preserves exact ordering, duplicate keys, and byte-for-byte identical CBOR output")
+    func orderedCBORMapMutatingBuilder() throws {
+        var mapAppend = OrderedCBORMap(minimumCapacity: 5)
+        mapAppend.append(key: "z_key", value: "z_value")
+        mapAppend.append(key: "a_key", value: 123)
+        mapAppend.append(key: "dup_key", value: "first")
+        mapAppend.append(key: "dup_key", value: "second")
+        mapAppend.append(key: "m_key", value: ["sub": "item"])
+
+        var mapAdding = OrderedCBORMap()
+        mapAdding = mapAdding.adding(key: "z_key", value: "z_value")
+        mapAdding = mapAdding.adding(key: "a_key", value: 123)
+        mapAdding = mapAdding.adding(key: "dup_key", value: "first")
+        mapAdding = mapAdding.adding(key: "dup_key", value: "second")
+        mapAdding = mapAdding.adding(key: "m_key", value: ["sub": "item"])
+
+        #expect(mapAppend.entries.count == 5)
+        #expect(mapAdding.entries.count == 5)
+        #expect(mapAppend.entries.map { $0.key } == ["z_key", "a_key", "dup_key", "dup_key", "m_key"])
+        #expect(mapAdding.entries.map { $0.key } == ["z_key", "a_key", "dup_key", "dup_key", "m_key"])
+
+        let cborAppendData = try mapAppend.encodedDAGCBOR()
+        let cborAddingData = try mapAdding.encodedDAGCBOR()
+        #expect(cborAppendData == cborAddingData)
+        #expect(!cborAppendData.isEmpty)
+    }
 
     private func isTag42(_ item: CBOR?) -> Bool {
         guard case let .tagged(tag, _) = item else { return false }

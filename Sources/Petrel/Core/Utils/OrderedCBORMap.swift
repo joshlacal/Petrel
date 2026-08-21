@@ -2,18 +2,33 @@ import Foundation
 
 /// Ordered map structure for DAG-CBOR encoding
 public struct OrderedCBORMap: DAGCBOREncodable {
-    public let entries: [(key: String, value: Any)]
+    public private(set) var entries: [(key: String, value: Any)]
 
     public init() {
         entries = []
+    }
+
+    public init(minimumCapacity: Int) {
+        entries = []
+        entries.reserveCapacity(minimumCapacity)
     }
 
     public init(entries: [(key: String, value: Any)]) {
         self.entries = entries
     }
 
+    public mutating func append(key: String, value: Any) {
+        entries.append((key: key, value: value))
+    }
+
+    public mutating func reserveCapacity(_ minimumCapacity: Int) {
+        entries.reserveCapacity(minimumCapacity)
+    }
+
     public func adding(key: String, value: Any) -> OrderedCBORMap {
-        return OrderedCBORMap(entries: entries + [(key: key, value: value)])
+        var copy = self
+        copy.append(key: key, value: value)
+        return copy
     }
 
     /// Implementation of DAGCBOREncodable protocol

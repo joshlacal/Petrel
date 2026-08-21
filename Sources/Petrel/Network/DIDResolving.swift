@@ -246,8 +246,7 @@ actor DIDResolutionService: DIDResolving {
 
         // Data decoding and validation
 
-        let decoder = JSONDecoder()
-        let decodedData = try? decoder.decode(
+        let decodedData = try? JSONCoders.defaultDecoder.decode(
             ComAtprotoIdentityResolveHandle.Output.self, from: responseData
         )
 
@@ -358,8 +357,7 @@ actor DIDResolutionService: DIDResolving {
             )
         }
 
-        let decoder = JSONDecoder()
-        let didDocument = try decoder.decode(DIDDocument.self, from: data)
+        let didDocument = try JSONCoders.defaultDecoder.decode(DIDDocument.self, from: data)
 
         guard
             let pdsEndpoint = didDocument.service.first(
@@ -402,8 +400,7 @@ actor DIDResolutionService: DIDResolving {
             )
         }
 
-        let decoder = JSONDecoder()
-        let didDocument = try decoder.decode(DIDDocument.self, from: data)
+        let didDocument = try JSONCoders.defaultDecoder.decode(DIDDocument.self, from: data)
 
         guard
             let pdsEndpoint = didDocument.service.first(

@@ -580,18 +580,18 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: type) // Assuming 'type' holds the lexicon identifier like "blob"
+        map.append(key: "$type", value: type) // Assuming 'type' holds the lexicon identifier like "blob"
 
         if let refLink = ref {
             let refValue = try refLink.toCBORValue()
-            map = map.adding(key: "ref", value: refValue)
+            map.append(key: "ref", value: refValue)
         }
 
-        map = map.adding(key: "mimeType", value: mimeType)
-        map = map.adding(key: "size", value: size)
+        map.append(key: "mimeType", value: mimeType)
+        map.append(key: "size", value: size)
 
         if let cidValue = cid {
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
         }
 
         return map

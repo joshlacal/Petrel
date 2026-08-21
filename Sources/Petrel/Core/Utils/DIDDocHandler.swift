@@ -31,22 +31,22 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
         var map = OrderedCBORMap()
 
         // Add fields in order
-        map = map.adding(key: "@context", value: context) // Array of Strings
-        map = map.adding(key: "id", value: id)
+        map.append(key: "@context", value: context) // Array of Strings
+        map.append(key: "id", value: id)
         if !alsoKnownAs.isEmpty { // Only add if not empty, common practice
-            map = map.adding(key: "alsoKnownAs", value: alsoKnownAs)
+            map.append(key: "alsoKnownAs", value: alsoKnownAs)
         }
 
         // Convert verificationMethod array
         let verificationMethodsCBOR = try verificationMethod.map { try $0.toCBORValue() }
         if !verificationMethodsCBOR.isEmpty {
-            map = map.adding(key: "verificationMethod", value: verificationMethodsCBOR)
+            map.append(key: "verificationMethod", value: verificationMethodsCBOR)
         }
 
         // Convert service array
         let servicesCBOR = try service.map { try $0.toCBORValue() }
         if !servicesCBOR.isEmpty {
-            map = map.adding(key: "service", value: servicesCBOR)
+            map.append(key: "service", value: servicesCBOR)
         }
 
         return map
@@ -66,9 +66,9 @@ public struct Service: ATProtocolCodable, ATProtocolValue {
 
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
-        map = map.adding(key: "id", value: id)
-        map = map.adding(key: "type", value: type)
-        map = map.adding(key: "serviceEndpoint", value: serviceEndpoint)
+        map.append(key: "id", value: id)
+        map.append(key: "type", value: type)
+        map.append(key: "serviceEndpoint", value: serviceEndpoint)
         return map
     }
 }
@@ -88,10 +88,10 @@ public struct VerificationMethod: ATProtocolCodable, ATProtocolValue {
 
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
-        map = map.adding(key: "id", value: id)
-        map = map.adding(key: "type", value: type)
-        map = map.adding(key: "controller", value: controller)
-        map = map.adding(key: "publicKeyMultibase", value: publicKeyMultibase)
+        map.append(key: "id", value: id)
+        map.append(key: "type", value: type)
+        map.append(key: "controller", value: controller)
+        map.append(key: "publicKeyMultibase", value: publicKeyMultibase)
         return map
     }
 }
