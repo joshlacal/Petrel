@@ -33,156 +33,6 @@ public enum CARRepository {
         public let roots: [CID]
     }
 
-    /// Recursively decodes the JSON emitted by `DAGCBORJSONBridge` without
-    /// requiring every value to be an object. Exact DAG-JSON link and bytes
-    /// objects recover their semantic container cases so DAG-CBOR re-encoding
-    /// retains Tag 42 and byte-string wire forms.
-    private struct CARJSONValue: Decodable {
-        let value: ATProtocolValueContainer
-
-        init(from decoder: Decoder) throws {
-            if let primitive = try Self.decodePrimitive(from: decoder) {
-                value = primitive
-                return
-            }
-            if let array = try Self.decodeArray(from: decoder) {
-                value = .array(array)
-                return
-            }
-
-            let objectContainer = try decoder.container(keyedBy: CARJSONCodingKey.self)
-            value = try Self.decodeObjectValue(from: objectContainer, decoder: decoder)
-        }
-
-        private static func decodePrimitive(
-            from decoder: Decoder
-        ) throws -> ATProtocolValueContainer? {
-            let singleValue = try decoder.singleValueContainer()
-
-            if singleValue.decodeNil() {
-                return .null
-            }
-            if let boolValue = try? singleValue.decode(Bool.self) {
-                return .bool(boolValue)
-            }
-            if let intValue = try? singleValue.decode(Int.self) {
-                return .number(intValue)
-            }
-            if let stringValue = try? singleValue.decode(String.self) {
-                // CAR's bridge policy intentionally represents unsigned integers above
-                // Int.max as decimal strings, so preserve all JSON strings verbatim.
-                return .string(stringValue)
-            }
-            return nil
-        }
-
-        private static func decodeArray(
-            from decoder: Decoder
-        ) throws -> [ATProtocolValueContainer]? {
-            guard var arrayContainer = try? decoder.unkeyedContainer() else {
-                return nil
-            }
-
-            var array = [ATProtocolValueContainer]()
-            while !arrayContainer.isAtEnd {
-                if try arrayContainer.decodeNil() {
-                    array.append(.null)
-                } else {
-                    try array.append(arrayContainer.decode(CARJSONValue.self).value)
-                }
-            }
-            return array
-        }
-
-        private static func decodeObjectValue(
-            from container: KeyedDecodingContainer<CARJSONCodingKey>,
-            decoder: Decoder
-        ) throws -> ATProtocolValueContainer {
-            if let specialObject = try decodeSpecialObject(from: container) {
-                return specialObject
-            }
-
-            if let typeKey = container.allKeys.first(where: { $0.stringValue == "$type" }) {
-                if let typeValue = try? container.decode(String.self, forKey: typeKey) {
-                    if let typedValue = try? ATProtocolValueContainer(from: decoder) {
-                        if case .unknownType = typedValue {
-                            return try decodeUnknownType(typeValue, from: container)
-                        }
-                        return typedValue
-                    }
-                    return try decodeUnknownType(typeValue, from: container)
-                }
-            }
-
-            return try .object(decodeObject(from: container))
-        }
-
-        private static func decodeUnknownType(
-            _ typeValue: String,
-            from container: KeyedDecodingContainer<CARJSONCodingKey>
-        ) throws -> ATProtocolValueContainer {
-            return try .unknownType(
-                typeValue,
-                .object(decodeObject(from: container))
-            )
-        }
-
-        private static func decodeSpecialObject(
-            from container: KeyedDecodingContainer<CARJSONCodingKey>
-        ) throws -> ATProtocolValueContainer? {
-            guard container.allKeys.count == 1, let onlyKey = container.allKeys.first else {
-                return nil
-            }
-
-            switch onlyKey.stringValue {
-            case "$link":
-                let cidString = try container.decode(String.self, forKey: onlyKey)
-                return try .link(ATProtoLink(cidString: cidString))
-            case "$bytes":
-                let base64String = try container.decode(String.self, forKey: onlyKey)
-                guard let data = Data(base64Encoded: base64String) else {
-                    throw DecodingError.dataCorruptedError(
-                        forKey: onlyKey,
-                        in: container,
-                        debugDescription: "Invalid base64 in exact $bytes object"
-                    )
-                }
-                return .bytes(Bytes(data: data))
-            default:
-                return nil
-            }
-        }
-
-        private static func decodeObject(
-            from container: KeyedDecodingContainer<CARJSONCodingKey>
-        ) throws -> [String: ATProtocolValueContainer] {
-            var object = [String: ATProtocolValueContainer]()
-            for key in container.allKeys {
-                if try container.decodeNil(forKey: key) {
-                    object[key.stringValue] = .null
-                } else {
-                    object[key.stringValue] = try container.decode(CARJSONValue.self, forKey: key).value
-                }
-            }
-            return object
-        }
-    }
-
-    private struct CARJSONCodingKey: CodingKey {
-        let stringValue: String
-        let intValue: Int?
-
-        init?(stringValue: String) {
-            self.stringValue = stringValue
-            intValue = nil
-        }
-
-        init?(intValue: Int) {
-            stringValue = String(intValue)
-            self.intValue = intValue
-        }
-    }
-
     // MARK: - Parsing
 
     /// Parses a CAR file, walking the MST and decoding each record.
@@ -267,8 +117,7 @@ public enum CARRepository {
     // MARK: - CBOR Decoding
 
     /// Decodes raw DAG-CBOR data into an `ATProtocolValueContainer`.
-    ///
-    /// Flow: CBOR bytes → SwiftCBOR parse → DAGCBOR.decodeCBORItem → Swift dict → JSON → ATProtocolValueContainer
+    /// Flow: CBOR bytes → SwiftCBOR parse → ATProtocolValueContainer.fromCBOR
     public static func decodeRecordCBOR(_ data: Data) throws -> ATProtocolValueContainer {
         guard !data.isEmpty else {
             throw CARReaderError.decodingFailed("Empty CBOR data")
@@ -278,18 +127,20 @@ public enum CARRepository {
             throw CARReaderError.decodingFailed("Failed to parse CBOR")
         }
 
-        let intermediate = try DAGCBOR.decodeCBORItem(cborItem)
-
-        let isMapRoot = intermediate is [String: Any]
-        guard isMapRoot || intermediate is [Any] else {
+        switch cborItem {
+        case .map, .array:
+            break
+        default:
             throw CARReaderError.decodingFailed("CBOR root is not a map or array")
         }
 
-        let jsonData = try DAGCBORJSONBridge.jsonData(
-            from: intermediate,
-            unsignedIntegerPolicy: .stringifyAboveIntMax
-        )
-
-        return try JSONCoders.decode(CARJSONValue.self, from: jsonData).value
+        do {
+            return try ATProtocolValueContainer.fromCBOR(
+                cborItem,
+                stringifyUnsignedAboveIntMax: true
+            )
+        } catch let error as DAGCBORError {
+            throw CARReaderError.decodingFailed(error.localizedDescription)
+        }
     }
 }
