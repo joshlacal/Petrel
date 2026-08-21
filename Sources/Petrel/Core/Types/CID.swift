@@ -39,14 +39,28 @@ public enum DAGCBORError: Error {
 // MARK: - ================== CIDAsLink Wrapper ==================
 
 /// Carries a CID's string-vs-link wire representation through CBOR conversion.
-struct CIDAsLink {
-    enum Representation {
+///
+/// Public because it is what `toCBORValue()` hands to callers: `ATProtoLink`
+/// yields `.link` (DAG-CBOR tag 42, spelled `$link` in JSON) and a bare `CID`
+/// yields `.string` (a StrongRef's `cid` field). Any consumer that encodes
+/// Petrel values itself — a PDS writing canonical record bytes, for instance —
+/// has to be able to tell those two apart. While this type was internal, such
+/// a consumer could only see an opaque value it had no case for: Swan rejected
+/// every record carrying a blob or a StrongRef with `InvalidRequest`, which is
+/// every like, repost, reply, quote and image post.
+public struct CIDAsLink {
+    public enum Representation {
         case link
         case string
     }
 
-    let cid: CID
-    let representation: Representation
+    public let cid: CID
+    public let representation: Representation
+
+    public init(cid: CID, representation: Representation) {
+        self.cid = cid
+        self.representation = representation
+    }
 }
 
 // MARK: - ================== CID Implementation ==================
