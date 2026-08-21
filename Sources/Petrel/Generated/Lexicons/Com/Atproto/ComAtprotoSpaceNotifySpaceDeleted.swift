@@ -34,6 +34,27 @@ public enum ComAtprotoSpaceNotifySpaceDeleted {
             case space
         }
     }
+
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.space.notifySpaceDeleted", kind: "procedure",
+        inputEncoding: "application/json", outputEncoding: nil,
+        declaredErrors: []
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Void, input: Input, context: Context
+        ) async throws
+    }
 }
 
 public extension ATProtoClient.Com.Atproto.Space {

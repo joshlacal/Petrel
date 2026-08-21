@@ -20,8 +20,34 @@ public enum ComAtprotoSimplespaceUpdateSpace {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             space = try container.decode(SpaceRef.self, forKey: .space)
-            policy = try container.decodeIfPresent(InputPolicyUnion.self, forKey: .policy)
-            appAccess = try container.decodeIfPresent(InputAppAccessUnion.self, forKey: .appAccess)
+            if container.contains(.policy) {
+                guard try !container.decodeNil(forKey: .policy) else {
+                    throw DecodingError.valueNotFound(
+                        InputPolicyUnion.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'policy' must not be null"
+                        )
+                    )
+                }
+                policy = try container.decode(InputPolicyUnion.self, forKey: .policy)
+            } else {
+                policy = nil
+            }
+            if container.contains(.appAccess) {
+                guard try !container.decodeNil(forKey: .appAccess) else {
+                    throw DecodingError.valueNotFound(
+                        InputAppAccessUnion.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'appAccess' must not be null"
+                        )
+                    )
+                }
+                appAccess = try container.decode(InputAppAccessUnion.self, forKey: .appAccess)
+            } else {
+                appAccess = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -67,6 +93,27 @@ public enum ComAtprotoSimplespaceUpdateSpace {
         public var errorName: String {
             return rawValue
         }
+    }
+
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.simplespace.updateSpace", kind: "procedure",
+        inputEncoding: "application/json", outputEncoding: nil,
+        declaredErrors: ["SpaceNotFound", "NotSpaceOwner", "UnsupportedPolicy", "UnsupportedAppAccess"]
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Void, input: Input, context: Context
+        ) async throws
     }
 
     public enum InputPolicyUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {

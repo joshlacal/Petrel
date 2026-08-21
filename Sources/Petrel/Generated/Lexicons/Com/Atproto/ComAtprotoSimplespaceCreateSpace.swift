@@ -22,7 +22,20 @@ public enum ComAtprotoSimplespaceCreateSpace {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             type = try container.decode(NSID.self, forKey: .type)
-            skey = try container.decodeIfPresent(RecordKey.self, forKey: .skey)
+            if container.contains(.skey) {
+                guard try !container.decodeNil(forKey: .skey) else {
+                    throw DecodingError.valueNotFound(
+                        RecordKey.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'skey' must not be null"
+                        )
+                    )
+                }
+                skey = try container.decode(RecordKey.self, forKey: .skey)
+            } else {
+                skey = nil
+            }
             policy = try container.decode(InputPolicyUnion.self, forKey: .policy)
             appAccess = try container.decode(InputAppAccessUnion.self, forKey: .appAccess)
         }
@@ -109,6 +122,27 @@ public enum ComAtprotoSimplespaceCreateSpace {
         public var errorName: String {
             return rawValue
         }
+    }
+
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.simplespace.createSpace", kind: "procedure",
+        inputEncoding: "application/json", outputEncoding: "application/json",
+        declaredErrors: ["SpaceAlreadyExists", "UnsupportedPolicy", "UnsupportedAppAccess"]
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Void, input: Input, context: Context
+        ) async throws -> Output
     }
 
     public enum InputPolicyUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {

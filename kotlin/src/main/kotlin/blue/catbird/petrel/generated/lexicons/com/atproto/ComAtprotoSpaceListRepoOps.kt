@@ -1,0 +1,80 @@
+// Lexicon: 1, ID: com.atproto.space.listRepoOps
+// List the operation log for an account's permissioned repo within a space, returning operations after a given revision. Primary incremental sync mechanism. By default each created or updated operation inlines the record's current value; set excludeValues for metadata-only entries. Note the oplog is a transport optimization with no history guarantee: a host may compact it or drop it, and it does not survive account migration, so omitting `since` returns the retained window rather than the repo's full history. Use getRepo for an initial sync or when a `since` revision is no longer available. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSpaceListRepoOpsDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.space.listRepoOps"
+}
+
+    /**
+     * A single operation in a permissioned repo's oplog. cid is null for deletes; prev is null for creates. Operations sharing the same rev belong to the same batch. value carries the record's current value for creates and updates, unless excludeValues was set or the value is stale (superseded by a later operation).
+     */
+    @Serializable
+    data class ComAtprotoSpaceListRepoOpsOpEntry(
+        @SerialName("rev")
+        val rev: String,        @SerialName("collection")
+        val collection: NSID,        @SerialName("rkey")
+        val rkey: String,        @SerialName("cid")
+        val cid: CID?,        @SerialName("prev")
+        val prev: CID?,/** The record's current value, inlined for create and update operations. Omitted when excludeValues is set, for deletes, or when the value has been superseded by a later operation. */        @SerialName("value")
+        val value: JsonElement? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#comAtprotoSpaceListRepoOpsOpEntry"
+        }
+    }
+
+@Serializable
+    data class ComAtprotoSpaceListRepoOpsParameters(
+// Reference to the space.        @SerialName("space")
+        val space: SpaceRef,// The DID of the account whose oplog to retrieve.        @SerialName("repo")
+        val repo: DID,// Return operations after this revision. The caller's own sync position; use `cursor` to continue a paginated response.        @SerialName("since")
+        val since: String? = null,// Maximum number of operations to return.        @SerialName("limit")
+        val limit: Int? = null,// Opaque pagination cursor from a previous response. Takes precedence over `since` when both are supplied.        @SerialName("cursor")
+        val cursor: String? = null,// If true, omit inlined record values and return only operation metadata.        @SerialName("excludeValues")
+        val excludeValues: Boolean? = null    )
+
+    @Serializable
+    data class ComAtprotoSpaceListRepoOpsOutput(
+        @SerialName("ops")
+        val ops: List<ComAtprotoSpaceListRepoOpsOpEntry>,// The account's current signed commit. Included when the response reaches the head of the oplog; omitted on backfill responses.        @SerialName("commit")
+        val commit: ComAtprotoSpaceDefsSignedCommit? = null,// Pass as `cursor` to fetch the next page. Absent once the response reaches the head of the oplog.        @SerialName("cursor")
+        val cursor: String? = null    )
+
+sealed class ComAtprotoSpaceListRepoOpsError(val name: String, val description: String?) {
+        object SpaceNotFound: ComAtprotoSpaceListRepoOpsError("SpaceNotFound", "")
+        object RepoNotFound: ComAtprotoSpaceListRepoOpsError("RepoNotFound", "")
+        object RepoTakendown: ComAtprotoSpaceListRepoOpsError("RepoTakendown", "")
+        object RepoSuspended: ComAtprotoSpaceListRepoOpsError("RepoSuspended", "")
+        object RepoDeactivated: ComAtprotoSpaceListRepoOpsError("RepoDeactivated", "")
+    }
+
+/**
+ * List the operation log for an account's permissioned repo within a space, returning operations after a given revision. Primary incremental sync mechanism. By default each created or updated operation inlines the record's current value; set excludeValues for metadata-only entries. Note the oplog is a transport optimization with no history guarantee: a host may compact it or drop it, and it does not survive account migration, so omitting `since` returns the retained window rather than the repo's full history. Use getRepo for an initial sync or when a `since` revision is no longer available. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+ *
+ * Endpoint: com.atproto.space.listRepoOps
+ */
+suspend fun ATProtoClient.Com.Atproto.Space.listRepoOps(
+parameters: ComAtprotoSpaceListRepoOpsParameters): ATProtoResponse<ComAtprotoSpaceListRepoOpsOutput> {
+    val endpoint = "com.atproto.space.listRepoOps"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

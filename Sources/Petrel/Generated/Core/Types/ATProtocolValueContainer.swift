@@ -979,6 +979,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["app.bsky.feed.defs#knownLikers"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedDefs.KnownLikers(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding AppBskyFeedDefs.KnownLikers: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedDefs.KnownLikers: \(error)")
+                }
+            }
+
             decoders["app.bsky.feed.defs#threadContext"] = { decoder in
                 do {
                     let decodedObject = try AppBskyFeedDefs.ThreadContext(from: decoder)

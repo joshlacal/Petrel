@@ -53,6 +53,27 @@ public enum ComAtprotoSimplespaceRemoveMember {
             return rawValue
         }
     }
+
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.simplespace.removeMember", kind: "procedure",
+        inputEncoding: "application/json", outputEncoding: nil,
+        declaredErrors: ["SpaceNotFound", "NotSpaceOwner"]
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Void, input: Input, context: Context
+        ) async throws
+    }
 }
 
 public extension ATProtoClient.Com.Atproto.Simplespace {

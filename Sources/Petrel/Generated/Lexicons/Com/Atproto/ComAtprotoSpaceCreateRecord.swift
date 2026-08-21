@@ -28,8 +28,34 @@ public enum ComAtprotoSpaceCreateRecord {
             space = try container.decode(SpaceRef.self, forKey: .space)
             repo = try container.decode(DID.self, forKey: .repo)
             collection = try container.decode(NSID.self, forKey: .collection)
-            rkey = try container.decodeIfPresent(RecordKey.self, forKey: .rkey)
-            validate = try container.decodeIfPresent(Bool.self, forKey: .validate)
+            if container.contains(.rkey) {
+                guard try !container.decodeNil(forKey: .rkey) else {
+                    throw DecodingError.valueNotFound(
+                        RecordKey.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'rkey' must not be null"
+                        )
+                    )
+                }
+                rkey = try container.decode(RecordKey.self, forKey: .rkey)
+            } else {
+                rkey = nil
+            }
+            if container.contains(.validate) {
+                guard try !container.decodeNil(forKey: .validate) else {
+                    throw DecodingError.valueNotFound(
+                        Bool.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'validate' must not be null"
+                        )
+                    )
+                }
+                validate = try container.decode(Bool.self, forKey: .validate)
+            } else {
+                validate = nil
+            }
             record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
         }
 
@@ -160,6 +186,27 @@ public enum ComAtprotoSpaceCreateRecord {
         public var errorName: String {
             return rawValue
         }
+    }
+
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.space.createRecord", kind: "procedure",
+        inputEncoding: "application/json", outputEncoding: "application/json",
+        declaredErrors: ["SpaceNotFound", "RecordAlreadyExists"]
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Void, input: Input, context: Context
+        ) async throws -> Output
     }
 }
 
