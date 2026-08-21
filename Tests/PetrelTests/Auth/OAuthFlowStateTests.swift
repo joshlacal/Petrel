@@ -3,10 +3,17 @@
 //  PetrelTests
 //
 
-import CryptoKit
+#if canImport(CryptoKit)
+    import CryptoKit
+#else
+    @preconcurrency import Crypto
+#endif
 import Foundation
 @testable import Petrel
 import Testing
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 private final class StateTestURLProtocol: URLProtocol {
     private nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> (HTTPURLResponse, Data))?

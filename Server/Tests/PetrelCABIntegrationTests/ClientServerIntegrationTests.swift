@@ -180,7 +180,7 @@ struct ClientServerIntegrationTests {
       networkService: NetworkService(baseURL: URL(string: "https://pds.test")!),
       oauthConfig: OAuthConfig(
         clientId: "https://cab.swan.place/oauth-client-metadata.json",
-        redirectUri: "place.swan.cab:/callback",
+        redirectUri: "blue.catbird.atprotodrive:/callback",
         scope: "atproto"
       ),
       didResolver: IntegrationDIDResolver()
@@ -198,7 +198,7 @@ struct ClientServerIntegrationTests {
     let client = try await ATProtoClient(
       oauthConfig: OAuthConfig(
         clientId: "https://cab.swan.place/oauth-client-metadata.json",
-        redirectUri: "place.swan.cab:/callback",
+        redirectUri: "blue.catbird.atprotodrive:/callback",
         scope: "atproto"
       ),
       namespace: "test.swan.par",
@@ -214,7 +214,7 @@ struct ClientServerIntegrationTests {
     let client = try await ATProtoClient(
       oauthConfig: OAuthConfig(
         clientId: "https://cab.swan.place/public-client-metadata.json",
-        redirectUri: "place.swan.cab:/callback",
+        redirectUri: "blue.catbird.atprotodrive:/callback",
         scope: "atproto"
       ),
       namespace: "test.bsky.public",
