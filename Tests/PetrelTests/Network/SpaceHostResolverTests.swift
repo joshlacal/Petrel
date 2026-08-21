@@ -148,6 +148,58 @@ struct SpaceHostResolverTests {
         let d = doc(services: [], verificationMethods: ["#atproto"])
         #expect(throws: (any Error).self) { try SpaceAuthorityEndpoints.extract(from: d) }
     }
+    @Test("falls back to #atproto_pds when #atproto_space_host endpoint is unparseable")
+    func fallbackWhenSpaceHostEndpointIsInvalid() throws {
+        let d = doc(
+            services: [
+                ("#atproto_space_host", ""),
+                ("#atproto_pds", "https://pds.test")
+            ],
+            verificationMethods: ["#atproto"]
+        )
+        let e = try SpaceAuthorityEndpoints.extract(from: d)
+        #expect(e.spaceHost == URL(string: "https://pds.test")!)
+    }
+
+    @Test("throws when service matches type but not #atproto_space_host or #atproto_pds id")
+    func throwsOnTypeMatchOnly() {
+        let d = DIDDocument(
+            context: ["https://www.w3.org/ns/did/v1"],
+            id: "did:example:123",
+            alsoKnownAs: [],
+            verificationMethod: [
+                VerificationMethod(
+                    id: "#atproto",
+                    type: "Multikey",
+                    controller: "did:example:123",
+                    publicKeyMultibase: "zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPqiYBme"
+                )
+            ],
+            service: [
+                Service(
+                    id: "#custom_service",
+                    type: "AtprotoPersonalDataServer",
+                    serviceEndpoint: "https://pds.test"
+                )
+            ]
+        )
+        #expect(throws: (any Error).self) { try SpaceAuthorityEndpoints.extract(from: d) }
+    }
+
+    @Test("throws when service has bare id without fragment hash")
+    func throwsOnBareIdWithoutHash() {
+        let d = doc(
+            services: [("atproto_pds", "https://pds.test")],
+            verificationMethods: ["#atproto"]
+        )
+        #expect(throws: (any Error).self) { try SpaceAuthorityEndpoints.extract(from: d) }
+    }
+
+    @Test("SpaceHostResolver public init with didResolver only compiles and constructs")
+    func publicInitSignature() {
+        let resolver = SpaceHostResolver(didResolver: DummyDIDResolver())
+        _ = resolver
+    }
 
     @Test("SpaceHostResolver actor resolves did:plc DID document over network")
     func actorResolvesPLCDID() async throws {

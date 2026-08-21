@@ -30,25 +30,30 @@ extension SpaceAuthorityEndpoints {
     /// Pure extraction per spec: #atproto_space_host → #atproto_pds fallback;
     /// #atproto_space → #atproto fallback. Throws if no host at all.
     public static func extract(from doc: DIDDocument) throws -> SpaceAuthorityEndpoints {
-        let spaceHostService = doc.service.first { service in
-            service.id == "#atproto_space_host"
-                || service.id.hasSuffix("#atproto_space_host")
-                || service.id == "atproto_space_host"
-        } ?? doc.service.first { service in
-            service.id == "#atproto_pds"
-                || service.id.hasSuffix("#atproto_pds")
-                || service.id == "atproto_pds"
-                || service.type == "AtprotoPersonalDataServer"
-        }
+        let spaceHostURL = doc.service.lazy
+            .filter { service in
+                service.id == "#atproto_space_host" || service.id.hasSuffix("#atproto_space_host")
+            }
+            .compactMap { service in
+                URL(string: service.serviceEndpoint)
+            }
+            .first
 
-        guard let service = spaceHostService, let hostURL = URL(string: service.serviceEndpoint) else {
+        let pdsURL = doc.service.lazy
+            .filter { service in
+                service.id == "#atproto_pds" || service.id.hasSuffix("#atproto_pds")
+            }
+            .compactMap { service in
+                URL(string: service.serviceEndpoint)
+            }
+            .first
+
+        guard let hostURL = spaceHostURL ?? pdsURL else {
             throw SpaceHostResolutionError.missingSpaceHostEndpoint(doc.id)
         }
 
         let hasSpaceKey = doc.verificationMethod.contains { vm in
-            vm.id == "#atproto_space"
-                || vm.id.hasSuffix("#atproto_space")
-                || vm.id == "atproto_space"
+            vm.id == "#atproto_space" || vm.id.hasSuffix("#atproto_space")
         }
 
         let signingKeyFragment = hasSpaceKey ? "#atproto_space" : "#atproto"
@@ -88,7 +93,12 @@ public actor SpaceHostResolver {
     private let didResolver: any DIDResolving
     private let urlSession: URLSession
 
-    public init(didResolver: any DIDResolving, urlSession: URLSession = .shared) {
+    public init(didResolver: any DIDResolving) {
+        self.didResolver = didResolver
+        self.urlSession = .shared
+    }
+
+    init(didResolver: any DIDResolving, urlSession: URLSession) {
         self.didResolver = didResolver
         self.urlSession = urlSession
     }
