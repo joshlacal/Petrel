@@ -205,7 +205,7 @@ public enum CARRepository {
 
         guard let commitRoot = reader.roots.first else {
             return Stats(
-                blockCount: reader.blockIndex.count,
+                blockCount: reader.rawBlockIndex.count,
                 recordCount: 0,
                 decodedCount: 0,
                 downgradedCount: 0,
@@ -255,7 +255,7 @@ public enum CARRepository {
         }
 
         return Stats(
-            blockCount: reader.blockIndex.count,
+            blockCount: reader.rawBlockIndex.count,
             recordCount: recordCount,
             decodedCount: decodedCount,
             downgradedCount: downgradedCount,

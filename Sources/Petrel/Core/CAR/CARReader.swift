@@ -44,8 +44,15 @@ public class CARReader {
     private let data: Data
     private var offset: Int = 0
 
-    /// Maps raw CID bytes → block location in the data
-    public private(set) var blockIndex: [Data: BlockLocation] = [:]
+    /// Internal raw byte-keyed index mapping raw CID bytes → block location in the data
+    public private(set) var rawBlockIndex: [Data: BlockLocation] = [:]
+
+    /// Maps CID hex string → block location in the data (public compatibility view)
+    public var blockIndex: [String: BlockLocation] {
+        Dictionary(uniqueKeysWithValues: rawBlockIndex.map { (key, value) in
+            (key.hexEncodedString(), value)
+        })
+    }
 
     /// CID roots from the CAR header
     public private(set) var roots: [CID] = []
@@ -191,7 +198,7 @@ public class CARReader {
                 let cidData = data[cidStart ..< offset]
                 let dataOffset = offset
                 let dataLength = totalLength - (offset - blockDataStart)
-                blockIndex[Data(cidData)] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
+                rawBlockIndex[Data(cidData)] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
                 offset = blockEnd
                 continue
             }
@@ -217,7 +224,7 @@ public class CARReader {
             let cidData = data[cidStart ..< offset]
             let dataOffset = offset
             let dataLength = totalLength - (offset - blockDataStart)
-            blockIndex[Data(cidData)] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
+            rawBlockIndex[Data(cidData)] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
 
             offset = blockEnd
         }
@@ -227,7 +234,7 @@ public class CARReader {
 
     /// Retrieves and decodes the CBOR block for a given CID bytes key.
     public func decodeBlock(for cidBytes: Data) throws -> Any? {
-        guard let location = blockIndex[cidBytes] else {
+        guard let location = rawBlockIndex[cidBytes] else {
             throw CARReaderError.blockNotFound(cidBytes.hexEncodedString())
         }
 
@@ -247,7 +254,7 @@ public class CARReader {
 
     /// Retrieves and decodes the CBOR block for a given CID hex string key (compatibility entry point).
     public func decodeBlock(for key: String) throws -> Any? {
-        if let hexData = Data(hexString: key), let location = blockIndex[hexData] {
+        if let hexData = Data(hexString: key), let location = rawBlockIndex[hexData] {
             let blockData = data[location.dataOffset ..< (location.dataOffset + location.dataLength)]
             guard let cbor = try? CBOR.decode([UInt8](blockData)) else {
                 throw CARReaderError.decodingFailed("Failed to decode CBOR for block \(key)")
@@ -259,7 +266,7 @@ public class CARReader {
 
     /// Returns raw block data for a given CID bytes key.
     public func rawBlockData(for cidBytes: Data) throws -> Data {
-        guard let location = blockIndex[cidBytes] else {
+        guard let location = rawBlockIndex[cidBytes] else {
             throw CARReaderError.blockNotFound(cidBytes.hexEncodedString())
         }
         return Data(data[location.dataOffset ..< (location.dataOffset + location.dataLength)])
@@ -272,7 +279,7 @@ public class CARReader {
 
     /// Returns raw block data for a given CID hex string key (compatibility entry point).
     public func rawBlockData(for key: String) throws -> Data {
-        if let hexData = Data(hexString: key), let location = blockIndex[hexData] {
+        if let hexData = Data(hexString: key), let location = rawBlockIndex[hexData] {
             return Data(data[location.dataOffset ..< (location.dataOffset + location.dataLength)])
         }
         throw CARReaderError.blockNotFound(key)

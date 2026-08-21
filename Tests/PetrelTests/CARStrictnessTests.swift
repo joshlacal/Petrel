@@ -366,9 +366,15 @@ struct CARStrictnessTests {
         ]))
 
         let archive = builder.archive(root: commitCID)
-        #expect(throws: CARReaderError.self) { try parse(archive) }
+        do {
+            _ = try parse(archive)
+            #expect(Bool(false), "Expected parse to throw cycle detection error")
+        } catch let CARReaderError.decodingFailed(msg) {
+            #expect(msg.contains("Cycle detected in MST"))
+        } catch {
+            #expect(Bool(false), "Unexpected error thrown: \(error)")
+        }
     }
-
     @Test("An over-deep MST exceeding 128 layers throws instead of exhausting the call stack")
     func overDeepMSTThrows() throws {
         var builder = TestCARBuilder()
@@ -402,9 +408,15 @@ struct CARStrictnessTests {
         ]))
 
         let archive = builder.archive(root: commitCID)
-        #expect(throws: CARReaderError.self) { try parse(archive) }
+        do {
+            _ = try parse(archive)
+            #expect(Bool(false), "Expected parse to throw depth limit error")
+        } catch let CARReaderError.decodingFailed(msg) {
+            #expect(msg.contains("MST depth limit exceeded"))
+        } catch {
+            #expect(Bool(false), "Unexpected error thrown: \(error)")
+        }
     }
-
     @Test("A valid multi-level tree with multi-byte UTF-8 record keys reconstructs keys correctly")
     func multiByteUTF8KeyReconstruction() throws {
         var builder = TestCARBuilder()
@@ -437,8 +449,9 @@ struct CARStrictnessTests {
         ]))
 
         // Root node:
-        // Entry 1: Key = "app.bsky.feed.post/🎉first" (19 + 4 + 5 = 28 bytes), t = childNodeCID
-        // Entry 2: Prefix count = 23 bytes ("app.bsky.feed.post/🎉"), suffix = "last" -> Key = "app.bsky.feed.post/🎉last"
+        // Entry 1: Key = "app.bsky.feed.post/🎉apple" (19 + 4 + 5 = 28 bytes), t = childNodeCID
+        // Entry 2: Prefix count = 23 bytes ("app.bsky.feed.post/🎉"), suffix = "zebra" -> Key = "app.bsky.feed.post/🎉zebra"
+        // In-order traversal: entry 1 ("🎉apple") -> right subtree ("🎉middle") -> entry 2 ("🎉zebra")
         let prefix23Bytes = Data("app.bsky.feed.post/🎉".utf8).count
         #expect(prefix23Bytes == 23)
 
@@ -446,13 +459,13 @@ struct CARStrictnessTests {
             ("e", TestCBOR.array([
                 TestCBOR.map([
                     ("p", TestCBOR.uint(0)),
-                    ("k", TestCBOR.bytes(Data("app.bsky.feed.post/🎉first".utf8))),
+                    ("k", TestCBOR.bytes(Data("app.bsky.feed.post/🎉apple".utf8))),
                     ("v", TestCBOR.link(record1CID)),
                     ("t", TestCBOR.link(childNodeCID)),
                 ]),
                 TestCBOR.map([
                     ("p", TestCBOR.uint(UInt64(prefix23Bytes))),
-                    ("k", TestCBOR.bytes(Data("last".utf8))),
+                    ("k", TestCBOR.bytes(Data("zebra".utf8))),
                     ("v", TestCBOR.link(record3CID)),
                 ]),
             ])),
@@ -471,10 +484,10 @@ struct CARStrictnessTests {
         #expect(stats.failedCount == 0)
         #expect(records.count == 3)
         #expect(records[0].collection == "app.bsky.feed.post")
-        #expect(records[0].rkey == "🎉first")
+        #expect(records[0].rkey == "🎉apple")
         #expect(records[1].collection == "app.bsky.feed.post")
         #expect(records[1].rkey == "🎉middle")
         #expect(records[2].collection == "app.bsky.feed.post")
-        #expect(records[2].rkey == "🎉last")
+        #expect(records[2].rkey == "🎉zebra")
     }
 }
