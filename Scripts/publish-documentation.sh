@@ -120,19 +120,39 @@ cleanup() {
 }
 trap cleanup EXIT
 
+# DocC's search index carries individual files of several megabytes
+# (index/data.mdb, index/index.json, index/navigator.index). jj's default
+# snapshot.max-new-file-size is 1 MiB and it *warns and skips* rather than
+# failing, which silently publishes a site whose search and navigator are
+# broken. Raise the limit for these commands only, so the repository's own
+# guard against stray large files stays in place.
+JJ_SNAPSHOT_LIMIT=${PETREL_DOCS_MAX_FILE_SIZE:-67108864}
+jj_publish() {
+  jj --config "snapshot.max-new-file-size=$JJ_SNAPSHOT_LIMIT" "$@"
+}
+
 (
   cd "$WORKSPACE"
   # 'root()' must be quoted; bare parentheses are a shell syntax error.
-  jj new 'root()' >/dev/null
+  jj_publish new 'root()' >/dev/null
 
   # Clear whatever the workspace materialised, then lay down only the site.
   find . -mindepth 1 -maxdepth 1 ! -name '.jj' -exec rm -rf -- {} +
   cp -R -- "$OUTPUT/." .
   touch .nojekyll
 
-  jj describe -m "docs: publish DocC site (base path: ${BASE_PATH:-/})" >/dev/null
-  jj bookmark set "$BRANCH" -r @ >/dev/null
+  jj_publish describe -m "docs: publish DocC site (base path: ${BASE_PATH:-/})" >/dev/null
+  jj_publish bookmark set "$BRANCH" -r @ >/dev/null
 )
+
+# A skipped file is a warning, not an error, so compare counts rather than
+# trusting the exit status.
+expected=$(find "$OUTPUT" -type f | wc -l | tr -d ' ')
+published=$(jj --repository "$ROOT" file list -r "$BRANCH" 2>/dev/null | wc -l | tr -d ' ')
+if [[ $expected != "$published" ]]; then
+  fail "published $published files but the site has $expected; jj skipped some (raise PETREL_DOCS_MAX_FILE_SIZE)"
+fi
+echo "publish-documentation: published $published files"
 
 cat <<EOF
 
