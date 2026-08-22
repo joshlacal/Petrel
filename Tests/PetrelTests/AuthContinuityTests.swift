@@ -261,6 +261,67 @@ final class AuthContinuityTests: XCTestCase {
         XCTAssertGreaterThan(after.generation, before.generation)
     }
 
+    func testProxiedUpstreamUnauthorizedReturnsBodyInsteadOfDemandingLogin() async throws {
+        let namespace = "test.auth-continuity.proxied-401.\(UUID().uuidString)"
+        let storage = KeychainStorage(namespace: namespace)
+        let account = Account(did: did, handle: "continuity.example", pdsURL: gatewayURL)
+        let accountManager = MockAccountManager(account: account)
+        try await storage.saveGatewaySession("gateway-session", for: did)
+        let manager = try AuthManager(
+            mode: .gateway,
+            storage: storage,
+            accountManager: accountManager,
+            networkService: NetworkService(baseURL: gatewayURL),
+            oauthConfig: OAuthConfig(
+                clientId: "https://client.example/client-metadata.json",
+                redirectUri: "blue.catbird:/oauth/callback",
+                scope: "atproto"
+            ),
+            didResolver: MockDIDResolver(),
+            gatewayBaseURL: gatewayURL
+        )
+        let requestURL = gatewayURL.appendingPathComponent("xrpc/blue.catbird.chat.getOwnDevices")
+        var request = URLRequest(url: requestURL)
+        request.setValue(
+            "did:web:chat.catbird.blue#atproto_mls", forHTTPHeaderField: "atproto-proxy"
+        )
+        let response = try XCTUnwrap(HTTPURLResponse(
+            url: requestURL,
+            statusCode: 401,
+            httpVersion: nil,
+            headerFields: nil
+        ))
+
+        let before = await manager.authContinuitySnapshot()
+
+        // `DeviceNotRegistered` is defined to start automatic device enrollment, so the
+        // body must reach the caller. Collapsing it into `authenticationRequired`
+        // strands the account permanently: logging in again never enrolls a device.
+        let body = Data(#"{"error":"DeviceNotRegistered","message":"DeviceNotRegistered"}"#.utf8)
+        let (returnedBody, returnedResponse) = try await manager.handleUnauthorizedResponse(
+            response, data: body, for: request
+        )
+        XCTAssertEqual(returnedBody, body)
+        XCTAssertEqual(returnedResponse.statusCode, 401)
+
+        let afterUpstream = await manager.authContinuitySnapshot()
+        XCTAssertEqual(afterUpstream, before)
+        XCTAssertEqual(afterUpstream.generation, before.generation)
+
+        // A genuine session failure must still terminate, even on a proxied request.
+        do {
+            _ = try await manager.handleUnauthorizedResponse(
+                response, data: Data(#"{"error":"invalid_session"}"#.utf8), for: request
+            )
+            XCTFail("Expected terminal gateway authentication error")
+        } catch {
+            XCTAssertTrue(error is ConfidentialGatewayStrategy.GatewayError)
+        }
+        let afterTerminal = await manager.authContinuitySnapshot()
+        XCTAssertNil(afterTerminal.did)
+        XCTAssertGreaterThan(afterTerminal.generation, before.generation)
+    }
+
     func testSwitchModeNeverAuthorizesNewModeUnderOldContinuity() async throws {
         let namespace = "test.auth-continuity.switch-mode-ordering.\(UUID().uuidString)"
         let storage = KeychainStorage(namespace: namespace)

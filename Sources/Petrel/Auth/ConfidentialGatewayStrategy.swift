@@ -379,6 +379,26 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
             case let .transient(reason):
                 let bodyPreview = String((String(data: data, encoding: .utf8) ?? "").prefix(200))
+
+                // A 401 on a proxied request was produced by the upstream service the
+                // gateway forwarded to, not by the gateway session — which this branch
+                // has just established is still valid. Collapsing it into
+                // `authenticationRequired` discards the response body, so the caller is
+                // told "log in again" instead of seeing its own protocol error. That
+                // breaks the MLS device lifecycle outright: `DeviceNotRegistered` is
+                // defined to start automatic enrollment, and logging in again never
+                // enrolls a device, so the account cannot recover. Hand the response
+                // back and let the caller decode it.
+                //
+                // This is the case the non-gateway branch below intends to cover; it is
+                // unreachable for proxied traffic, which shares the gateway's origin.
+                if request.value(forHTTPHeaderField: "atproto-proxy") != nil {
+                    logger.warning(
+                        "Upstream 401 on proxied request (reason: \(reason)) - returning body to caller. Body: \(bodyPreview)"
+                    )
+                    return (data, response)
+                }
+
                 logger.warning(
                     "Gateway returned transient 401 (reason: \(reason)) - preserving session. Body: \(bodyPreview)"
                 )
