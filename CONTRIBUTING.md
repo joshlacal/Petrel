@@ -33,11 +33,42 @@ To run a specific test suite or test case:
 swift test --filter ATProtoClientSimpleTests
 ```
 
-To generate and preview local DocC API documentation:
+## Documentation site
+
+DocC is Petrel's API reference. To check that your doc comments build:
 
 ```bash
 swift package generate-documentation
 ```
+
+To build the full static site, which is what the hosted documentation serves:
+
+```bash
+Scripts/publish-documentation.sh
+```
+
+That writes the site into `docs/` and prints a command for previewing it
+locally. The generated output under `docs/` is not tracked, so building it does
+not show up as a change. Hand-authored files in `docs/` — currently
+`docs/cab-backend-contract.md` and `docs/releases/` — are tracked and are left
+alone by the installer.
+
+The site is published as a single commit on the `docs-site` branch, which shares
+no ancestry with `main`:
+
+```bash
+Scripts/publish-documentation.sh --publish
+jj git push --bookmark docs-site --allow-new
+```
+
+`--base-path` must match the URL the host serves the site from, because DocC
+bakes that prefix into every asset reference. It defaults to `Petrel`, which
+suits a project site served at `https://<host>/Petrel/`. Pass `--base-path ""`
+for a site served at a domain root.
+
+Generated documentation is deliberately kept off `main`. Tracking it once put
+roughly 30,000 files and 160 MB into this repository's history, and a bulk
+overwrite of `docs/` deleted a hand-written contract document as collateral.
 
 ## Generated code and architecture boundary
 

@@ -1,10 +1,17 @@
 # ``Petrel``
 
-A comprehensive Swift library for the AT Protocol and Bluesky social network.
+A Swift 6 SDK for the AT Protocol and Bluesky.
 
 ## Overview
 
-Petrel provides a complete Swift implementation of the AT Protocol APIs, enabling developers to build applications that interact with Bluesky and other AT Protocol-based services. The library features automatic code generation from Lexicon specifications, modern Swift concurrency support, and robust authentication handling.
+Petrel generates strongly typed, actor-based Swift APIs from the upstream
+`com.atproto.*`, `app.bsky.*`, and `chat.bsky.*` lexicons. Calls are made
+through ``ATProtoClient``, which owns authentication, networking, and account
+state.
+
+Authentication covers OAuth with PAR, PKCE, and DPoP; a confidential gateway
+mode; a client-assertion backend mode; and a legacy app-password path retained
+for existing integrations. New applications should use OAuth.
 
 ## Topics
 
