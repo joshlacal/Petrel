@@ -34,3 +34,32 @@ _trash/
 Server/keys/
 *.pem
 .build-xcbeta/
+
+# Generated DocC site output under docs/.
+#
+# Committing it put ~30,000 files and 160 MB into this repository's history, and
+# a bulk overwrite of docs/ once deleted docs/cab-backend-contract.md as
+# collateral. The built site is now published from the `docs-site` branch by
+# Scripts/publish-documentation.sh rather than tracked on the main line.
+#
+# This list mirrors `generated_entries` in Scripts/install-generated-documentation.sh,
+# which still installs into docs/ for local preview and for the release pipeline.
+# Keep the two lists in step. Hand-authored files in docs/ stay tracked:
+# docs/cab-backend-contract.md and docs/releases/.
+/docs/.nojekyll
+/docs/css/
+/docs/data/
+/docs/developer-og-twitter.jpg
+/docs/developer-og.jpg
+/docs/documentation/
+/docs/downloads/
+/docs/favicon.ico
+/docs/favicon.svg
+/docs/images/
+/docs/img/
+/docs/index/
+/docs/index.html
+/docs/js/
+/docs/metadata.json
+/docs/theme-settings.json
+/docs/videos/
