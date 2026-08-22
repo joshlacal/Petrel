@@ -1,218 +1,75 @@
-# Petrel Examples
+# Petrel examples
 
-This directory contains example applications demonstrating how to use Petrel for various Bluesky/ATProto tasks.
+This directory contains executable example scripts and projects demonstrating how to interact with AT Protocol and Bluesky using Swift.
 
-## Examples
+## Available examples
 
-### 1. FirehoseDemo.swift
-
-A simple standalone script that connects to the Bluesky firehose and displays real-time events.
-
-**Features:**
-- No authentication required
-- WebSocket connection to the firehose
-- Real-time event monitoring
-- Automatic reconnection on errors
-
-**Usage:**
-```bash
-cd Examples
-swift FirehoseDemo.swift
-```
-
-**What you'll see:**
-- Real-time stream of events from the Bluesky network
-- Event rate statistics
-- Binary data packets from the firehose
-
-**Note:** This is a simplified demo. For production use, you'd want to properly decode the DAG-CBOR messages using the full Petrel library.
-
----
-
-### 2. PostCLIDemo
-
-A complete CLI application for posting to Bluesky using app password authentication.
-
-**Features:**
-- App password authentication (legacy auth)
-- Post creation with multi-line support
-- Profile viewing
-- Interactive menu system
-- Character count warnings
-
-**Setup:**
-```bash
-cd Examples/PostCLIDemo
-swift build
-```
-
-**Usage:**
-```bash
-swift run PostCLIDemo
-```
-
-**Interactive prompts:**
-1. Enter your Bluesky handle (e.g., `alice.bsky.social`)
-2. Enter your app password (generate one at https://bsky.app/settings/app-passwords)
-3. Choose from menu:
-   - Post a message
-   - View your profile
-   - Exit
-
-**Creating a post:**
-- Type your message (supports multiple lines)
-- Press Enter twice to finish
-- Type `cancel` to abort
-
-**Example session:**
-```
-📱 Bluesky CLI Poster
-=====================
-
-Enter your Bluesky handle (e.g., alice.bsky.social):
-alice.bsky.social
-
-Enter your app password:
-(Generate one at https://bsky.app/settings/app-passwords)
-****-****-****-****
-
-🔐 Authenticating...
-✅ Logged in successfully!
-   DID: did:plc:abc123...
-
-──────────────────────────────────────────────────
-What would you like to do?
-1. Post a message
-2. View your profile
-3. Exit
-──────────────────────────────────────────────────
-
-Choice: 1
-
-📝 Compose your post:
-(Press Enter twice to finish, or type 'cancel' to abort)
-
-Hello from the Petrel CLI! 🎉
-
-
-⏳ Posting...
-✅ Post created successfully!
-   URI: at://did:plc:abc123.../app.bsky.feed.post/3k...
-   View: https://bsky.app/profile/alice.bsky.social/post/3k...
-```
-
----
+| Example | Type | Description | Authentication |
+|---|---|---|---|
+| `FirehoseDemo.swift` | Standalone script | Connects to the Bluesky firehose WebSocket and decodes event frames in real time | None required |
+| `SimplePostCLI.swift` | Standalone script | Posts to Bluesky using direct HTTPS XRPC requests via Foundation | App password |
+| `PostCLIDemo/` | Swift Package CLI | Interactive CLI that uses the Petrel SDK to authenticate, post messages, and inspect profiles | App password |
 
 ## Requirements
 
-- Swift 5.9 or later
-- macOS 13.0+ (for PostCLIDemo)
-- Linux (for FirehoseDemo standalone script)
+- Swift 6.0 or later
+- macOS 15.0 or later (or Linux with Swift 6.0 toolchain installed)
 
-## Security Notes
+## Run the firehose monitor
 
-### App Passwords
+`FirehoseDemo.swift` subscribes to the unauthenticated firehose stream (`com.atproto.sync.subscribeRepos`) and parses incoming commit events.
 
-⚠️ **Important:** Never use your main account password! Always use app-specific passwords.
+To run the script:
 
-**How to generate an app password:**
-1. Go to https://bsky.app/settings/app-passwords
-2. Click "Add App Password"
-3. Give it a descriptive name (e.g., "Petrel CLI")
-4. Copy the generated password
-5. Use it in the CLI demo
+```bash
+swift Examples/FirehoseDemo.swift
+```
 
-**App password benefits:**
-- Can be revoked individually without affecting your main password
-- Limited scope (cannot change account settings)
-- More secure for automation and scripts
+To stop the stream, press `Ctrl+C`.
 
-### Credential Storage
+## Run the standalone poster
 
-These demos do NOT store credentials. You must enter them each time you run the app. For production apps, consider:
+`SimplePostCLI.swift` demonstrates direct HTTP XRPC requests against Bluesky servers without depending on the Petrel package. It creates a session via `com.atproto.server.createSession` and creates a record via `com.atproto.repo.createRecord`.
 
-- Using OAuth instead of app passwords
-- Storing tokens securely in Keychain (the Petrel library does this automatically)
-- Implementing proper credential management
+To run the script:
 
----
+```bash
+swift Examples/SimplePostCLI.swift
+```
 
-## Building for Production
+When prompted:
+1. Enter your handle (for example, `alice.bsky.social`).
+2. Enter an app password generated from your account settings.
+3. Enter your post text.
 
-These are simple demos for learning. For production apps:
+## Run the Petrel CLI application
 
-1. **Use OAuth instead of app passwords:**
-   ```swift
-   let url = try await client.startOAuthFlow(identifier: "alice.bsky.social")
-   // Present URL to user in browser
-   // Handle callback
-   try await client.handleOAuthCallback(url: callbackURL)
-   ```
+`PostCLIDemo` is a full Swift Package executable that depends on the local `Petrel` library target. It demonstrates client initialization, password authentication (`loginWithPassword`), record creation with `AppBskyFeedPost`, and profile lookup with `app.bsky.actor.getProfile`.
 
-2. **Handle errors gracefully:**
-   - Network failures
-   - Rate limiting
-   - Token expiration
-   - Invalid credentials
+To build and run `PostCLIDemo`:
 
-3. **Add proper firehose parsing:**
-   - Use DAG-CBOR decoder
-   - Parse commit messages
-   - Handle different event types
-   - Filter for specific content
+```bash
+cd Examples/PostCLIDemo
+swift run PostCLIDemo
+```
 
-4. **Implement rate limiting:**
-   - Respect API limits
-   - Add backoff strategies
-   - Handle 429 responses
+The interactive menu lets you:
+1. Compose and submit a post to Bluesky.
+2. View your profile information (display name, description, followers count, follows count, posts count).
+3. Exit the application.
 
----
+## Obtain an app password
 
-## Common Issues
+Posting examples require an app-specific password rather than your primary account credentials.
 
-### "Invalid credentials" error
-- Make sure you're using an app password, not your main password
-- Verify your handle format (e.g., `alice.bsky.social` not `@alice.bsky.social`)
-- Check that the app password hasn't been revoked
+To create an app password:
+1. Open your account settings at <https://bsky.app/settings/app-passwords>.
+2. Select **Add App Password**.
+3. Enter a label (for example, `Petrel CLI Demo`).
+4. Copy the generated password token (`xxxx-xxxx-xxxx-xxxx`).
 
-### Firehose connection drops
-- This is normal - the demo will automatically reconnect
-- Network issues may cause temporary disconnections
-- The firehose may restart during server maintenance
+App passwords can be revoked at any time from the same settings page without modifying your main account password.
 
-### Build errors
-- Ensure you're using Swift 5.9 or later: `swift --version`
-- Clean build folder: `swift package clean`
-- Update dependencies: `swift package update`
+## Production authentication
 
----
-
-## Next Steps
-
-After trying these demos, explore:
-
-1. **Full Petrel Integration:**
-   - Import Petrel in your own projects
-   - Use the complete API (feeds, profiles, follows, etc.)
-   - Implement OAuth for better security
-
-2. **Advanced Features:**
-   - Rich text with facets (mentions, links, hashtags)
-   - Image uploads
-   - Thread/reply handling
-   - Custom feeds
-
-3. **Documentation:**
-   - See `LEGACY_AUTH_EXAMPLE.md` for detailed authentication docs
-   - Check `GETTING_STARTED.md` for full library usage
-   - Read the API reference for all available methods
-
----
-
-## Contributing
-
-Found a bug or want to improve these examples? Pull requests welcome!
-
-## License
-
-These examples are provided as-is for educational purposes. See the main Petrel library license for details.
+These command-line demos use app password authentication (`AuthMode.legacy`). For production user-facing applications, use OAuth with DPoP (`AuthMode.publicOAuth` or `AuthMode.gateway`). See `Sources/Petrel/Petrel.docc/Authentication.md` and `GETTING_STARTED.md` for details on configuring OAuth flows.

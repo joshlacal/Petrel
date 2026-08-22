@@ -1,80 +1,127 @@
-# Kotlin Code Generator for Petrel
+# Kotlin code generator
 
-This document describes the Kotlin code generator that was added to the Petrel project, enabling automatic generation of Kotlin code from AT Protocol Lexicon files.
+The Petrel generator includes a Kotlin code generation backend that emits strongly typed Kotlin models, sealed interfaces, and client endpoints from AT Protocol Lexicon definitions.
 
-## Overview
+The `0.2.0` package release is scoped to the Swift Package Manager product. Kotlin generator output is repository-internal tooling, not a shipped product of this Swift package. Kotlin artifact publication and Kotlin/Swift feature parity are outside the `0.2.0` SPM release gate.
 
-The Kotlin generator creates idiomatic Kotlin code from the same Lexicon JSON files used for Swift generation. It produces:
-- **239 Kotlin source files** with full AT Protocol API coverage
-- **Data classes** with kotlinx.serialization support
-- **Sealed interfaces** for union types
-- **Suspend functions** for async API calls
-- **Type-safe API client** with namespace hierarchy
+## Generator architecture
 
-## Architecture
-
-### Generator Components
-
-The generator follows a modular architecture with language-agnostic base classes:
+The code generator lives in `generator/` and provides language-specific generators sharing common base validation and cycle-detection logic:
 
 ```
-Generator/
-├── base_code_generator.py          # Abstract base for all generators
-├── kotlin_code_generator.py        # Main Kotlin code generator
-├── kotlin_type_converter.py        # Lexicon → Kotlin type mapping
-├── kotlin_enum_generator.py        # Sealed interfaces & enum classes
-├── kotlin_templates.py             # Template management
+generator/
+├── main.py                         # CLI entrypoint and manifest runner
+├── base_code_generator.py          # Abstract base generator class
+├── kotlin_code_generator.py        # Kotlin code generator
+├── kotlin_type_converter.py        # Lexicon to Kotlin type mapping
+├── kotlin_enum_generator.py        # Sealed interfaces and enums
+├── kotlin_templates.py             # Template manager for Kotlin
+├── manifests/
+│   └── petrel-core.json            # Manifest defining inputs and outputs
 └── templates/kotlin/               # Jinja2 templates
     ├── mainTemplate.jinja
+    ├── KotlinClientMain.jinja
     ├── properties.jinja
     ├── sealedInterface.jinja
     ├── enumClass.jinja
+    ├── closedEnumClass.jinja
+    ├── parameters.jinja
+    ├── input.jinja
+    ├── output.jinja
     ├── query.jinja
     ├── procedure.jinja
-    └── ... (13 templates total)
+    ├── subscription.jinja
+    ├── record.jinja
+    ├── message.jinja
+    ├── strictRefSerializer.jinja
+    ├── lexiconDefinitions.jinja
+    └── errorsEnum.jinja
 ```
 
-### Type Mappings
+## Type mappings
 
-| Lexicon Type | Kotlin Type |
-|--------------|-------------|
-| `string` | `String` |
-| `integer` | `Int` |
-| `number` | `Double` |
-| `boolean` | `Boolean` |
-| `array` | `List<T>` |
-| `union` | `sealed interface` |
-| `string` (datetime) | `ATProtocolDate` |
-| `string` (uri) | `URI` |
-| `string` (at-uri) | `ATProtocolURI` |
-| `string` (did) | `DID` |
-| `string` (handle) | `Handle` |
-| `string` (cid) | `CID` |
-| `blob` | `Blob` |
-| `bytes` | `ByteArray` |
-| `unknown` | `JsonElement` |
+| Lexicon type | Kotlin type | Notes |
+|---|---|---|
+| `string` | `String` | Standard string |
+| `integer` | `Int` | 32-bit signed integer |
+| `number` | `Double` | Floating-point number |
+| `boolean` | `Boolean` | Primitive boolean |
+| `array` | `List<T>` | Immutable list |
+| `union` | `sealed interface` | Discriminated union types |
+| `string` (`datetime`) | `ATProtocolDate` | ISO 8601 timestamp |
+| `string` (`uri`) | `URI` | General URI representation |
+| `string` (`at-uri`) | `ATProtocolURI` | AT Protocol record URI (`at://`) |
+| `string` (`did`) | `DID` | Decentralized identifier |
+| `string` (`handle`) | `Handle` | AT Protocol handle |
+| `string` (`cid`) | `CID` | Content identifier |
+| `blob` | `Blob` | Binary large object metadata |
+| `bytes` | `ByteArray` | Raw byte data |
+| `unknown` | `JsonElement` | Unresolved JSON payload |
 
-## Usage
+## Run the generator
 
-### Running the Generator
+The generator is driven by `generator/manifests/petrel-core.json`, which configures lexicon paths, namespace filters, and output locations for both Swift and Kotlin:
+
+To generate Kotlin files:
 
 ```bash
-# Generate Kotlin code only
-python run.py Generator/lexicons path/to/output --language kotlin
-
-# Generate both Swift and Kotlin
-python run.py Generator/lexicons path/to/output --language both
-
-# Default (Swift only, for backward compatibility)
-python run.py Generator/lexicons path/to/output
+python3 run.py --manifest generator/manifests/petrel-core.json --language kotlin
 ```
 
-### Generated Code Examples
+To generate both Swift and Kotlin files:
 
-#### Data Class (from `app.bsky.actor.defs`)
+```bash
+python3 run.py --manifest generator/manifests/petrel-core.json --language both
+```
+
+### Formatting behavior
+
+Unlike the Swift generation workflow—which requires running `swiftformat Sources/Petrel/Generated` after generation—Kotlin generator output has **no post-format step**.
+
+The generator emits deterministic, byte-identical Kotlin source directly from its Jinja templates and post-processing routines. Byte-level stability is verified by unit tests in `generator/tests/test_kotlin_strict_ref_byte_stability.py`. Do not add or run `ktlint` or `spotless` passes on generated Kotlin output.
+
+## Project structure
+
+Generated Kotlin code is written to `kotlin/src/main/kotlin/blue/catbird/petrel/generated`:
+
+```
+kotlin/
+├── build.gradle.kts                         # Gradle build configuration
+├── settings.gradle.kts                      # Gradle settings
+├── gradle.properties                        # Gradle properties
+└── src/main/kotlin/blue/catbird/petrel/
+    ├── auth/                                # Authentication strategies
+    ├── client/                              # Base client classes
+    ├── core/                                # Core types (DID, URI, Handle, etc.)
+    ├── network/                             # HTTP and WebSocket networking
+    ├── runtime/                             # Runtime utilities
+    └── generated/                           # Generator output
+        ├── client/
+        │   └── ATProtoClientGenerated.kt    # Generated namespace client extensions
+        └── lexicons/                        # Generated lexicon models
+            ├── app/bsky/
+            ├── chat/bsky/
+            ├── com/atproto/
+            └── site/standard/
+```
+
+## Generated code structure
+
+### Model data class
+
+Generated from object definitions:
+
 ```kotlin
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import blue.catbird.petrel.core.DID
+import blue.catbird.petrel.core.Handle
+import blue.catbird.petrel.core.URI
+
 @Serializable
-data class ProfileViewBasic(
+data class AppBskyActorDefsProfileViewBasic(
     @SerialName("did")
     val did: DID,
     @SerialName("handle")
@@ -90,25 +137,37 @@ data class ProfileViewBasic(
 }
 ```
 
-#### Sealed Interface (Union Type)
+### Union sealed interface
+
+Generated from lexicon union definitions:
+
 ```kotlin
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.SerialName
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.JsonElement
+
 @Serializable
-sealed interface FeedViewPostUnion {
+sealed interface AppBskyFeedDefsFeedViewPostUnion {
     @Serializable
     @SerialName("app.bsky.feed.defs#postView")
-    data class PostView(val value: AppBskyFeedDefs.PostView) : FeedViewPostUnion
+    data class PostView(val value: AppBskyFeedDefsPostView) : AppBskyFeedDefsFeedViewPostUnion
 
     @Serializable
     @SerialName("app.bsky.feed.defs#reasonRepost")
-    data class ReasonRepost(val value: AppBskyFeedDefs.ReasonRepost) : FeedViewPostUnion
+    data class ReasonRepost(val value: AppBskyFeedDefsReasonRepost) : AppBskyFeedDefsFeedViewPostUnion
 
     @Serializable
     @SerialName("unknown")
-    data class Unexpected(val value: JsonElement) : FeedViewPostUnion
+    data class Unexpected(val value: JsonElement) : AppBskyFeedDefsFeedViewPostUnion
 }
 ```
 
-#### API Method (Query)
+### Client query extension
+
+Generated from query definitions:
+
 ```kotlin
 /**
  * Get detailed profile view of an actor.
@@ -116,8 +175,8 @@ sealed interface FeedViewPostUnion {
  * Endpoint: app.bsky.actor.getProfile
  */
 suspend fun ATProtoClient.App.Bsky.Actor.getProfile(
-    parameters: AppBskyActorGetprofile.Parameters
-): ATProtoResponse<AppBskyActorGetprofile.Output> {
+    parameters: AppBskyActorGetProfile.Parameters
+): ATProtoResponse<AppBskyActorGetProfile.Output> {
     val endpoint = "app.bsky.actor.getProfile"
 
     return networkService.performRequest(
@@ -130,222 +189,12 @@ suspend fun ATProtoClient.App.Bsky.Actor.getProfile(
 }
 ```
 
-## Project Structure
+## Build the Kotlin project
 
-```
-petrel-kotlin/
-├── build.gradle.kts                         # Gradle build configuration
-├── settings.gradle.kts                      # Gradle settings
-├── gradle.properties                        # Gradle properties
-└── src/main/kotlin/com/atproto/
-    ├── core/
-    │   └── ATProtoTypes.kt                  # Core types (DID, URI, Handle, etc.)
-    ├── network/
-    │   └── NetworkService.kt                # HTTP client & networking
-    ├── client/
-    │   └── ATProtoClient.kt                 # Main client class
-    └── generated/                           # Generated code (239 files)
-        ├── ATProtoClient.kt                 # Namespace hierarchy
-        ├── AppBskyActorDefs.kt
-        ├── AppBskyActorGetprofile.kt
-        └── ... (236 more files)
-```
-
-## Key Features
-
-### 1. No Circular Reference Boxing Required
-Unlike Swift, Kotlin doesn't need `IndirectBox<T>` for value types:
-
-```kotlin
-// Swift needs boxing:
-// private let _parent: IndirectBox<Post>
-
-// Kotlin just works:
-val parent: Post?
-```
-
-### 2. Superior Union Type Support
-Kotlin's sealed interfaces are more natural than Swift enums:
-
-```kotlin
-sealed interface PostUnion {
-    data class View(val value: PostView) : PostUnion
-    data class Unexpected(val value: JsonElement) : PostUnion
-}
-
-// Pattern matching:
-when (post) {
-    is PostUnion.View -> handleView(post.value)
-    is PostUnion.Unexpected -> handleUnknown()
-}
-```
-
-### 3. Coroutines Instead of Actors
-```kotlin
-// Swift: actor ATProtoClient
-// Kotlin: class ATProtoClient with suspend functions
-
-suspend fun getProfile(...): ATProtoResponse<Output> {
-    // Coroutine-based async
-}
-```
-
-### 4. kotlinx.serialization Integration
-```kotlin
-@Serializable
-data class Profile(
-    @SerialName("displayName")
-    val displayName: String?,
-    // Automatic JSON serialization
-)
-```
-
-## Core Types Implemented
-
-All essential AT Protocol types have been translated to Kotlin:
-
-- ✅ **ATProtocolDate** - ISO 8601 datetime with Instant backing
-- ✅ **URI** - General URI with DID support
-- ✅ **ATProtocolURI** - AT Protocol-specific URIs (at://)
-- ✅ **DID** - Decentralized Identifiers
-- ✅ **Handle** - AT Protocol handles with validation
-- ✅ **ATIdentifier** - Sealed class for DID or Handle
-- ✅ **CID** - Content Identifiers
-- ✅ **NSID** - Namespaced Identifiers
-- ✅ **Blob** - Binary large objects
-- ✅ **Bytes** - Base64-encoded byte arrays
-- ✅ **Language** - Language codes
-
-## Network Layer
-
-The Kotlin network layer uses **Ktor Client**:
-
-```kotlin
-class NetworkService(
-    private val baseUrl: String = "https://bsky.social"
-) {
-    suspend inline fun <reified T> performRequest(
-        method: String,
-        endpoint: String,
-        queryParams: Map<String, String>? = null,
-        headers: Map<String, String> = emptyMap(),
-        body: Any? = null
-    ): ATProtoResponse<T>
-}
-```
-
-### Dependencies
-- **Kotlin 1.9.22**
-- **kotlinx.coroutines** for async/await
-- **kotlinx.serialization** for JSON
-- **Ktor Client** for HTTP networking
-
-## Differences from Swift
-
-| Feature | Swift | Kotlin |
-|---------|-------|--------|
-| Async | async/await + actors | suspend functions + coroutines |
-| Optionals | `Type?` | `Type?` (same!) |
-| Serialization | Codable protocol | kotlinx.serialization |
-| Union types | enum with associated values | sealed interface |
-| Circular refs | IndirectBox required | Native support |
-| Namespaces | nested classes | nested classes/objects |
-| Nullability | Optional<T> | Type? |
-
-## Generated Statistics
-
-- **Total files generated**: 239
-- **Lexicons processed**: 238
-- **Sealed interfaces**: ~150+
-- **Data classes**: ~500+
-- **API endpoints**: ~200+
-- **Lines of code**: ~50,000+
-
-## Future Enhancements
-
-Potential improvements for the Kotlin generator:
-
-1. **Authentication Service** - OAuth and token management
-2. **WebSocket Support** - For subscription endpoints (Flow-based)
-3. **CBOR Encoding** - For DAG-CBOR support
-4. **DID Resolution** - Full DID document handling
-5. **Rich Text Utilities** - Facets and mentions
-6. **Multiplatform** - Kotlin/Native for iOS, Kotlin/JS for web
-7. **Testing** - Unit tests for generated code
-8. **Documentation** - KDoc generation from lexicon descriptions
-
-## Building the Project
+To compile the Kotlin project and execute its test suite:
 
 ```bash
-cd petrel-kotlin
-
-# Build
+cd kotlin
 ./gradlew build
-
-# Run tests
 ./gradlew test
-
-# Publish to local Maven
-./gradlew publishToMavenLocal
 ```
-
-## Integration Example
-
-```kotlin
-import com.atproto.client.ATProtoClient
-import com.atproto.core.*
-
-suspend fun main() {
-    val client = ATProtoClient("https://bsky.social")
-
-    try {
-        val params = AppBskyActorGetprofile.Parameters(
-            actor = ATIdentifier.parse("bsky.app")
-        )
-
-        val response = client.app.bsky.actor.getProfile(params)
-
-        if (response.responseCode == 200) {
-            println("Profile: ${response.data}")
-        }
-    } finally {
-        client.close()
-    }
-}
-```
-
-## Comparison with Swift Generator
-
-Both generators share:
-- ✅ Same lexicon input files
-- ✅ Same two-pass architecture (cycle detection)
-- ✅ Template-based code generation
-- ✅ Type-safe API methods
-- ✅ Forward-compatible union handling
-
-Kotlin-specific advantages:
-- ✅ Simpler recursive type handling
-- ✅ More expressive sealed interfaces
-- ✅ Multiplatform potential (JVM, Native, JS, Wasm)
-- ✅ Null-safety built into type system
-- ✅ Coroutines for structured concurrency
-
-## Contributing
-
-To extend the Kotlin generator:
-
-1. **Add new types**: Edit `kotlin_type_converter.py`
-2. **Modify templates**: Update files in `Generator/templates/kotlin/`
-3. **Change generation logic**: Modify `kotlin_code_generator.py`
-4. **Add new features**: Extend base classes in `base_code_generator.py`
-
-## License
-
-Same license as the Petrel project.
-
----
-
-**Generated**: November 17, 2025
-**Generator Version**: 1.0.0
-**Lexicon Version**: 1
-**Total Lexicons**: 238

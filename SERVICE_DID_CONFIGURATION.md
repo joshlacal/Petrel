@@ -1,22 +1,36 @@
-# Service DID Configuration
+# Service DID configuration
 
-## Overview
+In the AT Protocol architecture, a user account's primary endpoint is its Personal Data Server (PDS). Downstream services—such as the Bluesky AppView (`app.bsky.*`) for social feeds and threads, or the Chat service (`chat.bsky.*`) for direct messaging—are independent infrastructure components.
 
-Petrel now supports configurable service DIDs for all Bluesky and AT Protocol services. This allows you to route requests to custom AppView or Chat service instances while maintaining backward compatibility with the default Bluesky infrastructure.
+When a client sends an XRPC request targeting a downstream service, it routes the request to the account's PDS and attaches an `atproto-proxy` HTTP header containing the target service's Decentralized Identifier (DID) and service fragment (for example, `did:web:api.bsky.app#bsky_appview`). The PDS verifies the request authentication and reverse-proxies the call to the specified service.
 
-## Default Configuration
+Petrel manages this routing automatically and allows you to configure custom service DIDs when connecting to alternative AppView or Chat backends.
 
-By default, Petrel routes requests to the standard Bluesky services:
+## Default configuration
 
-- **app.bsky.*** endpoints → `did:web:api.bsky.app#bsky_appview`
-- **chat.bsky.*** endpoints → `did:web:api.bsky.chat#bsky_chat`
+By default, Petrel routes downstream namespaces to the standard Bluesky infrastructure:
 
-## Configuring Custom Service DIDs
+| Lexicon namespace | Default service DID | Destination service |
+|---|---|---|
+| `app.bsky.*` | `did:web:api.bsky.app#bsky_appview` | Bluesky AppView |
+| `chat.bsky.*` | `did:web:api.bsky.chat#bsky_chat` | Bluesky Chat Service |
+| `com.atproto.*` | `nil` (no proxy header) | User PDS |
 
-You can configure custom service DIDs when initializing the ATProtoClient:
+## Configure custom service DIDs
+
+To direct `app.bsky.*` or `chat.bsky.*` requests to custom service deployments, supply the service DIDs during `ATProtoClient` initialization:
 
 ```swift
-let client = await ATProtoClient(
+import Foundation
+import Petrel
+
+let oauthConfig = OAuthConfig(
+    clientId: "https://example.com/oauth/client-metadata.json",
+    redirectUri: "https://example.com/oauth/callback",
+    scope: "atproto transition:generic"
+)
+
+let client = try await ATProtoClient(
     baseURL: URL(string: "https://bsky.social")!,
     oauthConfig: oauthConfig,
     namespace: "com.example.myapp",
@@ -25,91 +39,49 @@ let client = await ATProtoClient(
 )
 ```
 
-## Special Cases
+## Special cases and routing behavior
 
-### Preferences Endpoints
+### Preferences endpoints
 
-The following endpoints **always** use the default Bluesky AppView DID, regardless of custom configuration:
+The following endpoints bypass service DID resolution and are never proxied:
 
 - `app.bsky.actor.getPreferences`
 - `app.bsky.actor.putPreferences`
 
-This is because the PDS stores Bluesky preferences locally and redirects these requests to the standard AppView service.
+These endpoints are defined in `NetworkService` under `neverProxyEndpoints`. Calling `getServiceDID(for:)` on either endpoint returns `nil`. Because user account preferences are stored directly on the PDS, Petrel transmits these requests straight to the PDS host with no `atproto-proxy` header.
 
-## How It Works
+### Namespace prefix matching
 
-1. When a request is made to any `app.bsky.*` or `chat.bsky.*` endpoint, the NetworkService determines the appropriate service DID
-2. If a service DID is configured for the endpoint's namespace, it's added as an `atproto-proxy` header
-3. The PDS routes the request to the specified service using the proxy header
+When Petrel evaluates an endpoint to determine whether to attach an `atproto-proxy` header, it uses longest-prefix matching against the configured mappings:
 
-## Implementation Details
+1. `"chat.bsky.convo.listConvos"` matches `"chat.bsky"` → returns the configured chat service DID.
+2. `"app.bsky.feed.getTimeline"` matches `"app.bsky"` → returns the configured AppView service DID.
+3. `"com.atproto.repo.createRecord"` matches no entry → returns `nil` (sent directly to PDS with no proxy header).
 
-### NetworkService Methods
+## Dynamic runtime updates
 
-```swift
-// Set a service DID for a namespace
-await networkService.setServiceDID("did:web:api.bsky.app#bsky_appview", for: "app.bsky")
-
-// Get the service DID for a specific endpoint
-let serviceDID = await networkService.getServiceDID(for: "app.bsky.feed.getTimeline")
-```
-
-### Namespace Matching
-
-The service DID mapping uses prefix matching with longest-match-first logic:
-
-- `"chat.bsky.convo.listConvos"` matches `"chat.bsky"` → returns chat service DID
-- `"app.bsky.feed.getTimeline"` matches `"app.bsky"` → returns AppView service DID
-- `"com.atproto.repo.createRecord"` has no match → returns `nil` (no proxy header added)
-
-## Use Cases
-
-### Custom AppView Instance
-
-If you're running your own AppView instance for testing or development:
+To update service DIDs after client initialization, use the client's configuration methods:
 
 ```swift
-let client = await ATProtoClient(
-    baseURL: URL(string: "https://bsky.social")!,
-    oauthConfig: oauthConfig,
-    namespace: "com.example.myapp",
-    bskyAppViewDID: "did:web:dev.appview.mycompany.com#my_appview"
+// Update a single namespace mapping
+await client.setServiceDID("did:web:custom.appview.example#custom_appview", for: "app.bsky")
+
+// Update both AppView and Chat service DIDs in memory
+await client.updateServiceDIDs(
+    bskyAppViewDID: "did:web:custom.appview.example#custom_appview",
+    bskyChatDID: "did:web:custom.chat.example#custom_chat"
+)
+
+// Update and persist service DIDs to the active account record in storage
+try await client.updateServiceDIDsForCurrentAccount(
+    bskyAppViewDID: "did:web:custom.appview.example#custom_appview",
+    bskyChatDID: "did:web:custom.chat.example#custom_chat"
 )
 ```
 
-### Custom Chat Service
+## Verify configuration
 
-For a custom chat/DM service implementation:
-
-```swift
-let client = await ATProtoClient(
-    baseURL: URL(string: "https://bsky.social")!,
-    oauthConfig: oauthConfig,
-    namespace: "com.example.myapp",
-    bskyChatDID: "did:web:chat.myservice.com#custom_chat"
-)
-```
-
-## Migration Guide
-
-Existing code continues to work without changes. The default service DIDs match the current behavior:
-
-```swift
-// Before - hardcoded chat DID in generator
-// (Old code works exactly the same)
-
-// After - configurable with same defaults
-let client = await ATProtoClient(
-    baseURL: URL(string: "https://bsky.social")!,
-    oauthConfig: oauthConfig,
-    namespace: "com.example.myapp"
-    // bskyAppViewDID and bskyChatDID use defaults
-)
-```
-
-## Testing
-
-Run the service DID mapping tests:
+To run the unit tests covering service DID mapping, longest-prefix resolution, and preferences endpoint exclusions:
 
 ```bash
 swift test --filter ServiceDIDMappingTests

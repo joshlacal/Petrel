@@ -22,7 +22,9 @@ if [[ $# == 3 ]]; then
 fi
 
 ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
-CANONICAL=/Users/joshlacalamito/Developer/Catbird+Petrel/Petrel
+# Git object store the baseline tag commit is fetched from. Defaults to this
+# checkout; override when the baseline lives in a separate mirror.
+CANONICAL=${PETREL_CANONICAL_REPO:-$ROOT}
 EXPECTED_TAG_COMMIT=02de350792158ffc9f2ad9902ac61f101ea84bca
 
 [[ -n ${RELEASE_SWIFT:-} && $RELEASE_SWIFT == /* && -x $RELEASE_SWIFT ]] || {

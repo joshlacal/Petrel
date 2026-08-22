@@ -1,152 +1,159 @@
-# Connection Policy Adapter
+# Connection policy adapter
 
-The Connection Policy Adapter allows client applications to control how the Petrel library resolves URLs for network connections. This is particularly useful for scenarios like:
+The `ConnectionPolicyAdapter` protocol lets you control how `ATProtoClient` resolves destination URLs for XRPC HTTP requests and WebSocket streams.
 
-- Bypassing HTTP proxies for WebSocket connections
-- Routing specific endpoints to different services
-- Supporting custom service endpoints that require direct connections
+## Problem and routing model
 
-## Overview
+In the AT Protocol architecture, an account's primary network host is its Personal Data Server (PDS). By default, `ATProtoClient` directs XRPC requests to the configured base URL (or account PDS) and attaches `atproto-proxy` headers for downstream services like the Bluesky AppView or Chat service.
 
-WebSocket connections cannot be proxied using standard HTTP proxy mechanisms in the AT Protocol. If your application uses a proxy for regular HTTP requests but needs direct WebSocket connections (e.g., for firehose subscriptions or custom MLS endpoints), you can implement a `ConnectionPolicyAdapter` to control this routing.
+This default routing model is insufficient in several operational scenarios:
 
-## Usage
+1. **WebSocket proxy bypass**: Standard HTTP reverse proxies frequently buffer, degrade, or reject long-lived WebSocket connections. Subscriptions like the repository firehose (`com.atproto.sync.subscribeRepos`) require direct connections to streaming hosts without passing through an HTTP proxy layer.
+2. **Dedicated service redirection**: Specialized namespaces or private overlay lexicons (such as dedicated messaging delivery services or custom media processing backends) may reside on distinct hosts rather than the PDS.
+3. **Environment switching**: Development, staging, and testing environments need dynamic URL substitution without re-instantiating the client or rebuilding authentication state.
 
-### 1. Implement the ConnectionPolicyAdapter Protocol
+`ConnectionPolicyAdapter` intercepts the target URL and endpoint identifier before Petrel establishes a connection, returning either the original URL or a rewritten destination.
+
+## Implement the adapter protocol
+
+The `ConnectionPolicyAdapter` protocol requires one method:
 
 ```swift
+public protocol ConnectionPolicyAdapter: Sendable {
+    func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL
+}
+```
+
+Implement the protocol to inspect the incoming URL and endpoint string, returning the resolved destination `URL`:
+
+```swift
+import Foundation
 import Petrel
 
-class WebSocketProxyBypass: ConnectionPolicyAdapter {
-    private let directServiceURL: URL
-    private let proxyServiceURL: URL
-    
-    init(directServiceURL: URL, proxyServiceURL: URL) {
-        self.directServiceURL = directServiceURL
-        self.proxyServiceURL = proxyServiceURL
+public final class WebSocketProxyBypassAdapter: ConnectionPolicyAdapter, Sendable {
+    private let directStreamingHost: String
+
+    public init(directStreamingHost: String) {
+        self.directStreamingHost = directStreamingHost
     }
-    
-    func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
-        // Bypass proxy for WebSocket connections
-        if url.scheme == "wss" || url.scheme == "ws" {
-            return convertToDirectURL(url)
+
+    public func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
+        // Bypass proxy only for WebSocket connections
+        guard url.scheme == "wss" || url.scheme == "ws" else {
+            return url
         }
-        
-        // Bypass proxy for specific custom endpoints
-        if let endpoint = endpoint, endpoint.hasPrefix("blue.catbird.mls") {
-            return convertToDirectURL(url)
-        }
-        
-        // Use proxy for all other HTTP requests
-        return url
-    }
-    
-    private func convertToDirectURL(_ url: URL) -> URL {
-        // Replace the proxied host with the direct service host
+
         var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-        components?.host = directServiceURL.host
-        components?.port = directServiceURL.port
+        components?.host = directStreamingHost
         return components?.url ?? url
     }
 }
 ```
 
-### 2. Set the Adapter on Your Client
+## Configure the client
+
+Set the adapter on `ATProtoClient` using `setConnectionPolicyAdapter(_:)`:
 
 ```swift
-// Create your client
-let client = ATProtoClient(pdsURL: yourPDSURL)
+import Foundation
+import Petrel
 
-// Create and set your connection policy adapter
-let adapter = WebSocketProxyBypass(
-    directServiceURL: URL(string: "https://direct-service.example.com")!,
-    proxyServiceURL: URL(string: "https://proxy.example.com")!
+let client = await ATProtoClient(
+    baseURL: URL(string: "https://bsky.social")!
 )
 
-await client.networkService.setConnectionPolicyAdapter(adapter)
+let adapter = WebSocketProxyBypassAdapter(directStreamingHost: "bsky.network")
+await client.setConnectionPolicyAdapter(adapter)
 ```
 
-### 3. Use Your Client Normally
-
-Once configured, the adapter will automatically be consulted for all network connections:
+For authenticated clients initialized with OAuth, set the adapter after client initialization:
 
 ```swift
-// WebSocket connections will use the direct URL
-let firehoseStream = try await client.com.atproto.sync.subscribeRepos(
-    parameters: SubscribeReposParameters()
+import Foundation
+import Petrel
+
+let oauthConfig = OAuthConfig(
+    clientId: "https://example.com/oauth/client-metadata.json",
+    redirectUri: "https://example.com/oauth/callback",
+    scope: "atproto transition:generic"
 )
 
-// Regular HTTP requests will go through the proxy (or whatever your adapter decides)
-let timeline = try await client.app.bsky.feed.getTimeline(
-    parameters: GetTimelineParameters()
+let client = try await ATProtoClient(
+    baseURL: URL(string: "https://bsky.social")!,
+    oauthConfig: oauthConfig,
+    namespace: "com.example.app"
+)
+
+let adapter = WebSocketProxyBypassAdapter(directStreamingHost: "bsky.network")
+await client.setConnectionPolicyAdapter(adapter)
+```
+
+Once configured, the adapter automatically resolves URLs for both streaming subscriptions and standard queries:
+
+```swift
+// WebSocket subscription resolves via the adapter to directStreamingHost
+let messages = try await client.com.atproto.sync.subscribeRepos(cursor: nil)
+
+// Standard HTTP requests resolve through the default base URL
+let (responseCode, timeline) = try await client.app.bsky.feed.getTimeline(
+    input: AppBskyFeedGetTimeline.Parameters(limit: 25)
 )
 ```
 
-## Common Patterns
+## Route specific namespaces
 
-### Firehose Subscriptions (No Auth Required)
-
-The firehose doesn't require authentication and is a WebSocket connection. Bypass any proxy:
+To divert specific lexicon namespaces to dedicated backend hosts, inspect the `endpoint` parameter in `resolveConnectionURL(_:endpoint:)`:
 
 ```swift
-func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
-    if endpoint == "com.atproto.sync.subscribeRepos" {
-        return directFirehoseURL(from: url)
+import Foundation
+import Petrel
+
+public final class NamespaceRoutingAdapter: ConnectionPolicyAdapter, Sendable {
+    private let chatServiceHost: String
+
+    public init(chatServiceHost: String) {
+        self.chatServiceHost = chatServiceHost
     }
-    return url
-}
-```
 
-### Custom Service Endpoints
-
-Route specific namespace prefixes to dedicated services:
-
-```swift
-func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
-    // Route blue.catbird.mls.* endpoints to dedicated MLS service
-    if let endpoint = endpoint, endpoint.hasPrefix("blue.catbird.mls") {
-        return mlsServiceURL(from: url)
-    }
-    
-    // Route chat.bsky.* endpoints to chat service
-    if let endpoint = endpoint, endpoint.hasPrefix("chat.bsky") {
-        return chatServiceURL(from: url)
-    }
-    
-    return url
-}
-```
-
-### Development/Testing Environments
-
-Route requests differently based on environment:
-
-```swift
-class EnvironmentBasedAdapter: ConnectionPolicyAdapter {
-    let isProduction: Bool
-    
-    func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
-        if isProduction {
-            return productionURL(from: url)
-        } else {
-            return stagingURL(from: url)
+    public func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
+        // Route chat.bsky.* endpoints to a dedicated chat host
+        if let endpoint, endpoint.hasPrefix("chat.bsky.") {
+            var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+            components?.host = chatServiceHost
+            return components?.url ?? url
         }
+
+        return url
     }
 }
 ```
 
-## Removing the Adapter
-
-To remove the adapter and return to default behavior:
+If your application uses private overlay lexicons (such as proprietary service extensions like `blue.catbird.mls.*` that are not part of standard AT Protocol lexicon distributions), you can use this same pattern to direct those calls to your private infrastructure:
 
 ```swift
-await client.networkService.setConnectionPolicyAdapter(nil)
+public func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
+    // Route private overlay lexicon endpoints to custom infrastructure
+    if let endpoint, endpoint.hasPrefix("blue.catbird.mls.") {
+        var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
+        components?.host = "mls.example.internal"
+        return components?.url ?? url
+    }
+
+    return url
+}
 ```
 
-## Notes
+## Remove the adapter
 
-- The adapter is called for **both HTTP and WebSocket connections**
-- The adapter receives the original URL and the endpoint name (e.g., "com.atproto.sync.subscribeRepos")
-- Return the same URL to use default behavior, or return a modified URL to change the connection destination
-- The adapter is `async` to allow for dynamic lookups if needed
-- Security validation still applies after URL resolution
+To restore default connection resolution, pass `nil` to `setConnectionPolicyAdapter(_:)`:
+
+```swift
+await client.setConnectionPolicyAdapter(nil)
+```
+
+## Runtime behavior
+
+1. The adapter is invoked for every outgoing HTTP request and WebSocket connection before network dispatch.
+2. The adapter receives the initial target `URL` and the lexicon method name as `endpoint` (e.g. `"com.atproto.sync.subscribeRepos"` or `"app.bsky.feed.getTimeline"`).
+3. If the adapter returns an unchanged `URL`, Petrel connects to the original target. If the adapter returns a modified `URL`, Petrel dispatches the network connection to the new destination.
+4. Authentication headers, DPoP proofs, and proxy headers continue to be constructed and applied to the request after destination resolution.

@@ -1,217 +1,65 @@
-# Petrel Project Structure
+# Petrel repository structure
 
-This document describes the mirrored directory structure for both the Swift and Kotlin implementations of the Petrel AT Protocol library.
+This document outlines the organization of the Petrel repository, covering both the Swift SDK and the Kotlin counterpart.
 
-## Design Principles
-
-1. **Mirrored Organization**: Swift and Kotlin codebases follow the same logical structure
-2. **Clear Separation of Concerns**: Each module has a specific responsibility
-3. **Hierarchical Generated Code**: Lexicon files are organized by namespace
-4. **Easy Discovery**: Main client files are separated from generated code
-
-## Directory Structure
-
-### Swift (`Sources/Petrel/`)
+## Top-level layout
 
 ```
-Sources/Petrel/
-├── Client/                              # Main client and extensions
-│   ├── Petrel.swift                     # Core client implementation
-│   ├── ATProtoClient+Generated.swift    # Generated namespace extensions (AUTO-GENERATED)
-│   ├── ATProtoClient+Labelers.swift     # Labeler extensions
-│   └── ATProtoClient+Debug.swift        # Debug utilities
-│
-├── Core/                                # Core types and utilities
-│   ├── Types/                           # Protocol types and value containers
-│   │   ├── ATProtocolValueContainer.swift  # Type factory (AUTO-GENERATED)
-│   │   └── ...                          # CID, DID, custom types
-│   ├── Protocols/                       # Swift protocols and interfaces
-│   └── Utils/                           # Helper utilities
-│       ├── SafeDecoder.swift
-│       ├── DateValidation.swift
-│       └── QueryParameters.swift
-│
-├── Auth/                                # Authentication & authorization
-│   ├── AuthenticationService.swift
-│   ├── KeychainManager.swift
-│   ├── OAuth/                           # OAuth-specific code
-│   │   ├── OAuthConfig.swift
-│   │   └── OAuthCallbackBuffer.swift
-│   └── Token/                           # Token management
-│       ├── TokenRefreshCoordinator.swift
-│       └── RefreshCircuitBreaker.swift
-│
-├── Network/                             # Networking layer
-│   ├── NetworkService.swift
-│   ├── RequestDeduplicator.swift
-│   ├── DIDResolving.swift
-│   ├── HardenedURLSessionDelegate.swift
-│   ├── IPAddress.swift
-│   └── URLRequest+Extensions.swift
-│
-├── Storage/                             # Secure storage implementations
-│   ├── SecureStorage.swift
-│   ├── AppleKeychainStore.swift         # Platform-specific
-│   ├── LibSecretStore.swift             # Platform-specific (Linux)
-│   ├── FileEncryptedStore.swift
-│   └── KeychainStorage.swift
-│
-├── Account/                             # Account management
-│   ├── AccountManager.swift
-│   ├── AccountSwitchCoordinator.swift
-│   └── LogManager.swift
-│
-└── Generated/                           # All generated code (AUTO-GENERATED)
-    └── Lexicons/                        # Hierarchical lexicon organization
-        ├── App/
-        │   └── Bsky/                    # app.bsky.* lexicons
-        │       ├── AppBskyFeedPost.swift
-        │       ├── AppBskyActorProfile.swift
-        │       └── ...
-        ├── Com/
-        │   └── Atproto/                 # com.atproto.* lexicons
-        │       ├── ComAtprotoRepoCreateRecord.swift
-        │       └── ...
-        ├── Chat/
-        │   └── Bsky/                    # chat.bsky.* lexicons
-        └── Tools/
-            └── Ozone/                   # tools.ozone.* lexicons
+Petrel/
+├── Sources/              # Swift package source targets
+│   ├── Petrel/           # Main AT Protocol SDK library
+│   ├── PetrelLoad/       # Concurrency and load testing executable
+│   ├── CLibSecretShim/   # C shim for Linux Secret Service (libsecret)
+│   └── CLibSecret/       # System library target for libsecret on Linux
+├── Tests/                # Test suites for Petrel and test harnesses
+│   ├── PetrelTests/      # SDK unit, integration, and auth tests
+│   └── PetrelLoadTests/  # Tests for the load harness
+├── generator/            # Python code generator for Swift and Kotlin
+│   ├── manifests/        # Manifest configurations (petrel-core.json)
+│   └── templates/        # Code generation templates
+├── kotlin/               # Kotlin multiplatform library implementation
+│   └── src/main/kotlin/blue/catbird/petrel/
+├── Examples/             # Standalone scripts and example CLI tools
+├── Server/               # Standalone petrel-cab-server package
+├── Scripts/              # Build, validation, and maintenance scripts
+└── docs/                 # Documentation assets and contracts
 ```
 
-### Kotlin (`petrel-kotlin/src/main/kotlin/com/atproto/`)
+## Swift SDK (`Sources/Petrel/`)
 
-```
-petrel-kotlin/src/main/kotlin/com/atproto/
-├── client/                              # Main client and extensions
-│   ├── ATProtoClient.kt                 # Core client implementation
-│   └── ATProtoClientGenerated.kt        # Generated namespace extensions (AUTO-GENERATED)
-│
-├── core/                                # Core types and utilities
-│   ├── types/                           # Protocol types
-│   │   ├── ATProtoTypes.kt              # Core AT Protocol types
-│   │   └── ...                          # CID, DID, custom types
-│   ├── protocols/                       # Kotlin interfaces
-│   └── utils/                           # Helper utilities
-│       ├── SafeDecoder.kt
-│       └── QueryParameters.kt
-│
-├── auth/                                # Authentication & authorization
-│   ├── AuthenticationService.kt
-│   ├── KeychainManager.kt
-│   ├── oauth/                           # OAuth-specific code
-│   │   └── OAuthConfig.kt
-│   └── token/                           # Token management
-│       └── TokenRefreshCoordinator.kt
-│
-├── network/                             # Networking layer
-│   ├── NetworkService.kt
-│   ├── RequestDeduplicator.kt
-│   └── DIDResolving.kt
-│
-├── storage/                             # Secure storage implementations
-│   ├── SecureStorage.kt
-│   ├── KeychainStore.kt                 # Platform-specific
-│   └── FileEncryptedStore.kt
-│
-├── account/                             # Account management
-│   ├── AccountManager.kt
-│   └── AccountSwitchCoordinator.kt
-│
-└── generated/                           # All generated code (AUTO-GENERATED)
-    └── lexicons/                        # Hierarchical lexicon organization
-        ├── app/
-        │   └── bsky/                    # app.bsky.* lexicons
-        │       ├── AppBskyFeedPost.kt
-        │       ├── AppBskyActorProfile.kt
-        │       └── ...
-        ├── com/
-        │   └── atproto/                 # com.atproto.* lexicons
-        │       ├── ComAtprotoRepoCreateRecord.kt
-        │       └── ...
-        ├── chat/
-        │   └── bsky/                    # chat.bsky.* lexicons
-        └── tools/
-            └── ozone/                   # tools.ozone.* lexicons
-```
+The primary Swift library is divided into functional modules:
 
-## Module Responsibilities
+- **`Client/`**: High-level client extensions and labeler management.
+- **`Core/`**: Core AT Protocol types (CID, DID, ATProtocolDate, ATProtocolURI), CAR archive decoding, and serialization utilities.
+- **`Auth/`**: Authentication engine (`AuthManager`), credential managers, token refresh coordinators, and strategy implementations (`OAuth/`, `Space/`, `Strategies/`).
+- **`Network/`**: XRPC communication layer (`NetworkService`), DID resolution (`DIDResolving`), host resolution, and IP validation.
+- **`Storage/`**: Platform-specific credential storage implementations conforming to `SecureStorage`: `AppleKeychainStore` (macOS/iOS Keychain), `LibSecretStore` (Linux desktop libsecret), and `FileEncryptedStore` (Linux headless AES-GCM).
+- **`Account/`**: Multi-account management (`AccountManager`), account switching, and auth event broadcasting.
+- **`Logging/`**: Structured OSLog integration (`OSLogHandler`).
+- **`Generated/`**: Auto-generated lexicon models and client API namespace accessors:
+  - `Client/`: Generated `ATProtoClient` extension properties (`app`, `com`, `chat`).
+  - `Lexicons/`: Generated types grouped by namespace (`App/Bsky/`, `Chat/Bsky/`, `Com/Atproto/`).
+  - `Compatibility/`: Backward-compatibility shims for earlier releases.
+- **`Petrel.docc/`**: DocC documentation catalog (`Petrel.md`, `Authentication.md`, `GettingStarted.md`).
 
-### Client
-Main client implementation and generated namespace extensions. This is the primary entry point for using the library.
+## Kotlin library (`kotlin/`)
 
-### Core
-Fundamental types, protocols, and utilities used throughout the library:
-- **Types**: AT Protocol core types (CID, DID, ATProtocolDate, etc.)
-- **Protocols**: Shared interfaces and protocols
-- **Utils**: Helper functions and utilities (query parameters, decoders, validators)
+The Kotlin implementation mirrors the Swift SDK structure under `kotlin/src/main/kotlin/blue/catbird/petrel/`:
 
-### Auth
-Complete authentication and authorization system:
-- OAuth flow implementation
-- Token management and refresh
-- Keychain integration
-- Circuit breaker for rate limiting
+- **`client/`**: `ATProtoClient` implementation and extension methods.
+- **`auth/`**: Authentication configuration, token coordination, and gateway handling.
+- **`core/`**: Core types, primitives, and serialization helpers.
+- **`network/`**: Network transport and XRPC request execution.
+- **`runtime/`**: Event subscription and stream processing.
+- **`generated/`**: Lexicon definitions and generated client methods emitted by `generator/`.
 
-### Network
-Low-level networking:
-- HTTP client with retry logic
-- Request deduplication
-- DID resolution
-- Security hardening
+## Code generation
 
-### Storage
-Secure credential and data storage:
-- Platform-specific keychain implementations
-- Encrypted file storage
-- Secure storage protocols
+Code generation is driven by Python scripts in `generator/` and configured via `generator/manifests/petrel-core.json`.
 
-### Account
-High-level account management:
-- Multi-account support
-- Account switching
-- Logging and debugging
+To regenerate both Swift and Kotlin targets from lexicon definitions:
 
-### Generated
-**AUTO-GENERATED CODE - DO NOT EDIT MANUALLY**
-
-All files in this directory are generated from AT Protocol lexicon definitions. To regenerate:
-
-#### Swift
 ```bash
-python run.py Generator/lexicons Sources/Petrel/Generated
+python3 run.py --manifest generator/manifests/petrel-core.json --language both
+swiftformat Sources/Petrel/Generated
 ```
-
-#### Kotlin
-```bash
-python run.py --language kotlin Generator/lexicons petrel-kotlin/src/main/kotlin/com/atproto/generated
-```
-
-## Code Generation
-
-The generator creates a hierarchical structure matching the lexicon namespaces:
-
-- Lexicon: `app.bsky.feed.post` → `Generated/Lexicons/App/Bsky/AppBskyFeedPost.swift`
-- Lexicon: `com.atproto.repo.createRecord` → `Generated/Lexicons/Com/Atproto/ComAtprotoRepoCreateRecord.swift`
-
-Main client files with namespace extensions are placed in the `Client/` directory for easy access.
-
-## Naming Conventions
-
-### Swift
-- **Files**: PascalCase matching the primary type
-- **Directories**: PascalCase (Client, Core, Auth, etc.)
-- **Generated files**: PascalCase based on lexicon ID
-
-### Kotlin
-- **Files**: PascalCase matching the primary type
-- **Directories**: lowercase (client, core, auth, etc.)
-- **Packages**: lowercase dot-separated (com.atproto.client)
-- **Generated files**: PascalCase based on lexicon ID
-
-## Benefits of This Structure
-
-1. **Discoverability**: Easy to find main client files and specific modules
-2. **Maintainability**: Clear separation makes code easier to maintain
-3. **Consistency**: Mirrored structure reduces cognitive load when switching languages
-4. **Scalability**: Hierarchical generated code scales well as lexicons grow
-5. **Team Collaboration**: Clear boundaries between manually written and generated code
