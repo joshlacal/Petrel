@@ -1,0 +1,65 @@
+// Lexicon: 1, ID: app.bsky.video.finishUpload
+// Finish an upload. This call is idempotent and safe to retry. On deduplication completedJobId may differ from the input jobId; poll getJobStatus with completedJobId. Probe-based validation failures surface later as JOB_STATE_FAILED from getJobStatus, not as errors from this call.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyVideoFinishUploadDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.video.finishUpload"
+}
+
+@Serializable
+    data class AppBskyVideoFinishUploadInput(
+        @SerialName("jobId")
+        val jobId: String    )
+
+    @Serializable
+    data class AppBskyVideoFinishUploadOutput(
+// The processing job to poll with getJobStatus; on deduplication this may differ from the input jobId.        @SerialName("completedJobId")
+        val completedJobId: String,        @SerialName("jobStatus")
+        val jobStatus: AppBskyVideoDefsJobStatus    )
+
+sealed class AppBskyVideoFinishUploadError(val name: String, val description: String?) {
+        object UploadNotFound: AppBskyVideoFinishUploadError("UploadNotFound", "The job ID is unknown or aged out of retention; known terminal sessions are never reported as not found.")
+        object UploadExpired: AppBskyVideoFinishUploadError("UploadExpired", "The upload session expired before finalization began.")
+        object MissingParts: AppBskyVideoFinishUploadError("MissingParts", "Not all parts are recorded; the error message lists the missing part numbers.")
+        object UploadNotReady: AppBskyVideoFinishUploadError("UploadNotReady", "A finish is in progress; check getUploadStatus and retry.")
+        object UnsupportedContentType: AppBskyVideoFinishUploadError("UnsupportedContentType", "The assembled object's detected content type is not supported.")
+        object UploadFailed: AppBskyVideoFinishUploadError("UploadFailed", "The session is known to have failed; the error carries its failure reason.")
+        object UploadAborted: AppBskyVideoFinishUploadError("UploadAborted", "The session is known to have been aborted.")
+        object ServiceOverloaded: AppBskyVideoFinishUploadError("ServiceOverloaded", "The service is draining or temporarily at capacity; retry later.")
+    }
+
+/**
+ * Finish an upload. This call is idempotent and safe to retry. On deduplication completedJobId may differ from the input jobId; poll getJobStatus with completedJobId. Probe-based validation failures surface later as JOB_STATE_FAILED from getJobStatus, not as errors from this call.
+ *
+ * Endpoint: app.bsky.video.finishUpload
+ */
+suspend fun ATProtoClient.App.Bsky.Video.finishUpload(
+input: AppBskyVideoFinishUploadInput): ATProtoResponse<AppBskyVideoFinishUploadOutput> {
+    val endpoint = "app.bsky.video.finishUpload"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}
