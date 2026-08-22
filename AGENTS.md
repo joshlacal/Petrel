@@ -64,6 +64,8 @@ You can limit generation to a single language using `--language swift` or `--lan
 
 The committed generated Swift code is post-formatted with SwiftFormat. CI enforces that running the generator and SwiftFormat produces an empty diff (`jj diff` or `git diff`).
 
+**SwiftFormat is pinned to 0.61.1.** CI invokes `nicklockwood/SwiftFormat@0.61.1` (`.github/workflows/lint.yml`, `.github/workflows/sync-lexicons.yml`) and `Scripts/bootstrap-release-tools.sh` pins the same tag. The generated tree is committed exactly as that version formats it, so a different SwiftFormat version reformats generated sources and breaks the round-trip invariant. Verify a clean regeneration by round-tripping to an empty diff, never by reading the output.
+
 Formatting behavior across packages:
 - **Petrel (Core)**: Automatically picks up `Petrel/.swiftformat` (4-space indentation, `--tabwidth 4`, `--wraparguments before-first`). Always run `swiftformat Sources/Petrel/Generated` after regenerating.
 - **Overlay packages** (such as `PetrelCatbird` for custom lexicons): Private overlay packages lack a `.swiftformat` configuration, so default SwiftFormat rules apply. Never pass `--config ../Petrel/.swiftformat` when formatting overlay packages; doing so rewraps enum case tuples and leaves files permanently dirty.

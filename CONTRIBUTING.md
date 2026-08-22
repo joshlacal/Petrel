@@ -5,8 +5,13 @@ Petrel is a Swift 6 SDK for the AT Protocol (Authenticated Transfer Protocol). T
 ## Prerequisites
 
 - **Swift**: Swift 6.0 toolchain or later (macOS 15+, iOS 18+, or Linux).
-- **Python**: Python 3.12+ for code generation.
-- **SwiftFormat**: `swiftformat` for formatting generated and hand-written Swift sources.
+- **Python**: Python 3 with `jinja2` and `aiofiles`, for the code generator.
+- **SwiftFormat**: pinned to **0.61.1**. CI runs
+  `nicklockwood/SwiftFormat@0.61.1` (see `.github/workflows/lint.yml` and
+  `Scripts/bootstrap-release-tools.sh`), and the generated tree is committed as
+  that version formats it. A different SwiftFormat version reformats generated
+  sources and fails the regenerate-and-format round-trip gate, which looks like
+  a generator bug and is not one.
 
 ## Building and testing
 
