@@ -5,6 +5,7 @@ public enum PetrelCryptoError: Error, Sendable, Equatable, CustomStringConvertib
     case malformed(String)
     case unauthorized(String)
     case unsupportedAlgorithm(String)
+    case expired
 
     public var description: String {
         switch self {
@@ -16,6 +17,8 @@ public enum PetrelCryptoError: Error, Sendable, Equatable, CustomStringConvertib
             return "Unauthorized: \(msg)"
         case let .unsupportedAlgorithm(msg):
             return "Unsupported algorithm: \(msg)"
+        case .expired:
+            return "Expired"
         }
     }
 }

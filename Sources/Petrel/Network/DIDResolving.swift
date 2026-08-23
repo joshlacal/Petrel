@@ -128,40 +128,45 @@ actor DIDResolutionService: DIDResolving {
         // Check for cancellation at the start
         try Task.checkCancellation()
 
+        guard let canonicalHandle = try? Handle(handleString: handle).value else {
+            throw DIDResolutionError.invalidHandle(handle)
+        }
+
         // Check cache
-        if let cachedDID = getCachedDID(for: handle) {
+        if let cachedDID = getCachedDID(for: canonicalHandle) {
             return cachedDID
         }
 
-        if let httpDID = try? await {
-            // Put all your HTTP resolution code in a separate function
-            let did = try await resolveHandleViaHTTP(handle: handle)
-            cacheDID(did, for: handle)
-            return did
-        }() {
-            return httpDID
+        // Resolve candidate DID via HTTP resolveHandle first, then well-known, then DNS
+        var candidateDID: String?
+        if let httpDID = try? await resolveHandleViaHTTP(handle: canonicalHandle) {
+            candidateDID = httpDID
+        } else if let wellKnownDID = try? await resolveHandleToDIDviaWellKnown(handle: canonicalHandle) {
+            candidateDID = wellKnownDID
+        } else if let dnsDID = try? await resolveHandleToDIDviaDNS(handle: canonicalHandle) {
+            candidateDID = dnsDID
+        }
+        guard let did = candidateDID else {
+            throw DIDResolutionError.handleCouldNotBeResolved(handle)
         }
 
-        // Check for cancellation before next attempt
+        // Bidirectional verification:
+        // Verify DID document's alsoKnownAs contains at://<canonicalHandle>
         try Task.checkCancellation()
-
-        // Try well-known second
-        if let wellKnownDID = try? await resolveHandleToDIDviaWellKnown(handle: handle) {
-            cacheDID(wellKnownDID, for: handle)
-            return wellKnownDID
+        let didDoc: DIDDocument
+        do {
+            didDoc = try await fetchDIDDocument(for: did)
+        } catch {
+            throw DIDResolutionError.handleCouldNotBeResolved(handle)
         }
 
-        // Check for cancellation before DNS fallback
-        try Task.checkCancellation()
-
-        // Finally fall back to DNS
-        if let dnsDID = try? await resolveHandleToDIDviaDNS(handle: handle) {
-            cacheDID(dnsDID, for: handle)
-            return dnsDID
+        let expectedAKA = "at://\(canonicalHandle)"
+        guard didDoc.alsoKnownAs.contains(where: { $0.lowercased() == expectedAKA }) else {
+            throw DIDResolutionError.handleCouldNotBeResolved(handle)
         }
 
-        // If all methods fail, throw an error with the handle
-        throw DIDResolutionError.handleCouldNotBeResolved(handle)
+        cacheDID(did, for: canonicalHandle)
+        return did
     }
 
     private func resolveHandleToDIDviaWellKnown(handle: String) async throws -> String? {
@@ -313,21 +318,8 @@ actor DIDResolutionService: DIDResolving {
             return (cachedHandle, cachedURL)
         }
 
-        // Determine the appropriate resolution method based on DID method
-        let handle: String
-        let pdsURL: URL
-        if did.starts(with: "did:plc:") {
-            let (resolvedHandle, resolvedPDSURL) = try await resolvePLCDID(did)
-            handle = resolvedHandle
-            pdsURL = resolvedPDSURL
-        } else if did.starts(with: "did:web:") {
-            let (resolvedHandle, resolvedPDSURL) = try await resolveWebDID(did)
-
-            handle = resolvedHandle
-            pdsURL = resolvedPDSURL
-        } else {
-            throw DIDResolutionError.invalidDID(did)
-        }
+        let didDocument = try await fetchDIDDocument(for: did)
+        let (handle, pdsURL) = try extractPDSURLAndHandle(from: didDocument, did: did)
 
         // Cache the result
         cachePDSURL(pdsURL, for: did)
@@ -336,8 +328,17 @@ actor DIDResolutionService: DIDResolving {
         return (handle, pdsURL)
     }
 
-    private func resolvePLCDID(_ did: String) async throws -> (String, URL) {
-        // Check for cancellation before network operation
+    private func fetchDIDDocument(for did: String) async throws -> DIDDocument {
+        if did.starts(with: "did:plc:") {
+            return try await fetchPLCDIDDocument(did)
+        } else if did.starts(with: "did:web:") {
+            return try await fetchWebDIDDocument(did)
+        } else {
+            throw DIDResolutionError.invalidDID(did)
+        }
+    }
+
+    private func fetchPLCDIDDocument(_ did: String) async throws -> DIDDocument {
         try Task.checkCancellation()
 
         let endpoint = "https://plc.directory/\(did)"
@@ -357,33 +358,27 @@ actor DIDResolutionService: DIDResolving {
             )
         }
 
-        let didDocument = try JSONCoders.decode(DIDDocument.self, from: data)
-
-        guard
-            let pdsEndpoint = didDocument.service.first(
-                where: { $0.type == "AtprotoPersonalDataServer" }
-            )?.serviceEndpoint,
-            let pdsURL = URL(string: pdsEndpoint),
-            let handle = didDocument.alsoKnownAs.first.map({
-                $0.replacingOccurrences(of: "at://", with: "")
-            })
-        else {
-            throw DIDResolutionError.missingPDSEndpoint(did)
-        }
-
-        return (handle, pdsURL)
+        return try JSONCoders.decode(DIDDocument.self, from: data)
     }
 
-    private func resolveWebDID(_ did: String) async throws -> (String, URL) {
-        // Check for cancellation before network operation
+    private func fetchWebDIDDocument(_ did: String) async throws -> DIDDocument {
         try Task.checkCancellation()
 
         let parts = did.split(separator: ":")
-        guard parts.count == 3, let domain = parts.last else {
+        guard parts.count >= 3, parts[0] == "did", parts[1] == "web" else {
             throw DIDResolutionError.invalidDID(did)
         }
 
-        let endpoint = "https://\(domain)/.well-known/did.json"
+        let domain = String(parts[2]).removingPercentEncoding ?? String(parts[2])
+        let pathComponents = parts.dropFirst(3)
+        let endpoint: String
+        if pathComponents.isEmpty {
+            endpoint = "https://\(domain)/.well-known/did.json"
+        } else {
+            let path = pathComponents.map { String($0).removingPercentEncoding ?? String($0) }.joined(separator: "/")
+            endpoint = "https://\(domain)/\(path)/did.json"
+        }
+
         let request = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
@@ -400,16 +395,26 @@ actor DIDResolutionService: DIDResolving {
             )
         }
 
-        let didDocument = try JSONCoders.decode(DIDDocument.self, from: data)
+        return try JSONCoders.decode(DIDDocument.self, from: data)
+    }
 
+    private func extractPDSURLAndHandle(from didDocument: DIDDocument, did: String) throws -> (String, URL) {
+        // Select PDS via service id #atproto_pds OR type AtprotoPersonalDataServer (accept both, per spec)
         guard
-            let pdsEndpoint = didDocument.service.first(
-                where: { $0.type == "AtprotoPersonalDataServer" }
-            )?.serviceEndpoint,
+            let pdsEndpoint = didDocument.service.first(where: { service in
+                service.id == "#atproto_pds"
+                    || service.id == "\(did)#atproto_pds"
+                    || service.id == "atproto_pds"
+                    || service.id.hasSuffix("#atproto_pds")
+                    || service.type == "AtprotoPersonalDataServer"
+            })?.serviceEndpoint,
             let pdsURL = URL(string: pdsEndpoint),
-            let handle = didDocument.alsoKnownAs.first.map({
+            let handle = didDocument.alsoKnownAs.first(where: { $0.hasPrefix("at://") }).map({
+                String($0.dropFirst(5))
+            }) ?? didDocument.alsoKnownAs.first.map({
                 $0.replacingOccurrences(of: "at://", with: "")
-            })
+            }),
+            !handle.isEmpty
         else {
             throw DIDResolutionError.missingPDSEndpoint(did)
         }
@@ -420,27 +425,27 @@ actor DIDResolutionService: DIDResolving {
     // MARK: - Caching
 
     private func getCachedDID(for handle: String) -> String? {
-        return (cache.object(forKey: handle as NSString) as? DIDCacheEntry)?.did
+        return (cache.object(forKey: "did:\(handle)" as NSString) as? DIDCacheEntry)?.did
     }
 
     private func cacheDID(_ did: String, for handle: String) {
-        cache.setObject(DIDCacheEntry(did: did), forKey: handle as NSString)
+        cache.setObject(DIDCacheEntry(did: did), forKey: "did:\(handle)" as NSString)
     }
 
-    private func getCachedHandle(for handle: String) -> String? {
-        return (cache.object(forKey: handle as NSString) as? DIDCacheEntry)?.did
+    private func getCachedHandle(for did: String) -> String? {
+        return (cache.object(forKey: "handle:\(did)" as NSString) as? HandleCacheEntry)?.handle
     }
 
-    private func cacheHandle(_ did: String, for handle: String) {
-        cache.setObject(DIDCacheEntry(did: did), forKey: handle as NSString)
+    private func cacheHandle(_ handle: String, for did: String) {
+        cache.setObject(HandleCacheEntry(handle: handle), forKey: "handle:\(did)" as NSString)
     }
 
     private func getCachedPDSURL(for did: String) -> URL? {
-        return (cache.object(forKey: did as NSString) as? PDSURLCacheEntry)?.url
+        return (cache.object(forKey: "pds:\(did)" as NSString) as? PDSURLCacheEntry)?.url
     }
 
     private func cachePDSURL(_ url: URL, for did: String) {
-        cache.setObject(PDSURLCacheEntry(url: url), forKey: did as NSString)
+        cache.setObject(PDSURLCacheEntry(url: url), forKey: "pds:\(did)" as NSString)
     }
 }
 

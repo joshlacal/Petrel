@@ -22,39 +22,22 @@ struct ATProtoInteropTests {
             let validHandles = [
                 "A.ISI.EDU",
                 "XX.LCS.MIT.EDU",
-                "SRI-NIC.ARPA",
-                "john.test",
-                "jan.test",
-                "a234567890123456789.test",
-                "john2.test",
-                "john-john.test",
                 "john.bsky.app",
                 "jo.hn",
                 "a.co",
                 "a.org",
                 "joh.n",
                 "j0.h0",
-                "jaymome-johnber123456.test",
-                "jay.mome-johnber123456.test",
                 "john.test.bsky.app",
-                "laptop.local",
-                "laptop.arpa",
-                "xn--ls8h.test",
                 "xn--bcher-kva.tld",
-                "expyuzz4wqqyqhjn.onion",
-                "friend.expyuzz4wqqyqhjn.onion",
-                "g2zyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion",
-                "12345.test",
                 "8.cn",
                 "4chan.org",
                 "4chan.o-g",
                 "blah.4chan.org",
                 "thing.a01",
                 "120.0.0.1.com",
-                "0john.test",
                 "9sta--ck.com",
                 "99stack.com",
-                "0ohn.test",
                 "john.t--t",
                 "thing.0aa.thing",
                 "stack.com",
@@ -71,7 +54,6 @@ struct ATProtoInteropTests {
                 "xn--masekowski-d0b.pl",
                 "john.t",
             ]
-
             for handleString in validHandles {
                 #expect(throws: Never.self) {
                     try ATIdentifier(string: handleString)
@@ -117,6 +99,23 @@ struct ATProtoInteropTests {
         @Test("Invalid ATIdentifiers - Handles")
         func invalidHandles() {
             let invalidHandles = [
+                "SRI-NIC.ARPA",
+                "john.test",
+                "jan.test",
+                "a234567890123456789.test",
+                "john2.test",
+                "john-john.test",
+                "jaymome-johnber123456.test",
+                "jay.mome-johnber123456.test",
+                "laptop.local",
+                "laptop.arpa",
+                "xn--ls8h.test",
+                "expyuzz4wqqyqhjn.onion",
+                "friend.expyuzz4wqqyqhjn.onion",
+                "g2zyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion",
+                "12345.test",
+                "0john.test",
+                "0ohn.test",
                 "did:thing.test",
                 "did:thing",
                 "john-.test",
@@ -165,7 +164,6 @@ struct ATProtoInteropTests {
                 }
             }
         }
-
         @Test("Invalid ATIdentifiers - DIDs")
         func invalidDIDs() {
             let invalidDIDs = [
@@ -202,33 +200,18 @@ struct ATProtoInteropTests {
             let validHandles = [
                 "A.ISI.EDU",
                 "XX.LCS.MIT.EDU",
-                "john.test",
-                "jan.test",
-                "a234567890123456789.test",
-                "john2.test",
-                "john-john.test",
                 "john.bsky.app",
                 "jo.hn",
                 "a.co",
                 "a.org",
                 "joh.n",
                 "j0.h0",
-                "jaymome-johnber123456.test",
-                "jay.mome-johnber123456.test",
                 "john.test.bsky.app",
-                "laptop.local",
-                "laptop.arpa",
-                "xn--ls8h.test",
                 "xn--bcher-kva.tld",
-                "expyuzz4wqqyqhjn.onion",
-                "friend.expyuzz4wqqyqhjn.onion",
-                "g2zyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion",
-                "12345.test",
                 "8.cn",
                 "4chan.org",
                 "john.t",
             ]
-
             for handleString in validHandles {
                 #expect(throws: Never.self) {
                     try Handle(handleString: handleString)
@@ -239,6 +222,21 @@ struct ATProtoInteropTests {
         @Test("Invalid Handles")
         func invalidHandles() {
             let invalidHandles = [
+                "SRI-NIC.ARPA",
+                "john.test",
+                "jan.test",
+                "a234567890123456789.test",
+                "john2.test",
+                "john-john.test",
+                "jaymome-johnber123456.test",
+                "jay.mome-johnber123456.test",
+                "laptop.local",
+                "laptop.arpa",
+                "xn--ls8h.test",
+                "expyuzz4wqqyqhjn.onion",
+                "friend.expyuzz4wqqyqhjn.onion",
+                "g2zyxa5ihm7nsggfxnu52rck2vv4rvmdlkiu3zzui5du4xyclen53wid.onion",
+                "12345.test",
                 "john-.test",
                 "john.0",
                 "john.-",
@@ -414,8 +412,25 @@ struct ATProtoInteropTests {
                 }
             }
         }
-    }
+        @Test("Invalid AT URIs")
+        func invalidATURIs() {
+            let invalidURIs = [
+                "at://",
+                "at://did:plc:asdf123/com.atproto.feed.post/.",
+                "at://did:plc:asdf123/com.atproto.feed.post/..",
+                "at://laptop.local/com.atproto.feed.post/abc",
+                "at://did:plc:asdf123/invalidcollection/abc",
+                "at://did:plc:asdf123/com.atproto.feed.post/abc/extra",
+                "at://not_a_valid_authority/com.atproto.feed.post/abc",
+            ]
 
+            for uriString in invalidURIs {
+                #expect(throws: (any Error).self) {
+                    try ATProtocolURI(uriString: uriString)
+                }
+            }
+        }
+    }
     // MARK: - Record Key Tests
 
     @Suite("Record Key Validation")
@@ -446,8 +461,23 @@ struct ATProtoInteropTests {
                 }
             }
         }
-    }
+        @Test("Invalid Record Keys")
+        func invalidRecordKeys() {
+            let invalidKeys = [
+                ".",
+                "..",
+                "",
+                "has spaces",
+                "has/slash",
+            ]
 
+            for keyString in invalidKeys {
+                #expect(throws: (any Error).self) {
+                    try RecordKey(keyString: keyString)
+                }
+            }
+        }
+    }
     // MARK: - TID Tests
 
     @Suite("TID Validation")

@@ -51,16 +51,21 @@ struct ATProtoTypesTests {
     struct ATProtocolURITests {
         @Test("Valid URI creation")
         func validURICreation() throws {
-            let uri = try ATProtocolURI(uriString: "at://did:plc:test/app.bsky.feed.post/abc123")
-            #expect(uri.authority == "did:plc:test")
+            let uri = try ATProtocolURI(uriString: "at://did:plc:test12345/app.bsky.feed.post/abc123")
+            #expect(uri.authority == "did:plc:test12345")
             #expect(uri.collection == "app.bsky.feed.post")
             #expect(uri.recordKey == "abc123")
+
+            let handleURI = try ATProtocolURI(uriString: "at://alice.bsky.social/app.bsky.feed.post/abc123")
+            #expect(handleURI.authority == "alice.bsky.social")
+            #expect(handleURI.collection == "app.bsky.feed.post")
+            #expect(handleURI.recordKey == "abc123")
         }
 
         @Test("URI without rkey")
         func uRIWithoutRkey() throws {
-            let uri = try ATProtocolURI(uriString: "at://did:plc:test/app.bsky.feed.post")
-            #expect(uri.authority == "did:plc:test")
+            let uri = try ATProtocolURI(uriString: "at://did:plc:test12345/app.bsky.feed.post")
+            #expect(uri.authority == "did:plc:test12345")
             #expect(uri.collection == "app.bsky.feed.post")
             #expect(uri.recordKey == nil)
         }
@@ -75,6 +80,24 @@ struct ATProtoTypesTests {
             }
             #expect(throws: (any Error).self) {
                 try ATProtocolURI(uriString: "at://") // Too short
+            }
+            #expect(throws: (any Error).self) {
+                try ATProtocolURI(uriString: "at://not_a_valid_authority/app.bsky.feed.post/abc123")
+            }
+            #expect(throws: (any Error).self) {
+                try ATProtocolURI(uriString: "at://laptop.local/app.bsky.feed.post/abc123")
+            }
+            #expect(throws: (any Error).self) {
+                try ATProtocolURI(uriString: "at://did:plc:test12345/invalidcollection/abc123")
+            }
+            #expect(throws: (any Error).self) {
+                try ATProtocolURI(uriString: "at://did:plc:test12345/app.bsky.feed.post/.")
+            }
+            #expect(throws: (any Error).self) {
+                try ATProtocolURI(uriString: "at://did:plc:test12345/app.bsky.feed.post/..")
+            }
+            #expect(throws: (any Error).self) {
+                try ATProtocolURI(uriString: "at://did:plc:test12345/app.bsky.feed.post/abc/extra/segment")
             }
         }
 
@@ -91,14 +114,18 @@ struct ATProtoTypesTests {
 
     @Suite("Handle Tests")
     struct HandleTests {
-        @Test("Valid handle creation")
+        @Test("Valid handle creation and lowercasing")
         func validHandleCreation() throws {
-            #expect(try Handle(handleString: "alice.bsky.social").description == "alice.bsky.social")
-            #expect(try Handle(handleString: "test.example.com").description == "test.example.com")
-            #expect(try Handle(handleString: "user.localhost").description == "user.localhost")
+            let handle1 = try Handle(handleString: "Alice.Bsky.Social")
+            #expect(handle1.value == "alice.bsky.social")
+            #expect(handle1.description == "alice.bsky.social")
+
+            let handle2 = try Handle(handleString: "test.example-domain.com")
+            #expect(handle2.value == "test.example-domain.com")
+            #expect(handle2.description == "test.example-domain.com")
         }
 
-        @Test("Invalid handle creation")
+        @Test("Invalid handle creation and disallowed TLDs")
         func invalidHandleCreation() {
             #expect(throws: (any Error).self) {
                 try Handle(handleString: "")
@@ -114,6 +141,24 @@ struct ATProtoTypesTests {
             }
             #expect(throws: (any Error).self) {
                 try Handle(handleString: "has spaces.com")
+            }
+
+            // Test every disallowed TLD
+            let disallowedTLDs = [
+                "user.alt",
+                "user.arpa",
+                "user.example",
+                "user.internal",
+                "user.invalid",
+                "user.local",
+                "user.localhost",
+                "user.onion",
+                "user.test",
+            ]
+            for handle in disallowedTLDs {
+                #expect(throws: (any Error).self, "Disallowed TLD should be rejected: \(handle)") {
+                    try Handle(handleString: handle)
+                }
             }
         }
 
@@ -186,13 +231,21 @@ struct ATProtoTypesTests {
                 try RecordKey(keyString: "")
             }
             #expect(throws: (any Error).self) {
+                try RecordKey(keyString: ".")
+            }
+            #expect(throws: (any Error).self) {
+                try RecordKey(keyString: "..")
+            }
+            #expect(throws: Never.self) {
+                try RecordKey(keyString: "...")
+            }
+            #expect(throws: (any Error).self) {
                 try RecordKey(keyString: "has spaces")
             }
             #expect(throws: (any Error).self) {
                 try RecordKey(keyString: "has/slash")
             }
         }
-
         @Test("RecordKey length limits")
         func recordKeyLengthLimits() {
             let longKey = String(repeating: "a", count: 513)

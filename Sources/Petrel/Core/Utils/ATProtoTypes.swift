@@ -66,37 +66,9 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     private let originalString: String
 
     public init(from decoder: Decoder) throws {
-        // Use a simpler direct approach to avoid complex decoder internals
         let container = try decoder.singleValueContainer()
         let uriString = try container.decode(String.self)
-
-        // Store original string
-        originalString = uriString
-
-        // Parse in a very straightforward way with minimal allocations
-        guard uriString.hasPrefix("at://") else {
-            throw ATProtocolError.invalidURI("Invalid AT URI format")
-        }
-
-        // Use simple string manipulation with bounds checking
-        guard uriString.count > 5 else {
-            throw ATProtocolError.invalidURI("Invalid AT URI: too short")
-        }
-        let parts = uriString.dropFirst(5).split(separator: "/", omittingEmptySubsequences: false)
-
-        guard !parts.isEmpty else {
-            throw ATProtocolError.invalidURI("Invalid AT URI: missing authority")
-        }
-
-        let parsed = ATProtocolURI.parseSegments(parts)
-        authority = parsed.authority
-        collection = parsed.collection
-        recordKey = parsed.recordKey
-        isSpace = parsed.isSpace
-        spaceDID = parsed.spaceDID
-        spaceType = parsed.spaceType
-        skey = parsed.skey
-        authorDID = parsed.authorDID
+        try self.init(uriString: uriString)
     }
 
     public init(uriString: String) throws {
@@ -119,7 +91,12 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             throw ATProtocolError.invalidURI("Invalid AT URI: missing or empty authority")
         }
 
-        let parsed = ATProtocolURI.parseSegments(components)
+        let authorityStr = String(components[0])
+        guard DID.isValidDID(authorityStr) || Handle.isValidHandle(authorityStr) else {
+            throw ATProtocolError.invalidURI("Invalid authority in AT URI: \(authorityStr)")
+        }
+
+        let parsed = try ATProtocolURI.parseSegments(components)
         authority = parsed.authority
         collection = parsed.collection
         recordKey = parsed.recordKey
@@ -129,7 +106,6 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
         skey = parsed.skey
         authorDID = parsed.authorDID
     }
-
     private struct ParsedURI {
         let authority: String
         let collection: String?
@@ -150,15 +126,40 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     /// Assigning positionally without checking for the `space` marker reports the
     /// marker as the collection and silently discards the space's `skey`, so the
     /// two are separated here. `segments[0]` is the authority.
-    private static func parseSegments(_ segments: [Substring]) -> ParsedURI {
+    private static func parseSegments(_ segments: [Substring]) throws -> ParsedURI {
         let authority = String(segments[0])
         let path = segments.dropFirst().map(String.init)
 
         guard path.first == "space" else {
+            // Public AT URI: at://{authority}[/{collection}[/{rkey}]]
+            guard path.count <= 2 else {
+                throw ATProtocolError.invalidURI("Too many path segments in public AT URI")
+            }
+
+            let collectionName: String?
+            if path.count > 0 && !path[0].isEmpty {
+                guard NSID.isValidNSID(path[0]) else {
+                    throw ATProtocolError.invalidURI("Invalid collection NSID: \(path[0])")
+                }
+                collectionName = path[0]
+            } else {
+                collectionName = nil
+            }
+
+            let rkey: String?
+            if path.count > 1 && !path[1].isEmpty {
+                guard RecordKey.isValidRecordKey(path[1]) else {
+                    throw ATProtocolError.invalidURI("Invalid record key: \(path[1])")
+                }
+                rkey = path[1]
+            } else {
+                rkey = nil
+            }
+
             return ParsedURI(
                 authority: authority,
-                collection: path.count > 0 ? (path[0].isEmpty ? nil : path[0]) : nil,
-                recordKey: path.count > 1 ? (path[1].isEmpty ? nil : path[1]) : nil,
+                collection: collectionName,
+                recordKey: rkey,
                 isSpace: false,
                 spaceDID: nil,
                 spaceType: nil,
@@ -167,7 +168,7 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             )
         }
 
-        // ["space", spaceType, skey, authorDid, collection, rkey]
+        // Space URI: at://{spaceDid}/space/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]
         let space = path.filter { !$0.isEmpty }
         func segment(_ index: Int) -> String? {
             return index < space.count ? space[index] : nil
@@ -751,9 +752,8 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         segments = components.count > 2 ? components.dropFirst(2).map { String($0) } : []
     }
 
-    /// `fileprivate` so `ATProtocolURI` and `SpaceRef` can gate a space URI's
-    /// authority and author on being well-formed DIDs, as the space grammar requires.
-    fileprivate static func isValidDID(_ did: String) -> Bool {
+    /// Gate a space URI's authority and author on being well-formed DIDs, as the space grammar requires.
+    public static func isValidDID(_ did: String) -> Bool {
         guard let regex = didRegex else {
             // Fallback validation without regex
             return did.hasPrefix("did:") && did.count > 4
@@ -809,6 +809,10 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let value: String
 
+    public static let disallowedTLDs: Set<String> = [
+        "alt", "arpa", "example", "internal", "invalid", "local", "localhost", "onion", "test",
+    ]
+
     /// Per https://atproto.com/specs/handle the final segment (TLD) cannot start with a digit
     private static let handlePattern =
         "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
@@ -827,18 +831,45 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
             throw ATProtocolError.invalidURI("Invalid handle format: \(handleString)")
         }
 
-        value = handleString
+        value = handleString.lowercased()
     }
 
-    private static func isValidHandle(_ handle: String) -> Bool {
+    public static func isValidHandle(_ handle: String) -> Bool {
         // Basic validation before regex
-        guard !handle.isEmpty, handle.count <= 253 else {
+        guard !handle.isEmpty, handle.utf8.count <= 253 else {
+            return false
+        }
+
+        let lower = handle.lowercased()
+        let labels = lower.split(separator: ".", omittingEmptySubsequences: false)
+        guard labels.count >= 2 else {
+            return false
+        }
+
+        guard labels.allSatisfy({ label in
+            !label.isEmpty
+                && label.utf8.count <= 63
+                && label.first != "-"
+                && label.last != "-"
+                && label.utf8.allSatisfy({ ($0 >= 97 && $0 <= 122) || ($0 >= 48 && $0 <= 57) || $0 == 45 })
+        }) else {
+            return false
+        }
+
+        guard let tld = labels.last.map(String.init) else {
+            return false
+        }
+
+        guard let firstByte = tld.utf8.first, (firstByte >= 97 && firstByte <= 122) else {
+            return false
+        }
+
+        guard !disallowedTLDs.contains(tld) else {
             return false
         }
 
         guard let regex = handleRegex else {
-            // Fallback validation without regex
-            return handle.allSatisfy { $0.isLetter || $0.isNumber || $0 == "." || $0 == "-" }
+            return true
         }
 
         let range = NSRange(location: 0, length: handle.utf16.count)
@@ -854,7 +885,7 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
             return false
         }
 
-        return value.lowercased() == otherHandle.value.lowercased()
+        return value == otherHandle.value
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -867,7 +898,7 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(value.lowercased())
+        hasher.combine(value)
     }
 
     public func toCBORValue() throws -> Any {
@@ -980,9 +1011,8 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
         authority = components.count > 1 ? components.dropLast().joined(separator: ".") : ""
     }
 
-    /// `fileprivate` so `ATProtocolURI` and `SpaceRef` can gate a space URI's
-    /// type segment, as the space grammar requires.
-    fileprivate static func isValidNSID(_ nsid: String) -> Bool {
+    /// Gate a space URI's type segment, as the space grammar requires.
+    public static func isValidNSID(_ nsid: String) -> Bool {
         // Basic validation before regex
         guard !nsid.isEmpty, nsid.count <= 584 else {
             return false
@@ -1060,10 +1090,9 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
 
         value = keyString
     }
-
-    private static func isValidRecordKey(_ key: String) -> Bool {
+    public static func isValidRecordKey(_ key: String) -> Bool {
         // Basic validation before regex
-        guard !key.isEmpty, key.count <= 512 else {
+        guard !key.isEmpty, key.utf8.count <= 512, key != ".", key != ".." else {
             return false
         }
 
