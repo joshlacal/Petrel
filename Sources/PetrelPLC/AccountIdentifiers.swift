@@ -62,21 +62,21 @@ public enum AccountIdentifiers {
 
     private static func validateWebDIDComponents(_ components: [Substring]) throws {
         let authority = String(components[2])
-        let authorityParts = authority.split(separator: ":", omittingEmptySubsequences: false)
+        let authorityParts = authority.components(separatedBy: "%3A")
         guard (1 ... 2).contains(authorityParts.count) else {
             throw PetrelPLCError.invalidIdentifier("did:web authority")
         }
-        let host = String(authorityParts[0])
+        let host = authorityParts[0]
         try validateCanonicalDNSName(host)
         if authorityParts.count == 2 {
-            guard let port = UInt16(authorityParts[1]), port > 0 else {
-                throw PetrelPLCError.invalidIdentifier("did:web port")
-            }
-            guard String(port) == authorityParts[1] else {
+            guard let port = UInt16(authorityParts[1]), port > 0, String(port) == authorityParts[1] else {
                 throw PetrelPLCError.invalidIdentifier("did:web port")
             }
         }
         for segment in components.dropFirst(3) {
+            guard !segment.isEmpty, segment != ".", segment != ".." else {
+                throw PetrelPLCError.invalidIdentifier("did:web path segment")
+            }
             try validateCanonicalWebPathSegment(segment)
         }
     }
@@ -99,7 +99,8 @@ public enum AccountIdentifiers {
                       && $0.utf8.count <= 63
                       && $0.first != "-"
                       && $0.last != "-"
-              }) else {
+              }),
+              labels.last?.allSatisfy(\.isNumber) == false else {
             throw PetrelPLCError.invalidIdentifier("did:web DNS name")
         }
     }
@@ -112,7 +113,7 @@ public enum AccountIdentifiers {
         var index = 0
         while index < bytes.count {
             let byte = bytes[index]
-            if isUnreserved(byte) || byte == UInt8(ascii: "@") {
+            if isUnreserved(byte) {
                 index += 1
                 continue
             }

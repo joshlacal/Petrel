@@ -24,6 +24,17 @@ final class PLCClientTests: XCTestCase {
         }
         XCTAssertThrowsError(try PLCClientConfiguration.laboratory(origin: URL(string: "http://192.168.1.2:2582")!))
     }
+    func testPLCHTTPResponseNormalizesHeaderNamesToLowercase() {
+        let response = PLCHTTPResponse(
+            status: 200,
+            headers: ["Content-Type": "application/json", "X-Custom-Header": "Value"],
+            body: Data(),
+            finalURL: nil,
+            redirectCount: 0
+        )
+        XCTAssertEqual(response.headers["content-type"], "application/json")
+        XCTAssertEqual(response.headers["x-custom-header"], "Value")
+    }
 
     func testSubmitUsesExactEscapedRouteMethodAndCanonicalJSON() async throws {
         let fixture = try operationFixture()

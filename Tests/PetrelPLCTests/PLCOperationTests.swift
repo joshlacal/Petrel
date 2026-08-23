@@ -45,6 +45,28 @@ final class PLCOperationTests: XCTestCase {
             value.replacingOccurrences(of: "zQ3s", with: "zDna")
         ))
     }
+    func testSecp256k1SignatureWithZeroRIsRejectedAsMalformed() throws {
+        let secp256k1Key = "did:key:zQ3shqwJEJyMBsBXCWyCBpUBMqxcon9oHB7mCvx4sSpMdLJwc"
+        let zeroRSigBytes = Data(repeating: 0, count: 32) + Data([0x01]) + Data(repeating: 0, count: 31)
+        let zeroRSigString = zeroRSigBytes.base64URLEncodedWithoutPadding
+        let json = """
+        {
+            "type": "plc_operation",
+            "rotationKeys": ["\(secp256k1Key)"],
+            "verificationMethods": {"atproto": "did:key:zDnaejgmAHMLkBPMBWnkBxyGxpXx8LgE4WJAYDhwZzyoRAddF"},
+            "alsoKnownAs": [],
+            "services": {},
+            "prev": null,
+            "sig": "\(zeroRSigString)"
+        }
+        """
+        XCTAssertThrowsError(try PLCOperationCodec.decodeSignedJSON(Data(json.utf8))) { error in
+            XCTAssertEqual(
+                error as? PetrelPLCError,
+                .malformed("PLC operation signature is not canonical")
+            )
+        }
+    }
 
     func testATProfileCreatesExactGenesisMapsAndOriginPolicy() throws {
         let unsigned = try PLCATProfile.regularOperation(
