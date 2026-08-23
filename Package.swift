@@ -17,6 +17,18 @@ let package = Package(
             name: "PetrelCrypto",
             targets: ["PetrelCrypto"]
         ),
+        .library(
+            name: "PetrelRepo",
+            targets: ["PetrelRepo"]
+        ),
+        .library(
+            name: "PetrelFirehose",
+            targets: ["PetrelFirehose"]
+        ),
+        .library(
+            name: "PetrelPLC",
+            targets: ["PetrelPLC"]
+        ),
         .executable(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
@@ -75,6 +87,40 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        .target(
+            name: "PetrelRepo",
+            dependencies: [
+                "Petrel",
+                "PetrelCrypto",
+                .product(name: "Crypto", package: "swift-crypto"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
+            name: "PetrelFirehose",
+            dependencies: [
+                "Petrel",
+                "PetrelCrypto",
+                "PetrelRepo",
+                .product(name: "Crypto", package: "swift-crypto"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
+            name: "PetrelPLC",
+            dependencies: [
+                "Petrel",
+                "PetrelCrypto",
+                .product(name: "Crypto", package: "swift-crypto"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .executableTarget(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
@@ -86,6 +132,18 @@ let package = Package(
         .testTarget(
             name: "PetrelCryptoTests",
             dependencies: ["PetrelCrypto"]
+        ),
+        .testTarget(
+            name: "PetrelRepoTests",
+            dependencies: ["PetrelRepo"]
+        ),
+        .testTarget(
+            name: "PetrelFirehoseTests",
+            dependencies: ["PetrelFirehose", "PetrelRepo"]
+        ),
+        .testTarget(
+            name: "PetrelPLCTests",
+            dependencies: ["PetrelPLC", "PetrelCrypto"]
         ),
         .testTarget(
             name: "PetrelLoadTests",

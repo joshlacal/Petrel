@@ -18,7 +18,8 @@ data class ATProtoResponse<T>(
 )
 
 class NetworkService(
-    private val baseUrl: String = "https://bsky.social"
+    private val baseUrl: String = "https://bsky.social",
+    private val logLevel: LogLevel = LogLevel.NONE
 ) {
     @PublishedApi
     internal val serviceDIDs = mutableMapOf<String, String>()
@@ -60,9 +61,11 @@ class NetworkService(
                 ignoreUnknownKeys = true
             })
         }
-        install(Logging) {
-            logger = Logger.DEFAULT
-            level = LogLevel.INFO
+        if (logLevel != LogLevel.NONE) {
+            install(Logging) {
+                logger = Logger.DEFAULT
+                level = logLevel
+            }
         }
     }
 
