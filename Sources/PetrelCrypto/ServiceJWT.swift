@@ -98,7 +98,7 @@ public enum ServiceJWT {
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
     ) throws -> String {
-        guard isValidDID(issuer),
+        guard serviceIssuerDID(issuer) != nil,
               isPrintable(audience, maximumBytes: 4096),
               isValidNSID(method),
               isPrintable(eventID, maximumBytes: 256),
@@ -249,6 +249,8 @@ public enum ServiceJWT {
     public static func verify(
         _ compact: String,
         publicKey: ATProtoJWTVerificationKey,
+        expectedAudience: String? = nil,
+        expectedMethod: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -260,6 +262,16 @@ public enum ServiceJWT {
         }
         let parsed = try parse(compact)
         try validateShape(parsed.header, claims: parsed.claims)
+        if let expectedAudience {
+            guard parsed.claims.aud == expectedAudience else {
+                throw PetrelCryptoError.unauthorized("service authentication audience mismatch")
+            }
+        }
+        if let expectedMethod {
+            guard parsed.claims.lxm == expectedMethod else {
+                throw PetrelCryptoError.unauthorized("service authentication method mismatch")
+            }
+        }
         guard try publicKey.verify(
             signature: parsed.signature,
             signingInput: parsed.signingInput,
@@ -301,6 +313,8 @@ public enum ServiceJWT {
     public static func verify(
         _ compact: String,
         publicKey: PLCDIDVerificationKey,
+        expectedAudience: String? = nil,
+        expectedMethod: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -308,6 +322,8 @@ public enum ServiceJWT {
         try verify(
             compact,
             publicKey: ATProtoJWTVerificationKey(publicKey),
+            expectedAudience: expectedAudience,
+            expectedMethod: expectedMethod,
             now: now,
             clockSkew: clockSkew,
             maximumLifetime: maximumLifetime
@@ -317,6 +333,8 @@ public enum ServiceJWT {
     public static func verify(
         _ compact: String,
         didKey: String,
+        expectedAudience: String? = nil,
+        expectedMethod: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -325,6 +343,8 @@ public enum ServiceJWT {
         return try verify(
             compact,
             publicKey: key,
+            expectedAudience: expectedAudience,
+            expectedMethod: expectedMethod,
             now: now,
             clockSkew: clockSkew,
             maximumLifetime: maximumLifetime
@@ -394,7 +414,7 @@ public enum ServiceJWT {
     }
 
     private static func validServiceMethod(_ value: String) -> Bool {
-        value.isEmpty || isValidNSID(value)
+        isValidNSID(value)
     }
 
     private static func validServiceEventID(_ value: String) -> Bool {
@@ -658,6 +678,8 @@ public enum SpaceServiceJWT {
     public static func verify(
         _ compact: String,
         publicKey: ATProtoJWTVerificationKey,
+        expectedAudience: String? = nil,
+        expectedMethod: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -665,6 +687,8 @@ public enum SpaceServiceJWT {
         try ServiceJWT.verify(
             compact,
             publicKey: publicKey,
+            expectedAudience: expectedAudience,
+            expectedMethod: expectedMethod,
             now: now,
             clockSkew: clockSkew,
             maximumLifetime: maximumLifetime
@@ -674,6 +698,8 @@ public enum SpaceServiceJWT {
     public static func verify(
         _ compact: String,
         publicKey: PLCDIDVerificationKey,
+        expectedAudience: String? = nil,
+        expectedMethod: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -681,6 +707,8 @@ public enum SpaceServiceJWT {
         try ServiceJWT.verify(
             compact,
             publicKey: publicKey,
+            expectedAudience: expectedAudience,
+            expectedMethod: expectedMethod,
             now: now,
             clockSkew: clockSkew,
             maximumLifetime: maximumLifetime
