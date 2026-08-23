@@ -319,13 +319,20 @@ actor DIDResolutionService: DIDResolving {
         }
 
         let didDocument = try await fetchDIDDocument(for: did)
-        let (handle, pdsURL) = try extractPDSURLAndHandle(from: didDocument, did: did)
+        let (candidateHandle, pdsURL) = try extractPDSURLAndHandle(from: didDocument, did: did)
+
+        // Bidirectional verification (DID -> handle):
+        // Verify that the candidate handle resolves back to this DID
+        let reverseDID = try await resolveHandleToDID(handle: candidateHandle)
+        guard reverseDID == did else {
+            throw DIDResolutionError.handleCouldNotBeResolved(candidateHandle)
+        }
 
         // Cache the result
         cachePDSURL(pdsURL, for: did)
-        cacheHandle(handle, for: did)
+        cacheHandle(candidateHandle, for: did)
 
-        return (handle, pdsURL)
+        return (candidateHandle, pdsURL)
     }
 
     private func fetchDIDDocument(for did: String) async throws -> DIDDocument {
@@ -364,18 +371,47 @@ actor DIDResolutionService: DIDResolving {
     private func fetchWebDIDDocument(_ did: String) async throws -> DIDDocument {
         try Task.checkCancellation()
 
-        let parts = did.split(separator: ":")
+        let parts = did.split(separator: ":", omittingEmptySubsequences: false)
         guard parts.count >= 3, parts[0] == "did", parts[1] == "web" else {
             throw DIDResolutionError.invalidDID(did)
         }
 
-        let domain = String(parts[2]).removingPercentEncoding ?? String(parts[2])
+        let rawAuthority = String(parts[2])
+        let authorityParts = rawAuthority.components(separatedBy: "%3A")
+        guard (1 ... 2).contains(authorityParts.count),
+              !authorityParts[0].contains("%"),
+              !authorityParts[0].contains("/") else {
+            throw DIDResolutionError.invalidDID(did)
+        }
+        let domain: String
+        if authorityParts.count == 2 {
+            let port = authorityParts[1]
+            guard !port.isEmpty, !port.contains("%"), !port.contains("/"),
+                  let portNum = UInt16(port), portNum > 0 else {
+                throw DIDResolutionError.invalidDID(did)
+            }
+            domain = "\(authorityParts[0]):\(port)"
+        } else {
+            domain = authorityParts[0]
+        }
+
         let pathComponents = parts.dropFirst(3)
         let endpoint: String
         if pathComponents.isEmpty {
             endpoint = "https://\(domain)/.well-known/did.json"
         } else {
-            let path = pathComponents.map { String($0).removingPercentEncoding ?? String($0) }.joined(separator: "/")
+            var decodedSegments: [String] = []
+            for component in pathComponents {
+                guard let decoded = String(component).removingPercentEncoding,
+                      !decoded.isEmpty,
+                      decoded != ".",
+                      decoded != "..",
+                      !decoded.contains("/") else {
+                    throw DIDResolutionError.invalidDID(did)
+                }
+                decodedSegments.append(decoded)
+            }
+            let path = decodedSegments.joined(separator: "/")
             endpoint = "https://\(domain)/\(path)/did.json"
         }
 
@@ -399,27 +435,28 @@ actor DIDResolutionService: DIDResolving {
     }
 
     private func extractPDSURLAndHandle(from didDocument: DIDDocument, did: String) throws -> (String, URL) {
-        // Select PDS via service id #atproto_pds OR type AtprotoPersonalDataServer (accept both, per spec)
-        guard
-            let pdsEndpoint = didDocument.service.first(where: { service in
-                service.id == "#atproto_pds"
-                    || service.id == "\(did)#atproto_pds"
-                    || service.id == "atproto_pds"
-                    || service.id.hasSuffix("#atproto_pds")
-                    || service.type == "AtprotoPersonalDataServer"
-            })?.serviceEndpoint,
-            let pdsURL = URL(string: pdsEndpoint),
-            let handle = didDocument.alsoKnownAs.first(where: { $0.hasPrefix("at://") }).map({
-                String($0.dropFirst(5))
-            }) ?? didDocument.alsoKnownAs.first.map({
-                $0.replacingOccurrences(of: "at://", with: "")
-            }),
-            !handle.isEmpty
+        // Swan & Upstream matchesIdentifier rule:
+        // Exactly one service matching id (#atproto_pds or did#atproto_pds) AND type AtprotoPersonalDataServer
+        let matches = didDocument.service.filter { service in
+            (service.id == "#atproto_pds" || service.id == "\(did)#atproto_pds")
+                && service.type == "AtprotoPersonalDataServer"
+        }
+        guard matches.count == 1,
+              let service = matches.first,
+              let pdsURL = URL(string: service.serviceEndpoint),
+              let candidate = didDocument.alsoKnownAs.compactMap({ aka -> String? in
+                  if aka.hasPrefix("at://") {
+                      return String(aka.dropFirst(5))
+                  } else {
+                      return aka
+                  }
+              }).first(where: { !$0.isEmpty }),
+              let canonicalHandle = try? Handle(handleString: candidate).value
         else {
             throw DIDResolutionError.missingPDSEndpoint(did)
         }
 
-        return (handle, pdsURL)
+        return (canonicalHandle, pdsURL)
     }
 
     // MARK: - Caching

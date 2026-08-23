@@ -60,6 +60,16 @@ struct ATProtoTypesTests {
             #expect(handleURI.authority == "alice.bsky.social")
             #expect(handleURI.collection == "app.bsky.feed.post")
             #expect(handleURI.recordKey == "abc123")
+
+            let localURI = try ATProtocolURI(uriString: "at://laptop.local/app.bsky.feed.post/abc123")
+            #expect(localURI.authority == "laptop.local")
+            #expect(localURI.collection == "app.bsky.feed.post")
+            #expect(localURI.recordKey == "abc123")
+
+            let testURI = try ATProtocolURI(uriString: "at://john.test/app.bsky.feed.post/abc123")
+            #expect(testURI.authority == "john.test")
+            #expect(testURI.collection == "app.bsky.feed.post")
+            #expect(testURI.recordKey == "abc123")
         }
 
         @Test("URI without rkey")
@@ -83,9 +93,6 @@ struct ATProtoTypesTests {
             }
             #expect(throws: (any Error).self) {
                 try ATProtocolURI(uriString: "at://not_a_valid_authority/app.bsky.feed.post/abc123")
-            }
-            #expect(throws: (any Error).self) {
-                try ATProtocolURI(uriString: "at://laptop.local/app.bsky.feed.post/abc123")
             }
             #expect(throws: (any Error).self) {
                 try ATProtocolURI(uriString: "at://did:plc:test12345/invalidcollection/abc123")
@@ -123,9 +130,26 @@ struct ATProtoTypesTests {
             let handle2 = try Handle(handleString: "test.example-domain.com")
             #expect(handle2.value == "test.example-domain.com")
             #expect(handle2.description == "test.example-domain.com")
+
+            // Handles with special/dev TLDs are syntactically valid per upstream @atproto/syntax
+            let testHandles = [
+                "john.test",
+                "laptop.local",
+                "service.arpa",
+                "hidden.onion",
+                "node.internal",
+                "host.localhost",
+                "sample.invalid",
+                "demo.example",
+                "peer.alt",
+            ]
+            for handleString in testHandles {
+                let handle = try Handle(handleString: handleString)
+                #expect(handle.value == handleString.lowercased())
+            }
         }
 
-        @Test("Invalid handle creation and disallowed TLDs")
+        @Test("Invalid handle syntax creation")
         func invalidHandleCreation() {
             #expect(throws: (any Error).self) {
                 try Handle(handleString: "")
@@ -142,24 +166,60 @@ struct ATProtoTypesTests {
             #expect(throws: (any Error).self) {
                 try Handle(handleString: "has spaces.com")
             }
-
-            // Test every disallowed TLD
-            let disallowedTLDs = [
-                "user.alt",
-                "user.arpa",
-                "user.example",
-                "user.internal",
-                "user.invalid",
-                "user.local",
-                "user.localhost",
-                "user.onion",
-                "user.test",
-            ]
-            for handle in disallowedTLDs {
-                #expect(throws: (any Error).self, "Disallowed TLD should be rejected: \(handle)") {
-                    try Handle(handleString: handle)
-                }
+            #expect(throws: (any Error).self) {
+                try Handle(handleString: "john-.com")
             }
+            #expect(throws: (any Error).self) {
+                try Handle(handleString: "-john.com")
+            }
+            #expect(throws: (any Error).self) {
+                try Handle(handleString: "john..com")
+            }
+            #expect(throws: (any Error).self) {
+                try Handle(handleString: "john.0")
+            }
+            #expect(throws: (any Error).self) {
+                try Handle(handleString: "127.0.0.1")
+            }
+        }
+
+        @Test("Registration-time TLD policy checks")
+        func registrationTimeTLDChecks() throws {
+            // Disallowed TLD set must match upstream @atproto/syntax exactly (8 entries, .test excluded)
+            let expectedDisallowed: Set<String> = [
+                "alt", "arpa", "example", "internal", "invalid", "local", "localhost", "onion",
+            ]
+            #expect(Handle.disallowedTLDs == expectedDisallowed)
+            #expect(!Handle.disallowedTLDs.contains("test"))
+
+            // isValidTLD and isValidTld checks
+            #expect(!Handle.isValidTLD("onion"))
+            #expect(!Handle.isValidTLD(".onion"))
+            #expect(!Handle.isValidTLD("local"))
+            #expect(!Handle.isValidTLD(".local"))
+            #expect(!Handle.isValidTld("arpa"))
+            #expect(!Handle.isValidTld(".arpa"))
+            #expect(Handle.isValidTLD("test"))
+            #expect(Handle.isValidTLD(".test"))
+            #expect(Handle.isValidTLD("com"))
+            #expect(Handle.isValidTLD(".social"))
+            #expect(Handle.isValidTld("app"))
+
+            // Instance hasDisallowedTLD checks
+            let onionHandle = try Handle(handleString: "hidden.onion")
+            #expect(onionHandle.hasDisallowedTLD)
+            #expect(onionHandle.hasDisallowedTld)
+
+            let localHandle = try Handle(handleString: "laptop.local")
+            #expect(localHandle.hasDisallowedTLD)
+
+            let testHandle = try Handle(handleString: "john.test")
+            #expect(!testHandle.hasDisallowedTLD)
+            #expect(!testHandle.hasDisallowedTld)
+
+            let normalHandle = try Handle(handleString: "alice.bsky.social")
+            #expect(!normalHandle.hasDisallowedTLD)
+            #expect(!normalHandle.hasDisallowedTld)
         }
 
         @Test("Handle length limits")

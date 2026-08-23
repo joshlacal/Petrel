@@ -98,8 +98,8 @@ struct DIDResolutionBidirectionalTests {
         }
     }
 
-    @Test("PDS selection selects by service id #atproto_pds")
-    func pdsSelectionByServiceId() async throws {
+    @Test("PDS selection requires matching service id AND type AtprotoPersonalDataServer")
+    func pdsSelectionRequiresIdAndType() async throws {
         DIDTestURLProtocol.reset()
         NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
         NetworkService.dnsResolverOverride = { _ in ["104.244.42.1"] }
@@ -109,51 +109,31 @@ struct DIDResolutionBidirectionalTests {
             NetworkService.dnsResolverOverride = nil
         }
 
-        let didDocJSON = """
+        // 1. Valid: id is #atproto_pds and type is AtprotoPersonalDataServer
+        let validDocJSON = """
         {
             "@context": ["https://www.w3.org/ns/did/v1"],
-            "id": "did:plc:user1",
-            "alsoKnownAs": ["at://user.bsky.social"],
+            "id": "did:plc:valid1",
+            "alsoKnownAs": ["at://user1.bsky.social"],
             "service": [
                 {
                     "id": "#atproto_pds",
-                    "type": "CustomServiceType",
+                    "type": "AtprotoPersonalDataServer",
                     "serviceEndpoint": "https://pds1.example.com"
                 }
             ]
         }
         """
 
-        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:user1") { _ in
-            (200, Data(didDocJSON.utf8), ["Content-Type": "application/json"])
-        }
-
-        let networkService = NetworkService(baseURL: baseURL)
-        let resolver = await DIDResolutionService(networkService: networkService)
-
-        let pdsURL = try await resolver.resolveDIDToPDSURL(did: "did:plc:user1")
-        #expect(pdsURL.absoluteString == "https://pds1.example.com")
-    }
-
-    @Test("PDS selection selects by type AtprotoPersonalDataServer")
-    func pdsSelectionByType() async throws {
-        DIDTestURLProtocol.reset()
-        NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["104.244.42.1"] }
-        defer {
-            DIDTestURLProtocol.reset()
-            NetworkService.setNetworkTestProtocolClasses(nil)
-            NetworkService.dnsResolverOverride = nil
-        }
-
-        let didDocJSON = """
+        // 2. Valid: id is did#atproto_pds and type is AtprotoPersonalDataServer
+        let validPrefixedDocJSON = """
         {
             "@context": ["https://www.w3.org/ns/did/v1"],
-            "id": "did:plc:user2",
-            "alsoKnownAs": ["at://user.bsky.social"],
+            "id": "did:plc:valid2",
+            "alsoKnownAs": ["at://user2.bsky.social"],
             "service": [
                 {
-                    "id": "#custom_id",
+                    "id": "did:plc:valid2#atproto_pds",
                     "type": "AtprotoPersonalDataServer",
                     "serviceEndpoint": "https://pds2.example.com"
                 }
@@ -161,37 +141,168 @@ struct DIDResolutionBidirectionalTests {
         }
         """
 
-        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:user2") { _ in
-            (200, Data(didDocJSON.utf8), ["Content-Type": "application/json"])
+        // 3. Invalid: id is #atproto_pds but type is NOT AtprotoPersonalDataServer
+        let wrongTypeDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:wrongtype",
+            "alsoKnownAs": ["at://user3.bsky.social"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "CustomServiceType",
+                    "serviceEndpoint": "https://pds3.example.com"
+                }
+            ]
+        }
+        """
+
+        // 4. Invalid: type is AtprotoPersonalDataServer but id is unrelated (#custom_id)
+        let wrongIdDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:wrongid",
+            "alsoKnownAs": ["at://user4.bsky.social"],
+            "service": [
+                {
+                    "id": "#custom_id",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds4.example.com"
+                }
+            ]
+        }
+        """
+
+        // 5. Invalid: ambiguous multiple PDS services
+        let multipleDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:multiple",
+            "alsoKnownAs": ["at://user5.bsky.social"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds5a.example.com"
+                },
+                {
+                    "id": "did:plc:multiple#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds5b.example.com"
+                }
+            ]
+        }
+        """
+
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:valid1") { _ in
+            (200, Data(validDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:valid2") { _ in
+            (200, Data(validPrefixedDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:wrongtype") { _ in
+            (200, Data(wrongTypeDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:wrongid") { _ in
+            (200, Data(wrongIdDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:multiple") { _ in
+            (200, Data(multipleDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { request in
+            guard let url = request.url?.absoluteString else {
+                return (404, Data(), [:])
+            }
+            if url.contains("user1.bsky.social") {
+                return (200, Data(#"{"did":"did:plc:valid1"}"#.utf8), ["Content-Type": "application/json"])
+            } else if url.contains("user2.bsky.social") {
+                return (200, Data(#"{"did":"did:plc:valid2"}"#.utf8), ["Content-Type": "application/json"])
+            }
+            return (404, Data(), [:])
         }
 
         let networkService = NetworkService(baseURL: baseURL)
         let resolver = await DIDResolutionService(networkService: networkService)
 
-        let pdsURL = try await resolver.resolveDIDToPDSURL(did: "did:plc:user2")
-        #expect(pdsURL.absoluteString == "https://pds2.example.com")
+        let pds1 = try await resolver.resolveDIDToPDSURL(did: "did:plc:valid1")
+        #expect(pds1.absoluteString == "https://pds1.example.com")
+
+        let pds2 = try await resolver.resolveDIDToPDSURL(did: "did:plc:valid2")
+        #expect(pds2.absoluteString == "https://pds2.example.com")
+
+        await #expect(throws: (any Error).self) {
+            try await resolver.resolveDIDToPDSURL(did: "did:plc:wrongtype")
+        }
+
+        await #expect(throws: (any Error).self) {
+            try await resolver.resolveDIDToPDSURL(did: "did:plc:wrongid")
+        }
+
+        await #expect(throws: (any Error).self) {
+            try await resolver.resolveDIDToPDSURL(did: "did:plc:multiple")
+        }
     }
 
-    @Test("Disallowed TLD handles are rejected before network lookup")
-    func disallowedTLDHandlesRejected() async throws {
+    @Test("Reverse DID to handle resolution fails when asserted handle resolves to different DID")
+    func reverseResolutionFailureMismatch() async throws {
+        DIDTestURLProtocol.reset()
+        NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in ["104.244.42.1"] }
+        defer {
+            DIDTestURLProtocol.reset()
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
+        }
+
+        // Attacker DID doc asserts alsoKnownAs: attacker.bsky.social
+        let attackerDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:attacker123",
+            "alsoKnownAs": ["at://attacker.bsky.social"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds.example.com"
+                }
+            ]
+        }
+        """
+        // But resolveHandle for attacker.bsky.social returns a DIFFERENT DID (e.g. did:plc:victim456)
+        let resolveHandleJSON = #"{"did":"did:plc:victim456"}"#
+
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:attacker123") { _ in
+            (200, Data(attackerDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { _ in
+            (200, Data(resolveHandleJSON.utf8), ["Content-Type": "application/json"])
+        }
+
         let networkService = NetworkService(baseURL: baseURL)
         let resolver = await DIDResolutionService(networkService: networkService)
 
-        let disallowedHandles = [
-            "alice.local",
-            "bob.arpa",
-            "charlie.onion",
-            "dan.test",
-            "eve.internal",
-            "frank.localhost",
-            "grace.invalid",
-            "heidi.example",
-            "ivan.alt",
+        await #expect(throws: (any Error).self) {
+            try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:attacker123")
+        }
+    }
+
+    @Test("did:web rejects path injection and invalid percent-encoding")
+    func didWebAntiInjection() async throws {
+        let networkService = NetworkService(baseURL: baseURL)
+        let resolver = await DIDResolutionService(networkService: networkService)
+
+        let invalidDIDs = [
+            "did:web:example.com%2F..%2Fx",
+            "did:web:example.com:path%2Ftraversal",
+            "did:web:example.com:..:x",
+            "did:web:example.com:.",
+            "did:web:example.com:port%3Aabc",
         ]
 
-        for handle in disallowedHandles {
-            await #expect(throws: (any Error).self, "Handle should be rejected: \(handle)") {
-                try await resolver.resolveHandleToDID(handle: handle)
+        for did in invalidDIDs {
+            await #expect(throws: (any Error).self, "Invalid did:web should be rejected: \(did)") {
+                try await resolver.resolveDIDToPDSURL(did: did)
             }
         }
     }

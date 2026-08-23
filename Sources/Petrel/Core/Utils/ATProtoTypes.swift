@@ -809,9 +809,33 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let value: String
 
+    /// Registration-time restricted TLDs (per upstream @atproto/syntax handle.ts: DISALLOWED_TLDS).
+    /// Note: .test is explicitly allowed for testing/development.
     public static let disallowedTLDs: Set<String> = [
-        "alt", "arpa", "example", "internal", "invalid", "local", "localhost", "onion", "test",
+        "alt", "arpa", "example", "internal", "invalid", "local", "localhost", "onion",
     ]
+
+    /// Registration-time policy check for TLD validity (mirrors upstream isValidTld).
+    public static func isValidTLD(_ tld: String) -> Bool {
+        let normalized = tld.hasPrefix(".") ? String(tld.dropFirst()) : tld
+        return !disallowedTLDs.contains(normalized.lowercased())
+    }
+
+    /// Registration-time policy check for TLD validity (alias matching upstream naming).
+    public static func isValidTld(_ tld: String) -> Bool {
+        isValidTLD(tld)
+    }
+
+    /// Returns true if this handle's TLD is in the registration-time disallowed list.
+    public var hasDisallowedTLD: Bool {
+        guard let tld = value.split(separator: ".").last else { return false }
+        return Self.disallowedTLDs.contains(String(tld))
+    }
+
+    /// Returns true if this handle's TLD is in the registration-time disallowed list.
+    public var hasDisallowedTld: Bool {
+        hasDisallowedTLD
+    }
 
     /// Per https://atproto.com/specs/handle the final segment (TLD) cannot start with a digit
     private static let handlePattern =
@@ -864,9 +888,6 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
             return false
         }
 
-        guard !disallowedTLDs.contains(tld) else {
-            return false
-        }
 
         guard let regex = handleRegex else {
             return true
