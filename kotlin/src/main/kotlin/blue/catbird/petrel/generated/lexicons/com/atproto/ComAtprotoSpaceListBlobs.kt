@@ -1,0 +1,61 @@
+// Lexicon: 1, ID: com.atproto.space.listBlobs
+// List the CIDs of blobs referenced by an account's records within a permissioned space, optionally since some revision of that repo. Lets a syncer discover which blobs to fetch via getBlob, and lets an account enumerate the blobs it must carry when migrating a permissioned repo. Scoped to one space: blobs behind permissioned records are never enumerated by com.atproto.sync.listBlobs, which is unauthenticated. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSpaceListBlobsDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.space.listBlobs"
+}
+
+@Serializable
+    data class ComAtprotoSpaceListBlobsParameters(
+// Reference to the space.        @SerialName("space")
+        val space: SpaceRef,// The DID of the account whose blobs to list.        @SerialName("repo")
+        val repo: DID,// Optional revision of the permissioned repo to list blobs since.        @SerialName("since")
+        val since: String? = null,        @SerialName("limit")
+        val limit: Int? = null,        @SerialName("cursor")
+        val cursor: String? = null    )
+
+    @Serializable
+    data class ComAtprotoSpaceListBlobsOutput(
+        @SerialName("cursor")
+        val cursor: String? = null,        @SerialName("cids")
+        val cids: List<CID>    )
+
+sealed class ComAtprotoSpaceListBlobsError(val name: String, val description: String?) {
+        object SpaceNotFound: ComAtprotoSpaceListBlobsError("SpaceNotFound", "")
+        object RepoNotFound: ComAtprotoSpaceListBlobsError("RepoNotFound", "")
+        object RepoTakendown: ComAtprotoSpaceListBlobsError("RepoTakendown", "")
+        object RepoSuspended: ComAtprotoSpaceListBlobsError("RepoSuspended", "")
+        object RepoDeactivated: ComAtprotoSpaceListBlobsError("RepoDeactivated", "")
+    }
+
+/**
+ * List the CIDs of blobs referenced by an account's records within a permissioned space, optionally since some revision of that repo. Lets a syncer discover which blobs to fetch via getBlob, and lets an account enumerate the blobs it must carry when migrating a permissioned repo. Scoped to one space: blobs behind permissioned records are never enumerated by com.atproto.sync.listBlobs, which is unauthenticated. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+ *
+ * Endpoint: com.atproto.space.listBlobs
+ */
+suspend fun ATProtoClient.Com.Atproto.Space.listBlobs(
+parameters: ComAtprotoSpaceListBlobsParameters): ATProtoResponse<ComAtprotoSpaceListBlobsOutput> {
+    val endpoint = "com.atproto.space.listBlobs"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

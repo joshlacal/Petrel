@@ -1,0 +1,75 @@
+// Lexicon: 1, ID: app.bsky.video.uploadPart
+// Upload one part. Parts are idempotent and may be retried or re-sent while the session is created. Each expected length is derived from the upload size and part size, and Content-Length must match exactly. ETags are never exposed to clients.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object AppBskyVideoUploadPartDefs {
+    const val TYPE_IDENTIFIER = "app.bsky.video.uploadPart"
+}
+
+@Serializable
+    data class AppBskyVideoUploadPartParameters(
+        @SerialName("jobId")
+        val jobId: String,        @SerialName("partNumber")
+        val partNumber: Int    )
+
+@Serializable
+    data class AppBskyVideoUploadPartInput(
+        @SerialName("data")
+        val `data`: ByteArray    )
+
+    @Serializable
+    data class AppBskyVideoUploadPartOutput(
+        @SerialName("partNumber")
+        val partNumber: Int,        @SerialName("sizeBytes")
+        val sizeBytes: Int    )
+
+sealed class AppBskyVideoUploadPartError(val name: String, val description: String?) {
+        object UploadNotFound: AppBskyVideoUploadPartError("UploadNotFound", "The job ID is unknown or aged out of retention; known terminal sessions are never reported as not found.")
+        object UploadExpired: AppBskyVideoUploadPartError("UploadExpired", "The upload session expired before completion.")
+        object InvalidPartNumber: AppBskyVideoUploadPartError("InvalidPartNumber", "The part number is outside the upload's valid part range.")
+        object PartSizeMismatch: AppBskyVideoUploadPartError("PartSizeMismatch", "Content-Length does not exactly match the expected size for this part.")
+        object UploadNotReady: AppBskyVideoUploadPartError("UploadNotReady", "A finish is in progress; check getUploadStatus and retry.")
+        object UploadFailed: AppBskyVideoUploadPartError("UploadFailed", "The session is known to have failed; the error carries its failure reason.")
+        object UploadAborted: AppBskyVideoUploadPartError("UploadAborted", "The session is known to have been aborted.")
+        object UploadAlreadyCompleted: AppBskyVideoUploadPartError("UploadAlreadyCompleted", "The session is known to have already completed.")
+        object ServiceOverloaded: AppBskyVideoUploadPartError("ServiceOverloaded", "The service is draining or temporarily at capacity; retry on another worker.")
+    }
+
+/**
+ * Upload one part. Parts are idempotent and may be retried or re-sent while the session is created. Each expected length is derived from the upload size and part size, and Content-Length must match exactly. ETags are never exposed to clients.
+ *
+ * Endpoint: app.bsky.video.uploadPart
+ */
+suspend fun ATProtoClient.App.Bsky.Video.uploadPart(
+input: AppBskyVideoUploadPartInput,
+    params: AppBskyVideoUploadPartParameters): ATProtoResponse<AppBskyVideoUploadPartOutput> {
+    val endpoint = "app.bsky.video.uploadPart"
+
+    // Binary data
+    val body = input.data
+    val contentType = "application/octet-stream"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = params.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

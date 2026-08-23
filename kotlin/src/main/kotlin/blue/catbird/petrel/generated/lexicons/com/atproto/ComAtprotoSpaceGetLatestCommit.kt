@@ -1,0 +1,57 @@
+// Lexicon: 1, ID: com.atproto.space.getLatestCommit
+// Get the current signed commit for an account's permissioned repo within a space. Served by a repo host. Throws RepoNotFound when the account holds no repo in the space, including the case of a member that has never written to it. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSpaceGetLatestCommitDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.space.getLatestCommit"
+}
+
+@Serializable
+    data class ComAtprotoSpaceGetLatestCommitParameters(
+// Reference to the space.        @SerialName("space")
+        val space: SpaceRef,// The DID of the account whose latest commit to retrieve.        @SerialName("repo")
+        val repo: DID    )
+
+    @Serializable
+    data class ComAtprotoSpaceGetLatestCommitOutput(
+// The account's current signed commit.        @SerialName("commit")
+        val commit: ComAtprotoSpaceDefsSignedCommit    )
+
+sealed class ComAtprotoSpaceGetLatestCommitError(val name: String, val description: String?) {
+        object SpaceNotFound: ComAtprotoSpaceGetLatestCommitError("SpaceNotFound", "")
+        object RepoNotFound: ComAtprotoSpaceGetLatestCommitError("RepoNotFound", "")
+        object RepoTakendown: ComAtprotoSpaceGetLatestCommitError("RepoTakendown", "")
+        object RepoSuspended: ComAtprotoSpaceGetLatestCommitError("RepoSuspended", "")
+        object RepoDeactivated: ComAtprotoSpaceGetLatestCommitError("RepoDeactivated", "")
+    }
+
+/**
+ * Get the current signed commit for an account's permissioned repo within a space. Served by a repo host. Throws RepoNotFound when the account holds no repo in the space, including the case of a member that has never written to it. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+ *
+ * Endpoint: com.atproto.space.getLatestCommit
+ */
+suspend fun ATProtoClient.Com.Atproto.Space.getLatestCommit(
+parameters: ComAtprotoSpaceGetLatestCommitParameters): ATProtoResponse<ComAtprotoSpaceGetLatestCommitOutput> {
+    val endpoint = "com.atproto.space.getLatestCommit"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

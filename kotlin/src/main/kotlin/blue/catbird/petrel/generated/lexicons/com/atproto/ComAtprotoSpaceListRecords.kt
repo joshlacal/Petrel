@@ -1,0 +1,75 @@
+// Lexicon: 1, ID: com.atproto.space.listRecords
+// List the records in an account's repo within a permissioned space, optionally filtered by collection. By default each record's value is inlined; set excludeValues for a metadata-only listing (collection, rkey, cid). Used for full-state recovery. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). Throws RepoNotFound when the account holds no repo in the space; this does not distinguish a member that has never written from a non-member.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSpaceListRecordsDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.space.listRecords"
+}
+
+    @Serializable
+    data class ComAtprotoSpaceListRecordsRecord(
+        @SerialName("collection")
+        val collection: NSID,        @SerialName("rkey")
+        val rkey: String,        @SerialName("cid")
+        val cid: CID,/** The record's value. Inlined by default; omitted when excludeValues is set. */        @SerialName("value")
+        val value: JsonElement? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#comAtprotoSpaceListRecordsRecord"
+        }
+    }
+
+@Serializable
+    data class ComAtprotoSpaceListRecordsParameters(
+// Reference to the space.        @SerialName("space")
+        val space: SpaceRef,// The DID of the account whose repo to list.        @SerialName("repo")
+        val repo: DID,// The NSID of the record collection. If omitted, lists records across all collections.        @SerialName("collection")
+        val collection: NSID? = null,// The number of records to return.        @SerialName("limit")
+        val limit: Int? = null,        @SerialName("cursor")
+        val cursor: String? = null,// Flag to reverse the order of the returned records.        @SerialName("reverse")
+        val reverse: Boolean? = null,// If true, omit inlined record values and return only metadata (collection, rkey, cid).        @SerialName("excludeValues")
+        val excludeValues: Boolean? = null    )
+
+    @Serializable
+    data class ComAtprotoSpaceListRecordsOutput(
+        @SerialName("cursor")
+        val cursor: String? = null,        @SerialName("records")
+        val records: List<ComAtprotoSpaceListRecordsRecord>    )
+
+sealed class ComAtprotoSpaceListRecordsError(val name: String, val description: String?) {
+        object SpaceNotFound: ComAtprotoSpaceListRecordsError("SpaceNotFound", "")
+        object RepoNotFound: ComAtprotoSpaceListRecordsError("RepoNotFound", "")
+        object RepoTakendown: ComAtprotoSpaceListRecordsError("RepoTakendown", "")
+        object RepoSuspended: ComAtprotoSpaceListRecordsError("RepoSuspended", "")
+        object RepoDeactivated: ComAtprotoSpaceListRecordsError("RepoDeactivated", "")
+    }
+
+/**
+ * List the records in an account's repo within a permissioned space, optionally filtered by collection. By default each record's value is inlined; set excludeValues for a metadata-only listing (collection, rkey, cid). Used for full-state recovery. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). Throws RepoNotFound when the account holds no repo in the space; this does not distinguish a member that has never written from a non-member.
+ *
+ * Endpoint: com.atproto.space.listRecords
+ */
+suspend fun ATProtoClient.Com.Atproto.Space.listRecords(
+parameters: ComAtprotoSpaceListRecordsParameters): ATProtoResponse<ComAtprotoSpaceListRecordsOutput> {
+    val endpoint = "com.atproto.space.listRecords"
+
+    // List<Pair<String, String>> preserves repeated keys, which ATProto
+    // array-valued query params rely on (e.g. `?actors=a&actors=b`).
+    val queryItems = parameters.toQueryItems()
+
+    return client.networkService.performRequest(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "application/json"),
+        body = null
+    )
+}

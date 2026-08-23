@@ -91,6 +91,27 @@ public enum ComAtprotoSpaceRegisterNotify {
             return rawValue
         }
     }
+
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.space.registerNotify", kind: "procedure",
+        inputEncoding: "application/json", outputEncoding: "application/json",
+        declaredErrors: ["SpaceNotFound", "ServiceNotResolvable"]
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Void, input: Input, context: Context
+        ) async throws -> Output
+    }
 }
 
 public extension ATProtoClient.Com.Atproto.Space {

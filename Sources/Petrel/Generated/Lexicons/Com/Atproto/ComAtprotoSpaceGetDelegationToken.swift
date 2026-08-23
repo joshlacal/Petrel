@@ -51,6 +51,27 @@ public enum ComAtprotoSpaceGetDelegationToken {
             case token
         }
     }
+
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.space.getDelegationToken", kind: "query",
+        inputEncoding: nil, outputEncoding: "application/json",
+        declaredErrors: []
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Parameters, input: Void, context: Context
+        ) async throws -> Output
+    }
 }
 
 public extension ATProtoClient.Com.Atproto.Space {

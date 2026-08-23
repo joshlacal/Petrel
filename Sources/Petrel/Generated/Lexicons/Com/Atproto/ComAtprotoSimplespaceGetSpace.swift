@@ -91,6 +91,27 @@ public enum ComAtprotoSimplespaceGetSpace {
         }
     }
 
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.simplespace.getSpace", kind: "query",
+        inputEncoding: nil, outputEncoding: "application/json",
+        declaredErrors: ["SpaceNotFound"]
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Parameters, input: Void, context: Context
+        ) async throws -> Output
+    }
+
     public enum OutputPolicyUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case comAtprotoSimplespaceDefsPublicPolicy(ComAtprotoSimplespaceDefs.PublicPolicy)
         case comAtprotoSimplespaceDefsMemberListPolicy(ComAtprotoSimplespaceDefs.MemberListPolicy)

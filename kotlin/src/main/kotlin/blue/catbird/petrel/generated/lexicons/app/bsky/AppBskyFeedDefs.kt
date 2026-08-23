@@ -573,9 +573,23 @@ object AppBskyFeedDefsSkeletonFeedPostReasonUnionSerializer : kotlinx.serializat
         val threadMuted: Boolean? = null,        @SerialName("replyDisabled")
         val replyDisabled: Boolean? = null,        @SerialName("embeddingDisabled")
         val embeddingDisabled: Boolean? = null,        @SerialName("pinned")
-        val pinned: Boolean? = null    ) {
+        val pinned: Boolean? = null,/** This property is present only in selected cases, as an optimization. */        @SerialName("knownLikers")
+        val knownLikers: AppBskyFeedDefsKnownLikers? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyFeedDefsViewerState"
+        }
+    }
+
+    /**
+     * The post's likers whom you also follow
+     */
+    @Serializable
+    data class AppBskyFeedDefsKnownLikers(
+        @SerialName("count")
+        val count: Int,        @SerialName("actors")
+        val actors: List<AppBskyActorDefsProfileViewBasic>    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyFeedDefsKnownLikers"
         }
     }
 

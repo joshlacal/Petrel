@@ -18,7 +18,20 @@ public enum ComAtprotoSpaceGetSpaceCredential {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             space = try container.decode(SpaceRef.self, forKey: .space)
-            clientAttestation = try container.decodeIfPresent(String.self, forKey: .clientAttestation)
+            if container.contains(.clientAttestation) {
+                guard try !container.decodeNil(forKey: .clientAttestation) else {
+                    throw DecodingError.valueNotFound(
+                        String.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'clientAttestation' must not be null"
+                        )
+                    )
+                }
+                clientAttestation = try container.decode(String.self, forKey: .clientAttestation)
+            } else {
+                clientAttestation = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -99,6 +112,27 @@ public enum ComAtprotoSpaceGetSpaceCredential {
         public var errorName: String {
             return rawValue
         }
+    }
+
+    public struct XRPCMethodDescriptor: Sendable, Equatable {
+        public let nsid: String
+        public let kind: String
+        public let inputEncoding: String?
+        public let outputEncoding: String?
+        public let declaredErrors: [String]
+    }
+
+    public static let endpointDescriptor = XRPCMethodDescriptor(
+        nsid: "com.atproto.space.getSpaceCredential", kind: "procedure",
+        inputEncoding: "application/json", outputEncoding: "application/json",
+        declaredErrors: ["SpaceNotFound", "SpaceDeleted", "UserNotAuthorized", "AppNotAuthorized", "NotAuthorized", "InvalidDelegationToken", "InvalidClientAttestation"]
+    )
+
+    public protocol ServerHandler: Sendable {
+        associatedtype Context: Sendable
+        func handle(
+            parameters: Void, input: Input, context: Context
+        ) async throws -> Output
     }
 }
 

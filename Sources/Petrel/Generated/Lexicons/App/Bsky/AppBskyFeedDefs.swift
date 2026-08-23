@@ -375,9 +375,10 @@ public enum AppBskyFeedDefs {
         public let replyDisabled: Bool?
         public let embeddingDisabled: Bool?
         public let pinned: Bool?
+        public let knownLikers: KnownLikers?
 
         public init(
-            repost: ATProtocolURI?, like: ATProtocolURI?, bookmarked: Bool?, threadMuted: Bool?, replyDisabled: Bool?, embeddingDisabled: Bool?, pinned: Bool?
+            repost: ATProtocolURI?, like: ATProtocolURI?, bookmarked: Bool?, threadMuted: Bool?, replyDisabled: Bool?, embeddingDisabled: Bool?, pinned: Bool?, knownLikers: KnownLikers?
         ) {
             self.repost = repost
             self.like = like
@@ -386,6 +387,7 @@ public enum AppBskyFeedDefs {
             self.replyDisabled = replyDisabled
             self.embeddingDisabled = embeddingDisabled
             self.pinned = pinned
+            self.knownLikers = knownLikers
         }
 
         public init(from decoder: Decoder) throws {
@@ -446,6 +448,14 @@ public enum AppBskyFeedDefs {
                 LogManager.logWarning("Decoding error for optional property 'pinned' — degrading to nil: \(error)")
                 pinned = nil
             }
+            do {
+                knownLikers = try container.decodeIfPresent(KnownLikers.self, forKey: .knownLikers)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'knownLikers' — degrading to nil: \(error)")
+                knownLikers = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -458,6 +468,7 @@ public enum AppBskyFeedDefs {
             try container.encodeIfPresent(replyDisabled, forKey: .replyDisabled)
             try container.encodeIfPresent(embeddingDisabled, forKey: .embeddingDisabled)
             try container.encodeIfPresent(pinned, forKey: .pinned)
+            try container.encodeIfPresent(knownLikers, forKey: .knownLikers)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -496,6 +507,11 @@ public enum AppBskyFeedDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = knownLikers {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -519,6 +535,9 @@ public enum AppBskyFeedDefs {
                 return false
             }
             if pinned != other.pinned {
+                return false
+            }
+            if knownLikers != other.knownLikers {
                 return false
             }
             return true
@@ -559,6 +578,10 @@ public enum AppBskyFeedDefs {
                 let pinnedValue = try value.toCBORValue()
                 map = map.adding(key: "pinned", value: pinnedValue)
             }
+            if let value = knownLikers {
+                let knownLikersValue = try value.toCBORValue()
+                map = map.adding(key: "knownLikers", value: knownLikersValue)
+            }
             return map
         }
 
@@ -571,6 +594,79 @@ public enum AppBskyFeedDefs {
             case replyDisabled
             case embeddingDisabled
             case pinned
+            case knownLikers
+        }
+    }
+
+    public struct KnownLikers: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.feed.defs#knownLikers"
+        public let count: Int
+        public let actors: [AppBskyActorDefs.ProfileViewBasic]
+
+        public init(
+            count: Int, actors: [AppBskyActorDefs.ProfileViewBasic]
+        ) {
+            self.count = count
+            self.actors = actors
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                count = try container.decode(Int.self, forKey: .count)
+            } catch {
+                LogManager.logError("Decoding error for required property 'count': \(error)")
+                throw error
+            }
+            do {
+                actors = try container.decode([AppBskyActorDefs.ProfileViewBasic].self, forKey: .actors)
+            } catch {
+                LogManager.logError("Decoding error for required property 'actors': \(error)")
+                throw error
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(count, forKey: .count)
+            try container.encode(actors, forKey: .actors)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(count)
+            hasher.combine(actors)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if count != other.count {
+                return false
+            }
+            if actors != other.actors {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let countValue = try count.toCBORValue()
+            map = map.adding(key: "count", value: countValue)
+            let actorsValue = try actors.toCBORValue()
+            map = map.adding(key: "actors", value: actorsValue)
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case count
+            case actors
         }
     }
 

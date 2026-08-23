@@ -1,0 +1,64 @@
+// Lexicon: 1, ID: com.atproto.space.getSpaceCredential
+// Exchange a delegation token for a space credential. Called on the space authority, with the delegation token as the request's authorization token and a DPoP proof signed by the key to bind the credential to. The resulting space credential reads repos across the space. Requires a delegation token and DPoP proof, plus a client attestation when the space gates on app identity.
+package blue.catbird.petrel.generated
+
+import kotlinx.serialization.*
+import kotlinx.serialization.json.*
+import blue.catbird.petrel.core.types.*
+import blue.catbird.petrel.core.*
+import blue.catbird.petrel.client.*
+import blue.catbird.petrel.network.*
+import blue.catbird.petrel.runtime.subscription.openSubscription
+import kotlinx.coroutines.flow.*
+
+object ComAtprotoSpaceGetSpaceCredentialDefs {
+    const val TYPE_IDENTIFIER = "com.atproto.space.getSpaceCredential"
+}
+
+@Serializable
+    data class ComAtprotoSpaceGetSpaceCredentialInput(
+// Reference to the space.        @SerialName("space")
+        val space: SpaceRef,// Optional client attestation JWT establishing the app's identity. Required only when the space gates on app identity.        @SerialName("clientAttestation")
+        val clientAttestation: String? = null    )
+
+    @Serializable
+    data class ComAtprotoSpaceGetSpaceCredentialOutput(
+// A signed JWT space credential, bound through its cnf.jkt claim to the key that signed the request's DPoP proof.        @SerialName("credential")
+        val credential: String    )
+
+sealed class ComAtprotoSpaceGetSpaceCredentialError(val name: String, val description: String?) {
+        object SpaceNotFound: ComAtprotoSpaceGetSpaceCredentialError("SpaceNotFound", "")
+        object SpaceDeleted: ComAtprotoSpaceGetSpaceCredentialError("SpaceDeleted", "")
+        object UserNotAuthorized: ComAtprotoSpaceGetSpaceCredentialError("UserNotAuthorized", "Refused on the basis of the requesting user.")
+        object AppNotAuthorized: ComAtprotoSpaceGetSpaceCredentialError("AppNotAuthorized", "Refused on the basis of the requesting app.")
+        object NotAuthorized: ComAtprotoSpaceGetSpaceCredentialError("NotAuthorized", "Refused without attributing the refusal to the user or the app. Authorities that do not wish to disclose which perimeter failed may return this in place of UserNotAuthorized or AppNotAuthorized.")
+        object InvalidDelegationToken: ComAtprotoSpaceGetSpaceCredentialError("InvalidDelegationToken", "")
+        object InvalidClientAttestation: ComAtprotoSpaceGetSpaceCredentialError("InvalidClientAttestation", "")
+    }
+
+/**
+ * Exchange a delegation token for a space credential. Called on the space authority, with the delegation token as the request's authorization token and a DPoP proof signed by the key to bind the credential to. The resulting space credential reads repos across the space. Requires a delegation token and DPoP proof, plus a client attestation when the space gates on app identity.
+ *
+ * Endpoint: com.atproto.space.getSpaceCredential
+ */
+suspend fun ATProtoClient.Com.Atproto.Space.getSpaceCredential(
+input: ComAtprotoSpaceGetSpaceCredentialInput): ATProtoResponse<ComAtprotoSpaceGetSpaceCredentialOutput> {
+    val endpoint = "com.atproto.space.getSpaceCredential"
+
+    // JSON serialization
+    val body = Json.encodeToString(input)
+    val contentType = "application/json"
+
+    val queryItems: List<Pair<String, String>>? = null
+
+    return client.networkService.performRequest(
+        method = "POST",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf(
+            "Content-Type" to contentType,
+            "Accept" to "application/json"
+        ),
+        body = body
+    )
+}

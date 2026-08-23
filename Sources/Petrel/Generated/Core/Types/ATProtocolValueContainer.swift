@@ -29,6 +29,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         init() {
             var decoders: [String: DecoderFunction] = [:]
 
+            decoders["app.bsky.actor.contentVisibilityDeclaration"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyActorContentVisibilityDeclaration(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding AppBskyActorContentVisibilityDeclaration: \(error)")
+                    return .decodeError("Error decoding AppBskyActorContentVisibilityDeclaration: \(error)")
+                }
+            }
+
             decoders["app.bsky.actor.defs#profileViewBasic"] = { decoder in
                 do {
                     let decodedObject = try AppBskyActorDefs.ProfileViewBasic(from: decoder)
@@ -966,6 +976,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding AppBskyFeedDefs.ViewerState: \(error)")
                     return .decodeError("Error decoding AppBskyFeedDefs.ViewerState: \(error)")
+                }
+            }
+
+            decoders["app.bsky.feed.defs#knownLikers"] = { decoder in
+                do {
+                    let decodedObject = try AppBskyFeedDefs.KnownLikers(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding AppBskyFeedDefs.KnownLikers: \(error)")
+                    return .decodeError("Error decoding AppBskyFeedDefs.KnownLikers: \(error)")
                 }
             }
 
