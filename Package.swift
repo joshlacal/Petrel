@@ -13,6 +13,10 @@ let package = Package(
             name: "Petrel",
             targets: ["Petrel"]
         ),
+        .library(
+            name: "PetrelCrypto",
+            targets: ["PetrelCrypto"]
+        ),
         .executable(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
@@ -28,6 +32,7 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMajor(from: "3.0.0")),
         .package(url: "https://github.com/apple/swift-log.git", .upToNextMajor(from: "1.0.0")),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
+        .package(url: "https://github.com/GigaBitcoin/secp256k1.swift.git", exact: "0.15.0"),
     ],
     targets: [
         // System library for libsecret (Linux only, ignored on other platforms)
@@ -46,12 +51,23 @@ let package = Package(
         ),
 
         .target(
+            name: "PetrelCrypto",
+            dependencies: [
+                .product(name: "Crypto", package: "swift-crypto"),
+                .product(name: "secp256k1", package: "secp256k1.swift"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
             name: "Petrel",
             dependencies: [
+                "PetrelCrypto",
                 "jose-swift",
                 "SwiftCBOR",
                 .product(name: "AsyncDNSResolver", package: "swift-async-dns-resolver"),
-                .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
+                .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "Logging", package: "swift-log"),
                 .target(name: "CLibSecretShim", condition: .when(platforms: [.linux])),
             ],
@@ -65,7 +81,11 @@ let package = Package(
         ),
         .testTarget(
             name: "PetrelTests",
-            dependencies: ["Petrel"]
+            dependencies: ["Petrel", "PetrelCrypto"]
+        ),
+        .testTarget(
+            name: "PetrelCryptoTests",
+            dependencies: ["PetrelCrypto"]
         ),
         .testTarget(
             name: "PetrelLoadTests",

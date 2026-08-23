@@ -7,11 +7,7 @@
 
 #if os(Linux) || os(macOS) || os(iOS)
 
-    #if canImport(CryptoKit)
-        import CryptoKit
-    #else
-        @preconcurrency import Crypto
-    #endif
+    import Crypto
     import Foundation
     #if canImport(Darwin)
         import Darwin

@@ -5,10 +5,11 @@
 //  Created by Claude Code on 6/1/25.
 //
 
+import Crypto
 import Foundation
 @testable import Petrel
+import PetrelCrypto
 import Testing
-
 /// Test suite for AT Protocol crypto validation using official interop test files
 /// Based on https://github.com/bluesky-social/atproto/tree/main/interop-test-files/crypto
 @Suite("AT Protocol Crypto Interop Tests")
@@ -73,19 +74,38 @@ struct ATProtoCryptoInteropTests {
                 }
 
                 // Verify message can be decoded (fixtures use unpadded base64)
-                let messageData = Data(unpaddedBase64: fixture.messageBase64)
-                #expect(messageData != nil, "Message should be valid base64: \(fixture.messageBase64)")
+                let messageData = try #require(Data(unpaddedBase64: fixture.messageBase64), "Message should be valid base64: \(fixture.messageBase64)")
 
                 // Verify signature can be decoded
-                let signatureData = Data(unpaddedBase64: fixture.signatureBase64)
-                #expect(signatureData != nil, "Signature should be valid base64: \(fixture.signatureBase64)")
+                let signatureData = try #require(Data(unpaddedBase64: fixture.signatureBase64), "Signature should be valid base64: \(fixture.signatureBase64)")
 
                 // Check algorithm is supported
                 #expect(
                     fixture.algorithm == "ES256" || fixture.algorithm == "ES256K",
-
                     "Algorithm should be ES256 or ES256K: \(fixture.algorithm)"
                 )
+
+                // Verify the signature using PetrelCrypto from the public DID key
+                let keyFromDID = try PLCDIDKeyCodec.decode(fixture.publicKeyDid)
+                let isValidFromDID = try keyFromDID.verify(
+                    signature: signatureData,
+                    signingInput: messageData,
+                    algorithm: fixture.algorithm
+                )
+                #expect(isValidFromDID, "Signature from valid DID key fixture should verify")
+
+                // Also verify using legacy multibase key decoding
+                let curve: PLCDIDKeyCodec.LegacyVerificationKeyCurve = fixture.algorithm == "ES256" ? .p256 : .secp256k1
+                let keyFromMultibase = try PLCDIDKeyCodec.decodeLegacyMultibase(
+                    fixture.publicKeyMultibase,
+                    curve: curve
+                )
+                let isValidFromMultibase = try keyFromMultibase.verify(
+                    signature: signatureData,
+                    signingInput: messageData,
+                    algorithm: fixture.algorithm
+                )
+                #expect(isValidFromMultibase, "Signature from valid multibase key fixture should verify")
             }
         }
 
@@ -124,6 +144,19 @@ struct ATProtoCryptoInteropTests {
                 // DIDs should still be parseable
                 #expect(throws: Never.self) {
                     try DID(didString: fixture.publicKeyDid)
+                }
+
+                let messageData = try #require(Data(unpaddedBase64: fixture.messageBase64))
+                let signatureData = try #require(Data(unpaddedBase64: fixture.signatureBase64))
+
+                let key = try PLCDIDKeyCodec.decode(fixture.publicKeyDid)
+                // High-S signatures MUST fail canonical verification in PetrelCrypto
+                #expect(throws: (any Error).self) {
+                    _ = try key.verify(
+                        signature: signatureData,
+                        signingInput: messageData,
+                        algorithm: fixture.algorithm
+                    )
                 }
             }
         }
@@ -164,10 +197,22 @@ struct ATProtoCryptoInteropTests {
                 #expect(throws: Never.self) {
                     try DID(didString: fixture.publicKeyDid)
                 }
+
+                let messageData = try #require(Data(unpaddedBase64: fixture.messageBase64))
+                let signatureData = try #require(Data(unpaddedBase64: fixture.signatureBase64))
+
+                let key = try PLCDIDKeyCodec.decode(fixture.publicKeyDid)
+                // DER-encoded signatures MUST fail canonical verification in PetrelCrypto
+                #expect(throws: (any Error).self) {
+                    _ = try key.verify(
+                        signature: signatureData,
+                        signingInput: messageData,
+                        algorithm: fixture.algorithm
+                    )
+                }
             }
         }
     }
-
     // MARK: - DID Key Tests
 
     @Suite("DID Key Validation")
@@ -211,6 +256,13 @@ struct ATProtoCryptoInteropTests {
                 // Verify DID follows did:key format
                 #expect(keyPair.publicDidKey.hasPrefix("did:key:"), "Should be a did:key")
                 #expect(keyPair.publicDidKey.contains("zQ3sh"), "K256 keys should start with zQ3sh")
+
+                // Verify decoding with PetrelCrypto produces secp256k1 key
+                let decodedKey = try PLCDIDKeyCodec.decode(keyPair.publicDidKey)
+                guard case .secp256k1 = decodedKey else {
+                    Issue.record("Expected secp256k1 key for \(keyPair.publicDidKey)")
+                    continue
+                }
             }
         }
 
@@ -232,6 +284,13 @@ struct ATProtoCryptoInteropTests {
                 // Verify DID follows did:key format for P256
                 #expect(keyPair.publicDidKey.hasPrefix("did:key:"), "Should be a did:key")
                 #expect(keyPair.publicDidKey.contains("zDnae"), "P256 keys should start with zDnae")
+
+                // Verify decoding with PetrelCrypto produces P-256 key
+                let decodedKey = try PLCDIDKeyCodec.decode(keyPair.publicDidKey)
+                guard case .p256 = decodedKey else {
+                    Issue.record("Expected P-256 key for \(keyPair.publicDidKey)")
+                    continue
+                }
             }
         }
 

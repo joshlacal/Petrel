@@ -2,11 +2,7 @@
 // Description: Implements CID handling and canonical DAG-CBOR encoding
 //              according to AT Protocol specifications.
 
-#if canImport(CryptoKit)
-    import CryptoKit
-#else
-    @preconcurrency import Crypto
-#endif
+import Crypto
 import Foundation
 import SwiftCBOR
 

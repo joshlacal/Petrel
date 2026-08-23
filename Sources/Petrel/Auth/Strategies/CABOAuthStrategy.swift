@@ -7,11 +7,7 @@
 //  exchange and refresh, then includes them in the token request.
 //
 
-#if canImport(CryptoKit)
-    import CryptoKit
-#else
-    @preconcurrency import Crypto
-#endif
+import Crypto
 import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking

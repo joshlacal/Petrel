@@ -5,11 +5,7 @@
 //  Created by Josh LaCalamito on 1/19/26.
 //
 
-#if canImport(CryptoKit)
-    import CryptoKit
-#else
-    @preconcurrency import Crypto
-#endif
+import Crypto
 import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking

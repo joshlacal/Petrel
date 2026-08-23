@@ -1,8 +1,4 @@
-#if canImport(CryptoKit)
-    import CryptoKit
-#else
-    @preconcurrency import Crypto
-#endif
+import Crypto
 import Foundation
 
 /// A non-secret value that binds work to the current authentication principal

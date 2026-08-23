@@ -5,11 +5,7 @@
 //  Created by Josh LaCalamito on 11/20/23.
 //
 
-#if canImport(CryptoKit)
-    import CryptoKit
-#else
-    @preconcurrency import Crypto
-#endif
+import Crypto
 import Foundation
 import Synchronization
 #if os(iOS) || os(macOS)
