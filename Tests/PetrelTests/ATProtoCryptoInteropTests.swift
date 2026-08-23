@@ -212,6 +212,158 @@ struct ATProtoCryptoInteropTests {
                 }
             }
         }
+
+        @Test("Tampered Message Fails Cryptographic Verification (ES256 and ES256K)")
+        func tamperedMessageFailsCryptographicVerification() throws {
+            let validFixtures: [SignatureFixture] = [
+                SignatureFixture(
+                    comment: "valid P-256 key and signature, with low-S signature",
+                    messageBase64: "oWVoZWxsb2V3b3JsZA",
+                    algorithm: "ES256",
+                    didDocSuite: "EcdsaSecp256r1VerificationKey2019",
+                    publicKeyDid: "did:key:zDnaembgSGUhZULN2Caob4HLJPaxBh92N7rtH21TErzqf8HQo",
+                    publicKeyMultibase: "zxdM8dSstjrpZaRUwBmDvjGXweKuEMVN95A9oJBFjkWMh",
+                    signatureBase64: "2vZNsG3UKvvO/CDlrdvyZRISOFylinBh0Jupc6KcWoJWExHptCfduPleDbG3rko3YZnn9Lw0IjpixVmexJDegg",
+                    validSignature: true,
+                    tags: []
+                ),
+                SignatureFixture(
+                    comment: "valid K-256 key and signature, with low-S signature",
+                    messageBase64: "oWVoZWxsb2V3b3JsZA",
+                    algorithm: "ES256K",
+                    didDocSuite: "EcdsaSecp256k1VerificationKey2019",
+                    publicKeyDid: "did:key:zQ3shqwJEJyMBsBXCWyCBpUBMqxcon9oHB7mCvx4sSpMdLJwc",
+                    publicKeyMultibase: "z25z9DTpsiYYJKGsWmSPJK2NFN8PcJtZig12K59UgW7q5t",
+                    signatureBase64: "5WpdIuEUUfVUYaozsi8G0B3cWO09cgZbIIwg1t2YKdUn/FEznOndsz/qgiYb89zwxYCbB71f7yQK5Lr7NasfoA",
+                    validSignature: true,
+                    tags: []
+                ),
+            ]
+
+            for fixture in validFixtures {
+                let messageData = try #require(Data(unpaddedBase64: fixture.messageBase64))
+                let signatureData = try #require(Data(unpaddedBase64: fixture.signatureBase64))
+                let key = try PLCDIDKeyCodec.decode(fixture.publicKeyDid)
+
+                // 1. Prove that structural low-S and wire format checks pass (no structural rejection)
+                if fixture.algorithm == "ES256" {
+                    #expect(P256WireSignature.isCanonicalLowS(signatureData), "P-256 fixture signature must pass canonical low-S guard")
+                    #expect(throws: Never.self) {
+                        _ = try P256WireSignature.decodeCanonical(signatureData)
+                    }
+                } else if fixture.algorithm == "ES256K" {
+                    #expect(ATProtoJWTVerificationKey.isCanonicalSecp256k1Signature(signatureData), "K-256 fixture signature must pass canonical low-S guard")
+                }
+
+                // 2. Prove that the unaltered signature + original message verifies successfully
+                let originalValid = try key.verify(
+                    signature: signatureData,
+                    signingInput: messageData,
+                    algorithm: fixture.algorithm
+                )
+                #expect(originalValid, "Original message and signature must verify successfully")
+
+                // 3. Tamper the message (flip one byte)
+                var tamperedMessage = messageData
+                tamperedMessage[tamperedMessage.startIndex] ^= 0x01
+
+                // 4. Verify against tampered message: MUST NOT throw structural error, but MUST return false from ECDSA verification
+                let tamperedValid = try key.verify(
+                    signature: signatureData,
+                    signingInput: tamperedMessage,
+                    algorithm: fixture.algorithm
+                )
+                #expect(!tamperedValid, "Signature over tampered message must fail ECDSA verification for \(fixture.algorithm)")
+
+                // 5. Also verify failure via legacy multibase decoding
+                let curve: PLCDIDKeyCodec.LegacyVerificationKeyCurve = fixture.algorithm == "ES256" ? .p256 : .secp256k1
+                let keyFromMultibase = try PLCDIDKeyCodec.decodeLegacyMultibase(
+                    fixture.publicKeyMultibase,
+                    curve: curve
+                )
+                let tamperedMultibaseValid = try keyFromMultibase.verify(
+                    signature: signatureData,
+                    signingInput: tamperedMessage,
+                    algorithm: fixture.algorithm
+                )
+                #expect(!tamperedMultibaseValid, "Signature over tampered message must fail ECDSA verification via multibase key for \(fixture.algorithm)")
+            }
+        }
+
+        @Test("Wrong Key Fails Cryptographic Verification (ES256 and ES256K)")
+        func wrongKeyFailsCryptographicVerification() throws {
+            struct WrongKeyCase {
+                let fixture: SignatureFixture
+                let wrongPublicKeyDid: String
+            }
+
+            let testCases: [WrongKeyCase] = [
+                WrongKeyCase(
+                    fixture: SignatureFixture(
+                        comment: "valid P-256 key and signature",
+                        messageBase64: "oWVoZWxsb2V3b3JsZA",
+                        algorithm: "ES256",
+                        didDocSuite: "EcdsaSecp256r1VerificationKey2019",
+                        publicKeyDid: "did:key:zDnaembgSGUhZULN2Caob4HLJPaxBh92N7rtH21TErzqf8HQo",
+                        publicKeyMultibase: "zxdM8dSstjrpZaRUwBmDvjGXweKuEMVN95A9oJBFjkWMh",
+                        signatureBase64: "2vZNsG3UKvvO/CDlrdvyZRISOFylinBh0Jupc6KcWoJWExHptCfduPleDbG3rko3YZnn9Lw0IjpixVmexJDegg",
+                        validSignature: true,
+                        tags: []
+                    ),
+                    wrongPublicKeyDid: "did:key:zDnaeTiq1PdzvZXUaMdezchcMJQpBdH2VN4pgrrEhMCCbmwSb"
+                ),
+                WrongKeyCase(
+                    fixture: SignatureFixture(
+                        comment: "valid K-256 key and signature",
+                        messageBase64: "oWVoZWxsb2V3b3JsZA",
+                        algorithm: "ES256K",
+                        didDocSuite: "EcdsaSecp256k1VerificationKey2019",
+                        publicKeyDid: "did:key:zQ3shqwJEJyMBsBXCWyCBpUBMqxcon9oHB7mCvx4sSpMdLJwc",
+                        publicKeyMultibase: "z25z9DTpsiYYJKGsWmSPJK2NFN8PcJtZig12K59UgW7q5t",
+                        signatureBase64: "5WpdIuEUUfVUYaozsi8G0B3cWO09cgZbIIwg1t2YKdUn/FEznOndsz/qgiYb89zwxYCbB71f7yQK5Lr7NasfoA",
+                        validSignature: true,
+                        tags: []
+                    ),
+                    wrongPublicKeyDid: "did:key:zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPQiYBme"
+                ),
+            ]
+
+            for testCase in testCases {
+                let messageData = try #require(Data(unpaddedBase64: testCase.fixture.messageBase64))
+                let signatureData = try #require(Data(unpaddedBase64: testCase.fixture.signatureBase64))
+
+                // 1. Prove structural low-S and wire format checks pass (no structural rejection)
+                if testCase.fixture.algorithm == "ES256" {
+                    #expect(P256WireSignature.isCanonicalLowS(signatureData), "P-256 fixture signature must pass canonical low-S guard")
+                    #expect(throws: Never.self) {
+                        _ = try P256WireSignature.decodeCanonical(signatureData)
+                    }
+                } else if testCase.fixture.algorithm == "ES256K" {
+                    #expect(ATProtoJWTVerificationKey.isCanonicalSecp256k1Signature(signatureData), "K-256 fixture signature must pass canonical low-S guard")
+                }
+
+                // 2. Prove the correct key verifies successfully
+                let correctKey = try PLCDIDKeyCodec.decode(testCase.fixture.publicKeyDid)
+                let correctValid = try correctKey.verify(
+                    signature: signatureData,
+                    signingInput: messageData,
+                    algorithm: testCase.fixture.algorithm
+                )
+                #expect(correctValid, "Signature must verify with the correct public key")
+
+                // 3. Decode a different valid public key of the same curve/algorithm
+                let wrongKey = try PLCDIDKeyCodec.decode(testCase.wrongPublicKeyDid)
+                #expect(wrongKey != correctKey, "Wrong key must differ from the correct key")
+
+                // 4. Verify against wrong key: MUST NOT throw structural error, but MUST return false from ECDSA verification
+                let wrongKeyValid = try wrongKey.verify(
+                    signature: signatureData,
+                    signingInput: messageData,
+                    algorithm: testCase.fixture.algorithm
+                )
+                #expect(!wrongKeyValid, "Valid signature must fail ECDSA verification when checked against a different public key for \(testCase.fixture.algorithm)")
+            }
+        }
     }
     // MARK: - DID Key Tests
 
