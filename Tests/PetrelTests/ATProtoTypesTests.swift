@@ -362,4 +362,116 @@ struct ATProtoTypesTests {
             #expect(!link1.isEqual(to: valueLink3))
         }
     }
+
+    @Suite("URI Tests")
+    struct URITests {
+        @Test("at:// URI with DID authority and collection/rkey round-trip")
+        func atURIRoundTrip() throws {
+            let atString = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3kabc123"
+            let uri = URI(uriString: atString)
+            #expect(uri.scheme == "at")
+            #expect(uri.authority == "did:plc:z72i7hdynmk6r22z27h6tvur")
+            #expect(uri.path == "/app.bsky.feed.post/3kabc123")
+            #expect(uri.isDID == false)
+            #expect(uri.isValid())
+            #expect(uri.uriString() == atString)
+            #expect(uri.description == atString)
+
+            // JSON round-trip
+            let jsonData = try JSONEncoder().encode(uri)
+            let decodedURI = try JSONDecoder().decode(URI.self, from: jsonData)
+            #expect(decodedURI.scheme == "at")
+            #expect(decodedURI.authority == "did:plc:z72i7hdynmk6r22z27h6tvur")
+            #expect(decodedURI.path == "/app.bsky.feed.post/3kabc123")
+            #expect(decodedURI.isValid())
+            #expect(decodedURI.uriString() == atString)
+            #expect(decodedURI == uri)
+        }
+
+        @Test("did: URI round-trip")
+        func didURIRoundTrip() throws {
+            let didString = "did:plc:z72i7hdynmk6r22z27h6tvur"
+            let uri = URI(uriString: didString)
+            #expect(uri.scheme == "did")
+            #expect(uri.authority == "plc")
+            #expect(uri.path == "z72i7hdynmk6r22z27h6tvur")
+            #expect(uri.isDID == true)
+            #expect(uri.isValid())
+            #expect(uri.uriString() == didString)
+            #expect(uri.description == didString)
+
+            // JSON round-trip
+            let jsonData = try JSONEncoder().encode(uri)
+            let decodedURI = try JSONDecoder().decode(URI.self, from: jsonData)
+            #expect(decodedURI.isDID == true)
+            #expect(decodedURI.scheme == "did")
+            #expect(decodedURI.authority == "plc")
+            #expect(decodedURI.path == "z72i7hdynmk6r22z27h6tvur")
+            #expect(decodedURI.isValid())
+            #expect(decodedURI.uriString() == didString)
+            #expect(decodedURI == uri)
+        }
+
+        @Test("https:// URI round-trip")
+        func httpsURIRoundTrip() throws {
+            let httpsString = "https://bsky.app/profile/alice.bsky.social/post/3kabc123"
+            let uri = URI(uriString: httpsString)
+            #expect(uri.scheme == "https")
+            #expect(uri.authority == "bsky.app")
+            #expect(uri.path == "/profile/alice.bsky.social/post/3kabc123")
+            #expect(uri.isDID == false)
+            #expect(uri.isValid())
+            #expect(uri.uriString() == httpsString)
+            #expect(uri.description == httpsString)
+
+            // JSON round-trip
+            let jsonData = try JSONEncoder().encode(uri)
+            let decodedURI = try JSONDecoder().decode(URI.self, from: jsonData)
+            #expect(decodedURI.scheme == "https")
+            #expect(decodedURI.authority == "bsky.app")
+            #expect(decodedURI.path == "/profile/alice.bsky.social/post/3kabc123")
+            #expect(decodedURI.isValid())
+            #expect(decodedURI.uriString() == httpsString)
+            #expect(decodedURI == uri)
+        }
+
+        @Test("Label decoding and round-trip for label-style URIs")
+        func labelURIRoundTrip() throws {
+            let targetATURI = "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3kabc123"
+            let labelJSON = """
+            {
+                "src": "did:plc:ar7c4by46qjdydhhy6tlvdgn",
+                "uri": "\(targetATURI)",
+                "val": "spam",
+                "cts": "2024-01-01T00:00:00.000Z"
+            }
+            """
+            let labelData = Data(labelJSON.utf8)
+            let label = try JSONDecoder().decode(ComAtprotoLabelDefs.Label.self, from: labelData)
+            #expect(label.uri.scheme == "at")
+            #expect(label.uri.authority == "did:plc:z72i7hdynmk6r22z27h6tvur")
+            #expect(label.uri.path == "/app.bsky.feed.post/3kabc123")
+            #expect(label.uri.uriString() == targetATURI)
+            #expect(label.uri.isValid())
+
+            let reencodedData = try JSONEncoder().encode(label)
+            let redecodedLabel = try JSONDecoder().decode(ComAtprotoLabelDefs.Label.self, from: reencodedData)
+            #expect(redecodedLabel.uri.uriString() == targetATURI)
+            #expect(redecodedLabel.uri == label.uri)
+
+            // Label with DID URI
+            let targetDIDURI = "did:plc:z72i7hdynmk6r22z27h6tvur"
+            let didLabelJSON = """
+            {
+                "src": "did:plc:ar7c4by46qjdydhhy6tlvdgn",
+                "uri": "\(targetDIDURI)",
+                "val": "!hide",
+                "cts": "2024-01-01T00:00:00.000Z"
+            }
+            """
+            let didLabel = try JSONDecoder().decode(ComAtprotoLabelDefs.Label.self, from: Data(didLabelJSON.utf8))
+            #expect(didLabel.uri.uriString() == targetDIDURI)
+            #expect(didLabel.uri.isValid())
+        }
+    }
 }

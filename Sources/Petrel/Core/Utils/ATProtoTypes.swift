@@ -372,6 +372,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     public let query: String?
     public let fragment: String?
     public let isDID: Bool
+    public let originalString: String?
 
     enum URIError: Error {
         case invalidScheme
@@ -392,6 +393,22 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             path = components.count > 2 ? components.dropFirst(2).joined(separator: ":") : nil
             query = nil
             fragment = nil
+            originalString = raw
+        } else if raw.starts(with: "at://") {
+            isDID = false
+            scheme = "at"
+            let afterPrefix = raw.dropFirst(5)
+            if let slashIndex = afterPrefix.firstIndex(of: "/") {
+                authority = String(afterPrefix[..<slashIndex])
+                let rem = String(afterPrefix[slashIndex...])
+                path = rem.isEmpty ? nil : rem
+            } else {
+                authority = String(afterPrefix)
+                path = nil
+            }
+            query = nil
+            fragment = nil
+            originalString = raw
         } else {
             // Defensive parse for non-DID URIs: reject obviously malformed strings like "//"
             // Require a non-empty scheme and avoid passing bad input to URLComponents.
@@ -403,6 +420,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
                 path = nil
                 query = nil
                 fragment = nil
+                originalString = raw.isEmpty ? nil : raw
             } else {
                 let comps = URLComponents(string: raw)
                 scheme = comps?.scheme ?? ""
@@ -410,22 +428,39 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
                 path = comps?.path.isEmpty ?? true ? nil : comps?.path
                 query = comps?.query
                 fragment = comps?.fragment
+                originalString = raw
             }
         }
     }
 
     public init(uriString: String) {
-        if uriString.starts(with: "did:") {
+        let raw = uriString.trimmingCharacters(in: .whitespacesAndNewlines)
+        if raw.starts(with: "did:") {
             isDID = true
-            let components = uriString.split(separator: ":")
+            let components = raw.split(separator: ":")
             scheme = "did"
             authority = components.count > 1 ? String(components[1]) : ""
             path = components.count > 2 ? components.dropFirst(2).joined(separator: ":") : nil
             query = nil
             fragment = nil
+            originalString = raw
+        } else if raw.starts(with: "at://") {
+            isDID = false
+            scheme = "at"
+            let afterPrefix = raw.dropFirst(5)
+            if let slashIndex = afterPrefix.firstIndex(of: "/") {
+                authority = String(afterPrefix[..<slashIndex])
+                let rem = String(afterPrefix[slashIndex...])
+                path = rem.isEmpty ? nil : rem
+            } else {
+                authority = String(afterPrefix)
+                path = nil
+            }
+            query = nil
+            fragment = nil
+            originalString = raw
         } else {
             isDID = false
-            let raw = uriString.trimmingCharacters(in: .whitespacesAndNewlines)
             if raw.isEmpty || raw.hasPrefix("//") || URI.detectScheme(in: raw) == nil {
                 // Safe fallback
                 scheme = "https"
@@ -433,6 +468,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
                 path = nil
                 query = nil
                 fragment = nil
+                originalString = raw.isEmpty ? nil : raw
             } else {
                 let comps = URLComponents(string: raw)
                 let defaultScheme = "https"
@@ -441,6 +477,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
                 path = comps?.path.isEmpty ?? true ? nil : comps?.path
                 query = comps?.query
                 fragment = comps?.fragment
+                originalString = raw
             }
         }
     }
@@ -475,6 +512,18 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
                 didString += ":\(path)"
             }
             return didString
+        } else if scheme == "at" {
+            if let originalString = originalString {
+                return originalString
+            }
+            var atString = "at://\(authority)"
+            if let path = path {
+                if !path.hasPrefix("/") {
+                    atString += "/"
+                }
+                atString += path
+            }
+            return atString
         } else {
             var components = URLComponents()
             components.scheme = scheme.isEmpty ? nil : scheme
@@ -490,15 +539,35 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     public init(url: URL) {
         isDID = false
         scheme = url.scheme ?? "https"
-        authority = url.host ?? ""
-        path = url.path.isEmpty ? nil : url.path
-        query = url.query
-        fragment = url.fragment
+        if scheme == "at" {
+            let raw = url.absoluteString
+            originalString = raw
+            let afterPrefix = raw.dropFirst(5)
+            if let slashIndex = afterPrefix.firstIndex(of: "/") {
+                authority = String(afterPrefix[..<slashIndex])
+                let rem = String(afterPrefix[slashIndex...])
+                path = rem.isEmpty ? nil : rem
+            } else {
+                authority = String(afterPrefix)
+                path = nil
+            }
+            query = url.query
+            fragment = url.fragment
+        } else {
+            authority = url.host ?? ""
+            path = url.path.isEmpty ? nil : url.path
+            query = url.query
+            fragment = url.fragment
+            originalString = url.absoluteString
+        }
     }
 
     /// Computed property to get URL from URI
     public var url: URL? {
         guard !isDID else { return nil }
+        if scheme == "at" {
+            return URL(string: uriString())
+        }
         var components = URLComponents()
         components.scheme = scheme.isEmpty ? nil : scheme
         components.host = authority

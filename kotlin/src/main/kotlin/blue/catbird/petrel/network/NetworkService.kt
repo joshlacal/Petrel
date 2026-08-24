@@ -44,6 +44,11 @@ class NetworkService(
      */
     var unauthorizedHandler: (suspend (host: String?, body: ByteArray) -> Unit)? = null
 
+    /**
+     * Provider for default headers attached to outgoing requests (e.g. atproto-accept-labelers).
+     */
+    var defaultHeadersProvider: (() -> Map<String, String>)? = null
+
     fun setServiceDID(did: String, namespace: String) {
         serviceDIDs[namespace] = did
     }
@@ -98,6 +103,12 @@ class NetworkService(
                 // Inject stored auth header if no explicit Authorization provided
                 if (!headers.containsKey("Authorization") && authorizationHeader != null) {
                     header("Authorization", authorizationHeader!!)
+                }
+
+                defaultHeadersProvider?.invoke()?.forEach { (key, value) ->
+                    if (!headers.containsKey(key)) {
+                        header(key, value)
+                    }
                 }
 
                 headers.forEach { (key, value) ->
