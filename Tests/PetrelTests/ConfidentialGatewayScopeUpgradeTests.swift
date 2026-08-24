@@ -941,6 +941,342 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         }
     }
 
+    func testStartAndFetchScopeUpgradeRejectWhenCandidateRecoveryFailsAndPreserveOldState() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.candidate.fail.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant pending upgrade state with persisted candidate (as if exchange completed, but commit failed)
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Configure recovery failure: commit returns 503
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"error":"service_unavailable"}"#.data(using: .utf8)!)
+                }
+                // Disallow any /auth/session or /auth/upgrade request using old bearer
+                if request.value(forHTTPHeaderField: "Authorization") == "Bearer \(oldSessionUUID)" {
+                    XCTFail("Must not emit request using old bearer: \(path)")
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. startGatewayScopeUpgrade must throw, emit no /auth/upgrade with old bearer, and preserve old+pending
+            do {
+                _ = try await client.startGatewayScopeUpgrade(
+                    requesting: ["identity:handle"],
+                    for: alice,
+                    callbackURL: self.validCallbackBase
+                )
+                XCTFail("Expected startGatewayScopeUpgrade to throw when candidate recovery fails")
+            } catch {}
+
+            let reqsAfterStart = GatewayUpgradeTestURLProtocol.recordedRequests()
+            let upgradeReqsWithOldBearer = reqsAfterStart.filter { req in
+                req.url?.path == "/auth/upgrade" && req.value(forHTTPHeaderField: "Authorization") == "Bearer \(oldSessionUUID)"
+            }
+            XCTAssertTrue(upgradeReqsWithOldBearer.isEmpty, "No /auth/upgrade request using old bearer must be emitted")
+
+            let sessionAfterStartFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterStartFail, oldSessionUUID, "Old session must remain intact in keychain")
+            let pendingAfterStartFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterStartFail, "Pending upgrade state must remain intact in keychain")
+
+            // 2. fetchGrantedScopes must throw, emit no /auth/session with old bearer, and preserve old+pending
+            do {
+                _ = try await client.fetchGrantedScopes(for: alice)
+                XCTFail("Expected fetchGrantedScopes to throw when candidate recovery fails")
+            } catch {}
+
+            let reqsAfterFetch = GatewayUpgradeTestURLProtocol.recordedRequests()
+            let sessionReqsWithOldBearer = reqsAfterFetch.filter { req in
+                req.url?.path == "/auth/session" && req.value(forHTTPHeaderField: "Authorization") == "Bearer \(oldSessionUUID)"
+            }
+            XCTAssertTrue(sessionReqsWithOldBearer.isEmpty, "No /auth/session request using old bearer must be emitted")
+
+            let sessionAfterFetchFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFetchFail, oldSessionUUID, "Old session must remain intact in keychain")
+            let pendingAfterFetchFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFetchFail, "Pending upgrade state must remain intact in keychain")
+        }
+    }
+
+    func testStartAndFetchScopeUpgradeRecoverCandidateOnIdempotentCommitSuccess() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.candidate.success.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant pending upgrade state with persisted candidate
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Configure idempotent commit success
+            let commitCount = Mutex<Int>(0)
+            let sessionCount = Mutex<Int>(0)
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    commitCount.withLock { $0 += 1 }
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                } else if path == "/auth/session" {
+                    sessionCount.withLock { $0 += 1 }
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)", "Session info must use candidate bearer")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                if request.value(forHTTPHeaderField: "Authorization") == "Bearer \(oldSessionUUID)" {
+                    XCTFail("Must not emit request using old bearer: \(path)")
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. fetchGrantedScopes first recovers candidate, then queries /auth/session with candidate bearer
+            let scopes = try await client.fetchGrantedScopes(for: alice)
+            XCTAssertEqual(scopes, ["atproto", "transition:generic", "identity:handle"])
+            XCTAssertEqual(commitCount.withLock { $0 }, 1, "Candidate was committed")
+            XCTAssertEqual(sessionCount.withLock { $0 }, 1, "Session was fetched with candidate bearer")
+
+            let sessionAfterFetch = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFetch, candidateUUID, "Session promoted to candidate")
+            let pendingAfterFetch = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfterFetch, "Pending candidate state cleaned up")
+
+            // 2. Now start a new upgrade: uses candidate session as the base and creates new pending state
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                } else if path == "/auth/upgrade" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)", "Upgrade request must use candidate bearer")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=new"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let authURL = try await client.startGatewayScopeUpgrade(
+                requesting: ["account:email"],
+                for: alice,
+                callbackURL: self.validCallbackBase
+            )
+            XCTAssertEqual(authURL.absoluteString, "https://auth.pds.test/oauth/authorize?req=new")
+
+            let newPendingData = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(newPendingData)
+            let newPendingObj = try JSONSerialization.jsonObject(with: newPendingData!) as? [String: Any]
+            XCTAssertEqual(newPendingObj?["oldSession"] as? String, candidateUUID, "New pending state has candidate as oldSession")
+            XCTAssertNil(newPendingObj?["candidateSession"], "New pending state has nil candidateSession")
+        }
+    }
+
+    func testStartScopeUpgradeDirectlyRecoversCandidateBeforeStartingNewUpgrade() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.start.recovers.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant pending upgrade state with persisted candidate
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let commitCount = Mutex<Int>(0)
+            let sessionCount = Mutex<Int>(0)
+            let upgradeCount = Mutex<Int>(0)
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    commitCount.withLock { $0 += 1 }
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                } else if path == "/auth/session" {
+                    sessionCount.withLock { $0 += 1 }
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                } else if path == "/auth/upgrade" {
+                    upgradeCount.withLock { $0 += 1 }
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=recovered"}"#.data(using: .utf8)!)
+                }
+                if request.value(forHTTPHeaderField: "Authorization") == "Bearer \(oldSessionUUID)" {
+                    XCTFail("Must not emit request using old bearer: \(path)")
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let authURL = try await client.startGatewayScopeUpgrade(
+                requesting: ["account:email"],
+                for: alice,
+                callbackURL: self.validCallbackBase
+            )
+            XCTAssertEqual(authURL.absoluteString, "https://auth.pds.test/oauth/authorize?req=recovered")
+            XCTAssertEqual(commitCount.withLock { $0 }, 1, "Candidate committed during startGatewayScopeUpgrade recovery")
+            XCTAssertEqual(sessionCount.withLock { $0 }, 1, "Session queried using candidate bearer")
+            XCTAssertEqual(upgradeCount.withLock { $0 }, 1, "Upgrade initiated using candidate bearer")
+
+            let sessionAfterStart = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterStart, candidateUUID)
+
+            let newPendingData = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(newPendingData)
+            let newPendingObj = try JSONSerialization.jsonObject(with: newPendingData!) as? [String: Any]
+            XCTAssertEqual(newPendingObj?["oldSession"] as? String, candidateUUID)
+            XCTAssertNil(newPendingObj?["candidateSession"])
+        }
+    }
+
+    func testStartScopeUpgradeFailsWhenPreCandidatePendingUpgradeInProgress() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.start.precandidate.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant pre-candidate pending upgrade state (browser flow in progress)
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": null,
+                "candidateGrantedScopes": null
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // 1. Calling startGatewayScopeUpgrade while pre-candidate pending exists must fail without overwriting
+            do {
+                _ = try await client.startGatewayScopeUpgrade(
+                    requesting: ["account:email"],
+                    for: alice,
+                    callbackURL: self.validCallbackBase
+                )
+                XCTFail("Expected startGatewayScopeUpgrade to fail when pending upgrade is already in progress")
+            } catch {}
+
+            let reqs = GatewayUpgradeTestURLProtocol.recordedRequests()
+            XCTAssertTrue(reqs.filter({ $0.url?.path == "/auth/upgrade" }).isEmpty, "No /auth/upgrade request sent")
+
+            let pendingAfterStartFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertEqual(pendingAfterStartFail, pendingState, "Pending data must not be overwritten")
+
+            // 2. Calling fetchGrantedScopes while pre-candidate pending exists still queries current authoritative grants without mutating state
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/session" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(oldSessionUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let scopes = try await client.fetchGrantedScopes(for: alice)
+            XCTAssertEqual(scopes, ["atproto", "transition:generic"])
+
+            let pendingAfterFetch = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertEqual(pendingAfterFetch, pendingState, "Pending data must remain untouched")
+        }
+    }
+
     // MARK: - 5. Cancellation, Denial, and Fail-Closed Tests
 
     func testCancellationAndCallbackErrorsFailClosed() async throws {

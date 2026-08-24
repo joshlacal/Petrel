@@ -539,7 +539,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard pendingState.expectedDID == did,
               let candidateSession = pendingState.candidateSession,
               let candidateGrants = pendingState.candidateGrantedScopes,
-              !candidateSession.isEmpty
+              !candidateSession.isEmpty,
+              !candidateGrants.isEmpty
         else {
             return nil
         }
@@ -579,18 +580,41 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard let keychainCurrentDID = try await storage.getCurrentDID(), keychainCurrentDID == expectedDID else {
             throw AuthError.invalidCredentials
         }
-        guard let oldSession = try await storage.getGatewaySession(for: expectedDID), !oldSession.isEmpty else {
-            throw AuthError.invalidCredentials
-        }
-        guard UUID(uuidString: oldSession) != nil else {
-            throw AuthError.invalidCredentials
-        }
-
         // Validate exact callback URL
         guard Self.isExactPermissionCallbackBase(callbackURL),
               URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.query == nil
         else {
             throw AuthError.invalidCallbackURL
+        }
+
+        // Inspect pending data before old-session/prior-scope/network work
+        if let pendingData = try await storage.getPendingGatewayUpgradeData(for: expectedDID) {
+            let pendingState = try JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
+            guard pendingState.expectedDID == expectedDID else {
+                throw AuthError.invalidCredentials
+            }
+            if let candidateSession = pendingState.candidateSession,
+               let candidateGrants = pendingState.candidateGrantedScopes,
+               !candidateSession.isEmpty,
+               !candidateGrants.isEmpty {
+                // Mandatory recovery of candidate; never authorize or bypass the old anchor
+                try await attemptRecoveryFromServerFailures(for: expectedDID)
+                guard let localSession = try await storage.getGatewaySession(for: expectedDID),
+                      localSession == candidateSession
+                else {
+                    throw GatewayError.invalidSession
+                }
+            } else {
+                // Pre-candidate pending state exists (browser flow in progress); fail to avoid overwriting
+                throw GatewayError.invalidSession
+            }
+        }
+
+        guard let oldSession = try await storage.getGatewaySession(for: expectedDID), !oldSession.isEmpty else {
+            throw AuthError.invalidCredentials
+        }
+        guard UUID(uuidString: oldSession) != nil else {
+            throw AuthError.invalidCredentials
         }
 
         // Authoritatively fetch prior session info (throwing, no try?)
@@ -739,11 +763,10 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard let keychainCurrentDID = try await storage.getCurrentDID(), keychainCurrentDID == expectedDID else {
             throw AuthError.invalidCredentials
         }
-        guard let pendingData = try await storage.getPendingGatewayUpgradeData(for: expectedDID),
-              var pendingState = try? JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
-        else {
+        guard let pendingData = try await storage.getPendingGatewayUpgradeData(for: expectedDID) else {
             throw GatewayError.invalidSession
         }
+        var pendingState = try JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
 
         guard pendingState.expectedDID == expectedDID else {
             throw AuthError.invalidCredentials
@@ -875,10 +898,22 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw AuthError.noActiveAccount
         }
 
+        // If recoverable candidate exists, mandatory recovery before reading session or querying gateway
+        if let recovery = try await recoverablePendingCandidate(for: targetDID) {
+            let candidateSession = recovery.1
+            try await attemptRecoveryFromServerFailures(for: targetDID)
+            guard let session = try await storage.getGatewaySession(for: targetDID),
+                  session == candidateSession
+            else {
+                throw GatewayError.invalidSession
+            }
+        }
+        // Pre-candidate pending state (e.g. browser flow in progress) does not block querying
+        // current authoritative grants on the active session, but must not mutate state.
+
         guard let session = try await storage.getGatewaySession(for: targetDID), !session.isEmpty else {
             throw GatewayError.missingSession
         }
-
         let sessionInfo = try await fetchSessionFromGateway(sessionId: session)
 
         guard sessionInfo.did == targetDID else {
