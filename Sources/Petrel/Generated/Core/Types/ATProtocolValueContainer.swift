@@ -3683,6 +3683,21 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         return typedValue
     }
 
+    private var containsKnownType: Bool {
+        switch self {
+        case .knownType:
+            return true
+        case let .unknownType(_, inner):
+            return inner.containsKnownType
+        case let .array(elements):
+            return elements.contains { $0.containsKnownType }
+        case let .object(properties):
+            return properties.values.contains { $0.containsKnownType }
+        default:
+            return false
+        }
+    }
+
     /// In-memory lossless-decode check that tolerates $type framing differences,
     /// unknown future fields, explicit nulls, and lenient optional degradations.
     public static func isSpecTolerantMatch(
@@ -3710,7 +3725,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             rawContainer = raw
         }
 
-        if typedContainer == rawContainer {
+        if typedContainer == rawContainer && !typedContainer.containsKnownType {
             return true
         }
 
@@ -3721,7 +3736,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         typed: ATProtocolValueContainer,
         raw: ATProtocolValueContainer
     ) -> Bool {
-        if typed == raw {
+        if typed == raw && !typed.containsKnownType {
             return true
         }
         switch (typed, raw) {
