@@ -227,11 +227,43 @@ public final class AccountMutationHub: @unchecked Sendable {
         }
     }
 }
+private final class AsyncSerialGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+    private var isLocked = false
+
+    func acquire() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if !isLocked {
+                isLocked = true
+                lock.unlock()
+                continuation.resume()
+            } else {
+                waiters.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+
+    func release() {
+        lock.lock()
+        if !waiters.isEmpty {
+            let next = waiters.removeFirst()
+            lock.unlock()
+            next.resume()
+        } else {
+            isLocked = false
+            lock.unlock()
+        }
+    }
+}
 
 /// A centralized storage layer for securely storing all persistent data using the keychain.
 public actor KeychainStorage {
     let namespace: String
     private let accessGroup: String?
+    private let gatewaySessionMutationGate = AsyncSerialGate()
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
     private struct PendingSessionState {
@@ -625,10 +657,27 @@ public actor KeychainStorage {
         }
     }
 
+    /// Deletes the current DID from the keychain.
+    public func deleteCurrentDID() async throws {
+        let key = makeKey("currentDID")
+        let continuityTicket = await beginAuthContinuityMutation()
+        do {
+            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            await endAuthContinuityMutation(continuityTicket)
+        } catch {
+            await endAuthContinuityMutation(continuityTicket)
+            if KeychainManager.isItemNotFound(error) { return }
+            throw error
+        }
+    }
+
     // MARK: - Gateway Session
 
     /// Saves the gateway session for a specific account (per-DID storage for multi-account support)
     func saveGatewaySession(_ session: String, for did: String) async throws {
+        await gatewaySessionMutationGate.acquire()
+        defer { gatewaySessionMutationGate.release() }
+
         let gKey = scopeKey(for: did)
         Self.completedMigrationHistory.withLock { _ = $0.remove(gKey) }
         let key = makeKey("gatewaySession", did: did)
@@ -699,6 +748,9 @@ public actor KeychainStorage {
     }
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
+        await gatewaySessionMutationGate.acquire()
+        defer { gatewaySessionMutationGate.release() }
+
         let key = makeKey("gatewaySession", did: did)
         let continuityTicket = await beginAuthContinuityMutation()
         do {
@@ -746,22 +798,38 @@ public actor KeychainStorage {
         }
     }
 
-    /// Actor-serialized compare-and-swap of gateway session.
+    /// Serialized compare-and-swap of gateway session.
     /// Verifies current stored session for `did` matches `expectedOldSession`
-    /// (and if a current DID is active, verifies it equals `did`) before replacing it.
+    /// and current stored DID equals `did` before replacing it.
     func compareAndSwapGatewaySession(
         expectedOldSession: String,
         newSession: String,
         for did: String
     ) async throws -> Bool {
-        let currentSession = try await getGatewaySession(for: did)
-        guard let currentSession, currentSession == expectedOldSession else {
+        await gatewaySessionMutationGate.acquire()
+        defer { gatewaySessionMutationGate.release() }
+
+        guard let currentDID = try await getCurrentDID(), currentDID == did else {
             return false
         }
-        if let currentDID = try await getCurrentDID(), !currentDID.isEmpty, currentDID != did {
+        guard let currentSession = try await getGatewaySession(for: did),
+              currentSession == expectedOldSession else {
             return false
         }
-        try await saveGatewaySession(newSession, for: did)
+        let gKey = scopeKey(for: did)
+        Self.completedMigrationHistory.withLock { _ = $0.remove(gKey) }
+        let key = makeKey("gatewaySession", did: did)
+        let data = newSession.data(using: .utf8) ?? Data()
+        LogManager.logInfo("KeychainStorage - CAS saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
+        let continuityTicket = await beginAuthContinuityMutation()
+        do {
+            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            await endAuthContinuityMutation(continuityTicket)
+        } catch {
+            await endAuthContinuityMutation(continuityTicket)
+            throw error
+        }
+        LogManager.logInfo("KeychainStorage - Successfully CAS-promoted gateway session for DID: \(did.prefix(20))...")
         return true
     }
 

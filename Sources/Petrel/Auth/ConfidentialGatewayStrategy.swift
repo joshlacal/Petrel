@@ -21,63 +21,135 @@ public struct GatewaySessionInfo: Codable, Sendable {
     public let granted_scopes: [String]?
 }
 
-private struct UpgradeStartRequest: Codable, Sendable {
+private struct StrictAnyCodingKey: CodingKey {
+    let stringValue: String
+    let intValue: Int?
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+        self.intValue = nil
+    }
+
+    init?(intValue: Int) {
+        self.stringValue = "\(intValue)"
+        self.intValue = intValue
+    }
+}
+
+private struct UpgradeStartRequest: Encodable, Sendable {
     let additional_scopes: [String]
     let browser_nonce: String
 }
 
-private struct UpgradeStartResponse: Codable, Sendable {
+private struct UpgradeStartResponse: Decodable, Sendable {
     let authorization_url: String
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case authorization_url
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: StrictAnyCodingKey.self)
+        let allowed = Set(CodingKeys.allCases.map(\.rawValue))
+        let present = Set(container.allKeys.map(\.stringValue))
+        guard present.isSubset(of: allowed) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown keys in UpgradeStartResponse: \(present.subtracting(allowed))")
+            )
+        }
+        guard let key = StrictAnyCodingKey(stringValue: "authorization_url") else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Missing key authorization_url"))
+        }
+        authorization_url = try container.decode(String.self, forKey: key)
+    }
 }
 
-private struct UpgradeExchangeRequest: Codable, Sendable {
+private struct UpgradeExchangeRequest: Encodable, Sendable {
     let code: String
     let browser_nonce: String
 }
 
-private struct UpgradeExchangeResponse: Codable, Sendable {
+private struct UpgradeExchangeResponse: Decodable, Sendable {
     let candidate_session_id: String
     let did: String
     let granted_scopes: [String]
-}
 
-private struct UpgradeCommitResponse: Codable, Sendable {
-    let status: String
-    let session_id: String
-    let did: String
-    let granted_scopes: [String]
-
-    private enum CodingKeys: String, CodingKey {
-        case status
-        case session_id
+    private enum CodingKeys: String, CodingKey, CaseIterable {
         case candidate_session_id
         case did
         case granted_scopes
     }
 
     init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        status = try container.decode(String.self, forKey: .status)
-        if let sid = try container.decodeIfPresent(String.self, forKey: .session_id) {
-            session_id = sid
-        } else if let csid = try container.decodeIfPresent(String.self, forKey: .candidate_session_id) {
-            session_id = csid
-        } else {
-            throw DecodingError.keyNotFound(
-                CodingKeys.session_id,
-                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Missing session_id or candidate_session_id")
+        let container = try decoder.container(keyedBy: StrictAnyCodingKey.self)
+        let allowed = Set(CodingKeys.allCases.map(\.rawValue))
+        let present = Set(container.allKeys.map(\.stringValue))
+        guard present.isSubset(of: allowed) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown keys in UpgradeExchangeResponse: \(present.subtracting(allowed))")
             )
         }
-        did = try container.decode(String.self, forKey: .did)
-        granted_scopes = try container.decode([String].self, forKey: .granted_scopes)
+        guard let csidKey = StrictAnyCodingKey(stringValue: "candidate_session_id"),
+              let didKey = StrictAnyCodingKey(stringValue: "did"),
+              let scopesKey = StrictAnyCodingKey(stringValue: "granted_scopes")
+        else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid keys"))
+        }
+        let rawCSID = try container.decode(String.self, forKey: csidKey)
+        guard let uuid = UUID(uuidString: rawCSID) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: [csidKey], debugDescription: "candidate_session_id is not a valid UUID: \(rawCSID)")
+            )
+        }
+        candidate_session_id = uuid.uuidString.lowercased()
+        did = try container.decode(String.self, forKey: didKey)
+        granted_scopes = try container.decode([String].self, forKey: scopesKey)
+    }
+}
+
+private enum CommitStatus: String, Decodable, Sendable {
+    case committed
+}
+
+private struct UpgradeCommitResponse: Decodable, Sendable {
+    let status: CommitStatus
+    let session_id: String
+    let did: String
+    let granted_scopes: [String]
+
+    private enum CodingKeys: String, CodingKey, CaseIterable {
+        case status
+        case session_id
+        case did
+        case granted_scopes
     }
 
-    func encode(to encoder: Encoder) throws {
-        var container = encoder.container(keyedBy: CodingKeys.self)
-        try container.encode(status, forKey: .status)
-        try container.encode(session_id, forKey: .session_id)
-        try container.encode(did, forKey: .did)
-        try container.encode(granted_scopes, forKey: .granted_scopes)
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: StrictAnyCodingKey.self)
+        let allowed = Set(CodingKeys.allCases.map(\.rawValue))
+        let present = Set(container.allKeys.map(\.stringValue))
+        guard present.isSubset(of: allowed) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Unknown keys in UpgradeCommitResponse: \(present.subtracting(allowed))")
+            )
+        }
+        guard let statusKey = StrictAnyCodingKey(stringValue: "status"),
+              let sidKey = StrictAnyCodingKey(stringValue: "session_id"),
+              let didKey = StrictAnyCodingKey(stringValue: "did"),
+              let scopesKey = StrictAnyCodingKey(stringValue: "granted_scopes")
+        else {
+            throw DecodingError.dataCorrupted(DecodingError.Context(codingPath: decoder.codingPath, debugDescription: "Invalid keys"))
+        }
+        status = try container.decode(CommitStatus.self, forKey: statusKey)
+        let rawSID = try container.decode(String.self, forKey: sidKey)
+        guard let uuid = UUID(uuidString: rawSID) else {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(codingPath: [sidKey], debugDescription: "session_id is not a valid UUID: \(rawSID)")
+            )
+        }
+        session_id = uuid.uuidString.lowercased()
+        did = try container.decode(String.self, forKey: didKey)
+        granted_scopes = try container.decode([String].self, forKey: scopesKey)
     }
 }
 
@@ -198,6 +270,8 @@ private func effectivePort(for url: URL) -> Int? {
 /// The gateway handles ATProto OAuth (PAR, PKCE, DPoP) and token management.
 /// The client only stores a gateway session UUID and attaches it as a Bearer token.
 actor ConfidentialGatewayStrategy: AuthStrategy {
+    public static let permissionCallbackURL = URL(string: "https://catbird.blue/oauth/permission-callback")!
+    public static let permissionCallbackOrigin = "https://catbird.blue"
     enum GatewayError: Error, LocalizedError {
         case missingSession
         case invalidCallbackURL
@@ -404,7 +478,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     func startGatewayScopeUpgrade(
         requesting: Set<String>,
         for expectedDID: String,
-        callbackURL: URL
+        callbackURL: URL = ConfidentialGatewayStrategy.permissionCallbackURL
     ) async throws -> URL {
         // Validate scopes
         guard !requesting.isEmpty, requesting.count <= 16 else {
@@ -422,16 +496,46 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             }
         }
 
-        // Validate expected DID and active account
+        // Validate active identity strictly
+        guard !expectedDID.isEmpty else {
+            throw AuthError.invalidCredentials
+        }
+        guard let currentAccount = await accountManager.getCurrentAccount(), currentAccount.did == expectedDID else {
+            throw AuthError.invalidCredentials
+        }
+        guard let keychainCurrentDID = try await storage.getCurrentDID(), keychainCurrentDID == expectedDID else {
+            throw AuthError.invalidCredentials
+        }
         guard let oldSession = try await storage.getGatewaySession(for: expectedDID), !oldSession.isEmpty else {
             throw AuthError.invalidCredentials
         }
-        if let currentAccount = await accountManager.getCurrentAccount(), currentAccount.did != expectedDID {
+        guard UUID(uuidString: oldSession) != nil else {
             throw AuthError.invalidCredentials
         }
 
-        // Validate callback URL client-side binding
-        try validateStartCallbackURL(callbackURL)
+        // Validate exact callback URL
+        guard Self.isExactPermissionCallbackBase(callbackURL),
+              URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.query == nil
+        else {
+            throw AuthError.invalidCallbackURL
+        }
+
+        // Authoritatively fetch prior session info (throwing, no try?)
+        let currentSessionInfo = try await fetchSessionFromGateway(sessionId: oldSession)
+        guard currentSessionInfo.active == true else {
+            throw GatewayError.invalidSession
+        }
+        guard currentSessionInfo.did == expectedDID else {
+            throw GatewayError.invalidSession
+        }
+        guard let granted = currentSessionInfo.granted_scopes, !granted.isEmpty else {
+            throw GatewayError.invalidSession
+        }
+        let priorScopeSet = Set(granted)
+        guard priorScopeSet.contains("atproto") else {
+            throw GatewayError.invalidSession
+        }
+        let priorScopes = granted.sorted()
 
         // Generate 32 cryptographically random bytes -> 43-char base64url unpadded nonce
         var rng = SystemRandomNumberGenerator()
@@ -442,13 +546,6 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         let browserNonce = JWTBase64URL.encode(Data(nonceBytes))
 
         let sortedScopes = requesting.sorted()
-
-        // Fetch prior scopes if available
-        var priorScopes: [String] = []
-        if let currentSessionInfo = try? await fetchSessionFromGateway(sessionId: oldSession),
-           let granted = currentSessionInfo.granted_scopes {
-            priorScopes = granted
-        }
 
         // Send POST /auth/upgrade
         var request = URLRequest(url: gatewayURL.appendingPathComponent("auth/upgrade"))
@@ -504,6 +601,20 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         callbackURL: URL,
         for expectedDID: String
     ) async throws -> Set<String> {
+        // Validate active identity strictly
+        guard !expectedDID.isEmpty else {
+            throw AuthError.invalidCredentials
+        }
+        guard let currentAccount = await accountManager.getCurrentAccount(), currentAccount.did == expectedDID else {
+            throw AuthError.invalidCredentials
+        }
+        guard let keychainCurrentDID = try await storage.getCurrentDID(), keychainCurrentDID == expectedDID else {
+            throw AuthError.invalidCredentials
+        }
+        guard let currentSession = try await storage.getGatewaySession(for: expectedDID), !currentSession.isEmpty else {
+            throw AuthError.invalidCredentials
+        }
+
         guard let pendingData = try await storage.getPendingGatewayUpgradeData(for: expectedDID),
               var pendingState = try? JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
         else {
@@ -519,7 +630,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         // Validate callback base URL
-        guard isMatchingCallbackBase(candidate: callbackURL, baseline: pendingState.callbackURL) else {
+        guard Self.isExactPermissionCallbackBase(callbackURL) else {
             throw AuthError.invalidCallbackURL
         }
 
@@ -528,21 +639,26 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw AuthError.invalidCallbackURL
         }
 
-        if let queryItems = components.queryItems {
-            if queryItems.contains(where: { $0.name == "error" }) {
-                try? await storage.deletePendingGatewayUpgradeData(for: expectedDID)
-                throw AuthError.cancelled
-            }
+        let queryItems = components.queryItems ?? []
+        if queryItems.isEmpty {
+            throw AuthError.invalidCallbackURL
         }
 
-        let codeItems = components.queryItems?.filter { $0.name == "code" } ?? []
+        if queryItems.contains(where: { $0.name == "error" }) {
+            throw AuthError.cancelled
+        }
+
+        let codeItems = queryItems.filter { $0.name == "code" }
         guard codeItems.count == 1,
               let code = codeItems.first?.value,
               !code.isEmpty,
-              code.count <= 512
+              code.count <= 512,
+              queryItems.count == 1
         else {
             throw AuthError.invalidCallbackURL
         }
+
+        let requiredScopes = Set(pendingState.priorScopes).union(Set(pendingState.requestedScopes))
 
         // 1. Exchange for candidate if not yet present
         let candidateSession: String
@@ -558,7 +674,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             exchangeReq.setValue("Bearer \(pendingState.oldSession)", forHTTPHeaderField: "Authorization")
             exchangeReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
             exchangeReq.setValue("application/json", forHTTPHeaderField: "Accept")
-            exchangeReq.setValue(gatewayOriginHeader(), forHTTPHeaderField: "Origin")
+            exchangeReq.setValue(Self.permissionCallbackOrigin, forHTTPHeaderField: "Origin")
 
             let exchangeBody = UpgradeExchangeRequest(code: code, browser_nonce: pendingState.browserNonce)
             exchangeReq.httpBody = try JSONCoders.encode(exchangeBody)
@@ -584,8 +700,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
             let grantSet = Set(exchangeResp.granted_scopes)
             guard grantSet.contains("atproto"),
-                  Set(pendingState.requestedScopes).isSubset(of: grantSet),
-                  Set(pendingState.priorScopes).isSubset(of: grantSet)
+                  requiredScopes.isSubset(of: grantSet)
             else {
                 throw GatewayError.invalidSession
             }
@@ -604,9 +719,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         var commitReq = URLRequest(url: gatewayURL.appendingPathComponent("auth/upgrade/commit"))
         commitReq.httpMethod = "POST"
         commitReq.setValue("Bearer \(candidateSession)", forHTTPHeaderField: "Authorization")
-        commitReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
         commitReq.setValue("application/json", forHTTPHeaderField: "Accept")
-        commitReq.httpBody = Data("{}".utf8)
+        commitReq.httpBody = nil
 
         let (commitData, commitResponse): (Data, URLResponse)
         do {
@@ -619,7 +733,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
         let commitResp = try JSONCoders.decode(UpgradeCommitResponse.self, from: commitData)
 
-        guard commitResp.status.lowercased() == "committed",
+        guard commitResp.status == .committed,
               commitResp.session_id == candidateSession,
               commitResp.did == expectedDID
         else {
@@ -627,7 +741,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
         let finalGrants = Set(commitResp.granted_scopes)
         guard finalGrants.contains("atproto"),
-              Set(pendingState.requestedScopes).isSubset(of: finalGrants)
+              requiredScopes.isSubset(of: finalGrants)
         else {
             throw GatewayError.invalidSession
         }
@@ -667,10 +781,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard sessionInfo.did == targetDID else {
             throw GatewayError.invalidSession
         }
-        if let active = sessionInfo.active {
-            guard active else {
-                throw GatewayError.invalidSession
-            }
+        guard sessionInfo.active == true else {
+            throw GatewayError.invalidSession
         }
         guard let grantedScopes = sessionInfo.granted_scopes, !grantedScopes.isEmpty else {
             throw GatewayError.invalidSession
@@ -683,45 +795,17 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         return scopeSet
     }
 
-    private func gatewayOriginHeader() -> String {
-        let scheme = gatewayURL.scheme ?? "https"
-        let host = gatewayURL.host ?? ""
-        if let port = gatewayURL.port, port != 80 && port != 443 {
-            return "\(scheme)://\(host):\(port)"
-        }
-        return "\(scheme)://\(host)"
-    }
-
-    private func isMatchingCallbackBase(candidate: URL, baseline: URL) -> Bool {
-        guard candidate.scheme?.lowercased() == baseline.scheme?.lowercased(),
-              candidate.host?.lowercased() == baseline.host?.lowercased(),
-              effectivePort(for: candidate) == effectivePort(for: baseline)
-        else {
+    private static func isExactPermissionCallbackBase(_ url: URL) -> Bool {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
             return false
         }
-        let candidatePath = candidate.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        let baselinePath = baseline.path.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
-        return candidatePath == baselinePath
-    }
-
-    private func validateStartCallbackURL(_ url: URL) throws {
-        guard let scheme = url.scheme?.lowercased() else {
-            throw AuthError.invalidCallbackURL
-        }
-        let host = url.host?.lowercased() ?? ""
-        guard !host.isEmpty else {
-            throw AuthError.invalidCallbackURL
-        }
-        let isLoopback = host == "127.0.0.1" || host == "localhost" || host == "::1"
-        guard scheme == "https" || (scheme == "http" && isLoopback) else {
-            throw AuthError.invalidCallbackURL
-        }
-        guard url.user == nil && url.password == nil else {
-            throw AuthError.invalidCallbackURL
-        }
-        guard url.query == nil && url.fragment == nil else {
-            throw AuthError.invalidCallbackURL
-        }
+        guard components.scheme?.lowercased() == "https" else { return false }
+        guard components.host?.lowercased() == "catbird.blue" else { return false }
+        guard components.path == "/oauth/permission-callback" else { return false }
+        guard components.user == nil && components.password == nil else { return false }
+        if let port = components.port, port != 443 { return false }
+        guard components.fragment == nil else { return false }
+        return true
     }
 
     // MARK: - AuthenticationProvider

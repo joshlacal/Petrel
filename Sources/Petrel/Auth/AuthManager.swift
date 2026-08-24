@@ -282,7 +282,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     func startGatewayScopeUpgrade(
         requesting: Set<String>,
         for expectedDID: String,
-        callbackURL: URL
+        callbackURL: URL = ConfidentialGatewayStrategy.permissionCallbackURL
     ) async throws -> URL {
         try await activeStrategy.startGatewayScopeUpgrade(
             requesting: requesting,
@@ -295,15 +295,6 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         callbackURL: URL,
         for expectedDID: String
     ) async throws -> Set<String> {
-        let tracksGatewayContinuity = currentMode == .gateway
-        if tracksGatewayContinuity {
-            await beginAuthContinuityMutation()
-        }
-        defer {
-            if tracksGatewayContinuity {
-                endAuthContinuityMutation()
-            }
-        }
         return try await activeStrategy.completeGatewayScopeUpgrade(
             callbackURL: callbackURL,
             for: expectedDID

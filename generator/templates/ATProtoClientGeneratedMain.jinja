@@ -706,8 +706,10 @@ public actor ATProtoClient {
     public func getGrantedScopes(for did: String? = nil) async -> Set<String> {
         return await authManager?.grantedScopes(for: did) ?? []
     }
-
     // MARK: - Gateway Scope Upgrade
+
+    /// The exact canonical permission callback URL for confidential gateway progressive scope upgrades.
+    public static let gatewayPermissionCallbackURL = URL(string: "https://catbird.blue/oauth/permission-callback")!
 
     /// Initiates a progressive OAuth scope upgrade through the confidential gateway.
     /// - Parameters:
@@ -718,7 +720,7 @@ public actor ATProtoClient {
     public func startGatewayScopeUpgrade(
         requesting: Set<String>,
         for expectedDID: String,
-        callbackURL: URL
+        callbackURL: URL = ATProtoClient.gatewayPermissionCallbackURL
     ) async throws -> URL {
         guard let authManager else {
             throw APIError.serviceNotInitialized
