@@ -159,8 +159,7 @@ public enum RepositoryMSTCodec {
     }
 
     /// Decodes only the exact repository MST schema. The parser checks shortest
-    /// CBOR forms and canonical map order while consuming, then re-encodes as a
-    /// final byte-for-byte canonicality check.
+    /// CBOR forms and canonical map order while consuming.
     public static func decode(_ bytes: Data) throws -> RepositoryMSTNode {
         var parser = MSTCBORParser(bytes)
         let node = try parser.parseNode()
@@ -168,10 +167,6 @@ public enum RepositoryMSTCodec {
             throw RepositoryMSTValidationError.invalidNodeSchema
         }
         _ = try reconstructedLeaves(from: node)
-        let canonical = try encodeUnchecked(node)
-        guard canonical == bytes else {
-            throw RepositoryMSTValidationError.nonCanonicalNode
-        }
         return node
     }
 

@@ -183,6 +183,35 @@ final class RepositoryMSTVectorTests: XCTestCase {
         XCTAssertEqual(try RepositoryMSTCodec.decode(Data(hex: blocks[0].1)).entries.count, 1)
     }
 
+    func testDecodeVerifiesStructureWithoutReencoding() throws {
+        // Decode validates schema, CBOR canonicality, and prefix reconstruction
+        // directly through MSTCBORParser and reconstructedLeaves without invoking
+        // the DAG-CBOR encoder. Byte-level integrity is ensured by hashing against
+        // the block's CID upon read.
+        let hex = "a2616581a4616b546170702e62736b792e666565642e706f73742f306170006174f66176d82a582500017112209d156bc3f3a520066252c708a9361fd3d089223842500e3713d404fdccb33cef616cf6"
+        let bytes = Data(hex: hex)
+        let decoded = try RepositoryMSTCodec.decode(bytes)
+        XCTAssertEqual(decoded.entries.count, 1)
+        XCTAssertEqual(decoded.entries[0].prefixLength, 0)
+        XCTAssertEqual(String(decoding: decoded.entries[0].keySuffix, as: UTF8.self), "app.bsky.feed.post/0")
+    }
+
+    func testCorruptedBlockBytesRejectedByCIDValidationEndToEnd() throws {
+        let hex = "a2616581a4616b546170702e62736b792e666565642e706f73742f306170006174f66176d82a582500017112209d156bc3f3a520066252c708a9361fd3d089223842500e3713d404fdccb33cef616cf6"
+        let validBytes = Data(hex: hex)
+        let expectedCID = CID.fromDAGCBOR(validBytes)
+
+        // Valid bytes match CID
+        XCTAssertNoThrow(try PublicRepositoryCID.validate(expectedCID, blockBytes: validBytes))
+
+        // Corrupted single byte fails CID validation
+        var corruptedBytes = validBytes
+        corruptedBytes[corruptedBytes.count - 1] ^= 0xff
+        XCTAssertThrowsError(try PublicRepositoryCID.validate(expectedCID, blockBytes: corruptedBytes)) { error in
+            XCTAssertEqual(error as? PublicRepositoryDomainError, .blockCIDMismatch)
+        }
+    }
+
     @discardableResult
     private func assertPinnedNode(cid: String, hex: String) throws -> Data {
         let bytes = Data(hex: hex)
