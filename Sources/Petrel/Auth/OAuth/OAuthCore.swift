@@ -10,9 +10,7 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
-import JSONWebAlgorithms
-import JSONWebKey
-import JSONWebSignature
+import PetrelCrypto
 
 /// Shared OAuth machinery (DPoP, PKCE, nonce tracking, metadata fetching,
 /// refresh coordination with deduplication & circuit breaking).
@@ -154,10 +152,7 @@ actor OAuthCore {
     // MARK: - Encoding Helpers
 
     func base64URLEncode(_ data: Data) -> String {
-        data.base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
+        JWTBase64URL.encode(data)
     }
 
     func encodeFormData(_ params: [String: String]) -> Data {
@@ -231,34 +226,28 @@ actor OAuthCore {
 
     func createJWK(from privateKey: P256.Signing.PrivateKey) throws -> JWK {
         let publicKey = privateKey.publicKey
-        let x = publicKey.x963Representation.dropFirst().prefix(32)
-        let y = publicKey.x963Representation.suffix(32)
-        return JWK(keyType: .ellipticCurve, curve: .p256, x: x, y: y)
+        let x963 = publicKey.x963Representation
+        let x = x963.dropFirst().prefix(32)
+        let y = x963.suffix(32)
+        return JWK(
+            x: JWTBase64URL.encode(Data(x)),
+            y: JWTBase64URL.encode(Data(y))
+        )
     }
 
     func calculateJWKThumbprint(jwk: JWK) throws -> String {
-        let canonicalJWK: [String: String] = [
-            "crv": "P-256",
-            "kty": "EC",
-            "x": jwk.x?.base64URLEscaped() ?? "",
-            "y": jwk.y?.base64URLEscaped() ?? "",
-        ]
-        let jsonString = "{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"\(canonicalJWK["x"]!)\",\"y\":\"\(canonicalJWK["y"]!)\"}"
-        let jsonData = Data(jsonString.utf8)
+        let canonicalJSON = "{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"\(jwk.x)\",\"y\":\"\(jwk.y)\"}"
+        let jsonData = Data(canonicalJSON.utf8)
         let hash = SHA256.hash(data: jsonData)
-        return Data(hash).base64URLEscaped()
+        return JWTBase64URL.encode(Data(hash))
     }
 
     func precomputeDPoPMaterial(for privateKey: P256.Signing.PrivateKey) throws -> DPoPMaterial {
         let jwk = try createJWK(from: privateKey)
         let thumbprint = try calculateJWKThumbprint(jwk: jwk)
-        let header = DefaultJWSHeaderImpl(
-            algorithm: .ES256,
-            jwk: jwk,
-            type: "dpop+jwt"
-        )
+        let header = DPoPHeader(jwk: jwk)
         let headerData = try encoder.encode(header)
-        let headerBase64 = headerData.base64URLEscaped()
+        let headerBase64 = JWTBase64URL.encode(headerData)
         return DPoPMaterial(
             privateKey: privateKey,
             jwk: jwk,
@@ -466,11 +455,12 @@ actor OAuthCore {
         )
 
         let jwtPayloadData = try encoder.encode(payload)
-        let signingInput = "\(headerBase64).\(base64URLEncode(jwtPayloadData))"
-        let signatureData = try privateKey.signature(for: Data(signingInput.utf8))
-        let signatureBase64 = base64URLEncode(signatureData.rawRepresentation)
+        let payloadBase64 = JWTBase64URL.encode(jwtPayloadData)
+        let signingInput = "\(headerBase64).\(payloadBase64)"
+        let signatureBytes = try P256WireSignature.sign(Data(signingInput.utf8), using: privateKey)
+        let signatureBase64 = JWTBase64URL.encode(signatureBytes)
 
-        let proof = "\(headerBase64).\(base64URLEncode(jwtPayloadData)).\(signatureBase64)"
+        let proof = "\(headerBase64).\(payloadBase64).\(signatureBase64)"
         return (proof, keyThumbprint)
     }
 
@@ -1113,6 +1103,40 @@ actor OAuthCore {
                 "CRITICAL: refreshed session for DID: \(LogManager.logDID(did)) could not be persisted at all; holding in memory only. Error: \(error)"
             )
         }
+    }
+}
+
+/// Minimal ES256 JWK representation for DPoP proof headers and RFC 7638 thumbprints.
+struct JWK: Codable, Sendable, Equatable {
+    let kty: String
+    let crv: String
+    let x: String
+    let y: String
+
+    init(x: String, y: String) {
+        self.kty = "EC"
+        self.crv = "P-256"
+        self.x = x
+        self.y = y
+    }
+
+    init(kty: String = "EC", crv: String = "P-256", x: String, y: String) {
+        self.kty = kty
+        self.crv = crv
+        self.x = x
+        self.y = y
+    }
+}
+
+private struct DPoPHeader: Codable, Sendable {
+    let typ: String
+    let alg: String
+    let jwk: JWK
+
+    init(jwk: JWK) {
+        self.typ = "dpop+jwt"
+        self.alg = "ES256"
+        self.jwk = jwk
     }
 }
 

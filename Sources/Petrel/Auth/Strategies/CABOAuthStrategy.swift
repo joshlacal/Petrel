@@ -12,9 +12,6 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
-import JSONWebAlgorithms
-import JSONWebKey
-import JSONWebSignature
 
 // MARK: - Client Assertion Response
 
