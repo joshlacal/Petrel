@@ -4,8 +4,7 @@
   @preconcurrency import Crypto
 #endif
 import Foundation
-import JSONWebKey
-import JSONWebSignature
+import PetrelCrypto
 
 public struct ValidatedProof: Sendable, Equatable {
   public let jkt: String
@@ -19,6 +18,12 @@ public struct DPoPProofClaims: Decodable, Sendable {
   public let iat: Int
   public let exp: Int?
   public let nonce: String?
+}
+
+struct DPoPProofHeader: Decodable, Sendable {
+  let typ: String?
+  let alg: String?
+  let jwk: JWK?
 }
 
 /// Stateless DPoP proof checks (RFC 9449): structure, typ/alg pinning,
@@ -36,37 +41,64 @@ public struct DPoPValidator: Sendable {
   public func validate(
     proof: String, now: Date = Date()
   ) throws -> (ValidatedProof, DPoPProofClaims) {
-    let jws: JWS
-    do {
-      jws = try JWS(jwsString: proof)
-    } catch {
+    let parts = proof.split(separator: ".", omittingEmptySubsequences: false)
+    guard parts.count == 3 else {
+      throw CABRequestError.invalidDPoPProof("malformed JWS")
+    }
+    let headerString = String(parts[0])
+    let payloadString = String(parts[1])
+    let signatureString = String(parts[2])
+
+    guard let headerData = try? JWTBase64URL.decode(headerString),
+          let payloadData = try? JWTBase64URL.decode(payloadString),
+          let signatureBytes = try? JWTBase64URL.decode(signatureString)
+    else {
       throw CABRequestError.invalidDPoPProof("malformed JWS")
     }
 
-    guard jws.protectedHeader.type == "dpop+jwt" else {
+    guard let header = try? JSONDecoder().decode(DPoPProofHeader.self, from: headerData) else {
+      throw CABRequestError.invalidDPoPProof("malformed JWS")
+    }
+
+    guard header.typ == "dpop+jwt" else {
       throw CABRequestError.invalidDPoPProof("typ must be dpop+jwt")
     }
-    // jose-swift's JWS.verify returns true unconditionally for alg=none —
-    // the algorithm MUST be pinned before verifying.
-    guard jws.protectedHeader.algorithm == .ES256 else {
+    guard header.alg == "ES256" else {
       throw CABRequestError.invalidDPoPProof("alg must be ES256")
     }
-    guard let jwk = jws.protectedHeader.jwk,
-          jwk.keyType == .ellipticCurve,
-          jwk.curve == .p256
+    guard let jwk = header.jwk,
+          jwk.kty == "EC",
+          jwk.crv == "P-256"
     else {
       throw CABRequestError.invalidDPoPProof("header jwk must be an EC P-256 public key")
     }
     guard jwk.d == nil else {
       throw CABRequestError.invalidDPoPProof("header jwk must not contain private key material")
     }
-    guard (try? jws.verify(key: jwk)) == true else {
+
+    guard let xData = try? JWTBase64URL.decode(jwk.x),
+          let yData = try? JWTBase64URL.decode(jwk.y),
+          xData.count == 32, yData.count == 32
+    else {
+      throw CABRequestError.invalidDPoPProof("header jwk coordinates must be 32-byte base64url")
+    }
+    var uncompressed = Data([0x04])
+    uncompressed.append(xData)
+    uncompressed.append(yData)
+    guard let publicKey = try? P256.Signing.PublicKey(x963Representation: uncompressed) else {
+      throw CABRequestError.invalidDPoPProof("header jwk must be an EC P-256 public key")
+    }
+
+    let signingInput = "\(headerString).\(payloadString)"
+    guard let ecdsaSig = try? P256WireSignature.decodeMalleabilityTolerant(signatureBytes),
+          publicKey.isValidSignature(ecdsaSig, for: Data(signingInput.utf8))
+    else {
       throw CABRequestError.invalidDPoPProof("signature verification failed")
     }
 
     let claims: DPoPProofClaims
     do {
-      claims = try JSONDecoder().decode(DPoPProofClaims.self, from: jws.payload)
+      claims = try JSONDecoder().decode(DPoPProofClaims.self, from: payloadData)
     } catch {
       throw CABRequestError.invalidDPoPProof("malformed claims")
     }

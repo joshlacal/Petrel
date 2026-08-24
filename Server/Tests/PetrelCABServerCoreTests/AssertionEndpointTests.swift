@@ -7,8 +7,7 @@ import Foundation
 import HTTPTypes
 import Hummingbird
 import HummingbirdTesting
-import JSONWebKey
-import JSONWebSignature
+import PetrelCrypto
 @testable import PetrelCABServerCore
 import Testing
 
@@ -65,17 +64,26 @@ struct AssertionEndpointTests {
       let body = try JSONDecoder().decode(Body.self, from: Data(buffer: response.body))
       #expect(body.clientId == config.clientId)
 
-      let jws = try JWS(jwsString: body.clientAssertion)
-      #expect(jws.protectedHeader.algorithm == .ES256)
-      #expect(jws.protectedHeader.keyID == "test-key-1")
-      #expect(try jws.verify(key: signingKey.publicKey.jwkRepresentation))
+      let parts = body.clientAssertion.split(separator: ".")
+      #expect(parts.count == 3)
+      let headerData = try JWTBase64URL.decode(String(parts[0]))
+      let headerDict = try #require(try JSONSerialization.jsonObject(with: headerData) as? [String: Any])
+      #expect(headerDict["alg"] as? String == "ES256")
+      #expect(headerDict["kid"] as? String == "test-key-1")
 
-      let claims = try JSONDecoder().decode(AssertionClaims.self, from: jws.payload)
+      let signingInput = "\(parts[0]).\(parts[1])"
+      let signatureBytes = try JWTBase64URL.decode(String(parts[2]))
+      let ecdsaSig = try P256WireSignature.decodeMalleabilityTolerant(signatureBytes)
+      #expect(signingKey.publicKey.isValidSignature(ecdsaSig, for: Data(signingInput.utf8)))
+
+      let claimsData = try JWTBase64URL.decode(String(parts[1]))
+      let claims = try JSONDecoder().decode(AssertionClaims.self, from: claimsData)
       #expect(claims.iss == config.clientId)
       #expect(claims.sub == config.clientId)
       #expect(claims.aud == "https://auth.example")
       #expect(claims.exp - claims.iat == 60)
-      #expect(claims.cnf.jkt == (try deviceKey.publicKey.jwkRepresentation.thumbprint()))
+      let deviceJKT = try JWK(publicKey: deviceKey.publicKey).thumbprint()
+      #expect(claims.cnf.jkt == deviceJKT)
       #expect(!claims.jti.isEmpty)
     }
   }
@@ -110,7 +118,7 @@ struct AssertionEndpointTests {
   @Test("A denied jkt gets access_denied")
   func deniedDevice() async throws {
     let deviceKey = P256.Signing.PrivateKey()
-    let jkt = try deviceKey.publicKey.jwkRepresentation.thumbprint()
+    let jkt = try JWK(publicKey: deviceKey.publicKey).thumbprint()
     let (config, _) = try makeTestConfig { $0.deniedJkts = [jkt] }
     let server = try CABServer(config: config)
     let app = Application(router: server.buildRouter())

@@ -12,7 +12,6 @@ let package = Package(
   dependencies: [
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.25.0"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
-    .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "6.0.0")),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
     .package(name: "Petrel", path: ".."),
@@ -22,7 +21,7 @@ let package = Package(
       name: "PetrelCABServerCore",
       dependencies: [
         .product(name: "Hummingbird", package: "hummingbird"),
-        .product(name: "jose-swift", package: "jose-swift"),
+        .product(name: "PetrelCrypto", package: "Petrel"),
         .product(name: "Logging", package: "swift-log"),
         .product(name: "Crypto", package: "swift-crypto", condition: .when(platforms: [.linux])),
       ],

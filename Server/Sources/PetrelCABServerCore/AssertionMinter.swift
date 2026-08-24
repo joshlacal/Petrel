@@ -1,6 +1,10 @@
+#if canImport(CryptoKit)
+  @preconcurrency import CryptoKit
+#else
+  @preconcurrency import Crypto
+#endif
 import Foundation
-import JSONWebKey
-import JSONWebSignature
+import PetrelCrypto
 
 /// Signs RFC 7523 client assertion JWTs bound to a DPoP key via cnf/jkt.
 public struct AssertionMinter: Sendable {
@@ -40,9 +44,23 @@ public struct AssertionMinter: Sendable {
       cnf: CnfClaim(jkt: jkt)
     )
     // kid is REQUIRED by @atproto/oauth-provider's client-assertion check.
-    let header = DefaultJWSHeaderImpl(algorithm: .ES256, keyID: signingKey.kid)
-    let payload = try JSONEncoder().encode(claims)
-    return try JWS(payload: payload, protectedHeader: header, key: signingKey.privateKey)
-      .compactSerialization
-  }
+    struct Header: Encodable {
+      let alg: String
+      let kid: String
+
+      init(kid: String) {
+        self.alg = "ES256"
+        self.kid = kid
+      }
+    }
+    let header = Header(kid: signingKey.kid)
+    let headerData = try JSONEncoder().encode(header)
+    let payloadData = try JSONEncoder().encode(claims)
+    let headerB64 = JWTBase64URL.encode(headerData)
+    let payloadB64 = JWTBase64URL.encode(payloadData)
+    let signingInput = "\(headerB64).\(payloadB64)"
+    let signatureBytes = try P256WireSignature.sign(Data(signingInput.utf8), using: signingKey.privateKey)
+    let sigB64 = JWTBase64URL.encode(signatureBytes)
+    return "\(headerB64).\(payloadB64).\(sigB64)"
+}
 }

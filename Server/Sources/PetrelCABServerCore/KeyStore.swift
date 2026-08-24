@@ -4,17 +4,64 @@
   @preconcurrency import Crypto
 #endif
 import Foundation
-import JSONWebAlgorithms
-import JSONWebKey
+import PetrelCrypto
+
+/// Minimal ES256 JWK representation for DPoP proof headers and RFC 7638 thumbprints.
+public struct JWK: Codable, Sendable, Equatable {
+  public let kty: String
+  public let crv: String
+  public let kid: String?
+  public let x: String
+  public let y: String
+  public let alg: String?
+  public let d: String?
+
+  public init(
+    kty: String = "EC",
+    crv: String = "P-256",
+    kid: String? = nil,
+    x: String,
+    y: String,
+    alg: String? = nil,
+    d: String? = nil
+  ) {
+    self.kty = kty
+    self.crv = crv
+    self.kid = kid
+    self.x = x
+    self.y = y
+    self.alg = alg
+    self.d = d
+  }
+
+  public init(publicKey: P256.Signing.PublicKey, kid: String? = nil, alg: String? = nil) {
+    let x963 = publicKey.x963Representation
+    let x = x963.dropFirst().prefix(32)
+    let y = x963.suffix(32)
+    self.init(
+      kty: "EC",
+      crv: "P-256",
+      kid: kid,
+      x: JWTBase64URL.encode(Data(x)),
+      y: JWTBase64URL.encode(Data(y)),
+      alg: alg
+    )
+  }
+
+  /// Computes the RFC 7638 SHA-256 thumbprint for this EC P-256 key.
+  public func thumbprint() throws -> String {
+    let canonicalJSON = "{\"crv\":\"P-256\",\"kty\":\"EC\",\"x\":\"\(x)\",\"y\":\"\(y)\"}"
+    let hash = SHA256.hash(data: Data(canonicalJSON.utf8))
+    return JWTBase64URL.encode(Data(hash))
+  }
+}
 
 public struct SigningKey: Sendable {
   public let kid: String
   public let privateKey: P256.Signing.PrivateKey
 
   public var publicJWK: JWK {
-    var jwk = privateKey.publicKey.jwkRepresentation
-    jwk.keyID = kid
-    return jwk
+    JWK(publicKey: privateKey.publicKey, kid: kid)
   }
 }
 
@@ -65,9 +112,7 @@ public struct KeyStore: Sendable {
       let keys: [JWK]
     }
     let publicKeys = keys.map { key -> JWK in
-      var jwk = key.publicJWK
-      jwk.algorithm = "ES256"
-      return jwk
+      JWK(publicKey: key.privateKey.publicKey, kid: key.kid, alg: "ES256")
     }
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.sortedKeys]
