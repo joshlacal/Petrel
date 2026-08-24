@@ -742,11 +742,6 @@ final class PLCClientTests: XCTestCase {
         XCTAssertNil(weakTransport, "URLSessionPLCTransport should deallocate when out of scope")
     }
 
-    func testURLSessionPLCTransportExplicitInvalidation() throws {
-        let transport = try URLSessionPLCTransport(maximumTimeout: 5)
-        transport.invalidate()
-    }
-
     func testURLSessionPLCTransportSuccessfulRequest() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]

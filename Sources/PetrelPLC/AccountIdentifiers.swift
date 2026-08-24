@@ -1,7 +1,4 @@
 import Foundation
-#if canImport(FoundationNetworking)
-    import FoundationNetworking
-#endif
 
 public enum AccountIdentifiers {
     public static func validateDID(_ did: String) throws -> String {

@@ -318,10 +318,6 @@ public final class URLSessionPLCTransport: PLCHTTPTransport, @unchecked Sendable
         session.invalidateAndCancel()
     }
 
-    public func invalidate() {
-        session.invalidateAndCancel()
-    }
-
     public convenience init(maximumTimeout: TimeInterval = 10) throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
