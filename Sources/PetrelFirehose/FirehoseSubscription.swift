@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+  import FoundationNetworking
+#endif
 import Petrel
 
 public protocol FirehoseCursorStorage: Sendable {
@@ -82,7 +85,8 @@ public final class URLSessionFirehoseWebSocketSession: FirehoseWebSocketSession,
   }
 }
 
-public struct URLSessionFirehoseWebSocketFactory: FirehoseWebSocketSessionFactory {
+/// URLSession is internally thread-safe/reference-safe, but Swift FoundationNetworking 6.1 lacks Sendable annotation on Linux.
+public struct URLSessionFirehoseWebSocketFactory: FirehoseWebSocketSessionFactory, @unchecked Sendable {
   private let session: URLSession
 
   public init(session: URLSession = .shared) {
