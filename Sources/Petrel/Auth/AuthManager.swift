@@ -279,6 +279,41 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         try await activeStrategy.attemptRecoveryFromServerFailures(for: did)
     }
 
+    func startGatewayScopeUpgrade(
+        requesting: Set<String>,
+        for expectedDID: String,
+        callbackURL: URL
+    ) async throws -> URL {
+        try await activeStrategy.startGatewayScopeUpgrade(
+            requesting: requesting,
+            for: expectedDID,
+            callbackURL: callbackURL
+        )
+    }
+
+    func completeGatewayScopeUpgrade(
+        callbackURL: URL,
+        for expectedDID: String
+    ) async throws -> Set<String> {
+        let tracksGatewayContinuity = currentMode == .gateway
+        if tracksGatewayContinuity {
+            await beginAuthContinuityMutation()
+        }
+        defer {
+            if tracksGatewayContinuity {
+                endAuthContinuityMutation()
+            }
+        }
+        return try await activeStrategy.completeGatewayScopeUpgrade(
+            callbackURL: callbackURL,
+            for: expectedDID
+        )
+    }
+
+    func fetchGrantedScopes(for did: String?) async throws -> Set<String> {
+        try await activeStrategy.fetchGrantedScopes(for: did)
+    }
+
     /// Returns the exact OAuth scopes granted to an account, read from its
     /// persisted session. Empty for unknown DIDs, legacy password sessions,
     /// and gateway-mode accounts (the gateway holds the tokens server-side).

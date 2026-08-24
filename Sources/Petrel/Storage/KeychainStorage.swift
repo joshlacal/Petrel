@@ -718,6 +718,53 @@ public actor KeychainStorage {
         }
     }
 
+    /// Saves raw pending gateway upgrade data for a specific account.
+    func savePendingGatewayUpgradeData(_ data: Data, for did: String) async throws {
+        let key = makeKey("pendingGatewayUpgrade", did: did)
+        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+    }
+
+    /// Retrieves raw pending gateway upgrade data for a specific account.
+    func getPendingGatewayUpgradeData(for did: String) async throws -> Data? {
+        let key = makeKey("pendingGatewayUpgrade", did: did)
+        do {
+            return try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return nil }
+            throw error
+        }
+    }
+
+    /// Deletes pending gateway upgrade data for a specific account.
+    func deletePendingGatewayUpgradeData(for did: String) async throws {
+        let key = makeKey("pendingGatewayUpgrade", did: did)
+        do {
+            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return }
+            throw error
+        }
+    }
+
+    /// Actor-serialized compare-and-swap of gateway session.
+    /// Verifies current stored session for `did` matches `expectedOldSession`
+    /// (and if a current DID is active, verifies it equals `did`) before replacing it.
+    func compareAndSwapGatewaySession(
+        expectedOldSession: String,
+        newSession: String,
+        for did: String
+    ) async throws -> Bool {
+        let currentSession = try await getGatewaySession(for: did)
+        guard let currentSession, currentSession == expectedOldSession else {
+            return false
+        }
+        if let currentDID = try await getCurrentDID(), !currentDID.isEmpty, currentDID != did {
+            return false
+        }
+        try await saveGatewaySession(newSession, for: did)
+        return true
+    }
+
     private func shouldMigrateLegacyGatewaySession(for did: String) async throws -> Bool {
         guard !did.isEmpty else { return false }
 

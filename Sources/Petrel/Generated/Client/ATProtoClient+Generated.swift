@@ -708,6 +708,58 @@ public actor ATProtoClient {
         return await authManager?.grantedScopes(for: did) ?? []
     }
 
+    // MARK: - Gateway Scope Upgrade
+
+    /// Initiates a progressive OAuth scope upgrade through the confidential gateway.
+    /// - Parameters:
+    ///   - requesting: The additional scopes requested for upgrade.
+    ///   - expectedDID: The DID of the account being upgraded.
+    ///   - callbackURL: The client-side callback URL binding for this flow.
+    /// - Returns: The authorization URL to present to the user in a browser.
+    public func startGatewayScopeUpgrade(
+        requesting: Set<String>,
+        for expectedDID: String,
+        callbackURL: URL
+    ) async throws -> URL {
+        guard let authManager else {
+            throw APIError.serviceNotInitialized
+        }
+        return try await authManager.startGatewayScopeUpgrade(
+            requesting: requesting,
+            for: expectedDID,
+            callbackURL: callbackURL
+        )
+    }
+
+    /// Completes a progressive OAuth scope upgrade after receiving the browser callback.
+    /// - Parameters:
+    ///   - callbackURL: The URL received from the browser redirect callback.
+    ///   - expectedDID: The DID of the account being upgraded.
+    /// - Returns: The authoritative set of granted scopes for the upgraded account.
+    public func completeGatewayScopeUpgrade(
+        callbackURL: URL,
+        for expectedDID: String
+    ) async throws -> Set<String> {
+        guard let authManager else {
+            throw APIError.serviceNotInitialized
+        }
+        return try await authManager.completeGatewayScopeUpgrade(
+            callbackURL: callbackURL,
+            for: expectedDID
+        )
+    }
+
+    /// Authoritatively fetches the currently granted scopes from the gateway or auth provider.
+    /// Throws on network, non-200, missing session, or invalid session responses.
+    /// - Parameter did: The account DID, or `nil` for the active account.
+    /// - Returns: The authoritative set of granted scopes.
+    public func fetchGrantedScopes(for did: String? = nil) async throws -> Set<String> {
+        guard let authManager else {
+            throw APIError.serviceNotInitialized
+        }
+        return try await authManager.fetchGrantedScopes(for: did)
+    }
+
     // MARK: - DID Resolution
 
     /// Resolves a handle to a DID.

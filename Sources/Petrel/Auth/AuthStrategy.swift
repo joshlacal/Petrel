@@ -49,6 +49,22 @@ public protocol AuthStrategy: AuthenticationProvider, Sendable {
 
     /// Attempts to recover from catastrophic auth failures.
     func attemptRecoveryFromServerFailures(for did: String?) async throws
+
+    /// Starts a progressive gateway scope upgrade flow.
+    func startGatewayScopeUpgrade(
+        requesting: Set<String>,
+        for expectedDID: String,
+        callbackURL: URL
+    ) async throws -> URL
+
+    /// Completes a progressive gateway scope upgrade flow.
+    func completeGatewayScopeUpgrade(
+        callbackURL: URL,
+        for expectedDID: String
+    ) async throws -> Set<String>
+
+    /// Authoritatively fetches granted scopes for the account from the auth provider.
+    func fetchGrantedScopes(for did: String?) async throws -> Set<String>
 }
 
 extension AuthStrategy {
@@ -60,5 +76,24 @@ extension AuthStrategy {
     public func startOAuthFlowWithState(identifier: String? = nil, bskyAppViewDID: String? = nil, bskyChatDID: String? = nil) async throws
         -> (url: URL, state: String) {
         throw AuthError.oauthFlowStateUnavailable
+    }
+
+    public func startGatewayScopeUpgrade(
+        requesting: Set<String>,
+        for expectedDID: String,
+        callbackURL: URL
+    ) async throws -> URL {
+        throw AuthError.invalidOAuthConfiguration
+    }
+
+    public func completeGatewayScopeUpgrade(
+        callbackURL: URL,
+        for expectedDID: String
+    ) async throws -> Set<String> {
+        throw AuthError.invalidOAuthConfiguration
+    }
+
+    public func fetchGrantedScopes(for did: String?) async throws -> Set<String> {
+        throw AuthError.invalidOAuthConfiguration
     }
 }
