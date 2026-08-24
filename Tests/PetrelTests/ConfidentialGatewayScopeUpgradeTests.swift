@@ -738,6 +738,8 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             let (client, storage) = try await self.makeClient(namespace: namespace)
 
             let alice = self.aliceDID
+            let oldSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertNotNil(oldSession)
             let candidateUUID = UUID().uuidString.lowercased()
             let exchangeCount = Mutex<Int>(0)
             let commitCount = Mutex<Int>(0)
@@ -785,10 +787,14 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertEqual(exchangeCount.withLock { $0 }, 1, "First exchange was executed")
             XCTAssertEqual(commitCount.withLock { $0 }, 0, "Commit must not be called when candidate persistence fails")
 
-            // Old session must remain intact
+            // Read the backend directly so this proves the physical anchor survived,
+            // not merely a KeychainStorage cache hit.
+            let physicalSession = try backend.retrieve(
+                key: "gatewaySession.\(alice)", namespace: namespace, accessGroup: nil
+            )
+            XCTAssertEqual(String(data: physicalSession, encoding: .utf8), oldSession)
             let sessionAfterFail = try await storage.getGatewaySession(for: self.aliceDID)
-            XCTAssertNotEqual(sessionAfterFail, candidateUUID)
-
+            XCTAssertEqual(sessionAfterFail, oldSession)
             // Disable failure injection for retry
             shouldFailPendingStore.withLock { $0 = false }
 
