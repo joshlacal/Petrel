@@ -19,6 +19,18 @@ public struct GatewaySessionInfo: Codable, Sendable {
     public let handle: String?
     public let active: Bool?
     public let granted_scopes: [String]?
+
+    public init(
+        did: String,
+        handle: String? = nil,
+        active: Bool? = nil,
+        granted_scopes: [String]? = nil
+    ) {
+        self.did = did
+        self.handle = handle
+        self.active = active
+        self.granted_scopes = granted_scopes
+    }
 }
 
 private struct StrictAnyCodingKey: CodingKey {
@@ -370,6 +382,9 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         // Fetch session details from gateway to get DID and handle FIRST
         let sessionInfo = try await fetchSessionFromGateway(sessionId: sessionId)
+        guard sessionInfo.active != false else {
+            throw GatewayError.invalidSession
+        }
 
         // Store the session ID keyed by DID (for multi-account support)
         try await saveGatewaySession(sessionId, for: sessionInfo.did)
@@ -578,7 +593,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         // Authoritatively fetch prior session info (throwing, no try?)
         let currentSessionInfo = try await fetchSessionFromGateway(sessionId: oldSession)
-        guard currentSessionInfo.active == true else {
+        guard currentSessionInfo.active != false else {
             throw GatewayError.invalidSession
         }
         guard currentSessionInfo.did == expectedDID else {
@@ -866,7 +881,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard sessionInfo.did == targetDID else {
             throw GatewayError.invalidSession
         }
-        guard sessionInfo.active == true else {
+        guard sessionInfo.active != false else {
             throw GatewayError.invalidSession
         }
         guard let grantedScopes = sessionInfo.granted_scopes, !grantedScopes.isEmpty else {

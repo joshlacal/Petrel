@@ -185,7 +185,6 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     {
                         "did": "\(alice)",
                         "handle": "alice.test",
-                        "active": true,
                         "granted_scopes": ["atproto", "transition:generic"]
                     }
                     """.data(using: .utf8)!
@@ -386,7 +385,6 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     {
                         "did": "\(alice)",
                         "handle": "alice.test",
-                        "active": true,
                         "granted_scopes": ["identity:handle"]
                     }
                     """.data(using: .utf8)!
@@ -420,7 +418,6 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     {
                         "did": "\(alice)",
                         "handle": "alice.test",
-                        "active": true,
                         "granted_scopes": ["atproto", "transition:generic"]
                     }
                     """.data(using: .utf8)!
@@ -506,7 +503,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 let path = request.url?.path ?? ""
                 if path == "/auth/session" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
-                            #"{"did":"\#(alice)","active":true,"granted_scopes":["atproto","transition:generic"]}"#.data(using: .utf8)!)
+                            #"{"did":"\#(alice)","granted_scopes":["atproto","transition:generic"]}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
                             #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
@@ -563,7 +560,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 let path = request.url?.path ?? ""
                 if path == "/auth/session" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
-                            #"{"did":"\#(alice)","active":true,"granted_scopes":["atproto"]}"#.data(using: .utf8)!)
+                            #"{"did":"\#(alice)","granted_scopes":["atproto"]}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
                             #"{"authorization_url":"https://auth.pds.test/oauth/authorize","unknown_field":"rejected"}"#.data(using: .utf8)!)
@@ -580,7 +577,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 let path = request.url?.path ?? ""
                 if path == "/auth/session" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
-                            #"{"did":"\#(alice)","active":true,"granted_scopes":["atproto"]}"#.data(using: .utf8)!)
+                            #"{"did":"\#(alice)","granted_scopes":["atproto"]}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
                             #"{"authorization_url":"https://auth.pds.test/oauth/authorize"}"#.data(using: .utf8)!)
@@ -652,7 +649,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 let path = request.url?.path ?? ""
                 if path == "/auth/session" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
-                            #"{"did":"\#(alice)","active":true,"granted_scopes":["atproto","transition:generic"]}"#.data(using: .utf8)!)
+                            #"{"did":"\#(alice)","granted_scopes":["atproto","transition:generic"]}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
@@ -740,7 +737,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 let path = request.url?.path ?? ""
                 if path == "/auth/session" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
-                            #"{"did":"\#(alice)","active":true,"granted_scopes":["atproto","transition:generic"]}"#.data(using: .utf8)!)
+                            #"{"did":"\#(alice)","granted_scopes":["atproto","transition:generic"]}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
                             #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
@@ -847,7 +844,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 let path = request.url?.path ?? ""
                 if path == "/auth/session" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
-                            #"{"did":"\#(alice)","active":true,"granted_scopes":["atproto","transition:generic","identity:handle"]}"#.data(using: .utf8)!)
+                            #"{"did":"\#(alice)","granted_scopes":["atproto","transition:generic","identity:handle"]}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade/commit" {
                     commitCount.withLock { $0 += 1 }
                     XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
@@ -942,7 +939,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 let path = request.url?.path ?? ""
                 if path == "/auth/session" {
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
-                            #"{"did":"\#(alice)","active":true,"granted_scopes":["atproto"]}"#.data(using: .utf8)!)
+                            #"{"did":"\#(alice)","granted_scopes":["atproto"]}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
@@ -1096,7 +1093,6 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     {
                         "did": "\(alice)",
                         "handle": "alice.test",
-                        "active": true,
                         "granted_scopes": ["atproto", "transition:generic"]
                     }
                     """.data(using: .utf8)!)
@@ -1176,6 +1172,53 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         }
     }
 
+    func testCompareAndSwapWithLegacyOnlySessionDoesNotDeadlockOrMigrate() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.cas.legacyonly.\(UUID().uuidString)"
+            let storage = KeychainStorage(namespace: namespace)
+            let alice = self.aliceDID
+            let legacySession = "legacy-session-value-12345"
+
+            // Install eligible legacy source and current DID, but NO per-DID key
+            try await storage.saveCurrentDID(alice)
+            backend.plant(key: "gatewaySession", namespace: namespace, data: Data(legacySession.utf8))
+            KeychainManager.clearCache()
+
+            // Run CAS under timeout
+            let newSession = UUID().uuidString.lowercased()
+            let casTask = Task {
+                try await storage.compareAndSwapGatewaySession(
+                    expectedOldSession: legacySession,
+                    newSession: newSession,
+                    for: alice
+                )
+            }
+
+            let timeoutTask = Task {
+                try await Task.sleep(nanoseconds: 2_000_000_000)
+                casTask.cancel()
+            }
+
+            let casResult = try await casTask.value
+            timeoutTask.cancel()
+
+            // CAS must return false promptly
+            XCTAssertFalse(casResult, "CAS must return false when no exact per-DID session is present")
+
+            // Must NOT alter or delete legacy source
+            let legacyDataInBackend = backend.peek(key: "gatewaySession", namespace: namespace)
+            XCTAssertEqual(legacyDataInBackend, Data(legacySession.utf8), "Legacy session must remain unaltered")
+
+            // Must NOT have migrated to per-DID key
+            let perDIDKeyInBackend = backend.peek(key: "gatewaySession.\(alice)", namespace: namespace)
+            XCTAssertNil(perDIDKeyInBackend, "CAS must not migrate legacy session to per-DID key")
+
+            // Subsequent normal getGatewaySession CAN still migrate the legacy session
+            let migratedSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(migratedSession, legacySession)
+        }
+    }
+
     func testTwoStorageInstancesConcurrentDeleteAndSaveSerialized() async throws {
         try await withInMemoryBackend { backend in
             let namespace = "test.gateway.twostorage.deletesave.\(UUID().uuidString)"
@@ -1243,7 +1286,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     {
                         "did": "\(alice)",
                         "handle": "alice.test",
-                        "active": true,
+                        "created_at": "2026-08-24T10:00:00Z",
                         "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
                     }
                     """.data(using: .utf8)!
@@ -1294,7 +1337,6 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 {
                     "did": "\(alice)",
                     "handle": "alice.test",
-                    "active": true,
                     "granted_scopes": ["identity:handle"]
                 }
                 """.data(using: .utf8)!
@@ -1312,7 +1354,6 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 {
                     "did": "\(bob)",
                     "handle": "bob.test",
-                    "active": true,
                     "granted_scopes": ["atproto", "identity:handle"]
                 }
                 """.data(using: .utf8)!
@@ -1327,6 +1368,102 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             do {
                 _ = try await client.fetchGrantedScopes(for: "did:plc:nonexistent")
                 XCTFail("Expected throw on missing session")
+            } catch {}
+        }
+    }
+
+    func testExactNestSessionDTODecodesWithoutActiveAndRejectsExplicitFalse() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.exactnestdto.\(UUID().uuidString)"
+            let initialSession = UUID().uuidString.lowercased()
+            let (client, _) = try await self.makeClient(namespace: namespace, initialSession: initialSession)
+            let alice = self.aliceDID
+
+            // 1. Exact Nest DTO without active (with created_at) succeeds in fetchGrantedScopes
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/session" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "created_at": "2026-08-24T10:00:00.123456Z",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let scopes = try await client.fetchGrantedScopes(for: self.aliceDID)
+            XCTAssertEqual(scopes, ["atproto", "transition:generic"])
+
+            // 2. Explicit active == false in fetchGrantedScopes is rejected
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/session" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "active": false,
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            do {
+                _ = try await client.fetchGrantedScopes(for: self.aliceDID)
+                XCTFail("Expected fetchGrantedScopes to reject active == false")
+            } catch {}
+
+            // 3. Exact Nest DTO in handleOAuthCallback succeeds
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/session" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "created_at": "2026-08-24T10:00:00.123456Z",
+                        "granted_scopes": ["atproto"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(UUID().uuidString.lowercased())")!
+            try await client.handleOAuthCallback(url: callbackURL)
+            let current = await client.getCurrentAccount()
+            XCTAssertEqual(current?.did, alice)
+            XCTAssertEqual(current?.handle, "alice.test")
+
+            // 4. Explicit active == false in handleOAuthCallback is rejected
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/session" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "active": false,
+                        "granted_scopes": ["atproto"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            do {
+                _ = try await client.handleOAuthCallback(url: callbackURL)
+                XCTFail("Expected handleOAuthCallback to reject active == false")
             } catch {}
         }
     }

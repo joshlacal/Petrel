@@ -816,6 +816,24 @@ public actor KeychainStorage {
         }
     }
 
+    /// Reads the exact per-DID gateway session directly without legacy migration or side effects.
+    private func readExactPerDIDGatewaySession(for did: String) async throws -> String? {
+        let key = makeKey("gatewaySession", did: did)
+        do {
+            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            guard let session = String(data: data, encoding: .utf8) else {
+                LogManager.logError("KeychainStorage - Stored gateway session is not valid UTF-8 for key \(namespace).\(key)")
+                throw KeychainError.dataFormatError
+            }
+            return session
+        } catch {
+            if KeychainManager.isItemNotFound(error) {
+                return nil
+            }
+            throw error
+        }
+    }
+
     /// Serialized compare-and-swap of gateway session.
     /// Verifies current stored session for `did` matches `expectedOldSession`
     /// and current stored DID equals `did` before replacing it.
@@ -831,7 +849,7 @@ public actor KeychainStorage {
         guard let currentDID = try await getCurrentDID(), currentDID == did else {
             return false
         }
-        guard let currentSession = try await getGatewaySession(for: did),
+        guard let currentSession = try await readExactPerDIDGatewaySession(for: did),
               currentSession == expectedOldSession else {
             return false
         }
