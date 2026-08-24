@@ -278,7 +278,6 @@ actor DIDResolutionService: DIDResolving {
         guard responseCode == 200, let did = decodedData?.did else {
             throw APIError.invalidPDSURL
         }
-        cacheDID(did.didString(), for: handle)
         return did.didString()
     }
 

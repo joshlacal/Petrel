@@ -93,6 +93,12 @@ struct DIDResolutionBidirectionalTests {
         let networkService = NetworkService(baseURL: baseURL)
         let resolver = await DIDResolutionService(networkService: networkService)
 
+        // First call: rejects because DID document alsoKnownAs does not assert handle
+        await #expect(throws: (any Error).self) {
+            try await resolver.resolveHandleToDID(handle: "alice.bsky.social")
+        }
+
+        // Second call: must ALSO reject (premature caching must not serve hostile DID)
         await #expect(throws: (any Error).self) {
             try await resolver.resolveHandleToDID(handle: "alice.bsky.social")
         }
