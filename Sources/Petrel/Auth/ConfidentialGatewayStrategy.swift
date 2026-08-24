@@ -338,21 +338,43 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         private let lock = NSLock()
         private var isHeld: Bool = false
         private var queue: [Waiter] = []
+        private var canceledWaiterIDs: Set<UUID> = []
+
+        var _onBeforeRegistration: (@Sendable (UUID) -> Void)?
 
         func acquireLease() async throws -> AuthenticationRequestLease {
             try Task.checkCancellation()
 
             let waiterID = UUID()
+            defer {
+                cleanupWaiter(id: waiterID)
+            }
+
             let lease: AuthenticationRequestLease = try await withTaskCancellationHandler {
                 try await withCheckedThrowingContinuation { continuation in
-                    lock.lock()
-                    if !isHeld {
-                        isHeld = true
-                        lock.unlock()
-                        continuation.resume(returning: makeLease())
-                    } else {
-                        queue.append(Waiter(id: waiterID, continuation: continuation))
-                        lock.unlock()
+                    _onBeforeRegistration?(waiterID)
+
+                    var shouldResumeCanceled = false
+                    var immediateLease: AuthenticationRequestLease?
+
+                    lock.withLock {
+                        if Task.isCancelled || canceledWaiterIDs.remove(waiterID) != nil {
+                            shouldResumeCanceled = true
+                            return
+                        }
+
+                        if !isHeld {
+                            isHeld = true
+                            immediateLease = makeLease()
+                        } else {
+                            queue.append(Waiter(id: waiterID, continuation: continuation))
+                        }
+                    }
+
+                    if shouldResumeCanceled {
+                        continuation.resume(throwing: CancellationError())
+                    } else if let immediateLease {
+                        continuation.resume(returning: immediateLease)
                     }
                 }
             } onCancel: {
@@ -366,6 +388,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             return lease
         }
 
+        private func cleanupWaiter(id: UUID) {
+            lock.withLock {
+                _ = canceledWaiterIDs.remove(id)
+            }
+        }
+
         private func makeLease() -> AuthenticationRequestLease {
             AuthenticationRequestLease { [weak self] in
                 self?.releaseLease()
@@ -373,28 +401,46 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         private func cancelWaiter(id: UUID) {
-            lock.lock()
-            if let index = queue.firstIndex(where: { $0.id == id }) {
-                let waiter = queue.remove(at: index)
-                lock.unlock()
-                waiter.continuation.resume(throwing: CancellationError())
-            } else {
-                lock.unlock()
+            var waiterToResume: Waiter?
+            lock.withLock {
+                if let index = queue.firstIndex(where: { $0.id == id }) {
+                    let waiter = queue.remove(at: index)
+                    canceledWaiterIDs.remove(id)
+                    waiterToResume = waiter
+                } else {
+                    canceledWaiterIDs.insert(id)
+                }
             }
+            waiterToResume?.continuation.resume(throwing: CancellationError())
         }
 
         private func releaseLease() {
-            var nextWaiter: Waiter?
-            lock.lock()
-            if !queue.isEmpty {
-                nextWaiter = queue.removeFirst()
-            }
-            if let nextWaiter {
-                lock.unlock()
-                nextWaiter.continuation.resume(returning: makeLease())
-            } else {
-                isHeld = false
-                lock.unlock()
+            while true {
+                var nextWaiter: Waiter?
+                var canceledWaiter: Waiter?
+
+                lock.withLock {
+                    if !queue.isEmpty {
+                        let candidate = queue.removeFirst()
+                        if canceledWaiterIDs.remove(candidate.id) != nil {
+                            canceledWaiter = candidate
+                        } else {
+                            nextWaiter = candidate
+                        }
+                    } else {
+                        isHeld = false
+                    }
+                }
+
+                if let canceledWaiter {
+                    canceledWaiter.continuation.resume(throwing: CancellationError())
+                    continue
+                }
+
+                if let nextWaiter {
+                    nextWaiter.continuation.resume(returning: makeLease())
+                }
+                break
             }
         }
 
@@ -407,22 +453,25 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         deinit {
-            lock.lock()
-            let remaining = queue
-            queue.removeAll()
-            isHeld = false
-            lock.unlock()
+            let remaining: [Waiter] = lock.withLock {
+                let waiters = queue
+                queue.removeAll()
+                canceledWaiterIDs.removeAll()
+                isHeld = false
+                return waiters
+            }
             for waiter in remaining {
                 waiter.continuation.resume(throwing: CancellationError())
             }
         }
     }
 
+    let coordinator = SerialOperationCoordinator()
+
     private let gatewayURL: URL
     private let storage: KeychainStorage
     private let accountManager: AccountManaging
     private let urlSession: URLSession
-    private let coordinator = SerialOperationCoordinator()
 
     private static let sessionKey = "gatewaySession"
 

@@ -32,10 +32,13 @@ extension ATProtoClient.{{ template_namespace_name }} {
             Task {
                 do {
                     // Use networkService to prepare authenticated streaming request with OAuth/DPoP
-                    let authenticatedRequest = try await networkService.prepareStreamingRequest(
+                    let preparedRequest = try await networkService.prepareStreamingRequest(
                         urlRequest,
                         additionalHeaders: proxyHeaders
                     )
+                    defer {
+                        preparedRequest.releaseAuthenticationLease()
+                    }
 
                     // Create URLSession with infinite timeouts for SSE long-lived connections
                     let configuration = URLSessionConfiguration.default
@@ -44,8 +47,8 @@ extension ATProtoClient.{{ template_namespace_name }} {
                     configuration.waitsForConnectivity = true
                     let sseSession = URLSession(configuration: configuration)
 
-                    let (bytes, response) = try await sseSession.bytes(for: authenticatedRequest)
-
+                    let (bytes, response) = try await sseSession.bytes(for: preparedRequest.request)
+                    preparedRequest.releaseAuthenticationLease()
                     guard let httpResponse = response as? HTTPURLResponse else {
                         continuation.finish(throwing: NetworkError.invalidResponse(description: "Non-HTTP response"))
                         return

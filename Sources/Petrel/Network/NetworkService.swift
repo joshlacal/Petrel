@@ -187,6 +187,21 @@ public struct AuthContext: Sendable {
         lease?.release()
     }
 }
+/// An internal container carrying a prepared streaming URLRequest and its authentication lifecycle lease.
+public struct PreparedStreamingRequest: Sendable {
+    public let request: URLRequest
+    let authContext: AuthContext?
+
+    init(request: URLRequest, authContext: AuthContext? = nil) {
+        self.request = request
+        self.authContext = authContext
+    }
+
+    public func releaseAuthenticationLease() {
+        authContext?.releaseAuthenticationLease()
+    }
+}
+
 
 public protocol AuthenticationProvider: Sendable {
     /// Prepares a request with authentication headers
@@ -2018,13 +2033,13 @@ public actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - request: The original URLRequest
     ///   - additionalHeaders: Optional additional headers (e.g., atproto-proxy)
-    /// - Returns: URLRequest with OAuth/DPoP authentication headers
-    func prepareStreamingRequest(_ request: URLRequest, additionalHeaders: [String: String]? = nil) async throws -> URLRequest {
+    /// - Returns: PreparedStreamingRequest containing the URLRequest and its authentication lease
+    func prepareStreamingRequest(
+        _ request: URLRequest,
+        additionalHeaders: [String: String]? = nil
+    ) async throws -> PreparedStreamingRequest {
         var finalRequest = request
         var authCtx: AuthContext? = nil
-        defer {
-            authCtx?.releaseAuthenticationLease()
-        }
         var requiresAuth = false
 
         // Determine if authentication is needed (same logic as regular requests)
@@ -2087,7 +2102,7 @@ public actor NetworkService: NetworkServiceProtocol {
             finalRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
         }
 
-        return finalRequest
+        return PreparedStreamingRequest(request: finalRequest, authContext: authCtx)
     }
 
     // MARK: - WebSocket Subscription Support
@@ -2155,17 +2170,26 @@ public actor NetworkService: NetworkServiceProtocol {
         }
 
         // Add authentication for WebSocket
+        var authCtx: AuthContext? = nil
+        defer {
+            authCtx?.releaseAuthenticationLease()
+        }
+
         if let authProvider = authProvider {
             do {
-                request = try await authProvider.prepareAuthenticatedRequest(request)
+                let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(request)
+                request = authed
+                authCtx = ctx
             } catch {
-                LogManager.logWarning("Failed to add auth to WebSocket: \(error)")
+                LogManager.logError("Failed to add auth to WebSocket: \(error)")
+                throw NetworkError.authenticationFailed
             }
         }
 
         // Create WebSocket task with authenticated request
         let webSocketTask = session.webSocketTask(with: request)
         webSocketTask.resume()
+        authCtx?.releaseAuthenticationLease()
 
         LogManager.logInfo("WebSocket connection opened to \(resolvedURL.absoluteString)")
 

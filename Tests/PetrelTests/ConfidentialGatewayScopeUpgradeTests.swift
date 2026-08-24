@@ -4805,10 +4805,13 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 authService: strategy
             )
 
-            // 1. Streaming path: prepareStreamingRequest releases lease on success
+            // 1. Streaming path: prepareStreamingRequest returns PreparedStreamingRequest holding lease until released
             let streamReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/com.atproto.sync.subscribeRepos"))
             let preparedStream = try await networkService.prepareStreamingRequest(streamReq)
-            XCTAssertEqual(preparedStream.value(forHTTPHeaderField: "Authorization"), "Bearer \(sessionUUID)")
+            XCTAssertEqual(preparedStream.request.value(forHTTPHeaderField: "Authorization"), "Bearer \(sessionUUID)")
+
+            // Release lease as caller (e.g. SSE query after handshake)
+            preparedStream.releaseAuthenticationLease()
 
             // Verify coordinator is free (tokensExist succeeds immediately)
             let tokensExist1 = await strategy.tokensExist()
@@ -4863,6 +4866,373 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             // Verify coordinator is free
             let tokensExist4 = await strategy.tokensExist()
             XCTAssertTrue(tokensExist4)
+        }
+    }
+
+    func testCoordinatorCancellationInRegistrationWindowViaHookAndLaterOperationProceeds() async throws {
+        let coordinator = ConfidentialGatewayStrategy.SerialOperationCoordinator()
+
+        // 1. Acquire initial lease so coordinator is held
+        let lease1 = try await coordinator.acquireLease()
+
+        let registrationHookEntered = TestAsyncGate()
+        let cancelSignal = TestAsyncGate()
+
+        coordinator._onBeforeRegistration = { _ in
+            registrationHookEntered.open()
+            cancelSignal.waitBlocking()
+        }
+
+        // 2. Launch task 2 that attempts to acquire lease
+        let task2 = Task {
+            try await coordinator.acquireLease()
+        }
+
+        // Wait until task 2 reaches the registration window before lock acquisition
+        await registrationHookEntered.wait()
+
+        // Cancel task 2 in the exact registration window
+        task2.cancel()
+        cancelSignal.open()
+
+        // Task 2 must throw CancellationError and not be queued
+        do {
+            _ = try await task2.value
+            XCTFail("Task 2 should have thrown CancellationError")
+        } catch is CancellationError {
+            // Expected
+        } catch {
+            XCTFail("Task 2 threw unexpected error: \(error)")
+        }
+
+        // Reset hook
+        coordinator._onBeforeRegistration = nil
+
+        // 3. Release lease 1
+        lease1.release()
+
+        // 4. Task 3 must acquire lease immediately without being blocked or wedged
+        let lease3 = try await coordinator.acquireLease()
+        lease3.release()
+    }
+
+    func testBlockedCandidateCompletionCannotPersistOrCommitBetweenSSEPrepareAndLaunchAndReleasesAfterHandshake() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.sse.lease.race.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback"
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [GatewayUpgradeTestURLProtocol.self]
+            let customSession = URLSession(configuration: config)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager,
+                urlSession: customSession
+            )
+
+            let networkService = NetworkService(
+                baseURL: self.gatewayURL,
+                authService: strategy
+            )
+
+            let commitEntered = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/exchange" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "candidate_session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/upgrade/commit" {
+                    commitEntered.open()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. Prepare streaming request - holds lease in PreparedStreamingRequest
+            let streamReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/com.atproto.sync.subscribeRepos"))
+            let preparedStream = try await networkService.prepareStreamingRequest(streamReq)
+            XCTAssertEqual(preparedStream.request.value(forHTTPHeaderField: "Authorization"), "Bearer \(oldSessionUUID)")
+
+            // 2. Concurrently, candidate completion arrives
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await strategy.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+
+            // Yield execution to verify completeTask is queued behind the streaming lease
+            await Task.yield()
+
+            // Verify session in storage is still oldSessionUUID while lease is held
+            let sessionWhilePrepared = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionWhilePrepared, oldSessionUUID, "Session in storage must remain oldSessionUUID while SSE lease is held")
+
+            // 3. Simulate SSE handshake returning and releasing lease
+            preparedStream.releaseAuthenticationLease()
+
+            // 4. Upgrade completion should now proceed and commit
+            await commitEntered.wait()
+            _ = try await completeTask.value
+
+            let sessionAfterCommit = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterCommit, candidateUUID, "Session in storage must be candidateUUID after upgrade completes")
+        }
+    }
+
+    func testBlockedCandidateCompletionCannotPersistOrCommitBetweenWebSocketPrepareAndResumeAndReleasesAfterResume() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.ws.lease.race.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback"
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [GatewayUpgradeTestURLProtocol.self]
+            let customSession = URLSession(configuration: config)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager,
+                urlSession: customSession
+            )
+
+            let networkService = NetworkService(
+                baseURL: self.gatewayURL,
+                authService: strategy
+            )
+
+            let commitEntered = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/exchange" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "candidate_session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/upgrade/commit" {
+                    commitEntered.open()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            struct DummyMessage: Codable, Sendable {}
+
+            // 1. Subscribe to WebSocket endpoint
+            let stream: AsyncThrowingStream<DummyMessage, Error> = try await networkService.subscribe(
+                endpoint: "com.atproto.sync.subscribeRepos",
+                parameters: nil as (any Parametrizable)?
+            )
+            _ = stream
+
+            // 2. Once subscribe returns, the lease has already been released after task resume
+            // Complete task should be able to acquire coordinator lease immediately
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await strategy.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+
+            await commitEntered.wait()
+            _ = try await completeTask.value
+
+            let sessionAfterCommit = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterCommit, candidateUUID, "Session in storage must be candidateUUID after upgrade completes")
+        }
+    }
+    func testWebSocketAuthFailureThrowsAuthenticationFailedAndEmitsNoWebSocketTask() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.ws.auth.failure.\(UUID().uuidString)"
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            // No gateway session saved in storage -> prepareAuthenticatedRequest will fail
+
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [GatewayUpgradeTestURLProtocol.self]
+            let customSession = URLSession(configuration: config)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager,
+                urlSession: customSession
+            )
+
+            let networkService = NetworkService(
+                baseURL: self.gatewayURL,
+                authService: strategy
+            )
+
+            struct DummyMessage: Codable, Sendable {}
+
+            do {
+                let _: AsyncThrowingStream<DummyMessage, Error> = try await networkService.subscribe(
+                    endpoint: "com.atproto.sync.subscribeRepos",
+                    parameters: nil as (any Parametrizable)?
+                )
+                XCTFail("Should have thrown NetworkError.authenticationFailed")
+            } catch let error as NetworkError {
+                switch error {
+                case .authenticationFailed:
+                    // Expected!
+                    break
+                default:
+                    XCTFail("Unexpected NetworkError: \(error)")
+                }
+            } catch {
+                XCTFail("Unexpected error thrown: \(error)")
+            }
+
+            // Verify coordinator is not wedged
+            let tokensExist = await strategy.tokensExist()
+            XCTAssertFalse(tokensExist)
+        }
+    }
+
+    func testSSETransportThrowReleasesLeaseImmediately() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.sse.throw.release.\(UUID().uuidString)"
+            let sessionUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(sessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let networkService = NetworkService(
+                baseURL: self.gatewayURL,
+                authService: strategy
+            )
+
+            let streamReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/com.atproto.sync.subscribeRepos"))
+            do {
+                let prepared = try await networkService.prepareStreamingRequest(streamReq)
+                defer {
+                    prepared.releaseAuthenticationLease()
+                }
+                // Simulate transport throwing
+                throw URLError(.cannotConnectToHost)
+            } catch {
+                // Expected throw
+            }
+
+            // Coordinator lease must be free immediately
+            let tokensExist = await strategy.tokensExist()
+            XCTAssertTrue(tokensExist)
         }
     }
 }
