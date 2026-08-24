@@ -31,7 +31,7 @@ public enum JWTBase64URL {
     }
 }
 
-public extension Data {
+extension Data {
     func base64URLEncodedString() -> String {
         JWTBase64URL.encode(self)
     }
