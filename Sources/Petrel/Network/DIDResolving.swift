@@ -319,20 +319,25 @@ actor DIDResolutionService: DIDResolving {
         }
 
         let didDocument = try await fetchDIDDocument(for: did)
-        let (candidateHandle, pdsURL) = try extractPDSURLAndHandle(from: didDocument, did: did)
+        let pdsURL = try extractPDSURL(from: didDocument, did: did)
+        let candidateHandle = extractCandidateHandle(from: didDocument)
 
         // Bidirectional verification (DID -> handle):
-        // Verify that the candidate handle resolves back to this DID
-        let reverseDID = try await resolveHandleToDID(handle: candidateHandle)
-        guard reverseDID == did else {
-            throw DIDResolutionError.handleCouldNotBeResolved(candidateHandle)
+        // When the DID document's asserted handle fails to round-trip (resolution failure OR mismatch),
+        // PDS resolution must still succeed and the verified-handle result must degrade to the upstream
+        // `handle.invalid` sentinel (atproto handle.ts INVALID_HANDLE) — callers see an unverified handle, not an error.
+        var verifiedHandle = Handle.invalid
+        if let candidate = candidateHandle {
+            if let reverseDID = try? await resolveHandleToDID(handle: candidate), reverseDID == did {
+                verifiedHandle = candidate
+            }
         }
 
         // Cache the result
         cachePDSURL(pdsURL, for: did)
-        cacheHandle(candidateHandle, for: did)
+        cacheHandle(verifiedHandle, for: did)
 
-        return (candidateHandle, pdsURL)
+        return (verifiedHandle, pdsURL)
     }
 
     private func fetchDIDDocument(for did: String) async throws -> DIDDocument {
@@ -434,7 +439,7 @@ actor DIDResolutionService: DIDResolving {
         return try JSONCoders.decode(DIDDocument.self, from: data)
     }
 
-    private func extractPDSURLAndHandle(from didDocument: DIDDocument, did: String) throws -> (String, URL) {
+    private func extractPDSURL(from didDocument: DIDDocument, did: String) throws -> URL {
         // Swan & Upstream matchesIdentifier rule:
         // Exactly one service matching id (#atproto_pds or did#atproto_pds) AND type AtprotoPersonalDataServer
         let matches = didDocument.service.filter { service in
@@ -443,20 +448,26 @@ actor DIDResolutionService: DIDResolving {
         }
         guard matches.count == 1,
               let service = matches.first,
-              let pdsURL = URL(string: service.serviceEndpoint),
-              let candidate = didDocument.alsoKnownAs.compactMap({ aka -> String? in
-                  if aka.hasPrefix("at://") {
-                      return String(aka.dropFirst(5))
-                  } else {
-                      return aka
-                  }
-              }).first(where: { !$0.isEmpty }),
-              let canonicalHandle = try? Handle(handleString: candidate).value
+              let pdsURL = URL(string: service.serviceEndpoint)
         else {
             throw DIDResolutionError.missingPDSEndpoint(did)
         }
+        return pdsURL
+    }
 
-        return (canonicalHandle, pdsURL)
+    private func extractCandidateHandle(from didDocument: DIDDocument) -> String? {
+        for aka in didDocument.alsoKnownAs {
+            let candidate: String
+            if aka.hasPrefix("at://") {
+                candidate = String(aka.dropFirst(5))
+            } else {
+                candidate = aka
+            }
+            if !candidate.isEmpty, let validHandle = try? Handle(handleString: candidate).value {
+                return validHandle
+            }
+        }
+        return nil
     }
 
     // MARK: - Caching

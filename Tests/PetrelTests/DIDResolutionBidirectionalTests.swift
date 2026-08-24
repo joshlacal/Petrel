@@ -243,7 +243,7 @@ struct DIDResolutionBidirectionalTests {
         }
     }
 
-    @Test("Reverse DID to handle resolution fails when asserted handle resolves to different DID")
+    @Test("Reverse DID to handle resolution degrades to handle.invalid on round-trip mismatch without blocking PDS")
     func reverseResolutionFailureMismatch() async throws {
         DIDTestURLProtocol.reset()
         NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
@@ -282,9 +282,60 @@ struct DIDResolutionBidirectionalTests {
         let networkService = NetworkService(baseURL: baseURL)
         let resolver = await DIDResolutionService(networkService: networkService)
 
-        await #expect(throws: (any Error).self) {
-            try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:attacker123")
+        // PDS URL still returned, handle degrades to handle.invalid
+        let (handle, pdsURL) = try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:attacker123")
+        #expect(handle == Handle.invalid)
+        #expect(pdsURL.absoluteString == "https://pds.example.com")
+
+        let directPDSURL = try await resolver.resolveDIDToPDSURL(did: "did:plc:attacker123")
+        #expect(directPDSURL.absoluteString == "https://pds.example.com")
+    }
+
+    @Test("Reverse DID to handle resolution degrades to handle.invalid when asserted handle cannot be resolved without blocking PDS")
+    func reverseResolutionFailureUnresolvable() async throws {
+        DIDTestURLProtocol.reset()
+        NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in nil }
+        defer {
+            DIDTestURLProtocol.reset()
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
         }
+
+        // DID doc asserts an unresolvable handle
+        let unresolvableDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:unresolvable123",
+            "alsoKnownAs": ["at://nonexistent.handle.test"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds.example.com"
+                }
+            ]
+        }
+        """
+
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:unresolvable123") { _ in
+            (200, Data(unresolvableDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        // resolveHandle fails with 404
+        DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { _ in
+            (404, Data("HandleNotFound".utf8), ["Content-Type": "application/json"])
+        }
+
+        let networkService = NetworkService(baseURL: baseURL)
+        let resolver = await DIDResolutionService(networkService: networkService)
+
+        // PDS URL still returned, handle degrades to handle.invalid
+        let (handle, pdsURL) = try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:unresolvable123")
+        #expect(handle == Handle.invalid)
+        #expect(pdsURL.absoluteString == "https://pds.example.com")
+
+        let directPDSURL = try await resolver.resolveDIDToPDSURL(did: "did:plc:unresolvable123")
+        #expect(directPDSURL.absoluteString == "https://pds.example.com")
     }
 
     @Test("did:web rejects path injection and invalid percent-encoding")

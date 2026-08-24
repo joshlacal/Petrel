@@ -808,6 +808,10 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 
 public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let value: String
+    /// Upstream sentinel for unverified / invalid handle in identity resolution (matches @atproto/syntax INVALID_HANDLE).
+    public static let invalid = "handle.invalid"
+    public static let invalidHandle = "handle.invalid"
+
 
     /// Registration-time restricted TLDs (per upstream @atproto/syntax handle.ts: DISALLOWED_TLDS).
     /// Note: .test is explicitly allowed for testing/development.
