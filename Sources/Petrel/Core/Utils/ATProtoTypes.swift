@@ -808,10 +808,53 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 
 public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let value: String
+    /// Upstream sentinel for unverified / invalid handle in identity resolution (matches @atproto/syntax INVALID_HANDLE).
+    public static let invalid = "handle.invalid"
+    public static let invalidHandle = "handle.invalid"
 
+
+    /// Registration-time restricted TLD suffixes (per upstream @atproto/syntax handle.ts: DISALLOWED_TLDS).
+    /// Note: .test is explicitly allowed for testing/development.
     public static let disallowedTLDs: Set<String> = [
-        "alt", "arpa", "example", "internal", "invalid", "local", "localhost", "onion", "test",
+        ".alt", ".arpa", ".example", ".internal", ".invalid", ".local", ".localhost", ".onion",
     ]
+
+    /// Registration-time policy check for TLD validity (mirrors upstream @atproto/syntax isValidTld exactly).
+    ///
+    /// Upstream implementation:
+    /// ```ts
+    /// export const isValidTld = (handle: string): boolean => {
+    ///   for (const tld of DISALLOWED_TLDS) {
+    ///     if (handle.endsWith(tld)) {
+    ///       return false
+    ///     }
+    ///   }
+    ///   return true
+    /// }
+    /// ```
+    /// Note: Upstream is case-sensitive and checks `endsWith(suffix)` against lowercase
+    /// DISALLOWED_TLDS without lowercasing the input (e.g. `isValidTld("SRI-NIC.ARPA")` returns `true`).
+    /// This is an upstream quirk preserved for exact interop fidelity.
+    public static func isValidTLD(_ handle: String) -> Bool {
+        !disallowedTLDs.contains { suffix in
+            handle.hasSuffix(suffix)
+        }
+    }
+
+    /// Registration-time policy check for TLD validity (alias matching upstream naming).
+    public static func isValidTld(_ handle: String) -> Bool {
+        isValidTLD(handle)
+    }
+
+    /// Returns true if this handle's TLD is in the registration-time disallowed list.
+    public var hasDisallowedTLD: Bool {
+        !Self.isValidTLD(value)
+    }
+
+    /// Returns true if this handle's TLD is in the registration-time disallowed list.
+    public var hasDisallowedTld: Bool {
+        hasDisallowedTLD
+    }
 
     /// Per https://atproto.com/specs/handle the final segment (TLD) cannot start with a digit
     private static let handlePattern =
@@ -864,9 +907,6 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
             return false
         }
 
-        guard !disallowedTLDs.contains(tld) else {
-            return false
-        }
 
         guard let regex = handleRegex else {
             return true

@@ -132,6 +132,8 @@ public enum ATProtoJWTVerificationKey: Sendable, Equatable {
             0x5d, 0x57, 0x6e, 0x73, 0x57, 0xa4, 0x50, 0x1d,
             0xdf, 0xe9, 0x2f, 0x46, 0x68, 0x1b, 0x20, 0xa0,
         ]
+        let r = bytes[..<32]
+        guard r.contains(where: { $0 != 0 }) else { return false }
         let s = bytes[32...]
         guard s.contains(where: { $0 != 0 }) else { return false }
         for (value, maximum) in zip(s, halfOrder) {

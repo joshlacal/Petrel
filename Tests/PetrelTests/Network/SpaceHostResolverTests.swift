@@ -316,4 +316,12 @@ struct SpaceHostResolverTests {
         #expect(endpoints.spaceHost == URL(string: "https://pds.example.com")!)
         #expect(endpoints.signingKeyFragment == "#atproto")
     }
+
+    @Test("SpaceAuthorityEndpoints.isSecureOrLoopback rejects https with no host")
+    func isSecureOrLoopbackNoHost() {
+        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https://example.com")!) == true)
+        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https:")!) == false)
+        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https://")!) == false)
+        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https:///path")!) == false)
+    }
 }

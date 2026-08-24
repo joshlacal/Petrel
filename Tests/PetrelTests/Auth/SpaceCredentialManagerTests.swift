@@ -926,4 +926,169 @@ struct SpaceCredentialManagerTests {
             Issue.record("Expected SpaceCredentialError, got \(error)")
         }
     }
+
+    @Test("provider-injection path: custom SpaceAuthorityHostProvider is invoked with space authority DID and used for exchange")
+    func customAuthorityHostProviderPath() async throws {
+        let session = makeMockSession()
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let space = try SpaceRef(uriString: "at://did:plc:customauth/space/com.example.drive/self")
+        let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+        let credentialJWT = makeMockCredentialJWT(exp: expTime)
+
+        let capturedRequests = Mutex<[URLRequest]>([])
+        let providerCalledWithDID = Mutex<String?>(nil)
+
+        SpaceMockURLProtocol.setHandler { request in
+            capturedRequests.withLock { $0.append(request) }
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString == "https://custom-space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                let body = try JSONEncoder().encode(["credential": credentialJWT])
+                return (resp, body)
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            authorityHostProvider: { did in
+                providerCalledWithDID.withLock { $0 = did }
+                return URL(string: "https://custom-space.test")!
+            },
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token-custom" }
+        )
+
+        let cred = try await manager.credential(for: space)
+        #expect(cred.token == credentialJWT)
+        #expect(providerCalledWithDID.withLock { $0 } == "did:plc:customauth")
+
+        let requests = capturedRequests.withLock { $0 }
+        let exchangeRequests = requests.filter {
+            $0.url?.absoluteString == "https://custom-space.test/xrpc/com.atproto.space.getSpaceCredential"
+        }
+        #expect(exchangeRequests.count == 1)
+        #expect(exchangeRequests[0].value(forHTTPHeaderField: "Authorization") == "Bearer mock-delegation-token-custom")
+    }
+
+    @Test("compatibility-sugar path: init(resolver:) delegates to authorityHostProvider correctly")
+    func compatibilitySugarResolverPath() async throws {
+        let session = makeMockSession()
+        let didResolver = DummyDIDResolver()
+        let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+        let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+        let credentialJWT = makeMockCredentialJWT(exp: expTime)
+
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString.contains("plc.directory") || urlString.contains(".well-known/did.json") {
+                let resp = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (resp, Data(self.didDocJSON.utf8))
+            }
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                let body = try JSONEncoder().encode(["credential": credentialJWT])
+                return (resp, body)
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            resolver: spaceResolver,
+            urlSession: session,
+            delegationTokenProvider: { _ in "mock-delegation-token-sugar" }
+        )
+
+        let cred = try await manager.credential(for: space)
+        #expect(cred.token == credentialJWT)
+    }
+
+    @Test("ordering preservation: authorityHostProvider is invoked before delegationTokenProvider minting")
+    func orderingPreservationProviderBeforeMint() async throws {
+        let session = makeMockSession()
+        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+        let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
+        let credentialJWT = makeMockCredentialJWT(exp: expTime)
+
+        let callOrder = Mutex<[String]>([])
+
+        SpaceMockURLProtocol.setHandler { request in
+            let urlString = request.url?.absoluteString ?? ""
+            if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                let resp = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                let body = try JSONEncoder().encode(["credential": credentialJWT])
+                return (resp, body)
+            }
+            let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!
+            return (resp, Data())
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+
+        let manager = SpaceCredentialManager(
+            client: client,
+            authorityHostProvider: { did in
+                callOrder.withLock { $0.append("authorityHostProvider:\(did)") }
+                return URL(string: "https://space.test")!
+            },
+            urlSession: session,
+            delegationTokenProvider: { ref in
+                callOrder.withLock { $0.append("delegationTokenProvider:\(ref.spaceDID)") }
+                return "mock-delegation-token"
+            }
+        )
+
+        _ = try await manager.credential(for: space)
+
+        let order = callOrder.withLock { $0 }
+        #expect(order == [
+            "authorityHostProvider:did:plc:auth123",
+            "delegationTokenProvider:did:plc:auth123"
+        ])
+    }
+
+    @Test("isSecureOrLoopback rejects https URL with no host")
+    func isSecureOrLoopbackRejectsNoHost() {
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https://example.com")!) == true)
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https://pds.test/xrpc")!) == true)
+
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https:")!) == false)
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https://")!) == false)
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https:///path/only")!) == false)
+
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http://127.0.0.1:8080")!) == true)
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http://localhost:3000")!) == true)
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http://[::1]:8080")!) == true)
+
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http://insecure.example.com")!) == false)
+        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http:")!) == false)
+    }
 }

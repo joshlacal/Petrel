@@ -47,7 +47,9 @@ public struct PLCHTTPResponse: Sendable, Equatable {
         redirectCount: Int = 0
     ) {
         self.status = status
-        self.headers = headers
+        self.headers = headers.reduce(into: [String: String]()) { result, entry in
+            result[entry.key.lowercased()] = entry.value
+        }
         self.body = body
         self.finalURL = finalURL
         self.redirectCount = redirectCount
