@@ -813,10 +813,10 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
     public static let invalidHandle = "handle.invalid"
 
 
-    /// Registration-time restricted TLDs (per upstream @atproto/syntax handle.ts: DISALLOWED_TLDS).
+    /// Registration-time restricted TLD suffixes (per upstream @atproto/syntax handle.ts: DISALLOWED_TLDS).
     /// Note: .test is explicitly allowed for testing/development.
     public static let disallowedTLDs: Set<String> = [
-        "alt", "arpa", "example", "internal", "invalid", "local", "localhost", "onion",
+        ".alt", ".arpa", ".example", ".internal", ".invalid", ".local", ".localhost", ".onion",
     ]
 
     /// Registration-time policy check for TLD validity (mirrors upstream @atproto/syntax isValidTld exactly).
@@ -824,17 +824,20 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
     /// Upstream implementation:
     /// ```ts
     /// export const isValidTld = (handle: string): boolean => {
-    ///   return !DISALLOWED_TLDS.some((tld) => {
-    ///     return handle.endsWith('.' + tld) || handle === tld
-    ///   })
+    ///   for (const tld of DISALLOWED_TLDS) {
+    ///     if (handle.endsWith(tld)) {
+    ///       return false
+    ///     }
+    ///   }
+    ///   return true
     /// }
     /// ```
-    /// Note: Upstream is case-sensitive and checks `endsWith("." + tld) || handle == tld` against lowercase
+    /// Note: Upstream is case-sensitive and checks `endsWith(suffix)` against lowercase
     /// DISALLOWED_TLDS without lowercasing the input (e.g. `isValidTld("SRI-NIC.ARPA")` returns `true`).
     /// This is an upstream quirk preserved for exact interop fidelity.
     public static func isValidTLD(_ handle: String) -> Bool {
-        !disallowedTLDs.contains { tld in
-            handle.hasSuffix("." + tld) || handle == tld
+        !disallowedTLDs.contains { suffix in
+            handle.hasSuffix(suffix)
         }
     }
 

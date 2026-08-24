@@ -187,17 +187,17 @@ struct ATProtoTypesTests {
         func registrationTimeTLDChecks() throws {
             // Disallowed TLD set must match upstream @atproto/syntax exactly (8 entries, .test excluded)
             let expectedDisallowed: Set<String> = [
-                "alt", "arpa", "example", "internal", "invalid", "local", "localhost", "onion",
+                ".alt", ".arpa", ".example", ".internal", ".invalid", ".local", ".localhost", ".onion",
             ]
             #expect(Handle.disallowedTLDs == expectedDisallowed)
-            #expect(!Handle.disallowedTLDs.contains("test"))
+            #expect(!Handle.disallowedTLDs.contains(".test"))
 
             // isValidTLD and isValidTld checks
-            #expect(!Handle.isValidTLD("onion"))
+            #expect(Handle.isValidTLD("onion"))
             #expect(!Handle.isValidTLD(".onion"))
-            #expect(!Handle.isValidTLD("local"))
+            #expect(Handle.isValidTLD("local"))
             #expect(!Handle.isValidTLD(".local"))
-            #expect(!Handle.isValidTld("arpa"))
+            #expect(Handle.isValidTld("arpa"))
             #expect(!Handle.isValidTld(".arpa"))
             #expect(Handle.isValidTLD("test"))
             #expect(Handle.isValidTLD(".test"))
