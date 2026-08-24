@@ -79,17 +79,26 @@ private func withInMemoryBackend<T>(
 
 private final class TestAsyncGate: @unchecked Sendable {
     private let lock = NSLock()
+    private let blockingSignal = DispatchSemaphore(value: 0)
     private var isOpen = false
     private var waiters: [CheckedContinuation<Void, Never>] = []
-
     func open() {
         lock.lock()
         isOpen = true
         let continuations = waiters
         waiters.removeAll()
         lock.unlock()
+        blockingSignal.signal()
         for c in continuations {
             c.resume()
+        }
+    }
+    func waitBlocking() {
+        lock.lock()
+        let alreadyOpen = isOpen
+        lock.unlock()
+        if !alreadyOpen {
+            blockingSignal.wait()
         }
     }
 
@@ -1252,12 +1261,135 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 try await storage2.saveGatewaySession(newSession, for: alice)
             }()
 
+
             _ = try await (deleteTask, saveTask)
 
             let session1 = try await storage1.getGatewaySession(for: alice)
             let session2 = try await storage2.getGatewaySession(for: alice)
             XCTAssertEqual(session1, newSession)
             XCTAssertEqual(session2, newSession)
+        }
+    }
+
+    func testGatewayCASSelectorLinearization() async throws {
+        try await withInMemoryBackend { backend in
+            for iteration in 0..<50 {
+                let namespace = "test.gateway.linearization.\(iteration).\(UUID().uuidString)"
+                let storageA = KeychainStorage(namespace: namespace)
+                let storageB = KeychainStorage(namespace: namespace)
+                let alice = self.aliceDID
+                let bob = self.bobDID
+                let oldSession = UUID().uuidString.lowercased()
+                let candidateSession = UUID().uuidString.lowercased()
+                try await storageA.saveCurrentDID(alice)
+                try await storageA.saveGatewaySession(oldSession, for: alice)
+                let candidateStarted = Mutex<Int>(0)
+                let selectorStarted = Mutex<Int>(0)
+                let candidateEntered = TestAsyncGate()
+                let candidateRelease = TestAsyncGate()
+                backend.beforeStore = { key in
+                    if key == "gatewaySession.\(alice)" {
+                        candidateStarted.withLock { $0 += 1 }
+                        candidateEntered.open()
+                        candidateRelease.waitBlocking()
+                    } else if key == "currentDID" {
+                        selectorStarted.withLock { $0 += 1 }
+                    }
+                }
+                defer {
+                    backend.beforeStore = nil
+                    backend.beforeDelete = nil
+                    candidateRelease.open()
+                }
+
+                let casStarted = TestAsyncGate()
+                let casTask = Task {
+                    casStarted.open()
+                    return try await storageA.compareAndSwapGatewaySession(
+                        expectedOldSession: oldSession, newSession: candidateSession, for: alice)
+                }
+                await casStarted.wait()
+                await candidateEntered.wait()
+                let selectorTask = Task {
+                    try await storageB.saveCurrentDID(bob)
+                }
+                XCTAssertEqual(selectorStarted.withLock { $0 }, 0)
+                candidateRelease.open()
+                let casResult = try await casTask.value
+                XCTAssertTrue(casResult)
+                try await selectorTask.value
+                let currentDID = try await storageB.getCurrentDID()
+                let promotedSession = try await storageA.getGatewaySession(for: alice)
+                XCTAssertEqual(currentDID, bob)
+                backend.beforeStore = nil
+                backend.beforeDelete = nil
+                try await storageB.saveCurrentDID(alice)
+                try await storageB.saveGatewaySession(oldSession, for: alice)
+                XCTAssertEqual(promotedSession, candidateSession)
+
+                try await storageB.saveCurrentDID(alice)
+                let selectorRelease = TestAsyncGate()
+                let selectorEntered = TestAsyncGate()
+                let candidateStarted2 = Mutex<Int>(0)
+                backend.beforeStore = { key in
+                    if key == "gatewaySession.\(alice)" {
+                        candidateStarted2.withLock { $0 += 1 }
+                    } else if key == "currentDID" {
+                        selectorEntered.open()
+                        selectorRelease.waitBlocking()
+                    }
+                }
+                let selectorTask2 = Task {
+                    try await storageB.saveCurrentDID(bob)
+                }
+                await selectorEntered.wait()
+                let casStarted2 = TestAsyncGate()
+                let casTask2 = Task {
+                    casStarted2.open()
+                    return try await storageA.compareAndSwapGatewaySession(
+                        expectedOldSession: oldSession, newSession: candidateSession, for: alice)
+                }
+                await casStarted2.wait()
+                XCTAssertEqual(candidateStarted2.withLock { $0 }, 0)
+                selectorRelease.open()
+                try await selectorTask2.value
+                let casResult2 = try await casTask2.value
+                let sessionAfterSelector = try await storageA.getGatewaySession(for: alice)
+                XCTAssertFalse(casResult2)
+                XCTAssertEqual(sessionAfterSelector, oldSession)
+
+                let deleteEntered = TestAsyncGate()
+                let deleteRelease = TestAsyncGate()
+                let candidateStarted3 = Mutex<Int>(0)
+                backend.beforeStore = { key in
+                    if key == "gatewaySession.\(alice)" {
+                        candidateStarted3.withLock { $0 += 1 }
+                    }
+                }
+                backend.beforeDelete = { key in
+                    if key == "currentDID" {
+                        deleteEntered.open()
+                        deleteRelease.waitBlocking()
+                    }
+                }
+                let deleteTask = Task { try await storageB.deleteCurrentDID() }
+                await deleteEntered.wait()
+                let casStarted3 = TestAsyncGate()
+                let casTask3 = Task {
+                    casStarted3.open()
+                    return try await storageA.compareAndSwapGatewaySession(
+                        expectedOldSession: oldSession, newSession: candidateSession, for: alice)
+                }
+                await casStarted3.wait()
+                XCTAssertEqual(candidateStarted3.withLock { $0 }, 0)
+                deleteRelease.open()
+                try await deleteTask.value
+                let casResult3 = try await casTask3.value
+                let currentDIDAfterDelete = try await storageA.getCurrentDID()
+                XCTAssertFalse(casResult3)
+                XCTAssertEqual(candidateStarted3.withLock { $0 }, 0)
+                XCTAssertNil(currentDIDAfterDelete)
+            }
         }
     }
 
