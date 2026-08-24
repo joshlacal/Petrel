@@ -70,7 +70,183 @@ public enum PLCSubmitSuccessResponsePolicy: String, Sendable, Equatable {
     case didPLCServer001 = "did-plc-server-0.0.1"
 }
 
-private final class DisallowRedirectsDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+private final class PLCRequestContext: @unchecked Sendable {
+    let maximumResponseBytes: Int
+    private let lock = NSLock()
+    private var accumulatedData: Data
+    private var response: HTTPURLResponse?
+    private var exceededBound = false
+    private var isTaskCancelled = false
+    private var continuation: CheckedContinuation<PLCHTTPResponse, any Error>?
+    private weak var task: URLSessionDataTask?
+
+    init(maximumResponseBytes: Int, continuation: CheckedContinuation<PLCHTTPResponse, any Error>) {
+        self.maximumResponseBytes = maximumResponseBytes
+        self.accumulatedData = Data()
+        self.accumulatedData.reserveCapacity(min(maximumResponseBytes, 1_048_576))
+        self.continuation = continuation
+    }
+
+    func attachTask(_ task: URLSessionDataTask) {
+        lock.withLock {
+            self.task = task
+            if isTaskCancelled || exceededBound {
+                task.cancel()
+            }
+        }
+    }
+
+    func didReceiveResponse(_ response: URLResponse) -> URLSession.ResponseDisposition {
+        lock.withLock {
+            guard let httpResponse = response as? HTTPURLResponse else {
+                return .allow
+            }
+            self.response = httpResponse
+            if httpResponse.expectedContentLength > Int64(maximumResponseBytes) && httpResponse.expectedContentLength != -1 {
+                self.exceededBound = true
+                self.task?.cancel()
+                return .cancel
+            }
+            return .allow
+        }
+    }
+
+    func didReceiveData(_ data: Data) {
+        lock.withLock {
+            guard !exceededBound && !isTaskCancelled else { return }
+            accumulatedData.append(data)
+            if accumulatedData.count > maximumResponseBytes {
+                exceededBound = true
+                task?.cancel()
+            }
+        }
+    }
+
+    func didCancelTask() {
+        lock.withLock {
+            isTaskCancelled = true
+            task?.cancel()
+        }
+    }
+
+    func didComplete(error: (any Error)?) {
+        let (continuationToResume, result) = lock.withLock { () -> (CheckedContinuation<PLCHTTPResponse, any Error>?, Result<PLCHTTPResponse, any Error>) in
+            guard let continuation = self.continuation else {
+                return (nil, .failure(PetrelPLCError.unavailable("PLC HTTP request failed")))
+            }
+            self.continuation = nil
+
+            if isTaskCancelled {
+                return (continuation, .failure(CancellationError()))
+            }
+
+            if exceededBound {
+                return (continuation, .failure(PetrelPLCError.unavailable("PLC HTTP response exceeded its bound")))
+            }
+
+            if let error = error {
+                let nsError = error as NSError
+                if nsError.domain == NSURLErrorDomain && nsError.code == NSURLErrorCancelled {
+                    if isTaskCancelled {
+                        return (continuation, .failure(CancellationError()))
+                    }
+                    if exceededBound {
+                        return (continuation, .failure(PetrelPLCError.unavailable("PLC HTTP response exceeded its bound")))
+                    }
+                }
+                return (continuation, .failure(PetrelPLCError.unavailable("PLC HTTP request failed")))
+            }
+
+            guard let httpResponse = self.response else {
+                return (continuation, .failure(PetrelPLCError.unavailable("PLC HTTP request failed")))
+            }
+
+            guard accumulatedData.count <= maximumResponseBytes else {
+                return (continuation, .failure(PetrelPLCError.unavailable("PLC HTTP response exceeded its bound")))
+            }
+
+            var headers = [String: String]()
+            for (key, value) in httpResponse.allHeaderFields {
+                if let keyString = key as? String, let valueString = value as? String {
+                    let name = keyString.lowercased()
+                    if headers[name] == nil {
+                        headers[name] = valueString
+                    } else {
+                        headers[name, default: ""].append(",\(valueString)")
+                    }
+                }
+            }
+
+            let response = PLCHTTPResponse(
+                status: httpResponse.statusCode,
+                headers: headers,
+                body: accumulatedData,
+                finalURL: httpResponse.url,
+                redirectCount: 0
+            )
+            return (continuation, .success(response))
+        }
+
+        if let continuation = continuationToResume {
+            switch result {
+            case let .success(response):
+                continuation.resume(returning: response)
+            case let .failure(error):
+                continuation.resume(throwing: error)
+            }
+        }
+    }
+}
+
+private final class ContextHolder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var context: PLCRequestContext?
+    private var task: URLSessionDataTask?
+    private var isCancelled = false
+
+    func set(context: PLCRequestContext, task: URLSessionDataTask) {
+        lock.withLock {
+            self.context = context
+            self.task = task
+            if isCancelled {
+                context.didCancelTask()
+                task.cancel()
+            }
+        }
+    }
+
+    func cancel() {
+        lock.withLock {
+            isCancelled = true
+            context?.didCancelTask()
+            task?.cancel()
+        }
+    }
+}
+
+private final class PLCSessionDelegate: NSObject, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
+    private let lock = NSLock()
+    private var contexts = [Int: PLCRequestContext]()
+
+    func register(context: PLCRequestContext, for task: URLSessionDataTask) {
+        lock.withLock {
+            contexts[task.taskIdentifier] = context
+        }
+        context.attachTask(task)
+    }
+
+    func unregister(task: URLSessionTask) {
+        lock.withLock {
+            _ = contexts.removeValue(forKey: task.taskIdentifier)
+        }
+    }
+
+    private func context(for task: URLSessionTask) -> PLCRequestContext? {
+        lock.withLock {
+            contexts[task.taskIdentifier]
+        }
+    }
+
     func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -81,25 +257,62 @@ private final class DisallowRedirectsDelegate: NSObject, URLSessionTaskDelegate,
         // Disallow redirects by passing nil
         completionHandler(nil)
     }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive response: URLResponse,
+        completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
+    ) {
+        guard let context = context(for: dataTask) else {
+            completionHandler(.allow)
+            return
+        }
+        let disposition = context.didReceiveResponse(response)
+        completionHandler(disposition)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        dataTask: URLSessionDataTask,
+        didReceive data: Data
+    ) {
+        context(for: dataTask)?.didReceiveData(data)
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        didCompleteWithError error: (any Error)?
+    ) {
+        let ctx = context(for: task)
+        unregister(task: task)
+        ctx?.didComplete(error: error)
+    }
 }
 
 public final class URLSessionPLCTransport: PLCHTTPTransport, @unchecked Sendable {
     private let session: URLSession
-    private let delegate: DisallowRedirectsDelegate
+    private let delegate: PLCSessionDelegate
     private let maximumTimeout: TimeInterval
 
-    public init(maximumTimeout: TimeInterval = 10) throws {
-        guard maximumTimeout > 0, maximumTimeout <= 30, maximumTimeout.isFinite else {
-            throw PetrelPLCError.malformed("PLC HTTP transport timeout is invalid")
-        }
-        self.maximumTimeout = maximumTimeout
+    public convenience init(maximumTimeout: TimeInterval = 10) throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.requestCachePolicy = .reloadIgnoringLocalAndRemoteCacheData
         configuration.urlCache = nil
         configuration.timeoutIntervalForRequest = maximumTimeout
         configuration.timeoutIntervalForResource = maximumTimeout
-        self.delegate = DisallowRedirectsDelegate()
-        self.session = URLSession(configuration: configuration)
+        try self.init(maximumTimeout: maximumTimeout, configuration: configuration)
+    }
+
+    init(maximumTimeout: TimeInterval = 10, configuration: URLSessionConfiguration) throws {
+        guard maximumTimeout > 0, maximumTimeout <= 30, maximumTimeout.isFinite else {
+            throw PetrelPLCError.malformed("PLC HTTP transport timeout is invalid")
+        }
+        self.maximumTimeout = maximumTimeout
+        let delegate = PLCSessionDelegate()
+        self.delegate = delegate
+        self.session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }
 
     public func execute(_ request: PLCHTTPRequest) async throws -> PLCHTTPResponse {
@@ -121,41 +334,22 @@ public final class URLSessionPLCTransport: PLCHTTPTransport, @unchecked Sendable
         }
         urlRequest.timeoutInterval = request.timeout
 
-        let data: Data
-        let response: URLResponse
-        do {
-            (data, response) = try await session.data(for: urlRequest, delegate: delegate)
-        } catch {
-            throw PetrelPLCError.unavailable("PLC HTTP request failed")
-        }
+        let contextHolder = ContextHolder()
 
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw PetrelPLCError.unavailable("PLC HTTP request failed")
-        }
-
-        guard data.count <= request.maximumResponseBytes else {
-            throw PetrelPLCError.unavailable("PLC HTTP response exceeded its bound")
-        }
-
-        var headers = [String: String]()
-        for (key, value) in httpResponse.allHeaderFields {
-            if let keyString = key as? String, let valueString = value as? String {
-                let name = keyString.lowercased()
-                if headers[name] == nil {
-                    headers[name] = valueString
-                } else {
-                    headers[name, default: ""].append(",\(valueString)")
-                }
+        return try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                let context = PLCRequestContext(
+                    maximumResponseBytes: request.maximumResponseBytes,
+                    continuation: continuation
+                )
+                let task = session.dataTask(with: urlRequest)
+                contextHolder.set(context: context, task: task)
+                delegate.register(context: context, for: task)
+                task.resume()
             }
+        } onCancel: {
+            contextHolder.cancel()
         }
-
-        return PLCHTTPResponse(
-            status: httpResponse.statusCode,
-            headers: headers,
-            body: data,
-            finalURL: httpResponse.url,
-            redirectCount: 0
-        )
     }
 }
 

@@ -582,6 +582,231 @@ final class PLCClientTests: XCTestCase {
         }
     }
 
+    func testURLSessionPLCTransportCancelsOversizedStreamingResponse() async throws {
+        StreamingTestURLProtocol.tracker.reset()
+
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [StreamingTestURLProtocol.self]
+        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+
+        let request = PLCHTTPRequest(
+            method: .get,
+            url: URL(string: "https://\(StreamingTestURLProtocol.testHost)/test")!,
+            headers: [:],
+            body: nil,
+            timeout: 5,
+            maximumResponseBytes: 1_000
+        )
+
+        do {
+            _ = try await transport.execute(request)
+            XCTFail("Expected execute to throw bound exceeded error")
+        } catch let error as PetrelPLCError {
+            guard case let .unavailable(message) = error else {
+                XCTFail("Expected unavailable error, got: \(error)")
+                return
+            }
+            XCTAssertEqual(message, "PLC HTTP response exceeded its bound")
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        // Allow URLSession background queue a moment to finish invoking stopLoading
+        for _ in 0 ..< 20 {
+            if StreamingTestURLProtocol.tracker.isCancelled { break }
+            try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        }
+
+        // Verify that loading was cancelled and later chunks were not consumed
+        XCTAssertTrue(StreamingTestURLProtocol.tracker.isCancelled, "Loading should be cancelled when response bound is exceeded")
+        XCTAssertLessThan(StreamingTestURLProtocol.tracker.chunksSent, 5, "Later chunks should not be emitted after cancellation")
+        XCTAssertLessThanOrEqual(StreamingTestURLProtocol.tracker.bytesSent, 1_500, "Bytes emitted should be bounded around the threshold")
+    }
+
+    func testURLSessionPLCTransportSuccessfulRequest() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
+        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+
+        let testBody = Data("{\"status\":\"ok\"}".utf8)
+        MockPLCHTTPURLProtocol.handler = { request in
+            XCTAssertEqual(request.value(forHTTPHeaderField: "X-Custom-Header"), "custom-value")
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: [
+                    "Content-Type": "application/json",
+                    "X-Response-Header": "header-value",
+                ]
+            )!
+            return (response, testBody)
+        }
+
+        let request = PLCHTTPRequest(
+            method: .post,
+            url: URL(string: "https://mock.plc.test/status")!,
+            headers: ["X-Custom-Header": "custom-value"],
+            body: Data("{\"hello\":\"world\"}".utf8),
+            timeout: 5,
+            maximumResponseBytes: 1_000
+        )
+
+        let response = try await transport.execute(request)
+        XCTAssertEqual(response.status, 200)
+        XCTAssertEqual(response.body, testBody)
+        XCTAssertEqual(response.headers["content-type"], "application/json")
+        XCTAssertEqual(response.headers["x-response-header"], "header-value")
+        XCTAssertEqual(response.finalURL, URL(string: "https://mock.plc.test/status"))
+        XCTAssertEqual(response.redirectCount, 0)
+    }
+
+    func testURLSessionPLCTransportDisallowsRedirects() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
+        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+
+        MockPLCHTTPURLProtocol.handler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 302,
+                httpVersion: "HTTP/1.1",
+                headerFields: [
+                    "Location": "https://evil.plc.test/redirected",
+                    "Content-Type": "text/plain",
+                ]
+            )!
+            return (response, Data("redirect".utf8))
+        }
+
+        let request = PLCHTTPRequest(
+            method: .get,
+            url: URL(string: "https://mock.plc.test/redirect")!,
+            headers: [:],
+            body: nil,
+            timeout: 5,
+            maximumResponseBytes: 1_000
+        )
+
+        let response = try await transport.execute(request)
+        XCTAssertEqual(response.status, 302)
+        XCTAssertEqual(response.finalURL, URL(string: "https://mock.plc.test/redirect"))
+        XCTAssertEqual(response.redirectCount, 0)
+    }
+
+    func testURLSessionPLCTransportPropagatesTaskCancellation() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
+        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+
+        MockPLCHTTPURLProtocol.handler = { request in
+            try? await Task.sleep(nanoseconds: 500_000_000)
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: [:]
+            )!
+            return (response, Data())
+        }
+
+        let request = PLCHTTPRequest(
+            method: .get,
+            url: URL(string: "https://mock.plc.test/cancel")!,
+            headers: [:],
+            body: nil,
+            timeout: 5,
+            maximumResponseBytes: 1_000
+        )
+
+        let task = Task {
+            try await transport.execute(request)
+        }
+
+        try await Task.sleep(nanoseconds: 20_000_000)
+        task.cancel()
+
+        do {
+            _ = try await task.value
+            XCTFail("Expected Task execution to throw CancellationError")
+        } catch is CancellationError {
+            // Success
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
+        }
+    }
+
+    func testURLSessionPLCTransportRejectsContentLengthExceedingBound() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
+        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+
+        MockPLCHTTPURLProtocol.handler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: [
+                    "Content-Length": "2000",
+                    "Content-Type": "application/octet-stream",
+                ]
+            )!
+            return (response, Data(repeating: 0x42, count: 2000))
+        }
+
+        let request = PLCHTTPRequest(
+            method: .get,
+            url: URL(string: "https://mock.plc.test/large-content-length")!,
+            headers: [:],
+            body: nil,
+            timeout: 5,
+            maximumResponseBytes: 1_000
+        )
+
+        do {
+            _ = try await transport.execute(request)
+            XCTFail("Expected execute to throw bound exceeded error")
+        } catch let error as PetrelPLCError {
+            guard case let .unavailable(message) = error else {
+                XCTFail("Expected unavailable error, got: \(error)")
+                return
+            }
+            XCTAssertEqual(message, "PLC HTTP response exceeded its bound")
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+    }
+
+    func testURLSessionPLCTransportValidatesRequestBounds() async throws {
+        let transport = try URLSessionPLCTransport(maximumTimeout: 10)
+        let validURL = URL(string: "https://plc.directory/test")!
+
+        // Timeout <= 0
+        await XCTAssertThrowsErrorAsync(try await transport.execute(PLCHTTPRequest(
+            method: .get, url: validURL, headers: [:], body: nil, timeout: 0, maximumResponseBytes: 1000
+        )))
+
+        // Timeout > maximumTimeout
+        await XCTAssertThrowsErrorAsync(try await transport.execute(PLCHTTPRequest(
+            method: .get, url: validURL, headers: [:], body: nil, timeout: 11, maximumResponseBytes: 1000
+        )))
+
+        // maximumResponseBytes <= 0
+        await XCTAssertThrowsErrorAsync(try await transport.execute(PLCHTTPRequest(
+            method: .get, url: validURL, headers: [:], body: nil, timeout: 5, maximumResponseBytes: 0
+        )))
+
+        // maximumResponseBytes > 1_048_576
+        await XCTAssertThrowsErrorAsync(try await transport.execute(PLCHTTPRequest(
+            method: .get, url: validURL, headers: [:], body: nil, timeout: 5, maximumResponseBytes: 1_048_577
+        )))
+
+        // Body > 32KB
+        await XCTAssertThrowsErrorAsync(try await transport.execute(PLCHTTPRequest(
+            method: .post, url: validURL, headers: [:], body: Data(repeating: 0, count: 32 * 1024 + 1), timeout: 5, maximumResponseBytes: 1000
+        )))
+    }
+
     private func operationFixture(
         rotationKeys: [P256.Signing.PrivateKey]? = nil
     ) throws -> (did: String, operation: PLCSignedOperation) {
@@ -693,4 +918,141 @@ private func XCTAssertThrowsErrorAsync<T>(
         _ = try await expression()
         XCTFail("expected error", file: file, line: line)
     } catch {}
+}
+
+private struct UnsafeTransfer<T>: @unchecked Sendable {
+    let value: T
+}
+
+final class StreamingTestURLProtocol: URLProtocol, @unchecked Sendable {
+    static let testHost = "streaming.test"
+
+    final class Tracker: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _chunksSent = 0
+        private var _bytesSent = 0
+        private var _isCancelled = false
+
+        var chunksSent: Int {
+            lock.withLock { _chunksSent }
+        }
+
+        var bytesSent: Int {
+            lock.withLock { _bytesSent }
+        }
+
+        var isCancelled: Bool {
+            lock.withLock { _isCancelled }
+        }
+
+        func recordChunk(bytes: Int) {
+            lock.withLock {
+                _chunksSent += 1
+                _bytesSent += bytes
+            }
+        }
+
+        func recordCancellation() {
+            lock.withLock {
+                _isCancelled = true
+            }
+        }
+
+        func reset() {
+            lock.withLock {
+                _chunksSent = 0
+                _bytesSent = 0
+                _isCancelled = false
+            }
+        }
+    }
+
+    static let tracker = Tracker()
+    private var streamTask: Task<Void, Never>?
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host == testHost
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let url = request.url else { return }
+        let response = HTTPURLResponse(
+            url: url,
+            statusCode: 200,
+            httpVersion: "HTTP/1.1",
+            headerFields: ["Content-Type": "application/json"]
+        )!
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+
+        // Emit 5 chunks of 500 bytes (total 2500 bytes).
+        let chunkData = Data(repeating: 0x41, count: 500)
+        let clientTransfer = UnsafeTransfer(value: self.client)
+        let protoTransfer = UnsafeTransfer(value: self)
+        streamTask = Task.detached {
+            for _ in 1 ... 5 {
+                if Task.isCancelled {
+                    Self.tracker.recordCancellation()
+                    return
+                }
+                Self.tracker.recordChunk(bytes: chunkData.count)
+                clientTransfer.value?.urlProtocol(protoTransfer.value, didLoad: chunkData)
+                try? await Task.sleep(nanoseconds: 20_000_000) // 20ms
+            }
+            if !Task.isCancelled {
+                clientTransfer.value?.urlProtocolDidFinishLoading(protoTransfer.value)
+            }
+        }
+    }
+
+    override func stopLoading() {
+        Self.tracker.recordCancellation()
+        streamTask?.cancel()
+    }
+}
+
+final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
+    typealias Handler = @Sendable (URLRequest) async throws -> (HTTPURLResponse, Data)
+
+    private static let lock = NSLock()
+    nonisolated(unsafe) private static var _handler: Handler?
+
+    static var handler: Handler? {
+        get { lock.withLock { _handler } }
+        set { lock.withLock { _handler = newValue } }
+    }
+
+    override class func canInit(with request: URLRequest) -> Bool {
+        request.url?.host?.contains("mock.plc.test") == true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        guard let handler = Self.handler else {
+            client?.urlProtocol(self, didFailWithError: URLError(.badURL))
+            return
+        }
+        let currentRequest = self.request
+        let clientTransfer = UnsafeTransfer(value: self.client)
+        let protoTransfer = UnsafeTransfer(value: self)
+        Task.detached {
+            do {
+                let (response, data) = try await handler(currentRequest)
+                if Task.isCancelled { return }
+                clientTransfer.value?.urlProtocol(protoTransfer.value, didReceive: response, cacheStoragePolicy: .notAllowed)
+                clientTransfer.value?.urlProtocol(protoTransfer.value, didLoad: data)
+                clientTransfer.value?.urlProtocolDidFinishLoading(protoTransfer.value)
+            } catch {
+                if Task.isCancelled { return }
+                clientTransfer.value?.urlProtocol(protoTransfer.value, didFailWithError: error)
+            }
+        }
+    }
+    override func stopLoading() {}
 }
