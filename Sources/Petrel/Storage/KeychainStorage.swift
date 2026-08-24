@@ -784,8 +784,11 @@ public actor KeychainStorage {
         try await deleteGatewaySessionInternal(for: did)
     }
 
-    /// Atomically deletes the gateway session for a specific account if and only if
+    /// Deletes the gateway session for a specific account if and only if
     /// the currently stored exact per-DID session matches `expectedSession`.
+    ///
+    /// Coordination uses a process-local gate combined with authoritative (cache-bypassing)
+    /// keychain reads rather than kernel-level CAS primitives.
     /// - Returns: `true` if the session matched and was deleted, `false` if missing or mismatched.
     func deleteGatewaySession(ifMatches expectedSession: String, for did: String) async throws -> Bool {
         let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
@@ -847,11 +850,16 @@ public actor KeychainStorage {
             throw error
         }
     }
-    /// Reads the selector directly, without any migration or mutation behavior.
+    /// Reads the selector directly using authoritative (cache-bypassing) keychain reads.
     private func readExactCurrentDID() async throws -> String? {
         let key = makeKey("currentDID")
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            let data = try await KeychainManager.retrieveAsync(
+                key: key,
+                namespace: namespace,
+                accessGroup: accessGroup,
+                bypassCache: true
+            )
             guard let did = String(data: data, encoding: .utf8) else {
                 throw KeychainError.dataFormatError
             }
@@ -862,11 +870,16 @@ public actor KeychainStorage {
         }
     }
 
-    /// Reads the exact per-DID gateway session directly without legacy migration or side effects.
+    /// Reads the exact per-DID gateway session directly using authoritative (cache-bypassing) keychain reads.
     private func readExactPerDIDGatewaySession(for did: String) async throws -> String? {
         let key = makeKey("gatewaySession", did: did)
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            let data = try await KeychainManager.retrieveAsync(
+                key: key,
+                namespace: namespace,
+                accessGroup: accessGroup,
+                bypassCache: true
+            )
             guard let session = String(data: data, encoding: .utf8) else {
                 LogManager.logError("KeychainStorage - Stored gateway session is not valid UTF-8 for key \(namespace).\(key)")
                 throw KeychainError.dataFormatError
@@ -883,6 +896,9 @@ public actor KeychainStorage {
     /// Serialized compare-and-swap of gateway session.
     /// Verifies current stored session for `did` matches `expectedOldSession`
     /// and current stored DID equals `did` before replacing it.
+    ///
+    /// Coordination uses a process-local gate combined with authoritative (cache-bypassing)
+    /// keychain reads rather than kernel-level CAS primitives.
     func compareAndSwapGatewaySession(
         expectedOldSession: String,
         newSession: String,

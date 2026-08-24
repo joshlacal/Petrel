@@ -1375,13 +1375,27 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                    let recovery = try await recoverablePendingCandidate(for: account.did)
                 {
                     // A recoverable candidate owns the old anchor until CAS succeeds.
-                    try await attemptRecoveryFromServerFailuresLocked(for: account.did)
-                    guard let session = try await storage.getGatewaySession(for: account.did),
-                          session == recovery.1
-                    else {
-                        throw GatewayError.invalidSession
+                    do {
+                        try await attemptRecoveryFromServerFailuresLocked(for: account.did)
+                        guard let session = try await storage.getGatewaySession(for: account.did),
+                              session == recovery.1
+                        else {
+                            throw GatewayError.invalidSession
+                        }
+                        throw GatewayError.authenticationRequired
+                    } catch {
+                        if isRetryableCandidateRecoveryError(error) {
+                            logger.warning(
+                                "Gateway terminal 401: candidate recovery encountered retryable error, preserving old+pending state: \(error.localizedDescription)"
+                            )
+                            throw GatewayError.upgradeTemporarilyUnavailable
+                        } else {
+                            logger.warning(
+                                "Gateway terminal 401: candidate recovery encountered terminal error: \(error.localizedDescription)"
+                            )
+                            throw error
+                        }
                     }
-                    throw GatewayError.authenticationRequired
                 }
                 guard let currentAccount = await accountManager.getCurrentAccount() else {
                     logger.warning(

@@ -5496,4 +5496,392 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertFalse(emptyResult)
         }
     }
+
+    func testCrossInstanceStaleCacheCompareDeleteObservesAuthoritativeBackendValueAndPreservesNewerSession() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.stale.cache.comparedelete.\(UUID().uuidString)"
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let oldSession = "session-v1-old"
+            let newerSession = "session-v2-newer"
+
+            // 1. Store oldSession through storage and warm KeychainManager's in-memory cache
+            try await storage.saveGatewaySession(oldSession, for: alice)
+            try await storage.saveCurrentDID(alice)
+            let cachedSession = try await storage.getGatewaySession(for: alice)
+            let cachedDID = try await storage.getCurrentDID()
+            XCTAssertEqual(cachedSession, oldSession)
+            XCTAssertEqual(cachedDID, alice)
+
+            // 2. Simulate external cross-instance write: mutate backend directly to newerSession without clearing cache
+            backend.plant(key: "gatewaySession.\(alice)", namespace: namespace, data: newerSession.data(using: .utf8)!)
+
+            // 3. Stale 401 arrives presenting oldSession -> call deleteGatewaySession(ifMatches: oldSession, for: alice)
+            // Authoritative bypassCache: true reads newerSession from backend, detects mismatch, returns false
+            let deleted = try await storage.deleteGatewaySession(ifMatches: oldSession, for: alice)
+            XCTAssertFalse(deleted, "Compare-delete must return false when backend has newer session")
+
+            // 4. Verify newerSession is preserved in backend
+            let backendData = backend.peek(key: "gatewaySession.\(alice)", namespace: namespace)
+            XCTAssertNotNil(backendData)
+            XCTAssertEqual(String(data: backendData!, encoding: .utf8), newerSession, "Newer session must be preserved in backend")
+
+            // 5. Subsequent delete matching the actual authoritative session returns true and deletes it
+            let deletedNewer = try await storage.deleteGatewaySession(ifMatches: newerSession, for: alice)
+            XCTAssertTrue(deletedNewer)
+            let peekAfterDelete = backend.peek(key: "gatewaySession.\(alice)", namespace: namespace)
+            XCTAssertNil(peekAfterDelete)
+        }
+    }
+
+    func testCrossInstanceStaleCacheCASObservesAuthoritativeBackendValueAndPreservesNewerSession() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.stale.cache.cas.session.\(UUID().uuidString)"
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let oldSession = "session-v1-old"
+            let newerSession = "session-v2-newer"
+
+            // 1. Store oldSession through storage and warm KeychainManager's cache
+            try await storage.saveGatewaySession(oldSession, for: alice)
+            try await storage.saveCurrentDID(alice)
+            let cachedSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(cachedSession, oldSession)
+
+            // 2. Mutate backend directly to newerSession without clearing cache
+            backend.plant(key: "gatewaySession.\(alice)", namespace: namespace, data: newerSession.data(using: .utf8)!)
+
+            // 3. Attempt CAS expecting oldSession
+            let casResult = try await storage.compareAndSwapGatewaySession(
+                expectedOldSession: oldSession,
+                newSession: "session-v3-candidate",
+                for: alice
+            )
+            XCTAssertFalse(casResult, "CAS must fail when backend authoritative session does not match expectedOldSession")
+
+            // 4. Newer session must remain in backend
+            let backendData = backend.peek(key: "gatewaySession.\(alice)", namespace: namespace)
+            XCTAssertNotNil(backendData)
+            XCTAssertEqual(String(data: backendData!, encoding: .utf8), newerSession)
+        }
+    }
+
+    func testCrossInstanceStaleCacheCASObservesAuthoritativeCurrentDIDAndPreservesSession() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.stale.cache.cas.did.\(UUID().uuidString)"
+            let alice = self.aliceDID
+            let bob = self.bobDID
+            let storage = KeychainStorage(namespace: namespace)
+            let session = "session-alice-1"
+
+            // 1. Store session and currentDID = alice and warm cache
+            try await storage.saveGatewaySession(session, for: alice)
+            try await storage.saveCurrentDID(alice)
+            let cachedDID = try await storage.getCurrentDID()
+            XCTAssertEqual(cachedDID, alice)
+
+            // 2. Mutate backend currentDID directly to bob without clearing cache
+            backend.plant(key: "currentDID", namespace: namespace, data: bob.data(using: .utf8)!)
+
+            // 3. Attempt CAS for alice expecting session
+            let casResult = try await storage.compareAndSwapGatewaySession(
+                expectedOldSession: session,
+                newSession: "session-alice-promoted",
+                for: alice
+            )
+            XCTAssertFalse(casResult, "CAS must fail when backend authoritative currentDID does not match target DID")
+
+            // 4. Verify alice's session is untouched
+            let backendData = backend.peek(key: "gatewaySession.\(alice)", namespace: namespace)
+            XCTAssertNotNil(backendData)
+            XCTAssertEqual(String(data: backendData!, encoding: .utf8), session)
+        }
+    }
+
+    func testSSEStreamTerminationCancelsProducerAndReleasesLease() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.sse.termination.lease.\(UUID().uuidString)"
+            let sessionUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(sessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let networkService = NetworkService(
+                baseURL: self.gatewayURL,
+                authService: strategy
+            )
+
+            let streamReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/com.atproto.sync.subscribeRepos"))
+            let leaseAcquired = TestAsyncGate()
+
+            let stream = AsyncThrowingStream<String, Error> { continuation in
+                let producerTask = Task {
+                    do {
+                        let preparedRequest = try await networkService.prepareStreamingRequest(streamReq)
+                        defer {
+                            preparedRequest.releaseAuthenticationLease()
+                        }
+                        leaseAcquired.open()
+
+                        while !Task.isCancelled {
+                            try await Task.sleep(nanoseconds: 50_000_000)
+                        }
+                    } catch {
+                        continuation.finish(throwing: error)
+                        return
+                    }
+                    continuation.finish()
+                }
+
+                continuation.onTermination = { @Sendable _ in
+                    producerTask.cancel()
+                }
+            }
+
+            let consumerTask = Task {
+                for try await _ in stream {
+                    break
+                }
+            }
+
+            await leaseAcquired.wait()
+
+            consumerTask.cancel()
+            _ = try? await consumerTask.value
+
+            try await Task.sleep(nanoseconds: 100_000_000)
+
+            let tokensExist = await strategy.tokensExist()
+            XCTAssertTrue(tokensExist, "Coordinator lease must be free after SSE stream termination")
+        }
+    }
+
+    func testTerminal401WithItemStoreErrorPreservesPendingStateAndEmitsNoAutoLogout() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.terminal.401.itemstoreerror.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "abcdefg123456",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let logoutEvents = TestThreadSafeArray<AuthEvent>()
+            await AuthEventBroadcaster.shared.addObserver { event in
+                if case .autoLogoutTriggered = event {
+                    logoutEvents.append(event)
+                }
+            }
+            defer {
+                Task {
+                    await AuthEventBroadcaster.shared.removeAllObservers()
+                }
+            }
+
+            backend.failStoreMatching = { key in
+                key.contains("gatewaySession")
+            }
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let gateway401Response = HTTPURLResponse(
+                url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let terminal401Body = #"{"error":"invalid_session","message":"The token has expired"}"#.data(using: .utf8)!
+
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: req
+                )
+                XCTFail("handleUnauthorizedResponse must throw when recovery fails on terminal 401")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .upgradeTemporarilyUnavailable = error else {
+                    XCTFail("Expected .upgradeTemporarilyUnavailable, got \(error)")
+                    return
+                }
+            } catch {
+                XCTFail("Expected GatewayError, got \(error)")
+            }
+
+            await PetrelAuthEvents.drain()
+
+            XCTAssertEqual(logoutEvents.values.count, 0, "No autoLogoutTriggered event must be broadcast for retryable itemStoreError")
+
+            let sessionAfter401 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfter401, oldSessionUUID, "Old session must NOT be deleted after terminal 401 when recovery fails with itemStoreError")
+            let pendingAfter401 = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfter401, "Pending upgrade state must NOT be deleted after terminal 401 when recovery fails with itemStoreError")
+
+            backend.failStoreMatching = nil
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            try await strategy.attemptRecoveryFromServerFailures(for: alice)
+            let promotedSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(promotedSession, candidateUUID, "Candidate session must be promoted once storage recovers")
+        }
+    }
+
+    func testTerminal401WithDeletionErrorPreservesPendingStateAndEmitsNoAutoLogout() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.terminal.401.deletionerror.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "abcdefg123456",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let logoutEvents = TestThreadSafeArray<AuthEvent>()
+            await AuthEventBroadcaster.shared.addObserver { event in
+                if case .autoLogoutTriggered = event {
+                    logoutEvents.append(event)
+                }
+            }
+            defer {
+                Task {
+                    await AuthEventBroadcaster.shared.removeAllObservers()
+                }
+            }
+
+            backend.failDeleteMatching = { key in
+                key.contains("pendingGatewayUpgrade")
+            }
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let gateway401Response = HTTPURLResponse(
+                url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let terminal401Body = #"{"error":"invalid_session","message":"The token has expired"}"#.data(using: .utf8)!
+
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: req
+                )
+                XCTFail("handleUnauthorizedResponse must throw when recovery fails on terminal 401")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .upgradeTemporarilyUnavailable = error else {
+                    XCTFail("Expected .upgradeTemporarilyUnavailable, got \(error)")
+                    return
+                }
+            } catch {
+                XCTFail("Expected GatewayError, got \(error)")
+            }
+
+            await PetrelAuthEvents.drain()
+
+            XCTAssertEqual(logoutEvents.values.count, 0, "No autoLogoutTriggered event must be broadcast for retryable deletionError")
+
+            backend.failDeleteMatching = nil
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            try await strategy.attemptRecoveryFromServerFailures(for: alice)
+            let promotedSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(promotedSession, candidateUUID, "Candidate session must be promoted once deletion error clears")
+            let pendingAfterSuccess = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfterSuccess, "Pending upgrade data must be cleaned up on promotion")
+        }
+    }
 }
