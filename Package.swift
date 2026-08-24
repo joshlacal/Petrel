@@ -129,7 +129,7 @@ let package = Package(
         .target(
             name: "PetrelPLC",
             dependencies: [
-                "Petrel",
+                "PetrelCore",
                 "PetrelCrypto",
                 .product(name: "Crypto", package: "swift-crypto"),
             ],
@@ -163,7 +163,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PetrelPLCTests",
-            dependencies: ["PetrelPLC", "PetrelCrypto"]
+            dependencies: ["PetrelPLC", "PetrelCrypto", "PetrelCore"]
         ),
         .testTarget(
             name: "PetrelLoadTests",

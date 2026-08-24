@@ -42,6 +42,11 @@ extension ATProtoLink: ATProtocolValue {
         guard let otherLink = other as? ATProtoLink else { return false }
         return cid == otherLink.cid
     }
+
+    public func isEqual(to other: any ATProtocolCodable) -> Bool {
+        guard let otherLink = other as? ATProtoLink else { return false }
+        return cid == otherLink.cid
+    }
 }
 
 extension CID: ATProtocolValue {

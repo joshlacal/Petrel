@@ -1,5 +1,5 @@
 import Foundation
-import Petrel
+import PetrelCore
 import PetrelCrypto
 @testable import PetrelPLC
 import XCTest

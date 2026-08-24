@@ -1,5 +1,5 @@
 import Foundation
-import Petrel
+import PetrelCore
 import PetrelCrypto
 
 public enum PLCHTTPMethod: String, Sendable, Equatable {

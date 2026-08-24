@@ -1,6 +1,6 @@
 import Crypto
 import Foundation
-import Petrel
+import PetrelCore
 import PetrelCrypto
 
 public struct PLCService: Codable, Sendable, Equatable {

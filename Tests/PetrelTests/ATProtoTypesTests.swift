@@ -342,4 +342,24 @@ struct ATProtoTypesTests {
             }
         }
     }
+
+    @Suite("ATProtoLink Equality Tests")
+    struct ATProtoLinkEqualityTests {
+        @Test("ATProtoLink isEqual to ATProtocolCodable and ATProtocolValue")
+        func linkIsEqualOverloads() throws {
+            let link1 = try ATProtoLink(cidString: "bafyreidfayvfuwqa7qgahxgn2xrq2xrq2xrq2xrq2xrq2xrq2xrq2xrq2y")
+            let link2 = try ATProtoLink(cidString: "bafyreidfayvfuwqa7qgahxgn2xrq2xrq2xrq2xrq2xrq2xrq2xrq2xrq2y")
+            let link3 = try ATProtoLink(cidString: "bafkreibm6jg3ux5qumhcn2b3flc3avznodquxdakgg5eafxf72bonstpxm")
+
+            let codableLink2: any ATProtocolCodable = link2
+            let codableLink3: any ATProtocolCodable = link3
+            let valueLink2: any ATProtocolValue = link2
+            let valueLink3: any ATProtocolValue = link3
+
+            #expect(link1.isEqual(to: codableLink2))
+            #expect(!link1.isEqual(to: codableLink3))
+            #expect(link1.isEqual(to: valueLink2))
+            #expect(!link1.isEqual(to: valueLink3))
+        }
+    }
 }
