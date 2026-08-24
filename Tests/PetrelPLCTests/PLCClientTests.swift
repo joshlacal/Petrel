@@ -597,8 +597,9 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportCancelsOversizedStreamingResponseWithExplicitSynchronization() async throws {
         MockPLCHTTPURLProtocol.reset()
         let stopExpectation = expectation(description: "stopLoading must be called when streaming exceeds bound")
+        stopExpectation.expectedFulfillmentCount = 1
+        stopExpectation.assertForOverFulfill = true
         MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
-
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
         let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
@@ -635,13 +636,13 @@ final class PLCClientTests: XCTestCase {
 
         let chunk1 = Data(repeating: 0x41, count: 600)
         streamContinuation?.yield(chunk1)
-        await MockPLCHTTPURLProtocol.waitForChunk()
+        await MockPLCHTTPURLProtocol.waitForChunk(after: 0)
 
         let chunk2 = Data(repeating: 0x42, count: 600)
         streamContinuation?.yield(chunk2)
         await fulfillment(of: [stopExpectation], timeout: 2.0)
         XCTAssertTrue(MockPLCHTTPURLProtocol.isStopLoadingCalled)
-
+        XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 1)
         let chunk3 = Data(repeating: 0x43, count: 500)
         streamContinuation?.yield(chunk3)
         streamContinuation?.finish()
@@ -662,6 +663,7 @@ final class PLCClientTests: XCTestCase {
         XCTAssertEqual(transport.lastAcceptedBytes, 600)
         XCTAssertEqual(MockPLCHTTPURLProtocol.chunksDeliveredAfterStop, 0)
         XCTAssertEqual(MockPLCHTTPURLProtocol.bytesDeliveredAfterStop, 0)
+        XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 1)
     }
 
     func testURLSessionPLCTransportSingleCallbackExceedingLimitRejectsWithoutBuffering() async throws {
@@ -749,6 +751,7 @@ final class PLCClientTests: XCTestCase {
 
         await fulfillment(of: [stopExpectation], timeout: 0.1)
         XCTAssertFalse(MockPLCHTTPURLProtocol.isStopLoadingCalled)
+        XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 0)
         XCTAssertEqual(transport.lastAcceptedBytes, 0)
     }
 
@@ -841,8 +844,9 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportPropagatesTaskCancellation() async throws {
         MockPLCHTTPURLProtocol.reset()
         let stopExpectation = expectation(description: "stopLoading must be called on in-flight cancellation")
+        stopExpectation.expectedFulfillmentCount = 1
+        stopExpectation.assertForOverFulfill = true
         MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
-
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
         let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
@@ -889,6 +893,7 @@ final class PLCClientTests: XCTestCase {
 
         await fulfillment(of: [stopExpectation], timeout: 2.0)
         XCTAssertTrue(MockPLCHTTPURLProtocol.isStopLoadingCalled)
+        XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 1)
         XCTAssertEqual(transport.lastAcceptedBytes, 0)
     }
 
@@ -1114,13 +1119,14 @@ private final class CancelGate: @unchecked Sendable {
 
 final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
     typealias Handler = @Sendable (URLRequest) async throws -> (HTTPURLResponse, Data)
-    typealias StreamHandler = @Sendable (URLRequest) async throws -> (HTTPURLResponse, AsyncStream<Data>)
+    typealias StreamHandler = @Sendable (URLRequest) throws -> (HTTPURLResponse, AsyncStream<Data>)
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var _handler: Handler?
     nonisolated(unsafe) private static var _streamHandler: StreamHandler?
     nonisolated(unsafe) private static var _startContinuation: CheckedContinuation<Void, Never>?
-    nonisolated(unsafe) private static var _chunkContinuation: CheckedContinuation<Void, Never>?
+    nonisolated(unsafe) private static var _deliveredChunkCount = 0
+    nonisolated(unsafe) private static var _chunkWaiters: [(targetCount: Int, continuation: CheckedContinuation<Void, Never>)] = []
     nonisolated(unsafe) private static var _isStartLoadingCalled = false
     nonisolated(unsafe) private static var _startExpectation: XCTestExpectation?
     nonisolated(unsafe) private static var _stopExpectation: XCTestExpectation?
@@ -1156,6 +1162,10 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
         set { lock.withLock { _stopExpectation = newValue } }
     }
 
+    static var deliveredChunkCount: Int {
+        lock.withLock { _deliveredChunkCount }
+    }
+
     static var stopCallCount: Int {
         lock.withLock { _stopCallCount }
     }
@@ -1181,13 +1191,14 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     static func reset() {
-        lock.withLock {
+        let waiters = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
             _handler = nil
             _streamHandler = nil
             _startContinuation?.resume()
             _startContinuation = nil
-            _chunkContinuation?.resume()
-            _chunkContinuation = nil
+            let waiters = _chunkWaiters.map(\.continuation)
+            _chunkWaiters.removeAll()
+            _deliveredChunkCount = 0
             _isStartLoadingCalled = false
             _startExpectation = nil
             _stopExpectation = nil
@@ -1199,6 +1210,10 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
             _chunksDeliveredAfterStop = 0
             _bytesDeliveredBeforeStop = 0
             _bytesDeliveredAfterStop = 0
+            return waiters
+        }
+        for waiter in waiters {
+            waiter.resume()
         }
     }
 
@@ -1229,18 +1244,37 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     static func recordChunkDelivered() {
-        let cont = lock.withLock { () -> CheckedContinuation<Void, Never>? in
-            let c = _chunkContinuation
-            _chunkContinuation = nil
-            return c
+        let waitersToResume = lock.withLock { () -> [CheckedContinuation<Void, Never>] in
+            _deliveredChunkCount += 1
+            var toResume: [CheckedContinuation<Void, Never>] = []
+            _chunkWaiters.removeAll { waiter in
+                if _deliveredChunkCount > waiter.targetCount {
+                    toResume.append(waiter.continuation)
+                    return true
+                }
+                return false
+            }
+            return toResume
         }
-        cont?.resume()
+        for continuation in waitersToResume {
+            continuation.resume()
+        }
     }
 
-    static func waitForChunk() async {
+    static func waitForChunk(after target: Int = 0) async {
+        let alreadyDelivered = lock.withLock { _deliveredChunkCount > target }
+        if alreadyDelivered { return }
         await withCheckedContinuation { continuation in
-            lock.withLock {
-                _chunkContinuation = continuation
+            let shouldResumeImmediately = lock.withLock { () -> Bool in
+                if _deliveredChunkCount > target {
+                    return true
+                } else {
+                    _chunkWaiters.append((targetCount: target, continuation: continuation))
+                    return false
+                }
+            }
+            if shouldResumeImmediately {
+                continuation.resume()
             }
         }
     }
@@ -1281,23 +1315,15 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
         let clientTransfer = UnsafeTransfer(value: self.client)
         let protoTransfer = UnsafeTransfer(value: self)
 
-        instanceLock.withLock {
-            loaderTask = Task.detached {
-                let proto = protoTransfer.value
-                if let streamHandler {
-                    do {
-                        let (response, stream) = try await streamHandler(currentRequest)
-                        let stopped = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
-                        guard !stopped else { return }
+        if let streamHandler {
+            do {
+                let (response, stream) = try streamHandler(currentRequest)
+                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+                Self.recordStart()
 
-                        clientTransfer.value?.urlProtocol(
-                            proto,
-                            didReceive: response,
-                            cacheStoragePolicy: .notAllowed
-                        )
-                        Self.recordStart()
-                        try? await Task.sleep(nanoseconds: 20_000_000)
-
+                instanceLock.withLock {
+                    loaderTask = Task.detached {
+                        let proto = protoTransfer.value
                         for await chunk in stream {
                             let stoppedDuringStream = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
                             guard !stoppedDuringStream else {
@@ -1314,18 +1340,20 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
                             }
                             clientTransfer.value?.urlProtocol(proto, didLoad: chunk)
                             Self.recordChunkDelivered()
-                            try? await Task.sleep(nanoseconds: 20_000_000)
                         }
 
                         let stoppedAfterStream = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
                         guard !stoppedAfterStream else { return }
                         clientTransfer.value?.urlProtocolDidFinishLoading(proto)
-                    } catch {
-                        let stopped = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
-                        guard !stopped else { return }
-                        clientTransfer.value?.urlProtocol(proto, didFailWithError: error)
                     }
-                } else if let handler {
+                }
+            } catch {
+                client?.urlProtocol(self, didFailWithError: error)
+            }
+        } else if let handler {
+            instanceLock.withLock {
+                loaderTask = Task.detached {
+                    let proto = protoTransfer.value
                     do {
                         Self.recordStart()
                         let (response, data) = try await handler(currentRequest)
@@ -1358,27 +1386,26 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {
-        let (taskToCancel, stopExp, stopCont) = instanceLock.withLock { () -> (Task<Void, Never>?, XCTestExpectation?, CheckedContinuation<Void, Never>?) in
-            guard !isStopped else { return (nil, nil, nil) }
+        let (exp, cont) = Self.lock.withLock { () -> (XCTestExpectation?, CheckedContinuation<Void, Never>?) in
+            Self._stopCallCount += 1
+            Self._isStopLoadingCalled = true
+            let e = Self._stopExpectation
+            let c = Self._stopContinuation
+            Self._stopContinuation = nil
+            return (e, c)
+        }
+
+        exp?.fulfill()
+        cont?.resume()
+
+        let taskToCancel = instanceLock.withLock { () -> Task<Void, Never>? in
+            guard !isStopped else { return nil }
             isStopped = true
             let task = loaderTask
-            loaderTask?.cancel()
             loaderTask = nil
-
-            let (exp, cont) = Self.lock.withLock { () -> (XCTestExpectation?, CheckedContinuation<Void, Never>?) in
-                Self._stopCallCount += 1
-                Self._isStopLoadingCalled = true
-                let e = Self._stopExpectation
-                Self._stopExpectation = nil
-                let c = Self._stopContinuation
-                Self._stopContinuation = nil
-                return (e, c)
-            }
-            return (task, exp, cont)
+            return task
         }
 
         taskToCancel?.cancel()
-        stopExp?.fulfill()
-        stopCont?.resume()
     }
 }
