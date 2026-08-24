@@ -3062,9 +3062,9 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         }
     }
 
-    func testLogoutClearsPendingUpgradeAndAllowsFreshSameDIDCallback() async throws {
-        try await withInMemoryBackend { _ in
-            let namespace = "test.gateway.logout.abandonment.\(UUID().uuidString)"
+    func testLogoutCandidateAbandonmentDeletesPendingBeforeRemoteLogout() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.logout.candidate.abandonment.\(UUID().uuidString)"
             let oldSessionUUID = UUID().uuidString.lowercased()
             let candidateUUID = UUID().uuidString.lowercased()
             let freshSessionUUID = UUID().uuidString.lowercased()
@@ -3086,10 +3086,13 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             """.data(using: .utf8)!
             try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
 
-            // Setup mock handler for logout (best effort)
+            // Setup mock handler for logout that peeks storage to verify pending data was deleted BEFORE /auth/logout
+            GatewayUpgradeTestURLProtocol.reset()
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 let path = request.url?.path ?? ""
                 if path == "/auth/logout" {
+                    let pendingPeek = backend.peek(key: "pendingGatewayUpgrade.\(alice)", namespace: namespace)
+                    XCTAssertNil(pendingPeek, "Pending upgrade data must be deleted before remote /auth/logout request is issued")
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return (resp, #"{"status":"ok"}"#.data(using: .utf8)!)
                 }
@@ -3141,6 +3144,104 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         }
     }
 
+    func testLogoutPreCandidateAbandonmentDeletesPendingBeforeRemoteLogout() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.logout.precandidate.abandonment.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant pre-candidate pending upgrade state (no candidateSession)
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback"
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Setup mock handler for logout that peeks storage to verify pending data was deleted BEFORE /auth/logout
+            GatewayUpgradeTestURLProtocol.reset()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/logout" {
+                    let pendingPeek = backend.peek(key: "pendingGatewayUpgrade.\(alice)", namespace: namespace)
+                    XCTAssertNil(pendingPeek, "Pre-candidate pending upgrade data must be deleted before remote /auth/logout request is issued")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"status":"ok"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Perform explicit logout
+            try await client.logout()
+
+            // 1. Pending upgrade state must be deleted
+            let pendingAfterLogout = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfterLogout, "Pending gateway upgrade must be deleted on logout")
+
+            // 2. Gateway session and current account must be cleared
+            let sessionAfterLogout = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(sessionAfterLogout, "Gateway session must be deleted on logout")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertNil(currentAccount, "Current account must be cleared on logout")
+        }
+    }
+
+    func testLogoutAbandonmentClearsLocalStateEvenWhenRemoteLogoutUnavailable() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.logout.remote.unavailable.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Setup mock handler for logout that fails with network error
+            GatewayUpgradeTestURLProtocol.reset()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/logout" {
+                    let pendingPeek = backend.peek(key: "pendingGatewayUpgrade.\(alice)", namespace: namespace)
+                    XCTAssertNil(pendingPeek, "Pending upgrade data must be deleted before remote logout call even when remote is down")
+                    throw URLError(.notConnectedToInternet)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Best-effort remote logout must not throw
+            try await client.logout()
+
+            // 1. Pending upgrade state must be deleted
+            let pendingAfterLogout = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfterLogout, "Pending gateway upgrade must be deleted on logout even if remote failed")
+
+            // 2. Gateway session and current account must be cleared
+            let sessionAfterLogout = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(sessionAfterLogout, "Gateway session must be deleted on logout even if remote failed")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertNil(currentAccount, "Current account must be cleared on logout even if remote failed")
+        }
+    }
+
     func testLogoutFailsWhenPendingUpgradeDeletionFailsPreservingSessionAndAccount() async throws {
         try await withInMemoryBackend { backend in
             let namespace = "test.gateway.logout.fail.\(UUID().uuidString)"
@@ -3164,6 +3265,13 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             """.data(using: .utf8)!
             try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
 
+            // Install URLProtocol handler that fails if any network request occurs
+            GatewayUpgradeTestURLProtocol.reset()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                XCTFail("No network request should occur when pending upgrade deletion fails: \(request.url?.absoluteString ?? "")")
+                return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
             // Inject failure when deleting pending gateway upgrade
             backend.failDeleteMatching = { key in
                 key.contains("pendingGatewayUpgrade")
@@ -3173,6 +3281,10 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 try await client.logout()
                 XCTFail("Logout must throw when deleting pending upgrade fails")
             } catch {}
+
+            // Assert zero requests occurred
+            let requests = GatewayUpgradeTestURLProtocol.recordedRequests()
+            XCTAssertEqual(requests.count, 0, "Zero network requests must be made when pending deletion fails")
 
             // Verify session, selector, and pending data are NOT deleted
             let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)

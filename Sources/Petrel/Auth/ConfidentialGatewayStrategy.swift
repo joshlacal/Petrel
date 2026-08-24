@@ -466,6 +466,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
         let did = currentAccount.did
 
+        // Delete pending gateway upgrade data FIRST.
+        // If it throws, propagate immediately: zero `/auth/logout` request,
+        // old session/current selector untouched. This is explicit abandonment ordering.
+        logger.info("🚪 Clearing pending gateway upgrade data for DID \(did.prefix(20))...")
+        try await storage.deletePendingGatewayUpgradeData(for: did)
+
         // Best-effort call to gateway to invalidate session server-side
         if let session = try? await storage.getGatewaySession(for: did) {
             let logoutURL = gatewayURL.appendingPathComponent("auth/logout")
@@ -498,12 +504,6 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 "🚪 No gateway session found for DID \(did.prefix(20))..., skipping gateway logout call"
             )
         }
-        // Delete pending gateway upgrade data before deleting session or current selector.
-        // If pending deletion fails, logout throws and must NOT delete session/current selector,
-        // preserving recoverability.
-        logger.info("🚪 Clearing pending gateway upgrade data for DID \(did.prefix(20))...")
-        try await storage.deletePendingGatewayUpgradeData(for: did)
-
         // Always clear local session for this account
         logger.info("🚪 Clearing local gateway session for DID \(did.prefix(20))...")
         try await storage.deleteGatewaySession(for: did)
