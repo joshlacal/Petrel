@@ -327,24 +327,93 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
     }
 
-    /// Coordinates stateful lifecycle operations serially to prevent actor reentrancy races.
-    private actor SerialOperationCoordinator {
-        private var previousTask: Task<Void, Never>?
+    /// Coordinates stateful lifecycle operations serially to prevent actor reentrancy races
+    /// and grants authenticated request leases while requests are launched.
+    final class SerialOperationCoordinator: @unchecked Sendable {
+        private struct Waiter {
+            let id: UUID
+            let continuation: CheckedContinuation<AuthenticationRequestLease, Error>
+        }
+
+        private let lock = NSLock()
+        private var isHeld: Bool = false
+        private var queue: [Waiter] = []
+
+        func acquireLease() async throws -> AuthenticationRequestLease {
+            try Task.checkCancellation()
+
+            let waiterID = UUID()
+            let lease: AuthenticationRequestLease = try await withTaskCancellationHandler {
+                try await withCheckedThrowingContinuation { continuation in
+                    lock.lock()
+                    if !isHeld {
+                        isHeld = true
+                        lock.unlock()
+                        continuation.resume(returning: makeLease())
+                    } else {
+                        queue.append(Waiter(id: waiterID, continuation: continuation))
+                        lock.unlock()
+                    }
+                }
+            } onCancel: {
+                self.cancelWaiter(id: waiterID)
+            }
+
+            if Task.isCancelled {
+                lease.release()
+                throw CancellationError()
+            }
+            return lease
+        }
+
+        private func makeLease() -> AuthenticationRequestLease {
+            AuthenticationRequestLease { [weak self] in
+                self?.releaseLease()
+            }
+        }
+
+        private func cancelWaiter(id: UUID) {
+            lock.lock()
+            if let index = queue.firstIndex(where: { $0.id == id }) {
+                let waiter = queue.remove(at: index)
+                lock.unlock()
+                waiter.continuation.resume(throwing: CancellationError())
+            } else {
+                lock.unlock()
+            }
+        }
+
+        private func releaseLease() {
+            var nextWaiter: Waiter?
+            lock.lock()
+            if !queue.isEmpty {
+                nextWaiter = queue.removeFirst()
+            }
+            if let nextWaiter {
+                lock.unlock()
+                nextWaiter.continuation.resume(returning: makeLease())
+            } else {
+                isHeld = false
+                lock.unlock()
+            }
+        }
 
         func run<T: Sendable>(_ operation: @Sendable @escaping () async throws -> T) async throws -> T {
-            let prev = previousTask
-            let currentTask = Task<T, Error> {
-                _ = await prev?.result
-                try Task.checkCancellation()
-                return try await operation()
+            let lease = try await acquireLease()
+            defer {
+                lease.release()
             }
-            previousTask = Task {
-                _ = await currentTask.result
-            }
-            return try await withTaskCancellationHandler {
-                try await currentTask.value
-            } onCancel: {
-                currentTask.cancel()
+            return try await operation()
+        }
+
+        deinit {
+            lock.lock()
+            let remaining = queue
+            queue.removeAll()
+            isHeld = false
+            lock.unlock()
+            for waiter in remaining {
+                waiter.continuation.resume(throwing: CancellationError())
             }
         }
     }
@@ -1132,6 +1201,10 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
     // MARK: - AuthenticationProvider
 
+    /// Prepares an authenticated request using the gateway session.
+    /// Note: NetworkService protected paths use `prepareAuthenticatedRequestWithContext` to hold the authentication
+    /// lifecycle lease through network request launch. Plain `prepareAuthenticatedRequest` executes under the lifecycle
+    /// gate without returning a lease handle.
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {
         try await coordinator.run { [self] in
             try await self.prepareAuthenticatedRequestLocked(request)
@@ -1141,10 +1214,14 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (
         URLRequest, AuthContext
     ) {
-        try await coordinator.run { [self] in
+        let lease = try await coordinator.acquireLease()
+        do {
             let authed = try await self.prepareAuthenticatedRequestLocked(request)
             // For gateway auth, we don't have DID/JKT at request time - gateway handles it
-            return (authed, AuthContext(did: nil, jkt: nil))
+            return (authed, AuthContext(did: nil, jkt: nil, lease: lease))
+        } catch {
+            lease.release()
+            throw error
         }
     }
 

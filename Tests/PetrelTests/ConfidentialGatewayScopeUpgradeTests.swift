@@ -127,6 +127,23 @@ private final class TestAtomicCounter: @unchecked Sendable {
     }
 }
 
+private final class TestThreadSafeArray<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var items: [T] = []
+
+    func append(_ item: T) {
+        lock.withLock {
+            items.append(item)
+        }
+    }
+
+    var values: [T] {
+        lock.withLock {
+            items
+        }
+    }
+}
+
 private final class ThrowingStorageBackend: SecureStorage, @unchecked Sendable {
     let errorToThrow: Error
     init(errorToThrow: Error) { self.errorToThrow = errorToThrow }
@@ -4468,7 +4485,6 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
 
             // Cancel task 2 while queued
             task2.cancel()
-
             // Release task 1
             op1Release.open()
 
@@ -4489,10 +4505,364 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertEqual(authedReq3.value(forHTTPHeaderField: "Authorization"), "Bearer \(initialSessionUUID)")
             XCTAssertNil(ctx3.did)
             XCTAssertNil(ctx3.jkt)
+            ctx3.releaseAuthenticationLease()
 
             // Task 4 must execute and succeed
             let tokensExist = await task4.value
             XCTAssertTrue(tokensExist)
+        }
+    }
+
+    func testCompleteBlockedInCommitQueuesPrepareWithContextAndUnreleasedLeaseBlocksNextMutationUntilReleased() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.complete.blocked.prepare.unreleased.lease.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let commitEntered = TestAsyncGate()
+            let commitRelease = TestAsyncGate()
+            let logoutEntered = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    commitEntered.open()
+                    commitRelease.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/logout" {
+                    logoutEntered.open()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    return (response, "{}".data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await strategy.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+            await commitEntered.wait()
+
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let prepareTask = Task {
+                try await strategy.prepareAuthenticatedRequestWithContext(req)
+            }
+
+            commitRelease.open()
+
+            _ = try await completeTask.value
+            let (authedReq, ctx) = try await prepareTask.value
+            XCTAssertEqual(
+                authedReq.value(forHTTPHeaderField: "Authorization"),
+                "Bearer \(candidateUUID)",
+                "prepareAuthenticatedRequestWithContext must return the candidate session"
+            )
+            XCTAssertNotNil(ctx.lease, "AuthContext must carry an authentication request lease")
+
+            // Start logout task while lease is unreleased - it must wait behind the lease
+            let logoutTask = Task {
+                try await strategy.logout()
+            }
+
+            // Yield execution to allow logoutTask to queue in coordinator
+            await Task.yield()
+
+            // Now release the lease from the prepared request
+            ctx.releaseAuthenticationLease()
+
+            // Logout should now proceed and enter the network handler
+            await logoutEntered.wait()
+            try await logoutTask.value
+
+            let sessionAfter = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(sessionAfter, "Session must be cleared after logout completes")
+        }
+    }
+
+    func testNetworkServiceIntegrationPrepareRequestHoldsLeasePreventingConcurrentCandidateCommitUntilDataFinishes() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.networkservice.lease.race.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback"
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [GatewayUpgradeTestURLProtocol.self]
+            let customSession = URLSession(configuration: config)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager,
+                urlSession: customSession
+            )
+
+            let networkService = NetworkService(
+                baseURL: self.gatewayURL,
+                authService: strategy
+            )
+
+            let profileReqEntered = TestAsyncGate()
+            let profileReqRelease = TestAsyncGate()
+            let commitEntered = TestAsyncGate()
+
+            let capturedAuthHeaders = TestThreadSafeArray<String>()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path.contains("app.bsky.actor.getProfile") {
+                    if let auth = request.value(forHTTPHeaderField: "Authorization") {
+                        capturedAuthHeaders.append(auth)
+                    }
+                    profileReqEntered.open()
+                    profileReqRelease.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    return (response, #"{"did":"\#(alice)","handle":"alice.test"}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade/exchange" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "candidate_session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/upgrade/commit" {
+                    commitEntered.open()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let profileReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+
+            // Launch request 1 through NetworkService - it prepares with oldSessionUUID and holds lease during session.data
+            let profileTask1 = Task {
+                try await networkService.request(profileReq)
+            }
+            await profileReqEntered.wait()
+
+            // At this point, profileTask1 is suspended in session.data, holding the auth lease
+            // Concurrently, candidate completion arrives:
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await strategy.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+
+            // Yield execution to verify completeTask is queued and cannot persist/commit candidate yet
+            await Task.yield()
+
+            let sessionWhileInFlight = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionWhileInFlight, oldSessionUUID, "Session in storage must remain oldSessionUUID while request 1 is in flight")
+
+            // Release profile request 1
+            profileReqRelease.open()
+
+            _ = try await profileTask1.value
+            _ = try await completeTask.value
+
+            let sessionAfterCommit = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterCommit, candidateUUID, "Session in storage must be candidateUUID after complete finishes")
+
+            // Now send request 2 through NetworkService - it must use the new candidateUUID
+            let (data2, res2) = try await networkService.request(profileReq)
+            XCTAssertEqual((res2 as? HTTPURLResponse)?.statusCode, 200)
+            XCTAssertFalse(data2.isEmpty)
+
+            let headers = capturedAuthHeaders.values
+            XCTAssertEqual(headers.count, 2)
+            XCTAssertEqual(headers[0], "Bearer \(oldSessionUUID)", "First request must have sent old bearer while authoritative")
+            XCTAssertEqual(headers[1], "Bearer \(candidateUUID)", "Second request must have sent candidate bearer")
+        }
+    }
+
+    func testExactAndGeneratedAndStreamingPathsReleaseLeaseOnThrownTransportAndSuccess() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.paths.lease.release.\(UUID().uuidString)"
+            let sessionUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(sessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let config = URLSessionConfiguration.ephemeral
+            config.protocolClasses = [GatewayUpgradeTestURLProtocol.self]
+            let customSession = URLSession(configuration: config)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager,
+                urlSession: customSession
+            )
+
+            let networkService = NetworkService(
+                baseURL: self.gatewayURL,
+                authService: strategy
+            )
+
+            // 1. Streaming path: prepareStreamingRequest releases lease on success
+            let streamReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/com.atproto.sync.subscribeRepos"))
+            let preparedStream = try await networkService.prepareStreamingRequest(streamReq)
+            XCTAssertEqual(preparedStream.value(forHTTPHeaderField: "Authorization"), "Bearer \(sessionUUID)")
+
+            // Verify coordinator is free (tokensExist succeeds immediately)
+            let tokensExist1 = await strategy.tokensExist()
+            XCTAssertTrue(tokensExist1)
+
+            // 2. Simple request path: transport throws error -> lease released
+            GatewayUpgradeTestURLProtocol.setHandler { _ in
+                throw URLError(.timedOut)
+            }
+
+            let profileReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await networkService.request(profileReq)
+                XCTFail("Should have thrown error")
+            } catch {
+                // Expected
+            }
+
+            // Verify coordinator is free
+            let tokensExist2 = await strategy.tokensExist()
+            XCTAssertTrue(tokensExist2)
+
+            // 3. Retry loop path: non-retryable transport error -> lease released immediately without loop delay
+            GatewayUpgradeTestURLProtocol.setHandler { _ in
+                throw URLError(.badServerResponse)
+            }
+            do {
+                _ = try await networkService.request(profileReq, skipTokenRefresh: false)
+                XCTFail("Should have thrown error")
+            } catch {
+                // Expected
+            }
+            // Verify coordinator is free
+            let tokensExist3 = await strategy.tokensExist()
+            XCTAssertTrue(tokensExist3)
+
+            // 4. Successful request path -> lease released
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let response = HTTPURLResponse(
+                    url: request.url!,
+                    statusCode: 200,
+                    httpVersion: nil,
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (response, #"{"status":"ok"}"#.data(using: .utf8)!)
+            }
+
+            let (data, res) = try await networkService.request(profileReq)
+            XCTAssertEqual((res as? HTTPURLResponse)?.statusCode, 200)
+            XCTAssertFalse(data.isEmpty)
+
+            // Verify coordinator is free
+            let tokensExist4 = await strategy.tokensExist()
+            XCTAssertTrue(tokensExist4)
         }
     }
 }

@@ -143,10 +143,49 @@ public protocol ConnectionPolicyAdapter: Sendable {
     func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL
 }
 
+/// An internal lease representing exclusive access to authentication lifecycle state while a request is in flight.
+public final class AuthenticationRequestLease: @unchecked Sendable {
+    private let onRelease: (@Sendable () -> Void)?
+    private let lock = NSLock()
+    private var isReleased = false
+
+    init(onRelease: @escaping @Sendable () -> Void) {
+        self.onRelease = onRelease
+    }
+
+    public func release() {
+        let shouldNotify: Bool = lock.withLock {
+            if !isReleased {
+                isReleased = true
+                return true
+            }
+            return false
+        }
+        if shouldNotify {
+            onRelease?()
+        }
+    }
+
+    deinit {
+        release()
+    }
+}
+
 /// Protocol for authentication providers
 public struct AuthContext: Sendable {
     let did: String?
     let jkt: String?
+    let lease: AuthenticationRequestLease?
+
+    init(did: String?, jkt: String?, lease: AuthenticationRequestLease? = nil) {
+        self.did = did
+        self.jkt = jkt
+        self.lease = lease
+    }
+
+    func releaseAuthenticationLease() {
+        lease?.release()
+    }
 }
 
 public protocol AuthenticationProvider: Sendable {
@@ -944,6 +983,9 @@ public actor NetworkService: NetworkServiceProtocol {
         let (_, requiresAuth) = determineEndpointTypeAndAuthRequirement(for: url)
         var requestToSend = request
         var authCtx_simple: AuthContext? = nil
+        defer {
+            authCtx_simple?.releaseAuthenticationLease()
+        }
 
         if requiresAuth {
             guard let authProvider = authProvider else {
@@ -982,6 +1024,7 @@ public actor NetworkService: NetworkServiceProtocol {
         do {
             LogManager.logRequest(requestToSend)
             let (rawData, response) = try await session.data(for: requestToSend)
+            authCtx_simple?.releaseAuthenticationLease()
 
             // Decompress if needed - use case-insensitive header lookup
             var data = rawData
@@ -1080,6 +1123,9 @@ public actor NetworkService: NetworkServiceProtocol {
             var requestToSend = currentRequest
             var requiresAuth = false // Determine based on URL or context
             var authCtx: AuthContext? = nil
+            defer {
+                authCtx?.releaseAuthenticationLease()
+            }
 
             // Determine if authentication is needed (simplified example)
             if let url = requestToSend.url,
@@ -1188,6 +1234,7 @@ public actor NetworkService: NetworkServiceProtocol {
                     // Skip deduplication for refresh requests to avoid circular dependencies
                     try await session.data(for: requestToSend)
                 }
+                authCtx?.releaseAuthenticationLease()
 
                 // Get data and ensure we have a valid HTTP response
                 guard let httpResponse = response as? HTTPURLResponse else {
@@ -1289,9 +1336,10 @@ public actor NetworkService: NetworkServiceProtocol {
                         LogManager.logError(
                             "Network Service - Received 401 but no auth provider or URL for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
                         )
+                        let autoLogoutDID = authCtx?.did ?? ""
                         // Broadcast auto-logout event so UI can redirect to reauth
                         Task {
-                            await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "401_no_auth_provider_or_url"))
+                            await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "401_no_auth_provider_or_url"))
                         }
                         throw NetworkError.authenticationRequired // Cannot handle 401 without provider/URL
                     }
@@ -1332,16 +1380,18 @@ public actor NetworkService: NetworkServiceProtocol {
                             }()
 
                             if let reason {
+                                let autoLogoutDID = authCtx?.did ?? ""
                                 Task {
-                                    await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: reason))
+                                    await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: reason))
                                 }
                             }
                             throw NetworkError.authenticationRequired
                         } catch {
                             LogManager.logError("Network Service - Gateway mode: auth provider failed to handle 401: \(error)")
                             // Unknown gateway auth failure - still signal auto-logout as a fallback.
+                            let autoLogoutDID = authCtx?.did ?? ""
                             Task {
-                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "gateway_401_unhandled_unknown"))
+                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "gateway_401_unhandled_unknown"))
                             }
                             throw NetworkError.authenticationRequired
                         }
@@ -1439,9 +1489,10 @@ public actor NetworkService: NetworkServiceProtocol {
                             LogManager.logError(
                                 "Network Service - authProvider failed to handle non-nonce 401: \(error). Giving up."
                             )
+                            let autoLogoutDID = authCtx?.did ?? ""
                             // Broadcast auto-logout event so UI can redirect to reauth
                             Task {
-                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "401_token_refresh_failed"))
+                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "401_token_refresh_failed"))
                             }
                             throw NetworkError.authenticationRequired // Throw if handling fails
                         }
@@ -1450,13 +1501,13 @@ public actor NetworkService: NetworkServiceProtocol {
                         LogManager.logError(
                             "Network Service - Received non-nonce 401 but skipping refresh for \(url.absoluteString). Cannot proceed."
                         )
+                        let autoLogoutDID = authCtx?.did ?? ""
                         // Broadcast auto-logout event so UI can redirect to reauth
                         Task {
-                            await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: authCtx?.did ?? "", reason: "401_skip_refresh"))
+                            await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "401_skip_refresh"))
                         }
                         throw NetworkError.authenticationRequired // Cannot handle this 401
                     }
-
                 // Handle 400 responses - check for ExpiredToken error which needs token refresh
                 case 400:
                     let responseBody = String(data: decompressedData, encoding: .utf8) ?? "<binary data>"
@@ -1629,8 +1680,14 @@ public actor NetworkService: NetworkServiceProtocol {
         requestToPrepare.setValue(UUID().uuidString, forHTTPHeaderField: "X-Catbird-Request-Id")
 
         let prepared: URLRequest
+        var authCtx: AuthContext? = nil
+        defer {
+            authCtx?.releaseAuthenticationLease()
+        }
         do {
-            prepared = try await captured.provider.prepareAuthenticatedRequestWithContext(requestToPrepare).0
+            let (preparedRequest, context) = try await captured.provider.prepareAuthenticatedRequestWithContext(requestToPrepare)
+            prepared = preparedRequest
+            authCtx = context
         } catch {
             scope.state.failContinuity()
             throw ExactAuthGeneratedRequestContinuityError()
@@ -1658,6 +1715,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
 
         let (rawData, response) = try await exactAuthSession.data(for: prepared)
+        authCtx?.releaseAuthenticationLease()
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse(description: "Received non-HTTP response")
         }
@@ -1963,6 +2021,10 @@ public actor NetworkService: NetworkServiceProtocol {
     /// - Returns: URLRequest with OAuth/DPoP authentication headers
     func prepareStreamingRequest(_ request: URLRequest, additionalHeaders: [String: String]? = nil) async throws -> URLRequest {
         var finalRequest = request
+        var authCtx: AuthContext? = nil
+        defer {
+            authCtx?.releaseAuthenticationLease()
+        }
         var requiresAuth = false
 
         // Determine if authentication is needed (same logic as regular requests)
@@ -1981,8 +2043,9 @@ public actor NetworkService: NetworkServiceProtocol {
                 _ = try await authProvider.refreshTokenIfNeeded()
 
                 // Get authenticated request with OAuth/DPoP headers
-                let (authed, _) = try await authProvider.prepareAuthenticatedRequestWithContext(finalRequest)
+                let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(finalRequest)
                 finalRequest = authed
+                authCtx = ctx
 
                 LogManager.logDebug("Prepared authenticated streaming request for: \(finalRequest.url?.absoluteString ?? "Unknown URL")")
             } catch AuthError.noActiveAccount {
