@@ -471,7 +471,63 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
     func setFailureDelegate(_ delegate: AuthFailureDelegate?) async {}
 
-    func attemptRecoveryFromServerFailures(for did: String?) async throws {}
+    func attemptRecoveryFromServerFailures(for did: String?) async throws {
+        let targetDID: String
+        if let did, !did.isEmpty {
+            targetDID = did
+        } else if let currentAccount = await accountManager.getCurrentAccount() {
+            targetDID = currentAccount.did
+        } else {
+            return
+        }
+
+        // Validate active identity strictly
+        guard let currentAccount = await accountManager.getCurrentAccount(), currentAccount.did == targetDID else {
+            return
+        }
+        guard let keychainCurrentDID = try await storage.getCurrentDID(), keychainCurrentDID == targetDID else {
+            return
+        }
+        guard let pendingData = try await storage.getPendingGatewayUpgradeData(for: targetDID),
+              let pendingState = try? JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
+        else {
+            return
+        }
+        guard pendingState.expectedDID == targetDID else {
+            return
+        }
+        guard Self.isExactPermissionCallbackBase(pendingState.callbackURL) else {
+            return
+        }
+        guard let candidateSession = pendingState.candidateSession,
+              let candidateGrants = pendingState.candidateGrantedScopes,
+              !candidateSession.isEmpty
+        else {
+            // Pre-candidate flows are left pending, not guessed.
+            return
+        }
+        guard let currentSession = try await storage.getGatewaySession(for: targetDID), !currentSession.isEmpty else {
+            return
+        }
+
+        if currentSession == candidateSession {
+            try await storage.deletePendingGatewayUpgradeData(for: targetDID)
+            return
+        }
+
+        guard currentSession == pendingState.oldSession else {
+            // If current is any third session, do not touch it
+            return
+        }
+
+        // Retry candidate commit + CAS + cleanup
+        _ = try await commitAndPromoteCandidate(
+            pendingState: pendingState,
+            candidateSession: candidateSession,
+            candidateGrants: candidateGrants,
+            for: targetDID
+        )
+    }
 
     // MARK: - Gateway Scope Upgrade
 
@@ -597,6 +653,61 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         return authURL
     }
 
+    private func commitAndPromoteCandidate(
+        pendingState: PendingGatewayUpgradeState,
+        candidateSession: String,
+        candidateGrants: [String],
+        for expectedDID: String
+    ) async throws -> Set<String> {
+        let requiredScopes = Set(pendingState.priorScopes).union(Set(pendingState.requestedScopes))
+
+        // 1. Commit candidate
+        var commitReq = URLRequest(url: gatewayURL.appendingPathComponent("auth/upgrade/commit"))
+        commitReq.httpMethod = "POST"
+        commitReq.setValue("Bearer \(candidateSession)", forHTTPHeaderField: "Authorization")
+        commitReq.setValue("application/json", forHTTPHeaderField: "Accept")
+        commitReq.httpBody = nil
+
+        let (commitData, commitResponse): (Data, URLResponse)
+        do {
+            (commitData, commitResponse) = try await urlSession.data(for: commitReq)
+        } catch {
+            throw GatewayError.networkError(error)
+        }
+        guard let httpCommitResp = commitResponse as? HTTPURLResponse, httpCommitResp.statusCode == 200 else {
+            throw GatewayError.invalidSession
+        }
+        let commitResp = try JSONCoders.decode(UpgradeCommitResponse.self, from: commitData)
+
+        guard commitResp.status == .committed,
+              commitResp.session_id == candidateSession,
+              commitResp.did == expectedDID
+        else {
+            throw GatewayError.invalidSession
+        }
+        let finalGrants = Set(commitResp.granted_scopes)
+        guard finalGrants.contains("atproto"),
+              requiredScopes.isSubset(of: finalGrants)
+        else {
+            throw GatewayError.invalidSession
+        }
+
+        // 2. CAS Promotion
+        let casSuccess = try await storage.compareAndSwapGatewaySession(
+            expectedOldSession: pendingState.oldSession,
+            newSession: candidateSession,
+            for: expectedDID
+        )
+        guard casSuccess else {
+            throw GatewayError.invalidSession
+        }
+
+        // 3. Cleanup
+        try await storage.deletePendingGatewayUpgradeData(for: expectedDID)
+
+        return finalGrants
+    }
+
     func completeGatewayScopeUpgrade(
         callbackURL: URL,
         for expectedDID: String
@@ -611,22 +722,44 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard let keychainCurrentDID = try await storage.getCurrentDID(), keychainCurrentDID == expectedDID else {
             throw AuthError.invalidCredentials
         }
-        guard let currentSession = try await storage.getGatewaySession(for: expectedDID), !currentSession.isEmpty else {
-            throw AuthError.invalidCredentials
-        }
-
         guard let pendingData = try await storage.getPendingGatewayUpgradeData(for: expectedDID),
               var pendingState = try? JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
         else {
             throw GatewayError.invalidSession
         }
 
-        // Crash recovery: check if candidate was already promoted before crash
+        guard pendingState.expectedDID == expectedDID else {
+            throw AuthError.invalidCredentials
+        }
+        guard Self.isExactPermissionCallbackBase(pendingState.callbackURL) else {
+            throw AuthError.invalidCallbackURL
+        }
+
+        guard let currentSession = try await storage.getGatewaySession(for: expectedDID), !currentSession.isEmpty else {
+            throw AuthError.invalidCredentials
+        }
+
+        // Exception: if pending candidate exists and current session equals candidate, cleanup+return stored grants.
         if let candidateSession = pendingState.candidateSession,
-           let currentSession = try? await storage.getGatewaySession(for: expectedDID),
            currentSession == candidateSession {
             try? await storage.deletePendingGatewayUpgradeData(for: expectedDID)
             return Set(pendingState.candidateGrantedScopes ?? [])
+        }
+
+        // If current is any third session, fail before network
+        guard currentSession == pendingState.oldSession else {
+            throw GatewayError.invalidSession
+        }
+
+        // If candidate already persisted, skip callback/code parsing and commit/promote directly
+        if let candidateSession = pendingState.candidateSession,
+           let candidateGrants = pendingState.candidateGrantedScopes {
+            return try await commitAndPromoteCandidate(
+                pendingState: pendingState,
+                candidateSession: candidateSession,
+                candidateGrants: candidateGrants,
+                for: expectedDID
+            )
         }
 
         // Validate callback base URL
@@ -660,106 +793,58 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let requiredScopes = Set(pendingState.priorScopes).union(Set(pendingState.requestedScopes))
 
-        // 1. Exchange for candidate if not yet present
-        let candidateSession: String
-        let candidateGrants: [String]
+        // Exchange for candidate
+        var exchangeReq = URLRequest(url: gatewayURL.appendingPathComponent("auth/upgrade/exchange"))
+        exchangeReq.httpMethod = "POST"
+        exchangeReq.setValue("Bearer \(pendingState.oldSession)", forHTTPHeaderField: "Authorization")
+        exchangeReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        exchangeReq.setValue("application/json", forHTTPHeaderField: "Accept")
+        exchangeReq.setValue(Self.permissionCallbackOrigin, forHTTPHeaderField: "Origin")
 
-        if let existingCandidate = pendingState.candidateSession,
-           let existingGrants = pendingState.candidateGrantedScopes {
-            candidateSession = existingCandidate
-            candidateGrants = existingGrants
-        } else {
-            var exchangeReq = URLRequest(url: gatewayURL.appendingPathComponent("auth/upgrade/exchange"))
-            exchangeReq.httpMethod = "POST"
-            exchangeReq.setValue("Bearer \(pendingState.oldSession)", forHTTPHeaderField: "Authorization")
-            exchangeReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            exchangeReq.setValue("application/json", forHTTPHeaderField: "Accept")
-            exchangeReq.setValue(Self.permissionCallbackOrigin, forHTTPHeaderField: "Origin")
+        let exchangeBody = UpgradeExchangeRequest(code: code, browser_nonce: pendingState.browserNonce)
+        exchangeReq.httpBody = try JSONCoders.encode(exchangeBody)
 
-            let exchangeBody = UpgradeExchangeRequest(code: code, browser_nonce: pendingState.browserNonce)
-            exchangeReq.httpBody = try JSONCoders.encode(exchangeBody)
-
-            let (data, response): (Data, URLResponse)
-            do {
-                (data, response) = try await urlSession.data(for: exchangeReq)
-            } catch {
-                throw GatewayError.networkError(error)
-            }
-            guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
-                throw GatewayError.invalidSession
-            }
-            let exchangeResp = try JSONCoders.decode(UpgradeExchangeResponse.self, from: data)
-
-            // Validate candidate
-            guard exchangeResp.did == expectedDID,
-                  !exchangeResp.candidate_session_id.isEmpty,
-                  exchangeResp.candidate_session_id != pendingState.oldSession
-            else {
-                throw GatewayError.invalidSession
-            }
-
-            let grantSet = Set(exchangeResp.granted_scopes)
-            guard grantSet.contains("atproto"),
-                  requiredScopes.isSubset(of: grantSet)
-            else {
-                throw GatewayError.invalidSession
-            }
-
-            candidateSession = exchangeResp.candidate_session_id
-            candidateGrants = exchangeResp.granted_scopes
-
-            // Durably store candidate BEFORE commit
-            pendingState.candidateSession = candidateSession
-            pendingState.candidateGrantedScopes = candidateGrants
-            let updatedData = try JSONCoders.encode(pendingState)
-            try await storage.savePendingGatewayUpgradeData(updatedData, for: expectedDID)
-        }
-
-        // 2. Commit candidate
-        var commitReq = URLRequest(url: gatewayURL.appendingPathComponent("auth/upgrade/commit"))
-        commitReq.httpMethod = "POST"
-        commitReq.setValue("Bearer \(candidateSession)", forHTTPHeaderField: "Authorization")
-        commitReq.setValue("application/json", forHTTPHeaderField: "Accept")
-        commitReq.httpBody = nil
-
-        let (commitData, commitResponse): (Data, URLResponse)
+        let (data, response): (Data, URLResponse)
         do {
-            (commitData, commitResponse) = try await urlSession.data(for: commitReq)
+            (data, response) = try await urlSession.data(for: exchangeReq)
         } catch {
             throw GatewayError.networkError(error)
         }
-        guard let httpCommitResp = commitResponse as? HTTPURLResponse, httpCommitResp.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             throw GatewayError.invalidSession
         }
-        let commitResp = try JSONCoders.decode(UpgradeCommitResponse.self, from: commitData)
+        let exchangeResp = try JSONCoders.decode(UpgradeExchangeResponse.self, from: data)
 
-        guard commitResp.status == .committed,
-              commitResp.session_id == candidateSession,
-              commitResp.did == expectedDID
-        else {
-            throw GatewayError.invalidSession
-        }
-        let finalGrants = Set(commitResp.granted_scopes)
-        guard finalGrants.contains("atproto"),
-              requiredScopes.isSubset(of: finalGrants)
+        // Validate candidate
+        guard exchangeResp.did == expectedDID,
+              !exchangeResp.candidate_session_id.isEmpty,
+              exchangeResp.candidate_session_id != pendingState.oldSession
         else {
             throw GatewayError.invalidSession
         }
 
-        // 3. CAS Promotion
-        let casSuccess = try await storage.compareAndSwapGatewaySession(
-            expectedOldSession: pendingState.oldSession,
-            newSession: candidateSession,
+        let grantSet = Set(exchangeResp.granted_scopes)
+        guard grantSet.contains("atproto"),
+              requiredScopes.isSubset(of: grantSet)
+        else {
+            throw GatewayError.invalidSession
+        }
+
+        let candidateSession = exchangeResp.candidate_session_id
+        let candidateGrants = exchangeResp.granted_scopes
+
+        // Durably store candidate BEFORE commit
+        pendingState.candidateSession = candidateSession
+        pendingState.candidateGrantedScopes = candidateGrants
+        let updatedData = try JSONCoders.encode(pendingState)
+        try await storage.savePendingGatewayUpgradeData(updatedData, for: expectedDID)
+
+        return try await commitAndPromoteCandidate(
+            pendingState: pendingState,
+            candidateSession: candidateSession,
+            candidateGrants: candidateGrants,
             for: expectedDID
         )
-        guard casSuccess else {
-            throw GatewayError.invalidSession
-        }
-
-        // 4. Cleanup
-        try await storage.deletePendingGatewayUpgradeData(for: expectedDID)
-
-        return finalGrants
     }
 
     func fetchGrantedScopes(for did: String?) async throws -> Set<String> {
@@ -835,6 +920,10 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             logger.warning("refreshTokenIfNeeded: No current account set")
             throw GatewayError.missingSession
         }
+
+        // If candidate+grants exist in pending state, retry recovery
+        try? await attemptRecoveryFromServerFailures(for: currentAccount.did)
+
         guard (try? await storage.getGatewaySession(for: currentAccount.did)) != nil else {
             logger.warning(
                 "refreshTokenIfNeeded: No gateway session found for DID: \(currentAccount.did.prefix(20))..."

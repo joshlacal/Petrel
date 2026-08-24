@@ -77,6 +77,36 @@ private func withInMemoryBackend<T>(
     }
 }
 
+private final class TestAsyncGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isOpen = false
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func open() {
+        lock.lock()
+        isOpen = true
+        let continuations = waiters
+        waiters.removeAll()
+        lock.unlock()
+        for c in continuations {
+            c.resume()
+        }
+    }
+
+    func wait() async {
+        await withCheckedContinuation { continuation in
+            lock.lock()
+            if isOpen {
+                lock.unlock()
+                continuation.resume()
+            } else {
+                waiters.append(continuation)
+                lock.unlock()
+            }
+        }
+    }
+}
+
 // MARK: - Test Suite
 
 final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
@@ -696,14 +726,15 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         }
     }
 
-    func testExchangeRetryWhenCandidateNotPersisted() async throws {
-        try await withInMemoryBackend { _ in
-            let namespace = "test.gateway.upgrade.exchangeretry.\(UUID().uuidString)"
+    func testExchangeFailureWithInjectedStorageErrorAndIdempotentRetry() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.upgrade.storagefail.\(UUID().uuidString)"
             let (client, storage) = try await self.makeClient(namespace: namespace)
 
             let alice = self.aliceDID
             let candidateUUID = UUID().uuidString.lowercased()
             let exchangeCount = Mutex<Int>(0)
+            let commitCount = Mutex<Int>(0)
 
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 let path = request.url?.path ?? ""
@@ -715,9 +746,11 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                             #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade/exchange" {
                     exchangeCount.withLock { $0 += 1 }
+                    // Idempotently returns SAME candidate on repeated calls with same code+nonce
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
                             #"{"candidate_session_id":"\#(candidateUUID)","did":"\#(alice)","granted_scopes":["atproto","transition:generic","identity:handle"]}"#.data(using: .utf8)!)
                 } else if path == "/auth/upgrade/commit" {
+                    commitCount.withLock { $0 += 1 }
                     return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
                             #"{"status":"committed","session_id":"\#(candidateUUID)","did":"\#(alice)","granted_scopes":["atproto","transition:generic","identity:handle"]}"#.data(using: .utf8)!)
                 }
@@ -726,14 +759,141 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
 
             _ = try await client.startGatewayScopeUpgrade(requesting: ["identity:handle"], for: self.aliceDID, callbackURL: self.validCallbackBase)
 
-            // Complete successfully
+            // Inject storage failure specifically for saving pending upgrade candidate data
+            let shouldFailPendingStore = Mutex<Bool>(true)
+            backend.failStoreMatching = { key in
+                if key.contains("pendingGatewayUpgrade") && shouldFailPendingStore.withLock({ $0 }) {
+                    return true
+                }
+                return false
+            }
+
             let callback = URL(string: "https://catbird.blue/oauth/permission-callback?code=code-12345")!
+
+            // First complete attempt: exchange succeeds, but candidate persistence fails
+            do {
+                _ = try await client.completeGatewayScopeUpgrade(callbackURL: callback, for: self.aliceDID)
+                XCTFail("Expected completeGatewayScopeUpgrade to throw on pending-state write failure")
+            } catch {}
+
+            XCTAssertEqual(exchangeCount.withLock { $0 }, 1, "First exchange was executed")
+            XCTAssertEqual(commitCount.withLock { $0 }, 0, "Commit must not be called when candidate persistence fails")
+
+            // Old session must remain intact
+            let sessionAfterFail = try await storage.getGatewaySession(for: self.aliceDID)
+            XCTAssertNotEqual(sessionAfterFail, candidateUUID)
+
+            // Disable failure injection for retry
+            shouldFailPendingStore.withLock { $0 = false }
+
+            // Retry complete: simulated Nest returns the SAME candidate; retry persists and commits
             let granted = try await client.completeGatewayScopeUpgrade(callbackURL: callback, for: self.aliceDID)
             XCTAssertEqual(granted, ["atproto", "transition:generic", "identity:handle"])
-            XCTAssertEqual(exchangeCount.withLock { $0 }, 1)
+            XCTAssertEqual(exchangeCount.withLock { $0 }, 2, "Second exchange was executed with same candidate returned")
+            XCTAssertEqual(commitCount.withLock { $0 }, 1, "Commit was executed after candidate persisted")
 
             let finalSession = try await storage.getGatewaySession(for: self.aliceDID)
             XCTAssertEqual(finalSession, candidateUUID)
+        }
+    }
+
+    func testRelaunchRecoveryCommitsPersistedCandidateWithoutCallback() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.relaunch.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+
+            // Initial client setup
+            let storage1 = KeychainStorage(namespace: namespace)
+            let client1 = try await ATProtoClient(
+                oauthConfig: OAuthConfig(
+                    clientId: "https://catbird.blue/oauth/client-metadata.json",
+                    redirectUri: "https://catbird.blue/oauth/callback",
+                    scope: "atproto transition:generic"
+                ),
+                namespace: namespace,
+                authMode: .gateway,
+                gatewayURL: self.gatewayURL
+            )
+
+            let account = Account(
+                did: alice,
+                handle: "alice.test",
+                pdsURL: self.gatewayURL
+            )
+            try await storage1.saveAccount(account, for: alice)
+            try await storage1.saveGatewaySession(oldSessionUUID, for: alice)
+            try await client1.switchToAccount(did: alice)
+
+            // Plant pending upgrade state with persisted candidate (as if exchange completed, but crashed before commit)
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "abcdefg123456",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage1.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Setup mock handler for commit
+            let commitCount = Mutex<Int>(0)
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
+                            #"{"did":"\#(alice)","active":true,"granted_scopes":["atproto","transition:generic","identity:handle"]}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade/commit" {
+                    commitCount.withLock { $0 += 1 }
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
+                            #"{"status":"committed","session_id":"\#(candidateUUID)","did":"\#(alice)","granted_scopes":["atproto","transition:generic","identity:handle"]}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Verify session on storage1 is still oldSessionUUID before relaunch
+            let sessionBeforeRelaunch = try await storage1.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionBeforeRelaunch, oldSessionUUID)
+
+            // Construct client2 (new KeychainStorage and Auth client in SAME namespace, simulating app relaunch)
+            let storage2 = KeychainStorage(namespace: namespace)
+            let client2 = try await ATProtoClient(
+                oauthConfig: OAuthConfig(
+                    clientId: "https://catbird.blue/oauth/client-metadata.json",
+                    redirectUri: "https://catbird.blue/oauth/callback",
+                    scope: "atproto transition:generic"
+                ),
+                namespace: namespace,
+                authMode: .gateway,
+                gatewayURL: self.gatewayURL
+            )
+
+            // Recovery runs automatically on client startup via refreshTokenIfNeeded, or can be explicitly driven
+            // Relaunch committed the persisted candidate with zero callbackURL passed
+            XCTAssertEqual(commitCount.withLock { $0 }, 1, "Recovery committed the persisted candidate")
+
+            // Session has been promoted to candidate
+            let sessionAfterRecovery = try await storage2.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterRecovery, candidateUUID)
+
+            let scopes = try await client2.fetchGrantedScopes(for: alice)
+            XCTAssertEqual(scopes, ["atproto", "transition:generic", "identity:handle"])
+
+            // Pending state cleaned up
+            let pendingAfter = try await storage2.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfter)
+
+            // DID and account preserved
+            let currentDID = try await storage2.getCurrentDID()
+            XCTAssertEqual(currentDID, alice)
+            let currentAccount = await client2.getCurrentAccount()
+            XCTAssertEqual(currentAccount?.did, alice)
         }
     }
 
@@ -919,6 +1079,150 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             )
             XCTAssertFalse(wrongDIDResult)
         }
+    }
+    func testLateCallbackWhenActiveSessionChangedFailsBeforeNetwork() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.latesession.\(UUID().uuidString)"
+            let initialSession = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: initialSession)
+
+            let alice = self.aliceDID
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "active": true,
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!)
+                } else if path == "/auth/upgrade" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"authorization_url":"https://catbird.blue/auth/authorize?req=1"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            _ = try await client.startGatewayScopeUpgrade(requesting: ["identity:handle"], for: self.aliceDID)
+
+            // Simulate user logging in again or rotating to a third session
+            let thirdSession = UUID().uuidString.lowercased()
+            try await storage.saveGatewaySession(thirdSession, for: self.aliceDID)
+
+            // Reset recorded network requests and set handler that fails if network is hit
+            GatewayUpgradeTestURLProtocol.reset()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                XCTFail("No network requests should be made when current session is a third session: \(request.url?.path ?? "")")
+                return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let callback = URL(string: "https://catbird.blue/oauth/permission-callback?code=late-code-12345")!
+            do {
+                _ = try await client.completeGatewayScopeUpgrade(callbackURL: callback, for: self.aliceDID)
+                XCTFail("Expected completeGatewayScopeUpgrade to fail before network when session has changed")
+            } catch {
+                // Expected failure
+            }
+
+            let reqs = GatewayUpgradeTestURLProtocol.recordedRequests()
+            XCTAssertEqual(reqs.count, 0, "Zero exchange/commit network requests must be made on late callback with third session")
+
+            let currentSession = try await storage.getGatewaySession(for: self.aliceDID)
+            XCTAssertEqual(currentSession, thirdSession)
+        }
+    }
+
+    func testTwoStorageInstancesSameNamespaceConcurrentCAS() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.twostorage.cas.\(UUID().uuidString)"
+            let storage1 = KeychainStorage(namespace: namespace)
+            let storage2 = KeychainStorage(namespace: namespace)
+            let initialSession = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+
+            try await storage1.saveCurrentDID(alice)
+            try await storage1.saveGatewaySession(initialSession, for: alice)
+
+            let candidateA = UUID().uuidString.lowercased()
+            let candidateB = UUID().uuidString.lowercased()
+
+            async let taskA = storage1.compareAndSwapGatewaySession(
+                expectedOldSession: initialSession,
+                newSession: candidateA,
+                for: alice
+            )
+            async let taskB = storage2.compareAndSwapGatewaySession(
+                expectedOldSession: initialSession,
+                newSession: candidateB,
+                for: alice
+            )
+
+            let (resultA, resultB) = try await (taskA, taskB)
+
+            XCTAssertTrue((resultA && !resultB) || (!resultA && resultB), "Across two storage instances, exactly one CAS must succeed")
+
+            let finalSession1 = try await storage1.getGatewaySession(for: alice)
+            let finalSession2 = try await storage2.getGatewaySession(for: alice)
+            XCTAssertEqual(finalSession1, finalSession2)
+            if resultA {
+                XCTAssertEqual(finalSession1, candidateA)
+            } else {
+                XCTAssertEqual(finalSession1, candidateB)
+            }
+        }
+    }
+
+    func testTwoStorageInstancesConcurrentDeleteAndSaveSerialized() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.twostorage.deletesave.\(UUID().uuidString)"
+            let storage1 = KeychainStorage(namespace: namespace)
+            let storage2 = KeychainStorage(namespace: namespace)
+            let alice = self.aliceDID
+            let initialSession = UUID().uuidString.lowercased()
+
+            try await storage1.saveCurrentDID(alice)
+            try await storage1.saveGatewaySession(initialSession, for: alice)
+
+            let deleteStarted = TestAsyncGate()
+            let saveCanProceed = TestAsyncGate()
+
+            backend.beforeDelete = { key in
+                if key.contains("gatewaySession") {
+                    deleteStarted.open()
+                }
+            }
+
+            let newSession = UUID().uuidString.lowercased()
+
+            async let deleteTask: Void = {
+                try await storage1.deleteGatewaySession(for: alice)
+                saveCanProceed.open()
+            }()
+
+            async let saveTask: Void = {
+                await deleteStarted.wait()
+                await saveCanProceed.wait()
+                try await storage2.saveGatewaySession(newSession, for: alice)
+            }()
+
+            _ = try await (deleteTask, saveTask)
+
+            let session1 = try await storage1.getGatewaySession(for: alice)
+            let session2 = try await storage2.getGatewaySession(for: alice)
+            XCTAssertEqual(session1, newSession)
+            XCTAssertEqual(session2, newSession)
+        }
+    }
+
+    func testClientBlueNamespaceRootAnchor() async throws {
+        let client = await ATProtoClient(baseURL: URL(string: "https://bsky.social")!)
+        let blue = await client.blue
+        _ = blue.networkService
+        XCTAssertTrue(type(of: blue) == ATProtoClient.Blue.self)
     }
 
     // MARK: - 7. Fetch Granted Scopes Tests

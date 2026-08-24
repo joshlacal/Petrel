@@ -259,11 +259,27 @@ private final class AsyncSerialGate: @unchecked Sendable {
     }
 }
 
+private final class GatewaySessionMutationCoordinator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var gates: [String: AsyncSerialGate] = [:]
+
+    func gate(for scopeKey: String) -> AsyncSerialGate {
+        lock.withLock {
+            if let existing = gates[scopeKey] {
+                return existing
+            }
+            let newGate = AsyncSerialGate()
+            gates[scopeKey] = newGate
+            return newGate
+        }
+    }
+}
+
 /// A centralized storage layer for securely storing all persistent data using the keychain.
 public actor KeychainStorage {
     let namespace: String
     private let accessGroup: String?
-    private let gatewaySessionMutationGate = AsyncSerialGate()
+    private static let gatewayMutationCoordinator = GatewaySessionMutationCoordinator()
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
     private struct PendingSessionState {
@@ -675,8 +691,9 @@ public actor KeychainStorage {
 
     /// Saves the gateway session for a specific account (per-DID storage for multi-account support)
     func saveGatewaySession(_ session: String, for did: String) async throws {
-        await gatewaySessionMutationGate.acquire()
-        defer { gatewaySessionMutationGate.release() }
+        let gate = Self.gatewayMutationCoordinator.gate(for: scopeKey(for: did))
+        await gate.acquire()
+        defer { gate.release() }
 
         let gKey = scopeKey(for: did)
         Self.completedMigrationHistory.withLock { _ = $0.remove(gKey) }
@@ -748,8 +765,9 @@ public actor KeychainStorage {
     }
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
-        await gatewaySessionMutationGate.acquire()
-        defer { gatewaySessionMutationGate.release() }
+        let gate = Self.gatewayMutationCoordinator.gate(for: scopeKey(for: did))
+        await gate.acquire()
+        defer { gate.release() }
 
         let key = makeKey("gatewaySession", did: did)
         let continuityTicket = await beginAuthContinuityMutation()
@@ -806,8 +824,9 @@ public actor KeychainStorage {
         newSession: String,
         for did: String
     ) async throws -> Bool {
-        await gatewaySessionMutationGate.acquire()
-        defer { gatewaySessionMutationGate.release() }
+        let gate = Self.gatewayMutationCoordinator.gate(for: scopeKey(for: did))
+        await gate.acquire()
+        defer { gate.release() }
 
         guard let currentDID = try await getCurrentDID(), currentDID == did else {
             return false
