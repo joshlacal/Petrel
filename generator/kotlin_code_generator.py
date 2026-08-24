@@ -297,7 +297,6 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
                 enum_name = self.class_name + "Defs" + convert_to_pascal_case(name)
                 identity = ("definition", self.lexicon_id, name)
                 self.enum_generator.generate_closed_string_enum(enum_name, def_schema['enum'], identity)
-
             elif def_type == 'string' and 'knownValues' in def_schema:
                 print(f"Generating enum for {name}")
                 # Generate enum class

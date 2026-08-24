@@ -18,7 +18,7 @@ class TypeConverter:
         (`{current lexicon id}#frag`). External refs to primitive defs would need
         the reference-lexicon corpus to resolve and fall through unchanged.
         """
-        nsid, _, fragment = ref.partition('#')
+        nsid, separator, fragment = ref.partition('#')
         fragment = fragment or 'main'
         if not nsid or nsid == self.swift_code_generator.lexicon_id:
             target = self.swift_code_generator.defs.get(fragment)
@@ -32,6 +32,25 @@ class TypeConverter:
                     return 'Bytes'
                 if target_type == 'cid-link':
                     return 'CID'
+            return convert_swift_ref(ref)
+
+        registry = getattr(self.swift_code_generator.cycle_detector, 'schemas_by_ref', None)
+        if registry is not None:
+            qualified_ref = ref if separator else f"{ref}#main"
+            target = registry.get(qualified_ref)
+            if isinstance(target, dict):
+                target_type = target.get('type')
+                if target_type == 'string' and 'enum' in target:
+                    pre_hash_parts = nsid.split('.')
+                    camel_case_pre_hash = ''.join([convert_to_camel_case(part) for part in pre_hash_parts])
+                    return f"{camel_case_pre_hash}.Defs{convert_to_camel_case(fragment)}"
+                if target_type == 'blob':
+                    return 'Blob'
+                if target_type == 'bytes':
+                    return 'Bytes'
+                if target_type == 'cid-link':
+                    return 'CID'
+
         return convert_swift_ref(ref)
 
     def determine_swift_type(self, name: str, prop: Dict[str, Any], required_fields: List[str], current_struct_name: str, isOptional: bool = None, context_identity=None) -> str:
