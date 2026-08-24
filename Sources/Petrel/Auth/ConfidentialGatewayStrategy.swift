@@ -304,7 +304,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         /// This should not be treated as a gateway session expiration.
         case authenticationRequired
         case networkError(Error)
-
+        case upgradeTemporarilyUnavailable
         var errorDescription: String? {
             switch self {
             case .missingSession:
@@ -321,6 +321,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 return "Authentication required."
             case let .networkError(error):
                 return "Network error: \(error.localizedDescription)"
+            case .upgradeTemporarilyUnavailable:
+                return "Gateway upgrade is temporarily unavailable. Please try again later."
             }
         }
     }
@@ -769,10 +771,18 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         } catch {
             throw GatewayError.networkError(error)
         }
-        guard let httpCommitResp = commitResponse as? HTTPURLResponse, httpCommitResp.statusCode == 200 else {
+        guard let httpCommitResp = commitResponse as? HTTPURLResponse else {
             throw GatewayError.invalidSession
         }
-        let commitResp = try JSONCoders.decode(UpgradeCommitResponse.self, from: commitData)
+        if httpCommitResp.statusCode != 200 {
+            if httpCommitResp.statusCode == 429 || (500...599).contains(httpCommitResp.statusCode) {
+                throw GatewayError.upgradeTemporarilyUnavailable
+            }
+            throw GatewayError.invalidSession
+        }
+        guard let commitResp = try? JSONCoders.decode(UpgradeCommitResponse.self, from: commitData) else {
+            throw GatewayError.invalidSession
+        }
 
         guard commitResp.status == .committed,
               commitResp.session_id == candidateSession,
@@ -1031,20 +1041,25 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw GatewayError.missingSession
         }
 
-        if let recovery = try await recoverablePendingCandidate(for: currentAccount.did) {
-            let candidateSession = recovery.1
-            do {
+        do {
+            if let recovery = try await recoverablePendingCandidate(for: currentAccount.did) {
+                let candidateSession = recovery.1
                 try await attemptRecoveryFromServerFailures(for: currentAccount.did)
                 guard let session = try await storage.getGatewaySession(for: currentAccount.did),
                       session == candidateSession
                 else {
-                    logger.warning("refreshTokenIfNeeded: candidate recovery did not promote candidate, preserving session continuity")
-                    return .stillValid
+                    logger.warning("refreshTokenIfNeeded: candidate recovery did not promote candidate, marking session invalid")
+                    throw GatewayError.invalidSession
                 }
                 return .stillValid
-            } catch {
-                logger.warning("refreshTokenIfNeeded: candidate recovery failed, preserving session continuity")
+            }
+        } catch {
+            if isRetryableCandidateRecoveryError(error) {
+                logger.warning("refreshTokenIfNeeded: candidate recovery encountered retryable error, preserving session continuity: \(error.localizedDescription)")
                 return .stillValid
+            } else {
+                logger.warning("refreshTokenIfNeeded: candidate recovery encountered terminal error: \(error.localizedDescription)")
+                throw error
             }
         }
 
@@ -1058,6 +1073,21 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
         return .stillValid
     }
+    private func isRetryableCandidateRecoveryError(_ error: Error) -> Bool {
+        switch error {
+        case GatewayError.networkError,
+             GatewayError.upgradeTemporarilyUnavailable,
+             is KeychainError,
+             is URLError,
+             is POSIXError:
+            return true
+        case let nsError as NSError where nsError.domain == NSURLErrorDomain || nsError.domain == NSPOSIXErrorDomain:
+            return true
+        default:
+            return false
+        }
+    }
+
 
     func handleUnauthorizedResponse(
         _ response: HTTPURLResponse, data: Data, for request: URLRequest

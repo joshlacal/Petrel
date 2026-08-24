@@ -2508,4 +2508,533 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertEqual(currentAccount?.handle, "alice.test", "Account handle must NOT be overwritten by third session")
         }
     }
+    func testCandidateCommitNetworkErrorDuringHasValidSessionPreservesContinuityAndPrepareFails() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.networkerror.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Handler: commit throws transport error (URLError)
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    throw URLError(.notConnectedToInternet)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. client.hasValidSession() returns true on retryable network error
+            let isValid = await client.hasValidSession()
+            XCTAssertTrue(isValid, "Session continuity must be preserved as valid when candidate recovery encounters network error")
+
+            // 2. Old session and pending upgrade state must remain intact in storage (no destructive clear)
+            let sessionAfterFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFail, oldSessionUUID, "Old session must remain intact in storage")
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
+
+            // 3. prepareAuthenticatedRequest must still throw and propagate recovery failure
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.prepareAuthenticatedRequest(req)
+                XCTFail("prepareAuthenticatedRequest must throw when candidate recovery encounters network error")
+            } catch {}
+        }
+    }
+
+    func testCandidateRecoveryWithCurrentDIDMismatchYieldsInvalidSessionWithoutDestructiveClear() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.didmismatch.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+            let bob = self.bobDID
+
+            // Plant candidate-bearing pending upgrade state for Alice
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Simulate storage currentDID mismatch: currentDID is bob while account is alice
+            try await storage.saveCurrentDID(bob)
+
+            // 1. client.hasValidSession() returns false
+            let isValid = await client.hasValidSession()
+            XCTAssertFalse(isValid, "hasValidSession must return false when currentDID mismatches")
+
+            // 2. Old session and pending upgrade state for Alice must remain intact in storage (no destructive clear)
+            let sessionAfterFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFail, oldSessionUUID, "Alice's old session must remain intact in storage")
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Alice's pending upgrade state must remain intact in storage")
+
+            // 3. prepareAuthenticatedRequest must throw
+            let accountManager = await AccountManager(storage: storage)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.prepareAuthenticatedRequest(req)
+                XCTFail("prepareAuthenticatedRequest must throw on currentDID mismatch")
+            } catch {}
+        }
+    }
+
+    func testCandidateRecoveryWithMissingSessionYieldsInvalidSessionWithoutDestructiveClear() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.missingsession.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Delete gateway session (simulate missing session)
+            try await storage.deleteGatewaySession(for: alice)
+
+            // 1. client.hasValidSession() returns false
+            let isValid = await client.hasValidSession()
+            XCTAssertFalse(isValid, "hasValidSession must return false when gateway session is missing")
+
+            // 2. Pending upgrade state must remain intact in storage (no destructive clear)
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
+
+            // 3. prepareAuthenticatedRequest must throw
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.prepareAuthenticatedRequest(req)
+                XCTFail("prepareAuthenticatedRequest must throw when session is missing")
+            } catch {}
+        }
+    }
+
+    func testCandidateRecoveryWithThirdSessionYieldsInvalidSessionWithoutDestructiveClear() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.thirdsession.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let thirdSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state (old = oldSessionUUID, candidate = candidateUUID)
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Set current stored session to thirdSessionUUID (neither old nor candidate)
+            try await storage.saveGatewaySession(thirdSessionUUID, for: alice)
+
+            // 1. client.hasValidSession() returns false
+            let isValid = await client.hasValidSession()
+            XCTAssertFalse(isValid, "hasValidSession must return false when current session is an un-promoted third session")
+
+            // 2. Storage must NOT be destructively cleared
+            let storedSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(storedSession, thirdSessionUUID, "Stored third session must remain intact")
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
+
+            // 3. prepareAuthenticatedRequest must throw
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.prepareAuthenticatedRequest(req)
+                XCTFail("prepareAuthenticatedRequest must throw when current session is a third session")
+            } catch {}
+        }
+    }
+
+    func testCandidateCommit4xxErrorYieldsInvalidSessionWithoutDestructiveClear() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.commit4xx.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Handler: commit returns HTTP 400 Bad Request
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"error":"invalid_request"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. client.hasValidSession() returns false on terminal 4xx error
+            let isValid = await client.hasValidSession()
+            XCTAssertFalse(isValid, "hasValidSession must return false on terminal 4xx commit failure")
+
+            // 2. Old session and pending upgrade state must remain intact in storage (no destructive clear)
+            let sessionAfterFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFail, oldSessionUUID, "Old session must remain intact in storage")
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
+
+            // 3. prepareAuthenticatedRequest must throw
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.prepareAuthenticatedRequest(req)
+                XCTFail("prepareAuthenticatedRequest must throw when candidate commit returns 400")
+            } catch {}
+        }
+    }
+
+    func testCandidateCommitMalformedReceiptYieldsInvalidSessionWithoutDestructiveClear() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.malformedcommit.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Handler: commit returns HTTP 200 with malformed/truncated JSON
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"status": "committed", "session_id": "#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. client.hasValidSession() returns false on malformed commit receipt
+            let isValid = await client.hasValidSession()
+            XCTAssertFalse(isValid, "hasValidSession must return false on malformed commit receipt")
+
+            // 2. Old session and pending upgrade state must remain intact in storage (no destructive clear)
+            let sessionAfterFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFail, oldSessionUUID, "Old session must remain intact in storage")
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
+
+            // 3. prepareAuthenticatedRequest must throw
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.prepareAuthenticatedRequest(req)
+                XCTFail("prepareAuthenticatedRequest must throw on malformed commit receipt")
+            } catch {}
+        }
+    }
+
+    func testCandidateCommitInvalidReceiptYieldsInvalidSessionWithoutDestructiveClear() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.invalidreceipt.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Handler: commit returns HTTP 200 with wrong session_id (mismatched candidate receipt)
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "wrong-candidate-session-id",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. client.hasValidSession() returns false on invalid commit receipt
+            let isValid = await client.hasValidSession()
+            XCTAssertFalse(isValid, "hasValidSession must return false on invalid commit receipt")
+
+            // 2. Old session and pending upgrade state must remain intact in storage (no destructive clear)
+            let sessionAfterFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFail, oldSessionUUID, "Old session must remain intact in storage")
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
+
+            // 3. prepareAuthenticatedRequest must throw
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.prepareAuthenticatedRequest(req)
+                XCTFail("prepareAuthenticatedRequest must throw on invalid commit receipt")
+            } catch {}
+        }
+    }
+
+    func testCandidateCommitCASFalseYieldsInvalidSessionWithoutDestructiveClear() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.casfalse.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let thirdSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Handler: commit returns 200, but in handler we mutate stored session so CAS fails
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    _ = Task {
+                        try? await storage.saveGatewaySession(thirdSessionUUID, for: alice)
+                    }
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. client.hasValidSession() returns false when CAS returns false
+            let isValid = await client.hasValidSession()
+            XCTAssertFalse(isValid, "hasValidSession must return false when CAS fails")
+
+            // 2. Storage and pending upgrade state must remain intact (no destructive clear)
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
+
+            // 3. prepareAuthenticatedRequest must throw
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.prepareAuthenticatedRequest(req)
+                XCTFail("prepareAuthenticatedRequest must throw when CAS fails")
+            } catch {}
+        }
+    }
+
+    func testCandidateCleanupWhenLocalSessionAlreadyCandidateYieldsStillValid() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.alreadycandidate.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: candidateUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state (session in storage is already candidateUUID)
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // 1. client.hasValidSession() returns true because local session is already candidate
+            let isValid = await client.hasValidSession()
+            XCTAssertTrue(isValid, "hasValidSession must return true when local session is already candidate")
+
+            // 2. Candidate session remains in storage and pending data is cleaned up
+            let session = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(session, candidateUUID)
+
+            // 3. prepareAuthenticatedRequest succeeds with candidate bearer token
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let prepared = try await strategy.prepareAuthenticatedRequest(req)
+            XCTAssertEqual(prepared.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+        }
+    }
 }

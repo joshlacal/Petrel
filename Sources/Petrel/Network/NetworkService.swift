@@ -1325,7 +1325,8 @@ public actor NetworkService: NetworkServiceProtocol {
                                 case .authenticationRequired,
                                      .invalidCallbackURL,
                                      .invalidGatewayURL,
-                                     .networkError:
+                                     .networkError,
+                                     .upgradeTemporarilyUnavailable:
                                     return nil
                                 }
                             }()
