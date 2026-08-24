@@ -10,9 +10,6 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
-import JSONWebAlgorithms
-import JSONWebKey
-import JSONWebSignature
 
 /// Authentication strategy for public clients (e.g. mobile apps)
 /// Handles:

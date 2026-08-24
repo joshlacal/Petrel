@@ -27,7 +27,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
 
         init() {
             var decoders: [String: DecoderFunction] = [:]
-            {% for type_key, swift_type in type_cases %}
+            decoders.reserveCapacity({{ type_cases | length }})
+            {% for chunk in type_cases | batch(25) %}
+            Self.registerChunk{{ loop.index0 }}(into: &decoders)
+            {% endfor %}
+            self.decoders = decoders
+        }
+
+        {% for chunk in type_cases | batch(25) %}
+        private static func registerChunk{{ loop.index0 }}(into decoders: inout [String: DecoderFunction]) {
+            {% for type_key, swift_type in chunk %}
             decoders["{{ type_key }}"] = { decoder in
                 do {
                     let decodedObject = try {{ swift_type }}(from: decoder)
@@ -38,8 +47,8 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
             {% endfor %}
-            self.decoders = decoders
         }
+        {% endfor %}
 
         func decoder(for type: String) -> DecoderFunction? {
             lock.lock()
@@ -185,6 +194,21 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         return typedValue
     }
 
+    private var containsKnownType: Bool {
+        switch self {
+        case .knownType:
+            return true
+        case let .unknownType(_, inner):
+            return inner.containsKnownType
+        case let .array(elements):
+            return elements.contains { $0.containsKnownType }
+        case let .object(properties):
+            return properties.values.contains { $0.containsKnownType }
+        default:
+            return false
+        }
+    }
+
     /// In-memory lossless-decode check that tolerates $type framing differences,
     /// unknown future fields, explicit nulls, and lenient optional degradations.
     public static func isSpecTolerantMatch(
@@ -212,6 +236,10 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             rawContainer = raw
         }
 
+        if typedContainer == rawContainer && !typedContainer.containsKnownType {
+            return true
+        }
+
         return isSpecTolerantContainerMatch(typed: typedContainer, raw: rawContainer)
     }
 
@@ -219,6 +247,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         typed: ATProtocolValueContainer,
         raw: ATProtocolValueContainer
     ) -> Bool {
+        if typed == raw && !typed.containsKnownType {
+            return true
+        }
         switch (typed, raw) {
         case let (.object(typedDict), .object(rawDict)):
             for (key, typedVal) in typedDict {

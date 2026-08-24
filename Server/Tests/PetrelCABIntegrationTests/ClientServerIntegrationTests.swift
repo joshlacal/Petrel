@@ -5,8 +5,7 @@
 #endif
 import Foundation
 import Hummingbird
-import JSONWebKey
-import JSONWebSignature
+import PetrelCrypto
 import Logging
 @testable import Petrel
 @testable import PetrelCABServerCore
@@ -123,9 +122,16 @@ struct ClientServerIntegrationTests {
       )
 
       #expect(response.clientId == "https://cab.test/oauth-client-metadata.json")
-      let jws = try JWS(jwsString: response.clientAssertion)
-      #expect(jws.protectedHeader.keyID == "integration-key")
-      #expect(try jws.verify(key: serverKey.publicKey.jwkRepresentation))
+      let parts = response.clientAssertion.split(separator: ".")
+      #expect(parts.count == 3)
+      let headerData = try JWTBase64URL.decode(String(parts[0]))
+      let headerDict = try #require(try JSONSerialization.jsonObject(with: headerData) as? [String: Any])
+      #expect(headerDict["kid"] as? String == "integration-key")
+
+      let signingInput = "\(parts[0]).\(parts[1])"
+      let signatureBytes = try JWTBase64URL.decode(String(parts[2]))
+      let ecdsaSig = try P256WireSignature.decodeMalleabilityTolerant(signatureBytes)
+      #expect(serverKey.publicKey.isValidSignature(ecdsaSig, for: Data(signingInput.utf8)))
 
       struct Claims: Decodable {
         struct Cnf: Decodable { let jkt: String }
@@ -133,12 +139,14 @@ struct ClientServerIntegrationTests {
         let aud: String
         let cnf: Cnf
       }
-      let claims = try JSONDecoder().decode(Claims.self, from: jws.payload)
+      let payloadData = try JWTBase64URL.decode(String(parts[1]))
+      let claims = try JSONDecoder().decode(Claims.self, from: payloadData)
       #expect(claims.iss == "https://cab.test/oauth-client-metadata.json")
       #expect(claims.aud == "https://auth.example")
-      #expect(claims.cnf.jkt == (try deviceKey.publicKey.jwkRepresentation.thumbprint()))
-    }
+      let deviceJKT = try JWK(publicKey: deviceKey.publicKey).thumbprint()
+      #expect(claims.cnf.jkt == deviceJKT)
   }
+    }
 
   @Test("Nonce dance is transparent: require_nonce server, one client call")
   func nonceDance() async throws {
@@ -154,7 +162,7 @@ struct ClientServerIntegrationTests {
   @Test("Server device refusal surfaces as the typed Petrel error")
   func deviceRefusal() async throws {
     let deviceKey = P256.Signing.PrivateKey()
-    let jkt = try deviceKey.publicKey.jwkRepresentation.thumbprint()
+    let jkt = try JWK(publicKey: deviceKey.publicKey).thumbprint()
     try await withRunningServer(mutateConfig: { $0.deniedJkts = [jkt] }) { port, _ in
       let strategy = makeStrategy(port: port, namespace: "integration.denied")
       await #expect(throws: ClientAssertionBackendError(statusCode: 403, code: "access_denied")) {

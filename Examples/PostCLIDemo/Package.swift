@@ -7,7 +7,7 @@ let package = Package(
         .macOS(.v13),
     ],
     dependencies: [
-        .package(path: "../.."), // Petrel library
+        .package(name: "Petrel", path: "../.."), // Petrel library
     ],
     targets: [
         .executableTarget(

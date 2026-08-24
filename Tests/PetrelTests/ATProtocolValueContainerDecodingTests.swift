@@ -720,6 +720,24 @@ struct ATProtocolValueContainerDecodingTests {
         #expect(ATProtocolValueContainer.isSpecTolerantMatch(typed: typedContainerA, raw: compatibleRawWithUnknown))
     }
 
+    @Test("Direct spec-tolerant comparison rejects equal objects containing knownType with decode error")
+    func specTolerantComparisonRejectsKnownTypeWithDecodeError() {
+        let nestedError = ATProtocolValueContainer.knownType(ATProtocolValueContainer.decodeError("x"))
+        let typedObj = ATProtocolValueContainer.object(["nested": nestedError])
+        let rawObj = ATProtocolValueContainer.object(["nested": nestedError])
+
+        // Direct equality is true (container Equatable), but spec-tolerant comparison must reject (false)
+        #expect(typedObj == rawObj)
+        #expect(!ATProtocolValueContainer.isSpecTolerantMatch(typed: typedObj, raw: rawObj))
+
+        // Also test when raw has an extra raw-only field
+        let rawWithExtra = ATProtocolValueContainer.object([
+            "nested": nestedError,
+            "extra": .string("foo"),
+        ])
+        #expect(!ATProtocolValueContainer.isSpecTolerantMatch(typed: typedObj, raw: rawWithExtra))
+    }
+
     @Test("CAR record decode falls back to unknownType when typed decode is lossy")
     func carRecordDecodeFallsBackOnLossyDecode() throws {
         let lossyMap = OrderedCBORMap(entries: [

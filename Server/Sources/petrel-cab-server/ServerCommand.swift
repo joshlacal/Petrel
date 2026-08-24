@@ -48,8 +48,8 @@ struct Serve: AsyncParsableCommand {
   @preconcurrency import Crypto
 #endif
 import Foundation
-import JSONWebAlgorithms
-import JSONWebKey
+import PetrelCABServerCore
+import PetrelCrypto
 
 struct GenerateKey: ParsableCommand {
   static let configuration = CommandConfiguration(
@@ -62,8 +62,7 @@ struct GenerateKey: ParsableCommand {
 
   func run() throws {
     let key = P256.Signing.PrivateKey()
-    var jwk = key.publicKey.jwkRepresentation
-    jwk.keyID = kid
+    let jwk = JWK(publicKey: key.publicKey, kid: kid, alg: "ES256")
     let encoder = JSONEncoder()
     encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
     let jwkJSON = String(data: try encoder.encode(jwk), encoding: .utf8) ?? "{}"

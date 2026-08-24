@@ -39,7 +39,6 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(url: "https://github.com/beatt83/jose-swift.git", .upToNextMajor(from: "6.0.0")),
         .package(url: "https://github.com/valpackett/SwiftCBOR.git", .upToNextMinor(from: "0.6.0")),
         .package(
             url: "https://github.com/apple/swift-async-dns-resolver",
@@ -92,7 +91,6 @@ let package = Package(
             dependencies: [
                 "PetrelCore",
                 "PetrelCrypto",
-                "jose-swift",
                 "SwiftCBOR",
                 .product(name: "AsyncDNSResolver", package: "swift-async-dns-resolver"),
                 .product(name: "Crypto", package: "swift-crypto"),
