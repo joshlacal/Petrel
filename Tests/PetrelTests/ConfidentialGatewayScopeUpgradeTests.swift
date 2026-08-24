@@ -1311,6 +1311,13 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 XCTFail("Expected error for access_denied callback")
             } catch {}
 
+            // Restart upgrade for subsequent validation tests
+            _ = try await client.startGatewayScopeUpgrade(
+                requesting: ["identity:handle"],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+
             // 2. Callback base URL mismatch (different host)
             let mismatchCallback = URL(string: "https://evil.attacker.test/oauth/permission-callback?code=12345")!
             do {
@@ -1332,10 +1339,256 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 _ = try await client.completeGatewayScopeUpgrade(callbackURL: extraQueryCallback, for: self.aliceDID)
                 XCTFail("Expected error for extra query parameters")
             } catch {}
-
             // Session must remain untouched
             let currentDID = try await storage.getCurrentDID()
             XCTAssertEqual(currentDID, self.aliceDID)
+        }
+    }
+    func testDeniedCallbackDeletesPreCandidateSessionUnchangedAndAllowsRestart() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.denied.restart.\(UUID().uuidString)"
+            let initialSession = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: initialSession)
+
+            let alice = self.aliceDID
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
+                            #"{"did":"\#(alice)","granted_scopes":["atproto"]}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Start upgrade creates pre-candidate state
+            _ = try await client.startGatewayScopeUpgrade(
+                requesting: ["identity:handle"],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+
+            let pendingDataBefore = try await storage.getPendingGatewayUpgradeData(for: self.aliceDID)
+            XCTAssertNotNil(pendingDataBefore, "Pending upgrade state should exist after start")
+
+            // Complete with exact ?error=access_denied
+            let denialCallback = URL(string: "https://catbird.blue/oauth/permission-callback?error=access_denied&error_description=User+denied")!
+            do {
+                _ = try await client.completeGatewayScopeUpgrade(callbackURL: denialCallback, for: self.aliceDID)
+                XCTFail("Expected AuthError.cancelled for access_denied callback")
+            } catch let error as AuthError {
+                guard case .cancelled = error else {
+                    XCTFail("Expected AuthError.cancelled, got: \(error)")
+                    return
+                }
+            } catch {
+                XCTFail("Expected AuthError.cancelled, got other error: \(error)")
+            }
+
+            // Pre-candidate pending data must be deleted
+            let pendingDataAfter = try await storage.getPendingGatewayUpgradeData(for: self.aliceDID)
+            XCTAssertNil(pendingDataAfter, "Pending upgrade state must be deleted on denied callback")
+
+            // Old session, current account, current DID must remain unchanged
+            let currentSession = try await storage.getGatewaySession(for: self.aliceDID)
+            XCTAssertEqual(currentSession, initialSession, "Old session must remain unchanged")
+            let currentDID = try await storage.getCurrentDID()
+            XCTAssertEqual(currentDID, self.aliceDID)
+            let currentAccount = try await storage.getAccount(for: self.aliceDID)
+            XCTAssertEqual(currentAccount?.did, self.aliceDID)
+
+            // Subsequent start succeeds and creates new state
+            _ = try await client.startGatewayScopeUpgrade(
+                requesting: ["identity:handle"],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+
+            let newPendingData = try await storage.getPendingGatewayUpgradeData(for: self.aliceDID)
+            XCTAssertNotNil(newPendingData, "New pending upgrade state should exist after restart")
+            XCTAssertNotEqual(pendingDataBefore, newPendingData, "New pending state must be distinct from prior state")
+        }
+    }
+
+    func testCancelOAuthFlowClearsPreCandidateSessionUnchangedAndAllowsRestart() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.cancel.restart.\(UUID().uuidString)"
+            let initialSession = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: initialSession)
+
+            let alice = self.aliceDID
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
+                            #"{"did":"\#(alice)","granted_scopes":["atproto"]}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Start upgrade creates pre-candidate state
+            _ = try await client.startGatewayScopeUpgrade(
+                requesting: ["identity:handle"],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+
+            let pendingDataBefore = try await storage.getPendingGatewayUpgradeData(for: self.aliceDID)
+            XCTAssertNotNil(pendingDataBefore)
+
+            // Cancel OAuth flow
+            await client.cancelOAuthFlow()
+
+            // Pre-candidate pending data must be deleted
+            let pendingDataAfter = try await storage.getPendingGatewayUpgradeData(for: self.aliceDID)
+            XCTAssertNil(pendingDataAfter, "Pending upgrade state must be cleared by cancelOAuthFlow")
+
+            // Old session, account, and DID unchanged
+            let currentSession = try await storage.getGatewaySession(for: self.aliceDID)
+            XCTAssertEqual(currentSession, initialSession)
+            let currentDID = try await storage.getCurrentDID()
+            XCTAssertEqual(currentDID, self.aliceDID)
+
+            // Subsequent start succeeds and creates new state
+            _ = try await client.startGatewayScopeUpgrade(
+                requesting: ["identity:handle"],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+
+            let newPendingData = try await storage.getPendingGatewayUpgradeData(for: self.aliceDID)
+            XCTAssertNotNil(newPendingData)
+        }
+    }
+
+    func testCandidateStateSurvivesCancelAndPermitsRecovery() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.candidate.survives.\(UUID().uuidString)"
+            let oldSession = UUID().uuidString.lowercased()
+            let candidateSession = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSession)
+            let alice = self.aliceDID
+
+            // Seed candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSession)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto"],
+                "browserNonce": "test_nonce_1234567890123456789012",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateSession)",
+                "candidateGrantedScopes": ["atproto", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Call cancelOAuthFlow
+            await client.cancelOAuthFlow()
+
+            // Candidate state must survive cancellation
+            let pendingDataAfter = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingDataAfter, "Candidate-bearing state must not be deleted by cancelOAuthFlow")
+
+            // Verify sessions/accounts unchanged
+            let currentSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(currentSession, oldSession)
+            let currentDID = try await storage.getCurrentDID()
+            XCTAssertEqual(currentDID, alice)
+        }
+    }
+
+    func testCancelOAuthFlowWithMalformedOrMismatchedStateFailsSafely() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.cancel.safe.\(UUID().uuidString)"
+            let initialSession = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: initialSession)
+            let alice = self.aliceDID
+            let bob = self.bobDID
+
+            // 1. Malformed pending data in storage
+            let malformedData = "not-valid-json".data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(malformedData, for: alice)
+
+            await client.cancelOAuthFlow()
+
+            // State retained, no crash, session unchanged
+            let storedData = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertEqual(storedData, malformedData, "Malformed state must be retained")
+            let currentSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(currentSession, initialSession)
+
+            // 2. Mismatched DID in pending state
+            let mismatchedData = """
+            {
+                "oldSession": "\(initialSession)",
+                "expectedDID": "\(bob)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto"],
+                "browserNonce": "test_nonce_1234567890123456789012",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": null,
+                "candidateGrantedScopes": null
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(mismatchedData, for: alice)
+
+            await client.cancelOAuthFlow()
+
+            let storedMismatched = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertEqual(storedMismatched, mismatchedData, "Mismatched DID state must be retained")
+            let currentSession2 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(currentSession2, initialSession)
+        }
+    }
+
+    func testDeniedCallbackPropagatesStorageDeletionError() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.upgrade.storagefail.denial.\(UUID().uuidString)"
+            let initialSession = UUID().uuidString.lowercased()
+            let (client, _) = try await self.makeClient(namespace: namespace, initialSession: initialSession)
+            let alice = self.aliceDID
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    return (HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!,
+                            #"{"did":"\#(alice)","granted_scopes":["atproto"]}"#.data(using: .utf8)!)
+                } else if path == "/auth/upgrade" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"authorization_url":"https://auth.pds.test/oauth/authorize?req=1"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            _ = try await client.startGatewayScopeUpgrade(
+                requesting: ["identity:handle"],
+                for: self.aliceDID,
+                callbackURL: self.validCallbackBase
+            )
+
+            // Inject storage failure on delete
+            backend.failDeleteMatching = { key in key.contains("pendingGatewayUpgrade") }
+
+            let denialCallback = URL(string: "https://catbird.blue/oauth/permission-callback?error=access_denied&error_description=User+denied")!
+            do {
+                _ = try await client.completeGatewayScopeUpgrade(callbackURL: denialCallback, for: self.aliceDID)
+                XCTFail("Expected storage error, not success")
+            } catch let error as AuthError {
+                if case .cancelled = error {
+                    XCTFail("Should not return AuthError.cancelled when storage deletion failed")
+                }
+            } catch {
+                // Storage error expected and properly propagated
+            }
         }
     }
 

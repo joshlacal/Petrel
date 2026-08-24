@@ -174,6 +174,16 @@ private struct PendingGatewayUpgradeState: Codable, Sendable {
     let callbackURL: URL
     var candidateSession: String?
     var candidateGrantedScopes: [String]?
+
+    var hasCandidate: Bool {
+        if let candidateSession, !candidateSession.isEmpty {
+            return true
+        }
+        if let candidateGrantedScopes, !candidateGrantedScopes.isEmpty {
+            return true
+        }
+        return false
+    }
 }
 
 private struct GatewayErrorResponse: Decodable {
@@ -473,7 +483,30 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         logger.info("🚪 Gateway logout complete")
     }
 
-    func cancelOAuthFlow() async {}
+    func cancelOAuthFlow() async {
+        guard let currentAccount = await accountManager.getCurrentAccount() else {
+            return
+        }
+        let did = currentAccount.did
+        do {
+            guard let pendingData = try await storage.getPendingGatewayUpgradeData(for: did) else {
+                return
+            }
+            let pendingState = try JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
+            guard pendingState.expectedDID == did else {
+                logger.warning("cancelOAuthFlow: pending upgrade expected DID mismatch, retaining state")
+                return
+            }
+            guard !pendingState.hasCandidate else {
+                logger.info("cancelOAuthFlow: pending upgrade has candidate state, retaining for recovery")
+                return
+            }
+            try await storage.deletePendingGatewayUpgradeData(for: did)
+            logger.info("cancelOAuthFlow: cleared pre-candidate pending upgrade state")
+        } catch {
+            logger.warning("cancelOAuthFlow: failed to load or clear pending upgrade state: \(error.localizedDescription)")
+        }
+    }
 
     func tokensExist() async -> Bool {
         guard let currentAccount = await accountManager.getCurrentAccount() else {
@@ -817,6 +850,9 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         if queryItems.contains(where: { $0.name == "error" }) {
+            if !pendingState.hasCandidate {
+                try await storage.deletePendingGatewayUpgradeData(for: expectedDID)
+            }
             throw AuthError.cancelled
         }
 
