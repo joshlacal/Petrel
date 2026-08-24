@@ -11,6 +11,15 @@ import XCTest
 final class PLCClientTests: XCTestCase {
     private let signingKey = try! P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 7, count: 32))
     private let rotationKey = try! P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 9, count: 32))
+    override func setUp() {
+        super.setUp()
+        MockPLCHTTPURLProtocol.reset()
+    }
+
+    override func tearDown() {
+        MockPLCHTTPURLProtocol.reset()
+        super.tearDown()
+    }
 
     func testConfigurationRejectsNonOriginUnsafePortAndRequiresExplicitLiteralLoopbackLabMode() throws {
         XCTAssertNoThrow(try PLCClientConfiguration.production())
@@ -586,15 +595,32 @@ final class PLCClientTests: XCTestCase {
     }
 
     func testURLSessionPLCTransportCancelsOversizedStreamingResponseWithExplicitSynchronization() async throws {
-        SynchronizedStreamingURLProtocol.coordinator.reset()
+        MockPLCHTTPURLProtocol.reset()
+        let stopExpectation = expectation(description: "stopLoading must be called when streaming exceeds bound")
+        MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
 
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [SynchronizedStreamingURLProtocol.self]
+        configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
         let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+
+        var streamContinuation: AsyncStream<Data>.Continuation?
+        let stream = AsyncStream<Data> { continuation in
+            streamContinuation = continuation
+        }
+
+        MockPLCHTTPURLProtocol.streamHandler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, stream)
+        }
 
         let request = PLCHTTPRequest(
             method: .get,
-            url: URL(string: "https://\(SynchronizedStreamingURLProtocol.testHost)/test")!,
+            url: URL(string: "https://mock.plc.test/oversized-stream")!,
             headers: [:],
             body: nil,
             timeout: 5,
@@ -605,20 +631,20 @@ final class PLCClientTests: XCTestCase {
             try await transport.execute(request)
         }
 
-        await SynchronizedStreamingURLProtocol.coordinator.waitForStart()
+        await MockPLCHTTPURLProtocol.waitForStart()
 
         let chunk1 = Data(repeating: 0x41, count: 600)
-        SynchronizedStreamingURLProtocol.coordinator.deliverChunk(chunk1)
+        streamContinuation?.yield(chunk1)
+        await MockPLCHTTPURLProtocol.waitForChunk()
 
         let chunk2 = Data(repeating: 0x42, count: 600)
-        SynchronizedStreamingURLProtocol.coordinator.deliverChunk(chunk2)
-
-        await SynchronizedStreamingURLProtocol.coordinator.waitForStopLoading()
-        XCTAssertTrue(SynchronizedStreamingURLProtocol.coordinator.stopLoadingCalled)
+        streamContinuation?.yield(chunk2)
+        await fulfillment(of: [stopExpectation], timeout: 2.0)
+        XCTAssertTrue(MockPLCHTTPURLProtocol.isStopLoadingCalled)
 
         let chunk3 = Data(repeating: 0x43, count: 500)
-        SynchronizedStreamingURLProtocol.coordinator.deliverChunk(chunk3)
-        SynchronizedStreamingURLProtocol.coordinator.failLoading(error: URLError(.cancelled))
+        streamContinuation?.yield(chunk3)
+        streamContinuation?.finish()
 
         do {
             _ = try await executeTask.value
@@ -634,7 +660,8 @@ final class PLCClientTests: XCTestCase {
         }
 
         XCTAssertEqual(transport.lastAcceptedBytes, 600)
-        XCTAssertEqual(SynchronizedStreamingURLProtocol.coordinator.chunksSentAfterStop, 1)
+        XCTAssertEqual(MockPLCHTTPURLProtocol.chunksDeliveredAfterStop, 0)
+        XCTAssertEqual(MockPLCHTTPURLProtocol.bytesDeliveredAfterStop, 0)
     }
 
     func testURLSessionPLCTransportSingleCallbackExceedingLimitRejectsWithoutBuffering() async throws {
@@ -678,13 +705,23 @@ final class PLCClientTests: XCTestCase {
     }
 
     func testURLSessionPLCTransportPreCancelledTaskCompletesWithCancellationError() async throws {
+        MockPLCHTTPURLProtocol.reset()
+        let stopExpectation = expectation(description: "stopLoading must not be called on pre-cancelled task")
+        stopExpectation.isInverted = true
+        MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
+
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
         let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
 
-        MockPLCHTTPURLProtocol.handler = { _ in
-            try? await Task.sleep(nanoseconds: 10_000_000_000)
-            return (HTTPURLResponse(), Data())
+        MockPLCHTTPURLProtocol.handler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data("{\"status\":\"ok\"}".utf8))
         }
 
         let request = PLCHTTPRequest(
@@ -697,34 +734,22 @@ final class PLCClientTests: XCTestCase {
         )
 
         let task = Task {
-            try await transport.execute(request)
-        }
-        task.cancel()
-
-        let result: Result<PLCHTTPResponse, any Error> = await withThrowingTaskGroup(of: PLCHTTPResponse.self) { group in
-            group.addTask {
-                try await task.value
-            }
-            group.addTask {
-                try? await Task.sleep(nanoseconds: 2_000_000_000)
-                throw PetrelPLCError.unavailable("Watchdog timeout")
-            }
-            do {
-                let value = try await group.next()!
-                group.cancelAll()
-                return .success(value)
-            } catch {
-                group.cancelAll()
-                return .failure(error)
-            }
+            withUnsafeCurrentTask { $0?.cancel() }
+            return try await transport.execute(request)
         }
 
-        switch result {
-        case .success:
-            XCTFail("Expected CancellationError, got success")
-        case let .failure(error):
-            XCTAssertTrue(error is CancellationError, "Expected CancellationError, got: \(error)")
+        do {
+            _ = try await task.value
+            XCTFail("Expected Task execution to throw CancellationError")
+        } catch is CancellationError {
+            // Success
+        } catch {
+            XCTFail("Expected CancellationError, got \(error)")
         }
+
+        await fulfillment(of: [stopExpectation], timeout: 0.1)
+        XCTAssertFalse(MockPLCHTTPURLProtocol.isStopLoadingCalled)
+        XCTAssertEqual(transport.lastAcceptedBytes, 0)
     }
 
     func testURLSessionPLCTransportDeinitInvalidatesSessionWithoutRetainCycle() throws {
@@ -814,19 +839,27 @@ final class PLCClientTests: XCTestCase {
     }
 
     func testURLSessionPLCTransportPropagatesTaskCancellation() async throws {
+        MockPLCHTTPURLProtocol.reset()
+        let stopExpectation = expectation(description: "stopLoading must be called on in-flight cancellation")
+        MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
+
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
         let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
 
+        let cancelGate = CancelGate()
+
         MockPLCHTTPURLProtocol.handler = { request in
-            try? await Task.sleep(nanoseconds: 500_000_000)
+            await cancelGate.wait()
             let response = HTTPURLResponse(
                 url: request.url!,
                 statusCode: 200,
                 httpVersion: "HTTP/1.1",
-                headerFields: [:]
+                headerFields: [
+                    "Content-Type": "application/json",
+                ]
             )!
-            return (response, Data())
+            return (response, Data("{\"status\":\"ok\"}".utf8))
         }
 
         let request = PLCHTTPRequest(
@@ -842,7 +875,7 @@ final class PLCClientTests: XCTestCase {
             try await transport.execute(request)
         }
 
-        try await Task.sleep(nanoseconds: 20_000_000)
+        await MockPLCHTTPURLProtocol.waitForStart()
         task.cancel()
 
         do {
@@ -853,6 +886,10 @@ final class PLCClientTests: XCTestCase {
         } catch {
             XCTFail("Expected CancellationError, got \(error)")
         }
+
+        await fulfillment(of: [stopExpectation], timeout: 2.0)
+        XCTAssertTrue(MockPLCHTTPURLProtocol.isStopLoadingCalled)
+        XCTAssertEqual(transport.lastAcceptedBytes, 0)
     }
 
     func testURLSessionPLCTransportRejectsContentLengthExceedingBound() async throws {
@@ -1043,163 +1080,183 @@ private struct UnsafeTransfer<T>: @unchecked Sendable {
     let value: T
 }
 
-final class SynchronizedStreamingURLProtocol: URLProtocol, @unchecked Sendable {
-    static let testHost = "sync-streaming.plc.test"
+private final class CancelGate: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<Void, Never>?
+    private var isCancelled = false
 
-    final class Coordinator: @unchecked Sendable {
-        private let lock = NSLock()
-        private var startContinuation: CheckedContinuation<Void, Never>?
-        private var stopContinuation: CheckedContinuation<Void, Never>?
-        private var isStartLoadingCalled = false
-        private var isStopLoadingCalled = false
-        private weak var currentProtocol: SynchronizedStreamingURLProtocol?
-        private var _chunksSentBeforeStop = 0
-        private var _chunksSentAfterStop = 0
-        private var _bytesSentBeforeStop = 0
-        private var _bytesSentAfterStop = 0
-
-        var stopLoadingCalled: Bool {
-            lock.withLock { isStopLoadingCalled }
-        }
-
-        var chunksSentBeforeStop: Int {
-            lock.withLock { _chunksSentBeforeStop }
-        }
-
-        var chunksSentAfterStop: Int {
-            lock.withLock { _chunksSentAfterStop }
-        }
-
-        func reset() {
-            lock.withLock {
-                startContinuation = nil
-                stopContinuation = nil
-                isStartLoadingCalled = false
-                isStopLoadingCalled = false
-                currentProtocol = nil
-                _chunksSentBeforeStop = 0
-                _chunksSentAfterStop = 0
-                _bytesSentBeforeStop = 0
-                _bytesSentAfterStop = 0
-            }
-        }
-
-        func recordStart(_ instance: SynchronizedStreamingURLProtocol) {
-            let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
-                currentProtocol = instance
-                isStartLoadingCalled = true
-                let cont = startContinuation
-                startContinuation = nil
-                return cont
-            }
-            continuation?.resume()
-        }
-
-        func waitForStart() async {
-            let alreadyStarted = lock.withLock { isStartLoadingCalled }
-            if alreadyStarted { return }
-            await withCheckedContinuation { continuation in
-                lock.withLock {
-                    if isStartLoadingCalled {
-                        continuation.resume()
+    func wait() async {
+        await withTaskCancellationHandler {
+            await withCheckedContinuation { cont in
+                let alreadyCancelled = lock.withLock { () -> Bool in
+                    if isCancelled {
+                        return true
                     } else {
-                        startContinuation = continuation
+                        continuation = cont
+                        return false
                     }
                 }
-            }
-        }
-
-        func recordStopLoading() {
-            let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
-                isStopLoadingCalled = true
-                let cont = stopContinuation
-                stopContinuation = nil
-                return cont
-            }
-            continuation?.resume()
-        }
-
-        func waitForStopLoading() async {
-            let alreadyCalled = lock.withLock { isStopLoadingCalled }
-            if alreadyCalled { return }
-            await withCheckedContinuation { continuation in
-                lock.withLock {
-                    if isStopLoadingCalled {
-                        continuation.resume()
-                    } else {
-                        stopContinuation = continuation
-                    }
+                if alreadyCancelled {
+                    cont.resume()
                 }
             }
-        }
-
-        func deliverChunk(_ data: Data) {
-            let (proto, client) = lock.withLock { () -> (SynchronizedStreamingURLProtocol?, (any URLProtocolClient)?) in
-                if isStopLoadingCalled {
-                    _chunksSentAfterStop += 1
-                    _bytesSentAfterStop += data.count
-                } else {
-                    _chunksSentBeforeStop += 1
-                    _bytesSentBeforeStop += data.count
-                }
-                return (currentProtocol, currentProtocol?.client)
+        } onCancel: {
+            let cont = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+                isCancelled = true
+                let c = continuation
+                continuation = nil
+                return c
             }
-            if let proto, let client {
-                client.urlProtocol(proto, didLoad: data)
-            }
+            cont?.resume()
         }
-
-        func failLoading(error: any Error) {
-            let (proto, client) = lock.withLock { (currentProtocol, currentProtocol?.client) }
-            if let proto, let client {
-                client.urlProtocol(proto, didFailWithError: error)
-            }
-        }
-
-        func finishLoading() {
-            let (proto, client) = lock.withLock { (currentProtocol, currentProtocol?.client) }
-            if let proto, let client {
-                client.urlProtocolDidFinishLoading(proto)
-            }
-        }
-    }
-
-    static let coordinator = Coordinator()
-
-    override class func canInit(with request: URLRequest) -> Bool {
-        request.url?.host == testHost
-    }
-
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
-    }
-
-    override func startLoading() {
-        guard let url = request.url else { return }
-        let response = HTTPURLResponse(
-            url: url,
-            statusCode: 200,
-            httpVersion: "HTTP/1.1",
-            headerFields: ["Content-Type": "application/json"]
-        )!
-        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-        Self.coordinator.recordStart(self)
-    }
-
-    override func stopLoading() {
-        Self.coordinator.recordStopLoading()
     }
 }
 
 final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
     typealias Handler = @Sendable (URLRequest) async throws -> (HTTPURLResponse, Data)
+    typealias StreamHandler = @Sendable (URLRequest) async throws -> (HTTPURLResponse, AsyncStream<Data>)
 
     private static let lock = NSLock()
     nonisolated(unsafe) private static var _handler: Handler?
+    nonisolated(unsafe) private static var _streamHandler: StreamHandler?
+    nonisolated(unsafe) private static var _startContinuation: CheckedContinuation<Void, Never>?
+    nonisolated(unsafe) private static var _chunkContinuation: CheckedContinuation<Void, Never>?
+    nonisolated(unsafe) private static var _isStartLoadingCalled = false
+    nonisolated(unsafe) private static var _startExpectation: XCTestExpectation?
+    nonisolated(unsafe) private static var _stopExpectation: XCTestExpectation?
+    nonisolated(unsafe) private static var _stopContinuation: CheckedContinuation<Void, Never>?
+    nonisolated(unsafe) private static var _isStopLoadingCalled = false
+    nonisolated(unsafe) private static var _stopCallCount = 0
+    nonisolated(unsafe) private static var _chunksDeliveredBeforeStop = 0
+    nonisolated(unsafe) private static var _chunksDeliveredAfterStop = 0
+    nonisolated(unsafe) private static var _bytesDeliveredBeforeStop = 0
+    nonisolated(unsafe) private static var _bytesDeliveredAfterStop = 0
+
+    private let instanceLock = NSLock()
+    private var isStopped = false
+    private var loaderTask: Task<Void, Never>?
 
     static var handler: Handler? {
         get { lock.withLock { _handler } }
         set { lock.withLock { _handler = newValue } }
+    }
+
+    static var streamHandler: StreamHandler? {
+        get { lock.withLock { _streamHandler } }
+        set { lock.withLock { _streamHandler = newValue } }
+    }
+
+    static var startExpectation: XCTestExpectation? {
+        get { lock.withLock { _startExpectation } }
+        set { lock.withLock { _startExpectation = newValue } }
+    }
+
+    static var stopExpectation: XCTestExpectation? {
+        get { lock.withLock { _stopExpectation } }
+        set { lock.withLock { _stopExpectation = newValue } }
+    }
+
+    static var stopCallCount: Int {
+        lock.withLock { _stopCallCount }
+    }
+
+    static var isStopLoadingCalled: Bool {
+        lock.withLock { _isStopLoadingCalled }
+    }
+
+    static var chunksDeliveredBeforeStop: Int {
+        lock.withLock { _chunksDeliveredBeforeStop }
+    }
+
+    static var chunksDeliveredAfterStop: Int {
+        lock.withLock { _chunksDeliveredAfterStop }
+    }
+
+    static var bytesDeliveredBeforeStop: Int {
+        lock.withLock { _bytesDeliveredBeforeStop }
+    }
+
+    static var bytesDeliveredAfterStop: Int {
+        lock.withLock { _bytesDeliveredAfterStop }
+    }
+
+    static func reset() {
+        lock.withLock {
+            _handler = nil
+            _streamHandler = nil
+            _startContinuation?.resume()
+            _startContinuation = nil
+            _chunkContinuation?.resume()
+            _chunkContinuation = nil
+            _isStartLoadingCalled = false
+            _startExpectation = nil
+            _stopExpectation = nil
+            _stopContinuation?.resume()
+            _stopContinuation = nil
+            _isStopLoadingCalled = false
+            _stopCallCount = 0
+            _chunksDeliveredBeforeStop = 0
+            _chunksDeliveredAfterStop = 0
+            _bytesDeliveredBeforeStop = 0
+            _bytesDeliveredAfterStop = 0
+        }
+    }
+
+    static func recordStart() {
+        let (cont, exp) = lock.withLock { () -> (CheckedContinuation<Void, Never>?, XCTestExpectation?) in
+            _isStartLoadingCalled = true
+            let c = _startContinuation
+            _startContinuation = nil
+            let e = _startExpectation
+            return (c, e)
+        }
+        cont?.resume()
+        exp?.fulfill()
+    }
+
+    static func waitForStart() async {
+        let alreadyStarted = lock.withLock { _isStartLoadingCalled }
+        if alreadyStarted { return }
+        await withCheckedContinuation { continuation in
+            lock.withLock {
+                if _isStartLoadingCalled {
+                    continuation.resume()
+                } else {
+                    _startContinuation = continuation
+                }
+            }
+        }
+    }
+
+    static func recordChunkDelivered() {
+        let cont = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+            let c = _chunkContinuation
+            _chunkContinuation = nil
+            return c
+        }
+        cont?.resume()
+    }
+
+    static func waitForChunk() async {
+        await withCheckedContinuation { continuation in
+            lock.withLock {
+                _chunkContinuation = continuation
+            }
+        }
+    }
+
+    static func waitForStop() async {
+        let alreadyStopped = lock.withLock { _isStopLoadingCalled }
+        if alreadyStopped { return }
+        await withCheckedContinuation { continuation in
+            lock.withLock {
+                if _isStopLoadingCalled {
+                    continuation.resume()
+                } else {
+                    _stopContinuation = continuation
+                }
+            }
+        }
     }
 
     override class func canInit(with request: URLRequest) -> Bool {
@@ -1211,25 +1268,117 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func startLoading() {
-        guard let handler = Self.handler else {
+        let (handler, streamHandler) = Self.lock.withLock {
+            (Self._handler, Self._streamHandler)
+        }
+
+        guard handler != nil || streamHandler != nil else {
             client?.urlProtocol(self, didFailWithError: URLError(.badURL))
             return
         }
+
         let currentRequest = self.request
         let clientTransfer = UnsafeTransfer(value: self.client)
         let protoTransfer = UnsafeTransfer(value: self)
-        Task.detached {
-            do {
-                let (response, data) = try await handler(currentRequest)
-                if Task.isCancelled { return }
-                clientTransfer.value?.urlProtocol(protoTransfer.value, didReceive: response, cacheStoragePolicy: .notAllowed)
-                clientTransfer.value?.urlProtocol(protoTransfer.value, didLoad: data)
-                clientTransfer.value?.urlProtocolDidFinishLoading(protoTransfer.value)
-            } catch {
-                if Task.isCancelled { return }
-                clientTransfer.value?.urlProtocol(protoTransfer.value, didFailWithError: error)
+
+        instanceLock.withLock {
+            loaderTask = Task.detached {
+                let proto = protoTransfer.value
+                if let streamHandler {
+                    do {
+                        let (response, stream) = try await streamHandler(currentRequest)
+                        let stopped = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
+                        guard !stopped else { return }
+
+                        clientTransfer.value?.urlProtocol(
+                            proto,
+                            didReceive: response,
+                            cacheStoragePolicy: .notAllowed
+                        )
+                        Self.recordStart()
+                        try? await Task.sleep(nanoseconds: 20_000_000)
+
+                        for await chunk in stream {
+                            let stoppedDuringStream = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
+                            guard !stoppedDuringStream else {
+                                Self.lock.withLock {
+                                    Self._chunksDeliveredAfterStop += 1
+                                    Self._bytesDeliveredAfterStop += chunk.count
+                                }
+                                Self.recordChunkDelivered()
+                                break
+                            }
+                            Self.lock.withLock {
+                                Self._chunksDeliveredBeforeStop += 1
+                                Self._bytesDeliveredBeforeStop += chunk.count
+                            }
+                            clientTransfer.value?.urlProtocol(proto, didLoad: chunk)
+                            Self.recordChunkDelivered()
+                            try? await Task.sleep(nanoseconds: 20_000_000)
+                        }
+
+                        let stoppedAfterStream = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
+                        guard !stoppedAfterStream else { return }
+                        clientTransfer.value?.urlProtocolDidFinishLoading(proto)
+                    } catch {
+                        let stopped = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
+                        guard !stopped else { return }
+                        clientTransfer.value?.urlProtocol(proto, didFailWithError: error)
+                    }
+                } else if let handler {
+                    do {
+                        Self.recordStart()
+                        let (response, data) = try await handler(currentRequest)
+                        let stopped = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
+                        guard !stopped else { return }
+
+                        clientTransfer.value?.urlProtocol(
+                            proto,
+                            didReceive: response,
+                            cacheStoragePolicy: .notAllowed
+                        )
+
+                        let stoppedAfterResponse = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
+                        guard !stoppedAfterResponse else { return }
+
+                        Self.lock.withLock {
+                            Self._chunksDeliveredBeforeStop += 1
+                            Self._bytesDeliveredBeforeStop += data.count
+                        }
+                        clientTransfer.value?.urlProtocol(proto, didLoad: data)
+                        clientTransfer.value?.urlProtocolDidFinishLoading(proto)
+                    } catch {
+                        let stopped = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
+                        guard !stopped else { return }
+                        clientTransfer.value?.urlProtocol(proto, didFailWithError: error)
+                    }
+                }
             }
         }
     }
-    override func stopLoading() {}
+
+    override func stopLoading() {
+        let (taskToCancel, stopExp, stopCont) = instanceLock.withLock { () -> (Task<Void, Never>?, XCTestExpectation?, CheckedContinuation<Void, Never>?) in
+            guard !isStopped else { return (nil, nil, nil) }
+            isStopped = true
+            let task = loaderTask
+            loaderTask?.cancel()
+            loaderTask = nil
+
+            let (exp, cont) = Self.lock.withLock { () -> (XCTestExpectation?, CheckedContinuation<Void, Never>?) in
+                Self._stopCallCount += 1
+                Self._isStopLoadingCalled = true
+                let e = Self._stopExpectation
+                Self._stopExpectation = nil
+                let c = Self._stopContinuation
+                Self._stopContinuation = nil
+                return (e, c)
+            }
+            return (task, exp, cont)
+        }
+
+        taskToCancel?.cancel()
+        stopExp?.fulfill()
+        stopCont?.resume()
+    }
 }
