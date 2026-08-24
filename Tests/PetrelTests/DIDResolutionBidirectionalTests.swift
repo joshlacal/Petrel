@@ -381,6 +381,92 @@ struct DIDResolutionBidirectionalTests {
         }
     }
 
+    @Test("did:web preserves percent-encoded path segments and does not interpret %3F as query delimiter")
+    func didWebPercentEncodedPathPreserved() async throws {
+        DIDTestURLProtocol.reset()
+        NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in ["104.244.42.1"] }
+        defer {
+            DIDTestURLProtocol.reset()
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
+        }
+
+        let docJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:web:example.com:path%3Fevil",
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds.example.com"
+                }
+            ]
+        }
+        """
+
+        let receivedBox = TestBox<URL?>(nil)
+        DIDTestURLProtocol.installRoute(matching: "example.com") { request in
+            receivedBox.set(request.url)
+            return (200, Data(docJSON.utf8), ["Content-Type": "application/json"])
+        }
+        let networkService = NetworkService(baseURL: baseURL)
+        let resolver = await DIDResolutionService(networkService: networkService)
+
+        let pds = try await resolver.resolveDIDToPDSURL(did: "did:web:example.com:path%3Fevil")
+        #expect(pds.absoluteString == "https://pds.example.com")
+        let receivedURL = receivedBox.get()
+        #expect(receivedURL != nil)
+        #expect(receivedURL?.query == nil)
+        #expect(receivedURL?.absoluteString.contains("path%3Fevil/did.json") == true)
+        #expect(receivedURL?.absoluteString != "https://example.com/path?evil/did.json")
+    }
+
+    @Test("extractCandidateHandle skips bare-hostname aliases and selects first valid at:// handle URI")
+    func extractCandidateHandleSkipsBareHostnames() async throws {
+        DIDTestURLProtocol.reset()
+        NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in ["104.244.42.1"] }
+        defer {
+            DIDTestURLProtocol.reset()
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
+        }
+
+        let docJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:alice123",
+            "alsoKnownAs": ["example.com", "https://example.com/user", "at://invalid..handle", "at://alice.example.com"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds.example.com"
+                }
+            ]
+        }
+        """
+
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:alice123") { _ in
+            (200, Data(docJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { request in
+            guard let url = request.url?.absoluteString, url.contains("alice.example.com") else {
+                return (404, Data(), [:])
+            }
+            return (200, Data(#"{"did":"did:plc:alice123"}"#.utf8), ["Content-Type": "application/json"])
+        }
+
+        let networkService = NetworkService(baseURL: baseURL)
+        let resolver = await DIDResolutionService(networkService: networkService)
+
+        let (handle, pdsURL) = try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:alice123")
+        #expect(handle == "alice.example.com")
+        #expect(pdsURL.absoluteString == "https://pds.example.com")
+    }
+
     @Test("Cancellation propagates and is never swallowed or converted to handle.invalid")
     func cancellationPropagates() async throws {
         DIDTestURLProtocol.reset()
@@ -568,6 +654,14 @@ struct DIDResolutionBidirectionalTests {
         #expect(secondHandle == Handle.invalid)
         #expect(secondPDSURL.absoluteString == "https://pds.example.com")
     }
+}
+
+private final class TestBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: T
+    init(_ value: T) { self.value = value }
+    func get() -> T { lock.withLock { value } }
+    func set(_ newValue: T) { lock.withLock { value = newValue } }
 }
 
 // MARK: - Mock URLProtocol for DID Tests

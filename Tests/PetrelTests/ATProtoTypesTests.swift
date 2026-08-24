@@ -204,6 +204,15 @@ struct ATProtoTypesTests {
             #expect(Handle.isValidTLD("com"))
             #expect(Handle.isValidTLD(".social"))
             #expect(Handle.isValidTld("app"))
+            // isValidTLD and isValidTld with full handle string
+            #expect(!Handle.isValidTld("alice.onion"))
+            #expect(!Handle.isValidTLD("alice.onion"))
+            #expect(!Handle.isValidTld("friend.expyuzz4wqqyqhjn.onion"))
+            #expect(!Handle.isValidTld("laptop.local"))
+            #expect(!Handle.isValidTld("SRI-NIC.ARPA"))
+            #expect(Handle.isValidTld("alice.bsky.social"))
+            #expect(Handle.isValidTld("john.test"))
+            #expect(Handle.isValidTld("jan.test"))
 
             // Instance hasDisallowedTLD checks
             let onionHandle = try Handle(handleString: "hidden.onion")

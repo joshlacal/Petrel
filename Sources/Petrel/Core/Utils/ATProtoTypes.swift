@@ -820,16 +820,18 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
     ]
 
     /// Registration-time policy check for TLD validity (mirrors upstream isValidTld).
-    public static func isValidTLD(_ tld: String) -> Bool {
-        let normalized = tld.hasPrefix(".") ? String(tld.dropFirst()) : tld
-        return !disallowedTLDs.contains(normalized.lowercased())
+    /// Takes a handle or TLD, extracts the final label, and returns false if it is in disallowedTLDs.
+    public static func isValidTLD(_ handleOrTLD: String) -> Bool {
+        guard let tld = handleOrTLD.split(separator: ".").last, !tld.isEmpty else {
+            return false
+        }
+        return !disallowedTLDs.contains(String(tld).lowercased())
     }
 
     /// Registration-time policy check for TLD validity (alias matching upstream naming).
-    public static func isValidTld(_ tld: String) -> Bool {
-        isValidTLD(tld)
+    public static func isValidTld(_ handleOrTLD: String) -> Bool {
+        isValidTLD(handleOrTLD)
     }
-
     /// Returns true if this handle's TLD is in the registration-time disallowed list.
     public var hasDisallowedTLD: Bool {
         guard let tld = value.split(separator: ".").last else { return false }

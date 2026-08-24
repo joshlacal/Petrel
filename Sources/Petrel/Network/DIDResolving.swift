@@ -435,36 +435,55 @@ actor DIDResolutionService: DIDResolving {
               !authorityParts[0].contains("/") else {
             throw DIDResolutionError.invalidDID(did)
         }
-        let domain: String
+        let host = authorityParts[0]
+        guard !host.isEmpty else {
+            throw DIDResolutionError.invalidDID(did)
+        }
+        let port: Int?
         if authorityParts.count == 2 {
-            let port = authorityParts[1]
-            guard !port.isEmpty, !port.contains("%"), !port.contains("/"),
-                  let portNum = UInt16(port), portNum > 0 else {
+            let portStr = authorityParts[1]
+            guard !portStr.isEmpty, !portStr.contains("%"), !portStr.contains("/"),
+                  let portNum = Int(portStr), (1 ... 65535).contains(portNum) else {
                 throw DIDResolutionError.invalidDID(did)
             }
-            domain = "\(authorityParts[0]):\(port)"
+            port = portNum
         } else {
-            domain = authorityParts[0]
+            port = nil
         }
 
         let pathComponents = parts.dropFirst(3)
-        let endpoint: String
+        var components = URLComponents()
+        components.scheme = "https"
+        components.host = host
+        components.port = port
+
         if pathComponents.isEmpty {
-            endpoint = "https://\(domain)/.well-known/did.json"
+            components.percentEncodedPath = "/.well-known/did.json"
         } else {
-            var decodedSegments: [String] = []
+            var rawSegments: [String] = []
             for component in pathComponents {
-                guard let decoded = String(component).removingPercentEncoding,
+                let rawSegment = String(component)
+                guard !rawSegment.isEmpty,
+                      rawSegment != ".",
+                      rawSegment != "..",
+                      !rawSegment.contains("/") else {
+                    throw DIDResolutionError.invalidDID(did)
+                }
+                guard let decoded = rawSegment.removingPercentEncoding,
                       !decoded.isEmpty,
                       decoded != ".",
                       decoded != "..",
-                      !decoded.contains("/") else {
+                      !decoded.contains("/"),
+                      !decoded.contains("\\") else {
                     throw DIDResolutionError.invalidDID(did)
                 }
-                decodedSegments.append(decoded)
+                rawSegments.append(rawSegment)
             }
-            let path = decodedSegments.joined(separator: "/")
-            endpoint = "https://\(domain)/\(path)/did.json"
+            components.percentEncodedPath = "/" + rawSegments.joined(separator: "/") + "/did.json"
+        }
+
+        guard let endpoint = components.url?.absoluteString else {
+            throw DIDResolutionError.invalidDID(did)
         }
 
         let request = try await networkService.createURLRequest(
@@ -504,12 +523,10 @@ actor DIDResolutionService: DIDResolving {
 
     private func extractCandidateHandle(from didDocument: DIDDocument) -> String? {
         for aka in didDocument.alsoKnownAs {
-            let candidate: String
-            if aka.hasPrefix("at://") {
-                candidate = String(aka.dropFirst(5))
-            } else {
-                candidate = aka
+            guard aka.hasPrefix("at://") else {
+                continue
             }
+            let candidate = String(aka.dropFirst(5))
             if !candidate.isEmpty, let validHandle = try? Handle(handleString: candidate).value {
                 return validHandle
             }
