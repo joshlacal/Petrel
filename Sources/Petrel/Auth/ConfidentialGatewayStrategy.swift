@@ -466,38 +466,64 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
         let did = currentAccount.did
 
+        // Snapshot candidate session from pending state BEFORE deletion.
+        // If pending read/decode fails, propagate immediately:
+        // zero `/auth/logout` request, old session/current selector untouched.
+        var candidateSessionToRetire: String? = nil
+        if let pendingData = try await storage.getPendingGatewayUpgradeData(for: did) {
+            let pendingState = try JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
+            if pendingState.expectedDID == did,
+               let candidateSession = pendingState.candidateSession,
+               let uuid = UUID(uuidString: candidateSession) {
+                candidateSessionToRetire = uuid.uuidString.lowercased()
+            }
+        }
+
         // Delete pending gateway upgrade data FIRST.
         // If it throws, propagate immediately: zero `/auth/logout` request,
         // old session/current selector untouched. This is explicit abandonment ordering.
         logger.info("🚪 Clearing pending gateway upgrade data for DID \(did.prefix(20))...")
         try await storage.deletePendingGatewayUpgradeData(for: did)
 
-        // Best-effort call to gateway to invalidate session server-side
-        if let session = try? await storage.getGatewaySession(for: did) {
+        // Build deduplicated token list from candidate session (if any) + stored local gateway session.
+        var tokensToLogout: [String] = []
+        if let candidateSessionToRetire, !candidateSessionToRetire.isEmpty {
+            tokensToLogout.append(candidateSessionToRetire)
+        }
+        if let localSession = try? await storage.getGatewaySession(for: did),
+           !localSession.isEmpty,
+           !tokensToLogout.contains(localSession) {
+            tokensToLogout.append(localSession)
+        }
+
+        // Best-effort call to gateway to invalidate each session server-side without logging tokens
+        if !tokensToLogout.isEmpty {
             let logoutURL = gatewayURL.appendingPathComponent("auth/logout")
-            logger.info(
-                "🚪 Calling gateway logout for DID \(did.prefix(20))...: \(logoutURL.absoluteString)"
-            )
-
-            var request = URLRequest(url: logoutURL)
-            request.httpMethod = "POST"
-            request.setValue("Bearer \(session)", forHTTPHeaderField: "Authorization")
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-
-            do {
-                let (data, response) = try await urlSession.data(for: request)
-                if let httpResponse = response as? HTTPURLResponse {
-                    logger.info("🚪 Gateway logout response: \(httpResponse.statusCode)")
-                    if httpResponse.statusCode != 200 {
-                        let body = String(data: data, encoding: .utf8) ?? "no body"
-                        logger.warning("🚪 Gateway logout non-200: \(body)")
-                    }
-                }
-            } catch {
-                // Don't fail logout if gateway is unreachable
-                logger.warning(
-                    "🚪 Gateway logout request failed (continuing anyway): \(error.localizedDescription)"
+            for token in tokensToLogout {
+                logger.info(
+                    "🚪 Calling gateway logout for DID \(did.prefix(20))...: \(logoutURL.absoluteString)"
                 )
+
+                var request = URLRequest(url: logoutURL)
+                request.httpMethod = "POST"
+                request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+
+                do {
+                    let (data, response) = try await urlSession.data(for: request)
+                    if let httpResponse = response as? HTTPURLResponse {
+                        logger.info("🚪 Gateway logout response: \(httpResponse.statusCode)")
+                        if httpResponse.statusCode != 200 {
+                            let body = String(data: data, encoding: .utf8) ?? "no body"
+                            logger.warning("🚪 Gateway logout non-200: \(body)")
+                        }
+                    }
+                } catch {
+                    // Don't fail logout if gateway is unreachable
+                    logger.warning(
+                        "🚪 Gateway logout request failed (continuing anyway): \(error.localizedDescription)"
+                    )
+                }
             }
         } else {
             logger.info(

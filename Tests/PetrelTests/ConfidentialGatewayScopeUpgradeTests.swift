@@ -3102,17 +3102,23 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             // Perform explicit logout
             try await client.logout()
 
-            // 1. Pending upgrade state must be deleted BEFORE anchor session is cleared
+            // 1. Verify remote logout requests sent for candidate first, then old session
+            let logoutRequests = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            XCTAssertEqual(logoutRequests.count, 2, "Explicit logout must retire both candidate and old sessions")
+            XCTAssertEqual(logoutRequests[0].value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+            XCTAssertEqual(logoutRequests[1].value(forHTTPHeaderField: "Authorization"), "Bearer \(oldSessionUUID)")
+
+            // 2. Pending upgrade state must be deleted BEFORE anchor session is cleared
             let pendingAfterLogout = try await storage.getPendingGatewayUpgradeData(for: alice)
             XCTAssertNil(pendingAfterLogout, "Pending gateway upgrade must be deleted on logout")
 
-            // 2. Gateway session and current account must be cleared
+            // 3. Gateway session and current account must be cleared
             let sessionAfterLogout = try await storage.getGatewaySession(for: alice)
             XCTAssertNil(sessionAfterLogout, "Gateway session must be deleted on logout")
             let currentAccount = await client.getCurrentAccount()
             XCTAssertNil(currentAccount, "Current account must be cleared on logout")
 
-            // 3. Fresh same-DID OAuth callback succeeds now that pending upgrade is gone
+            // 4. Fresh same-DID OAuth callback succeeds now that pending upgrade is gone
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 let path = request.url?.path ?? ""
                 if path == "/auth/session" {
@@ -3141,6 +3147,112 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertEqual(restoredAccount?.did, alice, "Current account must be restored to alice")
             let isValid = await client.hasValidSession()
             XCTAssertTrue(isValid, "Session must be valid after fresh login")
+        }
+    }
+
+    func testLogoutCandidateWhenLocalSessionAlreadyPromotedSendsCandidateBearerOnce() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.logout.promoted.candidate.\(UUID().uuidString)"
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: candidateUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state where candidate matches local session
+            let pendingState = """
+            {
+                "oldSession": "\(UUID().uuidString.lowercased())",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            GatewayUpgradeTestURLProtocol.reset()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/logout" {
+                    let pendingPeek = backend.peek(key: "pendingGatewayUpgrade.\(alice)", namespace: namespace)
+                    XCTAssertNil(pendingPeek, "Pending upgrade data must be deleted before remote /auth/logout request is issued")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"status":"ok"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            try await client.logout()
+
+            let logoutRequests = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            XCTAssertEqual(logoutRequests.count, 1, "Promoted candidate session must only send a single logout request")
+            XCTAssertEqual(logoutRequests[0].value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+
+            let pendingAfterLogout = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfterLogout, "Pending gateway upgrade must be deleted on logout")
+            let sessionAfterLogout = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(sessionAfterLogout, "Gateway session must be deleted on logout")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertNil(currentAccount, "Current account must be cleared on logout")
+        }
+    }
+
+    func testLogoutCandidateStagedReturns401ContinuesToOldSession() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.logout.staged.401.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Setup mock handler: candidate returns 401, oldSession returns 200
+            GatewayUpgradeTestURLProtocol.reset()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/logout" {
+                    let authHeader = request.value(forHTTPHeaderField: "Authorization") ?? ""
+                    if authHeader == "Bearer \(candidateUUID)" {
+                        let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                        return (resp, #"{"error":"unauthorized","message":"staged candidate not committed"}"#.data(using: .utf8)!)
+                    } else if authHeader == "Bearer \(oldSessionUUID)" {
+                        let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                        return (resp, #"{"status":"ok"}"#.data(using: .utf8)!)
+                    }
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Logout should succeed without throwing
+            try await client.logout()
+
+            let logoutRequests = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            XCTAssertEqual(logoutRequests.count, 2)
+            XCTAssertEqual(logoutRequests[0].value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+            XCTAssertEqual(logoutRequests[1].value(forHTTPHeaderField: "Authorization"), "Bearer \(oldSessionUUID)")
+
+            let pendingAfterLogout = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfterLogout, "Pending gateway upgrade must be deleted on logout")
+            let sessionAfterLogout = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(sessionAfterLogout, "Gateway session must be deleted on logout")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertNil(currentAccount, "Current account must be cleared on logout")
         }
     }
 
@@ -3179,6 +3291,11 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
 
             // Perform explicit logout
             try await client.logout()
+
+            // Verify remote logout request sent for old session only
+            let logoutRequests = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            XCTAssertEqual(logoutRequests.count, 1, "Pre-candidate upgrade must only send old session logout request")
+            XCTAssertEqual(logoutRequests[0].value(forHTTPHeaderField: "Authorization"), "Bearer \(oldSessionUUID)")
 
             // 1. Pending upgrade state must be deleted
             let pendingAfterLogout = try await storage.getPendingGatewayUpgradeData(for: alice)
@@ -3229,6 +3346,11 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
 
             // Best-effort remote logout must not throw
             try await client.logout()
+
+            let logoutRequests = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            XCTAssertEqual(logoutRequests.count, 2)
+            XCTAssertEqual(logoutRequests[0].value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+            XCTAssertEqual(logoutRequests[1].value(forHTTPHeaderField: "Authorization"), "Bearer \(oldSessionUUID)")
 
             // 1. Pending upgrade state must be deleted
             let pendingAfterLogout = try await storage.getPendingGatewayUpgradeData(for: alice)
@@ -3295,6 +3417,44 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertEqual(currentAccount?.did, alice, "Current account must NOT be cleared when pending deletion throws")
             let currentDID = try await storage.getCurrentDID()
             XCTAssertEqual(currentDID, alice, "Current DID selector must NOT be cleared when pending deletion throws")
+        }
+    }
+    func testLogoutFailsWhenPendingUpgradeDecodeFailsPreservingSessionAndAccount() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.logout.decodefail.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant corrupted pending upgrade state data (invalid JSON)
+            let corruptedData = Data([0x00, 0x01, 0x02, 0x03])
+            try await storage.savePendingGatewayUpgradeData(corruptedData, for: alice)
+
+            // Install URLProtocol handler that fails if any network request occurs
+            GatewayUpgradeTestURLProtocol.reset()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                XCTFail("No network request should occur when pending upgrade decode fails: \(request.url?.absoluteString ?? "")")
+                return (HTTPURLResponse(url: request.url!, statusCode: 500, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            do {
+                try await client.logout()
+                XCTFail("Logout must throw when decoding pending upgrade fails")
+            } catch {}
+
+            // Assert zero requests occurred
+            let requests = GatewayUpgradeTestURLProtocol.recordedRequests()
+            XCTAssertEqual(requests.count, 0, "Zero network requests must be made when pending decode fails")
+
+            // Verify session, selector, and pending data are NOT deleted
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade must NOT be deleted when decode throws")
+            let sessionAfterFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFail, oldSessionUUID, "Gateway session must NOT be deleted when pending decode throws")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertEqual(currentAccount?.did, alice, "Current account must NOT be cleared when pending decode throws")
+            let currentDID = try await storage.getCurrentDID()
+            XCTAssertEqual(currentDID, alice, "Current DID selector must NOT be cleared when pending decode throws")
         }
     }
 
