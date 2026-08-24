@@ -116,6 +116,18 @@ private final class TestAsyncGate: @unchecked Sendable {
     }
 }
 
+private final class ThrowingStorageBackend: SecureStorage, @unchecked Sendable {
+    let errorToThrow: Error
+    init(errorToThrow: Error) { self.errorToThrow = errorToThrow }
+    func store(key: String, value: Data, namespace: String, accessGroup: String?) throws { throw errorToThrow }
+    func retrieve(key: String, namespace: String, accessGroup: String?) throws -> Data { throw errorToThrow }
+    func delete(key: String, namespace: String, accessGroup: String?) throws { throw errorToThrow }
+    func deleteAll(namespace: String, accessGroup: String?) throws { throw errorToThrow }
+    func storeDPoPKeyRepresentation(_ representation: Data, keyTag: String, accessGroup: String?) throws { throw errorToThrow }
+    func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data { throw errorToThrow }
+    func deleteDPoPKey(keyTag: String, accessGroup: String?) throws { throw errorToThrow }
+}
+
 // MARK: - Test Suite
 
 final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
@@ -2272,7 +2284,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 httpVersion: nil,
                 headerFields: ["Content-Type": "application/json"]
             )!
-            let terminal401Body = #"{"error":"AuthenticationRequired","message":"token expired"}"#.data(using: .utf8)!
+            let terminal401Body = #"{"error":"ExpiredToken","message":"The token has expired"}"#.data(using: .utf8)!
 
             do {
                 _ = try await strategy.handleUnauthorizedResponse(
@@ -2280,9 +2292,15 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     data: terminal401Body,
                     for: req
                 )
-                XCTFail("handleUnauthorizedResponse must throw when recovery fails")
-            } catch {}
-
+                XCTFail("handleUnauthorizedResponse must throw when recovery fails on terminal 401")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .upgradeTemporarilyUnavailable = error else {
+                    XCTFail("Expected .upgradeTemporarilyUnavailable, got \(error)")
+                    return
+                }
+            } catch {
+                XCTFail("Expected GatewayError, got \(error)")
+            }
             let sessionAfter401 = try await storage.getGatewaySession(for: alice)
             XCTAssertEqual(sessionAfter401, oldSessionUUID, "Old session must NOT be deleted after terminal 401 when recovery fails")
             let pendingAfter401 = try await storage.getPendingGatewayUpgradeData(for: alice)
@@ -2944,13 +2962,16 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             """.data(using: .utf8)!
             try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
 
-            // Handler: commit returns 200, but in handler we mutate stored session so CAS fails
+            // Handler: commit returns 200, but in handler we mutate stored session deterministically before returning 200
+            let writeGate = TestAsyncGate()
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 let path = request.url?.path ?? ""
                 if path == "/auth/upgrade/commit" {
-                    _ = Task {
+                    Task {
                         try? await storage.saveGatewaySession(thirdSessionUUID, for: alice)
+                        writeGate.open()
                     }
+                    writeGate.waitBlocking()
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     let body = """
                     {
@@ -2969,6 +2990,9 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             let isValid = await client.hasValidSession()
             XCTAssertFalse(isValid, "hasValidSession must return false when CAS fails")
 
+            // 2. Assert third session was indeed stored in storage
+            let sessionInStorage = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionInStorage, thirdSessionUUID, "Stored session must be thirdSessionUUID")
             // 2. Storage and pending upgrade state must remain intact (no destructive clear)
             let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
             XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
@@ -3035,6 +3059,278 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
             let prepared = try await strategy.prepareAuthenticatedRequest(req)
             XCTAssertEqual(prepared.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+        }
+    }
+
+    func testLogoutClearsPendingUpgradeAndAllowsFreshSameDIDCallback() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.logout.abandonment.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let freshSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant terminal candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Setup mock handler for logout (best effort)
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/logout" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"status":"ok"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Perform explicit logout
+            try await client.logout()
+
+            // 1. Pending upgrade state must be deleted BEFORE anchor session is cleared
+            let pendingAfterLogout = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfterLogout, "Pending gateway upgrade must be deleted on logout")
+
+            // 2. Gateway session and current account must be cleared
+            let sessionAfterLogout = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(sessionAfterLogout, "Gateway session must be deleted on logout")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertNil(currentAccount, "Current account must be cleared on logout")
+
+            // 3. Fresh same-DID OAuth callback succeeds now that pending upgrade is gone
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(freshSessionUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "session_id": "\(freshSessionUUID)",
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "active": true,
+                        "scope": "atproto transition:generic"
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(freshSessionUUID)")!
+            try await client.handleOAuthCallback(url: callbackURL)
+
+            let restoredSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(restoredSession, freshSessionUUID, "Fresh session must be saved")
+            let restoredAccount = await client.getCurrentAccount()
+            XCTAssertEqual(restoredAccount?.did, alice, "Current account must be restored to alice")
+            let isValid = await client.hasValidSession()
+            XCTAssertTrue(isValid, "Session must be valid after fresh login")
+        }
+    }
+
+    func testLogoutFailsWhenPendingUpgradeDeletionFailsPreservingSessionAndAccount() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.logout.fail.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Inject failure when deleting pending gateway upgrade
+            backend.failDeleteMatching = { key in
+                key.contains("pendingGatewayUpgrade")
+            }
+
+            do {
+                try await client.logout()
+                XCTFail("Logout must throw when deleting pending upgrade fails")
+            } catch {}
+
+            // Verify session, selector, and pending data are NOT deleted
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade must NOT be deleted when deletion throws")
+            let sessionAfterFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFail, oldSessionUUID, "Gateway session must NOT be deleted when pending deletion throws")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertEqual(currentAccount?.did, alice, "Current account must NOT be cleared when pending deletion throws")
+            let currentDID = try await storage.getCurrentDID()
+            XCTAssertEqual(currentDID, alice, "Current DID selector must NOT be cleared when pending deletion throws")
+        }
+    }
+
+    func testCandidateRecoveryWithCorruptedCurrentDIDOrSessionIsTerminal() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.corrupted.terminal.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // 1. Plant invalid UTF-8 bytes at currentDID key (corrupted selector)
+            let invalidUTF8 = Data([0xFF, 0xFE, 0xFD, 0x00, 0xFF])
+            KeychainManager.clearCache()
+            backend.plant(key: "currentDID", namespace: namespace, data: invalidUTF8)
+
+            // hasValidSession must return false (terminal dataFormatError propagates)
+            let isValidWithCorruptedDID = await client.hasValidSession()
+            XCTAssertFalse(isValidWithCorruptedDID, "Corrupted currentDID must be terminal (hasValidSession = false)")
+
+            // Restore valid currentDID, but plant invalid UTF-8 bytes at gatewaySession key
+            KeychainManager.clearCache()
+            backend.plant(key: "currentDID", namespace: namespace, data: Data(alice.utf8))
+            backend.plant(key: "gatewaySession.\(alice)", namespace: namespace, data: invalidUTF8)
+
+            let isValidWithCorruptedSession = await client.hasValidSession()
+            XCTAssertFalse(isValidWithCorruptedSession, "Corrupted session must be terminal (hasValidSession = false)")
+        }
+    }
+
+    func testCandidateRecoveryWithRetrievalOrStorageUnavailableIsTerminal() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.unavailable.terminal.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // 1. Fail retrieval of pendingGatewayUpgrade with itemRetrievalError (non-not-found)
+            KeychainManager.clearCache()
+            backend.failRetrieveMatching = { key in
+                key.contains("pendingGatewayUpgrade")
+            }
+
+            let isValidWithRetrievalFail = await client.hasValidSession()
+            XCTAssertFalse(isValidWithRetrievalFail, "Retrieval failure must be terminal (hasValidSession = false)")
+
+            // 2. Storage unavailable error
+            backend.failRetrieveMatching = nil
+            KeychainManager.clearCache()
+            let unavailableStorage = ThrowingStorageBackend(errorToThrow: KeychainError.storageUnavailable("Secure enclave unavailable"))
+            KeychainManager._setStorageOverride(unavailableStorage)
+
+            let isValidWithUnavailable = await client.hasValidSession()
+            XCTAssertFalse(isValidWithUnavailable, "Storage unavailable must be terminal (hasValidSession = false)")
+
+            // Reset back
+            KeychainManager._setStorageOverride(backend)
+            KeychainManager.clearCache()
+        }
+    }
+    func testCandidateRecoveryWithRetryableStoreOrDeletionErrorPreservesSessionContinuity() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.retryable.keychain.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Setup commit handler returning 200
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. Fail store of candidate session with itemStoreError (atomic failure preserves old)
+            backend.failStoreMatching = { key in
+                key.contains("gatewaySession")
+            }
+
+            let isValidWithStoreError = await client.hasValidSession()
+            XCTAssertTrue(isValidWithStoreError, "itemStoreError is retryable; session continuity must be preserved")
+
+            // 2. Allow store, but fail deletion of pending upgrade data with deletionError
+            backend.failStoreMatching = nil
+            backend.failDeleteMatching = { key in
+                key.contains("pendingGatewayUpgrade")
+            }
+
+            let isValidWithDeleteError = await client.hasValidSession()
+            XCTAssertTrue(isValidWithDeleteError, "deletionError is retryable; session continuity must be preserved")
         }
     }
 }

@@ -498,6 +498,11 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 "🚪 No gateway session found for DID \(did.prefix(20))..., skipping gateway logout call"
             )
         }
+        // Delete pending gateway upgrade data before deleting session or current selector.
+        // If pending deletion fails, logout throws and must NOT delete session/current selector,
+        // preserving recoverability.
+        logger.info("🚪 Clearing pending gateway upgrade data for DID \(did.prefix(20))...")
+        try await storage.deletePendingGatewayUpgradeData(for: did)
 
         // Always clear local session for this account
         logger.info("🚪 Clearing local gateway session for DID \(did.prefix(20))...")
@@ -1076,9 +1081,19 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     private func isRetryableCandidateRecoveryError(_ error: Error) -> Bool {
         switch error {
         case GatewayError.networkError,
-             GatewayError.upgradeTemporarilyUnavailable,
-             is KeychainError,
-             is URLError,
+             GatewayError.upgradeTemporarilyUnavailable:
+            return true
+        case let keychainError as KeychainError:
+            switch keychainError {
+            case .itemStoreError, .deletionError:
+                // .itemStoreError: failure-atomic replacement preserves old state.
+                // .deletionError: cleanup failure after session state preserved.
+                return true
+            case .dataFormatError, .unableToCreateKey, .storageUnavailable, .itemRetrievalError:
+                // Corrupted storage, uninitialized backend, or retrieval failures are terminal.
+                return false
+            }
+        case is URLError,
              is POSIXError:
             return true
         case let nsError as NSError where nsError.domain == NSURLErrorDomain || nsError.domain == NSPOSIXErrorDomain:
