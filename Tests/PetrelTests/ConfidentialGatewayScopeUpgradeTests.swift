@@ -3605,4 +3605,365 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertTrue(isValidWithDeleteError, "deletionError is retryable; session continuity must be preserved")
         }
     }
+
+    // MARK: - Lifecycle Serialization & Queue Concurrency Tests
+
+    func testStartBlockedInUpgradeNetworkSerializesLogoutAndClearsPendingAndSession() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.start.blocked.logout.\(UUID().uuidString)"
+            let initialSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: initialSessionUUID)
+            let alice = self.aliceDID
+            let callbackBase = Self.validCallbackBase
+
+            let startUpgradeEntered = TestAsyncGate()
+            let startUpgradeRelease = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/upgrade" {
+                    startUpgradeEntered.open()
+                    startUpgradeRelease.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {"authorization_url":"https://auth.pds.test/oauth/authorize?req=123"}
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/logout" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    return (response, Data())
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let startTask = Task {
+                try await client.startGatewayScopeUpgrade(
+                    requesting: ["identity:handle"],
+                    for: alice,
+                    callbackURL: callbackBase
+                )
+            }
+            await startUpgradeEntered.wait()
+
+            // Begin logout while startGatewayScopeUpgrade is blocked in /auth/upgrade network
+            let logoutTask = Task {
+                try await client.logout()
+            }
+
+            // Verify that while start is in-flight, logout has not called /auth/logout or cleared session
+            let logoutReqsBefore = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            XCTAssertTrue(logoutReqsBefore.isEmpty, "Logout network request must wait for in-flight start to complete")
+            let sessionBefore = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionBefore, initialSessionUUID, "Session must not be cleared while start is in-flight")
+
+            // Release start
+            startUpgradeRelease.open()
+
+            let authURL = try await startTask.value
+            XCTAssertEqual(authURL.absoluteString, "https://auth.pds.test/oauth/authorize?req=123")
+
+            try await logoutTask.value
+
+            // Prove logout serialized after start, cleared the newly persisted pending upgrade and session
+            let pendingAfter = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfter, "Logout must clear pending gateway upgrade state persisted by start")
+            let sessionAfter = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(sessionAfter, "Logout must clear local gateway session")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertNil(currentAccount, "Logout must clear current account")
+
+            let logoutReqsAfter = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            XCTAssertFalse(logoutReqsAfter.isEmpty, "Logout network call must have occurred")
+        }
+    }
+
+    func testCompleteBlockedInCommitSerializesLogoutAndRetiresCandidateAndClearsState() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.complete.blocked.logout.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let commitEntered = TestAsyncGate()
+            let commitRelease = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    commitEntered.open()
+                    commitRelease.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/logout" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    return (response, Data())
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await client.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+            await commitEntered.wait()
+
+            // Start logout while completeGatewayScopeUpgrade is blocked inside /auth/upgrade/commit
+            let logoutTask = Task {
+                try await client.logout()
+            }
+
+            // Verify logout is waiting and has not sent /auth/logout
+            let logoutReqsBefore = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            XCTAssertTrue(logoutReqsBefore.isEmpty, "Logout must wait for in-flight complete/commit")
+
+            // Release commit
+            commitRelease.open()
+
+            let grants = try await completeTask.value
+            XCTAssertTrue(grants.contains("identity:handle"))
+
+            try await logoutTask.value
+
+            // Prove logout serialized, candidate session was retired and all state cleared
+            let pendingAfter = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfter, "Pending upgrade data must be nil after logout")
+            let sessionAfter = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(sessionAfter, "Gateway session must be nil after logout")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertNil(currentAccount, "Current account must be nil after logout")
+            let logoutReqsAfter = GatewayUpgradeTestURLProtocol.recordedRequests().filter { $0.url?.path == "/auth/logout" }
+            let logoutTokens = logoutReqsAfter.compactMap { $0.value(forHTTPHeaderField: "Authorization") }
+            XCTAssertTrue(logoutTokens.contains("Bearer \(candidateUUID)"), "Candidate session must be invalidated during logout")
+        }
+    }
+
+    func testCancelWhileStartBlockedSerializesAndClearsResultingPreCandidate() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.cancel.start.blocked.\(UUID().uuidString)"
+            let initialSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: initialSessionUUID)
+            let alice = self.aliceDID
+            let callbackBase = Self.validCallbackBase
+            let startEntered = TestAsyncGate()
+            let startRelease = TestAsyncGate()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/upgrade" {
+                    startEntered.open()
+                    startRelease.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {"authorization_url":"https://auth.pds.test/oauth/authorize?req=123"}
+                    """.data(using: .utf8)!
+                    return (response, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let startTask = Task {
+                try await client.startGatewayScopeUpgrade(
+                    requesting: ["identity:handle"],
+                    for: alice,
+                    callbackURL: callbackBase
+                )
+            }
+            await startEntered.wait()
+
+            // Queue cancel while start is blocked in /auth/upgrade
+            let cancelTask = Task {
+                await client.cancelOAuthFlow()
+            }
+
+            // Release start
+            startRelease.open()
+
+            _ = try await startTask.value
+            await cancelTask.value
+
+            // Verify that cancel serialized after start, clearing the persisted pre-candidate
+            let pendingAfter = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfter, "Cancel must clear pre-candidate state persisted by start")
+            let sessionAfter = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfter, initialSessionUUID, "Original session must remain intact")
+
+            // Verify start can immediately be started again cleanly
+            let authURL2 = try await client.startGatewayScopeUpgrade(
+                requesting: ["identity:handle"],
+                for: alice,
+                callbackURL: callbackBase
+            )
+            XCTAssertEqual(authURL2.absoluteString, "https://auth.pds.test/oauth/authorize?req=123")
+        }
+    }
+
+    func testCallerCancellationWhileQueuedRemovesOperationWithoutDeadlockingQueue() async throws {
+        try await withInMemoryBackend { backend in
+            let namespace = "test.gateway.queued.cancellation.\(UUID().uuidString)"
+            let initialSessionUUID = UUID().uuidString.lowercased()
+            let (client, _) = try await self.makeClient(namespace: namespace, initialSession: initialSessionUUID)
+            let alice = self.aliceDID
+            let callbackBase = Self.validCallbackBase
+            let op1Entered = TestAsyncGate()
+            let op1Release = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/upgrade" {
+                    op1Entered.open()
+                    op1Release.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {"authorization_url":"https://auth.pds.test/oauth/authorize?req=123"}
+                    """.data(using: .utf8)!
+                    return (response, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Task 1: start scope upgrade (will block in /auth/upgrade)
+            let task1 = Task {
+                try await client.startGatewayScopeUpgrade(
+                    requesting: ["identity:handle"],
+                    for: alice,
+                    callbackURL: callbackBase
+                )
+            }
+
+            await op1Entered.wait()
+
+            // Task 2: complete scope upgrade (enqueued behind task 1)
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let task2 = Task {
+                try await client.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+            let task3 = Task {
+                try await client.fetchGrantedScopes(for: alice)
+            }
+
+            // Cancel task 2 while queued
+            task2.cancel()
+
+            // Release task 1
+            op1Release.open()
+
+            let authURL = try await task1.value
+            XCTAssertEqual(authURL.absoluteString, "https://auth.pds.test/oauth/authorize?req=123")
+
+            do {
+                _ = try await task2.value
+                XCTFail("task2 should have thrown CancellationError")
+            } catch is CancellationError {
+                // Expected: task2 cancelled cleanly while queued
+            } catch {
+                XCTFail("task2 threw unexpected error: \(error)")
+            }
+
+            // Task 3 must have executed and succeeded without queue deadlock
+            let scopes = try await task3.value
+            XCTAssertTrue(scopes.contains("atproto"))
+        }
+    }
 }

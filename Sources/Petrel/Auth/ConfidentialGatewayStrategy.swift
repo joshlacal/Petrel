@@ -327,10 +327,33 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
     }
 
+    /// Coordinates stateful lifecycle operations serially to prevent actor reentrancy races.
+    private actor SerialOperationCoordinator {
+        private var previousTask: Task<Void, Never>?
+
+        func run<T: Sendable>(_ operation: @Sendable @escaping () async throws -> T) async throws -> T {
+            let prev = previousTask
+            let currentTask = Task<T, Error> {
+                _ = await prev?.result
+                try Task.checkCancellation()
+                return try await operation()
+            }
+            previousTask = Task {
+                _ = await currentTask.result
+            }
+            return try await withTaskCancellationHandler {
+                try await currentTask.value
+            } onCancel: {
+                currentTask.cancel()
+            }
+        }
+    }
+
     private let gatewayURL: URL
     private let storage: KeychainStorage
     private let accountManager: AccountManaging
     private let urlSession: URLSession
+    private let coordinator = SerialOperationCoordinator()
 
     private static let sessionKey = "gatewaySession"
 
@@ -385,6 +408,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     func handleOAuthCallback(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
+        try await coordinator.run { [self] in
+            try await self.handleOAuthCallbackLocked(url: url)
+        }
+    }
+
+    private func handleOAuthCallbackLocked(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
         // Gateway sends session_id in URL fragment: catbird.blue/oauth/callback#session_id=<uuid>
         guard let fragment = url.fragment,
               let sessionId = parseSessionIdFromFragment(fragment)
@@ -405,11 +434,11 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 throw AuthError.invalidCredentials
             }
             if pendingState.hasCandidate {
-                // If candidate-bearing: mandatory attemptRecoveryFromServerFailures;
+                // If candidate-bearing: mandatory attemptRecoveryFromServerFailuresLocked;
                 // regardless of recovery success, reject the ordinary callback without saving the third session
                 // (on success local candidate remains; on failure old+pending remain).
                 do {
-                    try await attemptRecoveryFromServerFailures(for: sessionInfo.did)
+                    try await attemptRecoveryFromServerFailuresLocked(for: sessionInfo.did)
                 } catch {
                     logger.warning("handleOAuthCallback: recovery of pending candidate failed, retaining old state: \(error.localizedDescription)")
                 }
@@ -457,6 +486,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     func logout() async throws {
+        try await coordinator.run { [self] in
+            try await self.logoutLocked()
+        }
+    }
+
+    private func logoutLocked() async throws {
         logger.info("🚪 Gateway logout initiated")
 
         // Get the current account's DID for per-account session management
@@ -538,6 +573,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     func cancelOAuthFlow() async {
+        _ = try? await coordinator.run { [self] in
+            await self.cancelOAuthFlowLocked()
+        }
+    }
+
+    private func cancelOAuthFlowLocked() async {
         guard let currentAccount = await accountManager.getCurrentAccount() else {
             return
         }
@@ -574,6 +615,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     func setFailureDelegate(_ delegate: AuthFailureDelegate?) async {}
 
     func attemptRecoveryFromServerFailures(for did: String?) async throws {
+        try await coordinator.run { [self] in
+            try await self.attemptRecoveryFromServerFailuresLocked(for: did)
+        }
+    }
+
+    private func attemptRecoveryFromServerFailuresLocked(for did: String?) async throws {
         let targetDID: String
         if let did, !did.isEmpty {
             targetDID = did
@@ -641,6 +688,20 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         for expectedDID: String,
         callbackURL: URL = ConfidentialGatewayStrategy.permissionCallbackURL
     ) async throws -> URL {
+        try await coordinator.run { [self] in
+            try await self.startGatewayScopeUpgradeLocked(
+                requesting: requesting,
+                for: expectedDID,
+                callbackURL: callbackURL
+            )
+        }
+    }
+
+    private func startGatewayScopeUpgradeLocked(
+        requesting: Set<String>,
+        for expectedDID: String,
+        callbackURL: URL
+    ) async throws -> URL {
         // Validate scopes
         guard !requesting.isEmpty, requesting.count <= 16 else {
             throw AuthError.invalidOAuthConfiguration
@@ -685,7 +746,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                !candidateSession.isEmpty,
                !candidateGrants.isEmpty {
                 // Mandatory recovery of candidate; never authorize or bypass the old anchor
-                try await attemptRecoveryFromServerFailures(for: expectedDID)
+                try await attemptRecoveryFromServerFailuresLocked(for: expectedDID)
                 guard let localSession = try await storage.getGatewaySession(for: expectedDID),
                       localSession == candidateSession
                 else {
@@ -848,6 +909,18 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         callbackURL: URL,
         for expectedDID: String
     ) async throws -> Set<String> {
+        try await coordinator.run { [self] in
+            try await self.completeGatewayScopeUpgradeLocked(
+                callbackURL: callbackURL,
+                for: expectedDID
+            )
+        }
+    }
+
+    private func completeGatewayScopeUpgradeLocked(
+        callbackURL: URL,
+        for expectedDID: String
+    ) async throws -> Set<String> {
         // Validate active identity strictly
         guard !expectedDID.isEmpty else {
             throw AuthError.invalidCredentials
@@ -988,6 +1061,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     func fetchGrantedScopes(for did: String?) async throws -> Set<String> {
+        try await coordinator.run { [self] in
+            try await self.fetchGrantedScopesLocked(for: did)
+        }
+    }
+
+    private func fetchGrantedScopesLocked(for did: String?) async throws -> Set<String> {
         let targetDID: String
         if let did, !did.isEmpty {
             targetDID = did
@@ -1000,7 +1079,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         // If recoverable candidate exists, mandatory recovery before reading session or querying gateway
         if let recovery = try await recoverablePendingCandidate(for: targetDID) {
             let candidateSession = recovery.1
-            try await attemptRecoveryFromServerFailures(for: targetDID)
+            try await attemptRecoveryFromServerFailuresLocked(for: targetDID)
             guard let session = try await storage.getGatewaySession(for: targetDID),
                   session == candidateSession
             else {
@@ -1066,6 +1145,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
+        try await coordinator.run { [self] in
+            try await self.refreshTokenIfNeededLocked()
+        }
+    }
+
+    private func refreshTokenIfNeededLocked() async throws -> TokenRefreshResult {
         // Gateway manages token refresh automatically - client session is long-lived
         guard let currentAccount = await accountManager.getCurrentAccount() else {
             logger.warning("refreshTokenIfNeeded: No current account set")
@@ -1075,7 +1160,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         do {
             if let recovery = try await recoverablePendingCandidate(for: currentAccount.did) {
                 let candidateSession = recovery.1
-                try await attemptRecoveryFromServerFailures(for: currentAccount.did)
+                try await attemptRecoveryFromServerFailuresLocked(for: currentAccount.did)
                 guard let session = try await storage.getGatewaySession(for: currentAccount.did),
                       session == candidateSession
                 else {
@@ -1133,6 +1218,14 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     func handleUnauthorizedResponse(
         _ response: HTTPURLResponse, data: Data, for request: URLRequest
     ) async throws -> (Data, HTTPURLResponse) {
+        try await coordinator.run { [self] in
+            try await self.handleUnauthorizedResponseLocked(response, data: data, for: request)
+        }
+    }
+
+    private func handleUnauthorizedResponseLocked(
+        _ response: HTTPURLResponse, data: Data, for request: URLRequest
+    ) async throws -> (Data, HTTPURLResponse) {
         // Only clear session if the 401 came from our gateway
         // 401s from other services (MLS, Bluesky API) shouldn't invalidate gateway session
         if isRequestToGatewayOrigin(request, gatewayURL: gatewayURL) {
@@ -1142,7 +1235,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                    let recovery = try await recoverablePendingCandidate(for: account.did)
                 {
                     // A recoverable candidate owns the old anchor until CAS succeeds.
-                    try await attemptRecoveryFromServerFailures(for: account.did)
+                    try await attemptRecoveryFromServerFailuresLocked(for: account.did)
                     guard let session = try await storage.getGatewaySession(for: account.did),
                           session == recovery.1
                     else {
@@ -1224,7 +1317,9 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             LogManager.logError("ConfidentialGatewayStrategy - No current account set!")
             throw GatewayError.missingSession
         }
-        try await attemptRecoveryFromServerFailures(for: currentAccount.did)
+        if (try await recoverablePendingCandidate(for: currentAccount.did)) != nil {
+            try await attemptRecoveryFromServerFailures(for: currentAccount.did)
+        }
         guard let session = try await storage.getGatewaySession(for: currentAccount.did) else {
             LogManager.logError(
                 "ConfidentialGatewayStrategy - No gateway session found for DID: \(currentAccount.did.prefix(20))..."
