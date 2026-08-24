@@ -62,11 +62,7 @@ public struct CIDAsLink {
 // MARK: - ================== CID Implementation ==================
 
 /// Represents the codec type for Content Identifiers
-public enum CIDCodec: UInt8, ATProtocolValue {
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? CIDCodec else { return false }
-        return self == other
-    }
+public enum CIDCodec: UInt8, Codable, Equatable, Hashable, Sendable, DAGCBOREncodable {
 
     public func toCBORValue() throws -> Any {
         return rawValue
@@ -90,11 +86,7 @@ public enum CIDCodec: UInt8, ATProtocolValue {
 }
 
 /// Represents a multihash structure as used in IPFS and AT Protocol
-public struct Multihash: ATProtocolValue {
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Multihash else { return false }
-        return algorithm == other.algorithm && length == other.length && digest == other.digest
-    }
+public struct Multihash: Codable, Equatable, Hashable, Sendable, DAGCBOREncodable {
 
     public func toCBORValue() throws -> Any {
         return bytes
@@ -150,7 +142,7 @@ public struct Multihash: ATProtocolValue {
 
 // MARK: $link
 
-public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
+public struct ATProtoLink: Codable, DAGCBORCodable, Hashable, Equatable, Sendable {
     /// Store the actual CID object
     public let cid: CID
 
@@ -188,12 +180,6 @@ public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Send
         try container.encode(cid.string, forKey: .cidString)
     }
 
-    // --- ATProtocolValue / Equatable / Hashable Conformance ---
-
-    public func isEqual(to other: any ATProtocolCodable) -> Bool {
-        guard let otherLink = other as? ATProtoLink else { return false }
-        return cid == otherLink.cid // Compare contained CIDs
-    }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(cid)
@@ -237,7 +223,7 @@ public struct ATProtoLink: Codable, ATProtocolCodable, Hashable, Equatable, Send
 }
 
 /// Content Identifier (CID) implementation for AT Protocol (v1, SHA-256)
-public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProtocolValue {
+public struct CID: Equatable, Hashable, Codable, Sendable, CustomStringConvertible, DAGCBORCodable {
     private enum CodingKeys: String, CodingKey {
         case link = "$link"
     }
@@ -390,12 +376,6 @@ public struct CID: Equatable, Hashable, Codable, CustomStringConvertible, ATProt
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         try container.encode(string)
-    }
-
-    /// --- ATProtocolValue Conformance ---
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? CID else { return false }
-        return self == other
     }
 
     /// --- DAGCBOREncodable Conformance ---

@@ -23,6 +23,34 @@ public extension ATProtocolValue {
         ""
     }
 }
+extension CIDCodec: ATProtocolValue {
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? CIDCodec else { return false }
+        return self == other
+    }
+}
+
+extension Multihash: ATProtocolValue {
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Multihash else { return false }
+        return algorithm == other.algorithm && length == other.length && digest == other.digest
+    }
+}
+
+extension ATProtoLink: ATProtocolValue {
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let otherLink = other as? ATProtoLink else { return false }
+        return cid == otherLink.cid
+    }
+}
+
+extension CID: ATProtocolValue {
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? CID else { return false }
+        return self == other
+    }
+}
+
 
 public enum ATProtocolError: Error {
     case invalidURI(String)

@@ -1,12 +1,12 @@
 import Foundation
 
-enum DAGCBORJSONBridge {
-    enum UnsignedIntegerPolicy {
+package enum DAGCBORJSONBridge {
+    package enum UnsignedIntegerPolicy {
         case exactJSONNumber
         case stringifyAboveIntMax
     }
 
-    static func jsonCompatibleValue(
+    package static func jsonCompatibleValue(
         from value: Any,
         unsignedIntegerPolicy: UnsignedIntegerPolicy = .exactJSONNumber
     ) throws -> Any {
@@ -76,7 +76,7 @@ enum DAGCBORJSONBridge {
         }
     }
 
-    static func jsonData(
+    package static func jsonData(
         from value: Any,
         unsignedIntegerPolicy: UnsignedIntegerPolicy = .exactJSONNumber
     ) throws -> Data {

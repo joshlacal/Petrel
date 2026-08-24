@@ -44,9 +44,8 @@ public class CARReader {
     private let data: Data
     private var offset: Int = 0
 
-    /// Internal raw byte-keyed index mapping raw CID bytes → block location in the data
-    private(set) var rawBlockIndex: [Data: BlockLocation] = [:]
-
+    /// Raw byte-keyed index mapping raw CID bytes → block location in the data
+    public private(set) var rawBlockIndex: [Data: BlockLocation] = [:]
     /// Maps CID hex string → block location in the data (public compatibility view)
     public var blockIndex: [String: BlockLocation] {
         Dictionary(uniqueKeysWithValues: rawBlockIndex.map { (key, value) in

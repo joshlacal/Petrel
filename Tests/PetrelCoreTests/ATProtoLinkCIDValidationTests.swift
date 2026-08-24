@@ -1,5 +1,5 @@
 import Foundation
-@testable import Petrel
+@testable import PetrelCore
 import Testing
 
 @Suite("ATProtoLink CID Validation")

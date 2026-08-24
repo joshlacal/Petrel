@@ -1,6 +1,6 @@
 import Foundation
 import Testing
-@testable import Petrel
+@testable import PetrelCore
 
 @Suite("JSONCoders tests")
 struct JSONCodersTests {

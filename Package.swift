@@ -14,6 +14,10 @@ let package = Package(
             targets: ["Petrel"]
         ),
         .library(
+            name: "PetrelCore",
+            targets: ["PetrelCore"]
+        ),
+        .library(
             name: "PetrelCrypto",
             targets: ["PetrelCrypto"]
         ),
@@ -73,8 +77,20 @@ let package = Package(
             ]
         ),
         .target(
+            name: "PetrelCore",
+            dependencies: [
+                "PetrelCrypto",
+                "SwiftCBOR",
+                .product(name: "Crypto", package: "swift-crypto"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
             name: "Petrel",
             dependencies: [
+                "PetrelCore",
                 "PetrelCrypto",
                 "jose-swift",
                 "SwiftCBOR",
@@ -132,6 +148,10 @@ let package = Package(
         .testTarget(
             name: "PetrelCryptoTests",
             dependencies: ["PetrelCrypto"]
+        ),
+        .testTarget(
+            name: "PetrelCoreTests",
+            dependencies: ["PetrelCore", "PetrelCrypto"]
         ),
         .testTarget(
             name: "PetrelRepoTests",
