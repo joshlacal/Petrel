@@ -45,8 +45,9 @@ actor OAuthCore {
     /// `noncesByThumbprint`. Bounds how often a proof re-reads the keychain.
     var lastPersistedNonceMerge: [String: Date] = [:]
 
-    /// Cached DPoP key and precomputed proof material per DID.
-    struct DPoPMaterial: Sendable {
+    /// Cached DPoP key and precomputed proof material per DID. Swift Crypto
+    /// 3.x's immutable P-256 key lacks a Linux `Sendable` annotation.
+    struct DPoPMaterial: @unchecked Sendable {
         let privateKey: P256.Signing.PrivateKey
         let jwk: JWK
         let thumbprint: String
