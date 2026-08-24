@@ -396,9 +396,30 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw GatewayError.invalidSession
         }
 
+        // Inspect pending upgrade for sessionInfo.did BEFORE saving session / account / current mutations
+        if let pendingData = try await storage.getPendingGatewayUpgradeData(for: sessionInfo.did) {
+            let pendingState = try JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
+            guard pendingState.expectedDID == sessionInfo.did else {
+                throw AuthError.invalidCredentials
+            }
+            if pendingState.hasCandidate {
+                // If candidate-bearing: mandatory attemptRecoveryFromServerFailures;
+                // regardless of recovery success, reject the ordinary callback without saving the third session
+                // (on success local candidate remains; on failure old+pending remain).
+                do {
+                    try await attemptRecoveryFromServerFailures(for: sessionInfo.did)
+                } catch {
+                    logger.warning("handleOAuthCallback: recovery of pending candidate failed, retaining old state: \(error.localizedDescription)")
+                }
+                throw GatewayError.invalidSession
+            } else {
+                // If pre-candidate pending: reject callback and retain state; caller must cancel upgrade first.
+                throw GatewayError.invalidSession
+            }
+        }
+
         // Store the session ID keyed by DID (for multi-account support)
         try await saveGatewaySession(sessionId, for: sessionInfo.did)
-
         // Create and save an Account object so the AccountManager can track this user
         let account = Account(
             did: sessionInfo.did,
@@ -858,7 +879,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let codeItems = queryItems.filter { $0.name == "code" }
         // /auth/upgrade/exchange retries require Nest to return a short-lived,
-        // idempotent receipt keyed by old bearer + code + nonce.
+        // idempotent receipt keyed by old bearer + code + nonce. This is a deployment
+        // prerequisite; there is no client-side fallback.
         guard codeItems.count == 1,
               let code = codeItems.first?.value,
               !code.isEmpty,
@@ -1011,13 +1033,19 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         if let recovery = try await recoverablePendingCandidate(for: currentAccount.did) {
             let candidateSession = recovery.1
-            try await attemptRecoveryFromServerFailures(for: currentAccount.did)
-            guard let session = try await storage.getGatewaySession(for: currentAccount.did),
-                  session == candidateSession
-            else {
-                throw GatewayError.invalidSession
+            do {
+                try await attemptRecoveryFromServerFailures(for: currentAccount.did)
+                guard let session = try await storage.getGatewaySession(for: currentAccount.did),
+                      session == candidateSession
+                else {
+                    logger.warning("refreshTokenIfNeeded: candidate recovery did not promote candidate, preserving session continuity")
+                    return .stillValid
+                }
+                return .stillValid
+            } catch {
+                logger.warning("refreshTokenIfNeeded: candidate recovery failed, preserving session continuity")
+                return .stillValid
             }
-            return .stillValid
         }
 
         guard let session = try await storage.getGatewaySession(for: currentAccount.did),

@@ -2198,4 +2198,314 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             } catch {}
         }
     }
+
+    // MARK: - 9. Auth Continuity & Same-DID Reauth Tests
+
+    func testCandidateCommitFailureDuringHasValidSessionPreservesContinuityAndOldStateUntilPromoted() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.continuity.commitfail.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            // Handler: commit returns 503 Service Unavailable
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"error":"service_unavailable"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // 1. client.hasValidSession() returns true during commit failure
+            let isValid = await client.hasValidSession()
+            XCTAssertTrue(isValid, "Session continuity must be preserved as valid when candidate recovery commit fails")
+
+            let sessionAfterFail = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterFail, oldSessionUUID, "Old session must remain intact in storage")
+            let pendingAfterFail = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfterFail, "Pending upgrade state must remain intact in storage")
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertEqual(currentAccount?.did, alice, "Account DID must remain unchanged")
+
+            // 2. Direct completeGatewayScopeUpgrade still throws on 503
+            do {
+                _ = try await client.completeGatewayScopeUpgrade(
+                    callbackURL: URL(string: "https://catbird.blue/oauth/permission-callback?code=some-code")!,
+                    for: alice
+                )
+                XCTFail("Direct complete must throw on 503")
+            } catch {}
+
+            // 3. Subsequent ordinary terminal 401 does not delete old session if recovery still fails
+            let accountManager = await AccountManager(storage: storage)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let gateway401Response = HTTPURLResponse(
+                url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let terminal401Body = #"{"error":"AuthenticationRequired","message":"token expired"}"#.data(using: .utf8)!
+
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: req
+                )
+                XCTFail("handleUnauthorizedResponse must throw when recovery fails")
+            } catch {}
+
+            let sessionAfter401 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfter401, oldSessionUUID, "Old session must NOT be deleted after terminal 401 when recovery fails")
+            let pendingAfter401 = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfter401, "Pending upgrade state must NOT be deleted after terminal 401 when recovery fails")
+
+            // 4. Later idempotent commit succeeds and promotes
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let isValidAfterSuccess = await client.hasValidSession()
+            XCTAssertTrue(isValidAfterSuccess)
+
+            let sessionAfterSuccess = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterSuccess, candidateUUID, "Candidate session must be promoted in storage")
+            let pendingAfterSuccess = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfterSuccess, "Pending upgrade data must be cleaned up on promotion")
+        }
+    }
+
+    func testSameDIDOAuthCallbackWithCandidateRecoverySuccessRejectsCallbackWithoutSavingThirdSession() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.reauth.success.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let thirdSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(thirdSessionUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.third",
+                        "active": true,
+                        "granted_scopes": ["atproto"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                if path == "/auth/upgrade/commit" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(thirdSessionUUID)")!
+            do {
+                _ = try await client.handleOAuthCallback(url: callbackURL)
+                XCTFail("Ordinary callback must be rejected when candidate upgrade is pending")
+            } catch {}
+
+            // The third session must never be saved in storage
+            let currentStoredSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(currentStoredSession, candidateUUID, "Candidate must remain promoted, third session must never be saved")
+            let pendingData = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingData, "Pending upgrade state must be cleared after successful candidate promotion")
+
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertEqual(currentAccount?.handle, "alice.test", "Account handle must NOT be overwritten by third session")
+        }
+    }
+
+    func testSameDIDOAuthCallbackWithCandidateRecoveryFailureRejectsCallbackAndPreservesOldAndPending() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.reauth.fail.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let thirdSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant candidate-bearing pending upgrade state
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(thirdSessionUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.third",
+                        "active": true,
+                        "granted_scopes": ["atproto"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                if path == "/auth/upgrade/commit" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, #"{"error":"service_unavailable"}"#.data(using: .utf8)!)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(thirdSessionUUID)")!
+            do {
+                _ = try await client.handleOAuthCallback(url: callbackURL)
+                XCTFail("Ordinary callback must be rejected when candidate upgrade is pending")
+            } catch {}
+
+            // Third session must never be saved; old session and pending upgrade state must remain
+            let currentStoredSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(currentStoredSession, oldSessionUUID, "Old session must remain intact in storage")
+            let pendingData = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingData, "Pending upgrade state must remain intact in storage")
+
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertEqual(currentAccount?.handle, "alice.test", "Account handle must NOT be overwritten by third session")
+        }
+    }
+
+    func testSameDIDOAuthCallbackWithPreCandidatePendingRejectsCallbackAndRetainsPendingState() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.reauth.precandidate.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let thirdSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(namespace: namespace, initialSession: oldSessionUUID)
+            let alice = self.aliceDID
+
+            // Plant pre-candidate pending upgrade state (browser flow in progress)
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback"
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(thirdSessionUUID)")
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.third",
+                        "active": true,
+                        "granted_scopes": ["atproto"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(thirdSessionUUID)")!
+            do {
+                _ = try await client.handleOAuthCallback(url: callbackURL)
+                XCTFail("Ordinary callback must be rejected when pre-candidate upgrade is in progress")
+            } catch {}
+
+            // Third session must never be saved; old session and pending upgrade state must remain
+            let currentStoredSession = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(currentStoredSession, oldSessionUUID, "Old session must remain intact in storage")
+            let pendingData = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingData, "Pending upgrade state must remain intact in storage")
+
+            let currentAccount = await client.getCurrentAccount()
+            XCTAssertEqual(currentAccount?.handle, "alice.test", "Account handle must NOT be overwritten by third session")
+        }
+    }
 }
