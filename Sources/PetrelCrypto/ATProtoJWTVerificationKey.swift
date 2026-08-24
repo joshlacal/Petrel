@@ -6,9 +6,9 @@ import secp256k1
 /// operator-pinned interop fixture. P-256 remains the local issuance
 /// format, while the reference TypeScript PDS produces compact low-S secp256k1
 /// JWT signatures (`ES256K`). Keeping only raw secp256k1 public bytes here
-/// makes the key material `Sendable` and avoids a request path retaining a
-/// mutable C crypto context.
-public enum ATProtoJWTVerificationKey: Sendable, Equatable {
+/// avoids retaining a mutable C crypto context. Swift Crypto 3.x's P-256
+/// public key is immutable but lacks a Linux `Sendable` annotation.
+public enum ATProtoJWTVerificationKey: @unchecked Sendable, Equatable {
     case p256(P256.Signing.PublicKey)
     case secp256k1PublicKey(Data)
 
