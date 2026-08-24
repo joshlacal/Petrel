@@ -1383,12 +1383,35 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                     }
                     throw GatewayError.authenticationRequired
                 }
-                logger.warning(
-                    "Gateway returned terminal auth error (reason: \(reason)) - clearing local session"
-                )
-                await clearCurrentGatewaySession()
-                throw GatewayError.sessionExpired
+                guard let currentAccount = await accountManager.getCurrentAccount() else {
+                    logger.warning(
+                        "Gateway returned terminal auth error (reason: \(reason)) with no active account - preserving state"
+                    )
+                    throw GatewayError.authenticationRequired
+                }
 
+                guard let presentedToken = extractPresentedBearerToken(from: request) else {
+                    logger.warning(
+                        "Gateway returned terminal auth error (reason: \(reason)) on request without valid bearer token - preserving session"
+                    )
+                    throw GatewayError.authenticationRequired
+                }
+
+                let deleted = try await storage.deleteGatewaySession(
+                    ifMatches: presentedToken,
+                    for: currentAccount.did
+                )
+                if deleted {
+                    logger.warning(
+                        "Gateway returned terminal auth error (reason: \(reason)) for matching presented session - clearing local session"
+                    )
+                    throw GatewayError.sessionExpired
+                } else {
+                    logger.warning(
+                        "Gateway returned terminal auth error (reason: \(reason)) for stale presented session - preserving current session"
+                    )
+                    throw GatewayError.authenticationRequired
+                }
             case let .transient(reason):
                 let bodyPreview = String((String(data: data, encoding: .utf8) ?? "").prefix(200))
 
@@ -1435,20 +1458,20 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
     // MARK: - Private Helpers
 
-    private func clearCurrentGatewaySession() async {
-        guard let currentAccount = await accountManager.getCurrentAccount() else {
-            logger.warning("No current account available while clearing gateway session")
-            return
+    private func extractPresentedBearerToken(from request: URLRequest) -> String? {
+        guard let authHeader = request.value(forHTTPHeaderField: "Authorization") else {
+            return nil
         }
-
-        do {
-            try await storage.deleteGatewaySession(for: currentAccount.did)
-        } catch {
-            logger.error(
-                "Failed to delete gateway session during 401 handling: \(error)"
-            )
+        let components = authHeader.components(separatedBy: .whitespacesAndNewlines)
+            .filter { !$0.isEmpty }
+        guard components.count == 2,
+              components[0].caseInsensitiveCompare("Bearer") == .orderedSame else {
+            return nil
         }
+        let token = components[1]
+        return token.isEmpty ? nil : token
     }
+
 
     /// Gets the gateway session for the current account
     private func gatewaySessionLocked() async throws -> String {

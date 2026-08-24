@@ -230,7 +230,8 @@ final class AuthContinuityTests: XCTestCase {
             gatewayBaseURL: gatewayURL
         )
         let requestURL = gatewayURL.appendingPathComponent("xrpc/example")
-        let request = URLRequest(url: requestURL)
+        var request = URLRequest(url: requestURL)
+        request.setValue("Bearer gateway-session", forHTTPHeaderField: "Authorization")
         let response = try XCTUnwrap(HTTPURLResponse(
             url: requestURL,
             statusCode: 401,
@@ -285,6 +286,7 @@ final class AuthContinuityTests: XCTestCase {
         request.setValue(
             "did:web:chat.catbird.blue#atproto_mls", forHTTPHeaderField: "atproto-proxy"
         )
+        request.setValue("Bearer gateway-session", forHTTPHeaderField: "Authorization")
         let response = try XCTUnwrap(HTTPURLResponse(
             url: requestURL,
             statusCode: 401,

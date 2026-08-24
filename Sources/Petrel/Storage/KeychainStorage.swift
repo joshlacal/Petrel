@@ -781,6 +781,26 @@ public actor KeychainStorage {
         await gate.acquire()
         defer { gate.release() }
 
+        try await deleteGatewaySessionInternal(for: did)
+    }
+
+    /// Atomically deletes the gateway session for a specific account if and only if
+    /// the currently stored exact per-DID session matches `expectedSession`.
+    /// - Returns: `true` if the session matched and was deleted, `false` if missing or mismatched.
+    func deleteGatewaySession(ifMatches expectedSession: String, for did: String) async throws -> Bool {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+
+        guard let currentSession = try await readExactPerDIDGatewaySession(for: did),
+              currentSession == expectedSession else {
+            return false
+        }
+        try await deleteGatewaySessionInternal(for: did)
+        return true
+    }
+
+    private func deleteGatewaySessionInternal(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
         let continuityTicket = await beginAuthContinuityMutation()
         do {

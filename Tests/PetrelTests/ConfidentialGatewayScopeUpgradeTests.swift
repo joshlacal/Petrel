@@ -5235,4 +5235,265 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertTrue(tokensExist)
         }
     }
+
+    func testStaleUnauthorizedDoesNotDeletePromotedCandidateOrAutoLogout() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.stale.401.candidate.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let dummyReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let (oldPreparedReq, authCtx) = try await strategy.prepareAuthenticatedRequestWithContext(dummyReq)
+            // Release lease so candidate promotion can proceed
+            authCtx.releaseAuthenticationLease()
+
+            // Promote candidate session
+            let casResult = try await storage.compareAndSwapGatewaySession(
+                expectedOldSession: oldSessionUUID,
+                newSession: candidateUUID,
+                for: alice
+            )
+            XCTAssertTrue(casResult)
+            let storedBefore401 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(storedBefore401, candidateUUID)
+
+            // Deliver terminal 401 for old request
+            let gateway401Response = HTTPURLResponse(
+                url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let terminal401Body = #"{"error":"invalid_session","message":"Session has been revoked"}"#.data(using: .utf8)!
+
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: oldPreparedReq
+                )
+                XCTFail("handleUnauthorizedResponse should throw authenticationRequired for stale 401")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .authenticationRequired = error else {
+                    XCTFail("Expected .authenticationRequired, got \(error)")
+                    return
+                }
+            } catch {
+                XCTFail("Unexpected error: \(error)")
+            }
+
+            // Promoted candidate must remain intact, no session deletion or auto-logout
+            let storedAfter401 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(storedAfter401, candidateUUID)
+            let currentDIDAfter401 = try await storage.getCurrentDID()
+            XCTAssertEqual(currentDIDAfter401, alice)
+        }
+    }
+
+    func testMatchingBearer401DeletesSessionAndThrowsSessionExpired() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.matching.401.delete.\(UUID().uuidString)"
+            let currentSessionUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(currentSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let dummyReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let (preparedReq, authCtx) = try await strategy.prepareAuthenticatedRequestWithContext(dummyReq)
+            authCtx.releaseAuthenticationLease()
+
+            let gateway401Response = HTTPURLResponse(
+                url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let terminal401Body = #"{"error":"invalid_session","message":"Session has expired"}"#.data(using: .utf8)!
+
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: preparedReq
+                )
+                XCTFail("handleUnauthorizedResponse should throw sessionExpired for matching 401")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .sessionExpired = error else {
+                    XCTFail("Expected .sessionExpired, got \(error)")
+                    return
+                }
+            } catch {
+                XCTFail("Unexpected error: \(error)")
+            }
+
+            // Matching session must be deleted
+            let storedAfter401 = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(storedAfter401)
+        }
+    }
+
+    func testMalformedOrMissingBearer401CannotDeleteSession() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.malformed.401.\(UUID().uuidString)"
+            let currentSessionUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(currentSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let gateway401Response = HTTPURLResponse(
+                url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
+                statusCode: 401,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            let terminal401Body = #"{"error":"invalid_session","message":"Session has expired"}"#.data(using: .utf8)!
+
+            // Case 1: Missing Authorization header
+            let missingAuthReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: missingAuthReq
+                )
+                XCTFail("Expected throw for missing auth header")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .authenticationRequired = error else {
+                    XCTFail("Expected .authenticationRequired, got \(error)")
+                    return
+                }
+            }
+            let sessionAfterCase1 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterCase1, currentSessionUUID)
+
+            // Case 2: Malformed Bearer (no token)
+            var emptyBearerReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            emptyBearerReq.setValue("Bearer ", forHTTPHeaderField: "Authorization")
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: emptyBearerReq
+                )
+                XCTFail("Expected throw for empty bearer")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .authenticationRequired = error else {
+                    XCTFail("Expected .authenticationRequired, got \(error)")
+                    return
+                }
+            }
+            let sessionAfterCase2 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterCase2, currentSessionUUID)
+
+            // Case 3: Multiple tokens in Bearer header
+            var multiTokenReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            multiTokenReq.setValue("Bearer \(currentSessionUUID) extra", forHTTPHeaderField: "Authorization")
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: multiTokenReq
+                )
+                XCTFail("Expected throw for multi-token bearer")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .authenticationRequired = error else {
+                    XCTFail("Expected .authenticationRequired, got \(error)")
+                    return
+                }
+            }
+            let sessionAfterCase3 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterCase3, currentSessionUUID)
+
+            // Case 4: Non-Bearer scheme
+            var basicAuthReq = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            basicAuthReq.setValue("Basic dXNlcjpwYXNz", forHTTPHeaderField: "Authorization")
+            do {
+                _ = try await strategy.handleUnauthorizedResponse(
+                    gateway401Response,
+                    data: terminal401Body,
+                    for: basicAuthReq
+                )
+                XCTFail("Expected throw for basic auth header")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .authenticationRequired = error else {
+                    XCTFail("Expected .authenticationRequired, got \(error)")
+                    return
+                }
+            }
+            let sessionAfterCase4 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfterCase4, currentSessionUUID)
+        }
+    }
+
+    func testKeychainStorageDeleteGatewaySessionIfMatchesExactBehavior() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.keychain.delete.ifmatches.\(UUID().uuidString)"
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+
+            // 1. Missing session -> returns false
+            let missingResult = try await storage.deleteGatewaySession(ifMatches: "some-session", for: alice)
+            XCTAssertFalse(missingResult)
+
+            // 2. Save session-A
+            try await storage.saveGatewaySession("session-A", for: alice)
+            let session1 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(session1, "session-A")
+
+            // 3. Mismatched session-B -> returns false, session-A remains
+            let mismatchResult = try await storage.deleteGatewaySession(ifMatches: "session-B", for: alice)
+            XCTAssertFalse(mismatchResult)
+            let session2 = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(session2, "session-A")
+
+            // 4. Matching session-A -> returns true, session deleted
+            let matchResult = try await storage.deleteGatewaySession(ifMatches: "session-A", for: alice)
+            XCTAssertTrue(matchResult)
+            let session3 = try await storage.getGatewaySession(for: alice)
+            XCTAssertNil(session3)
+
+            // 5. Subsequent delete on now-empty -> returns false
+            let emptyResult = try await storage.deleteGatewaySession(ifMatches: "session-A", for: alice)
+            XCTAssertFalse(emptyResult)
+        }
+    }
 }
