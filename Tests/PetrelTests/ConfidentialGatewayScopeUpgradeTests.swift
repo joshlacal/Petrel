@@ -1358,6 +1358,10 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 XCTAssertFalse(casResult2)
                 XCTAssertEqual(sessionAfterSelector, oldSession)
 
+                // Re-establish Alice before proving delete-first ordering.
+                try await storageB.saveCurrentDID(alice)
+                try await storageB.saveGatewaySession(oldSession, for: alice)
+
                 let deleteEntered = TestAsyncGate()
                 let deleteRelease = TestAsyncGate()
                 let candidateStarted3 = Mutex<Int>(0)

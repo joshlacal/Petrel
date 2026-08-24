@@ -496,33 +496,19 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             return
         }
 
-        // Validate active identity strictly
-        guard let currentAccount = await accountManager.getCurrentAccount(), currentAccount.did == targetDID else {
+        guard let recovery = try await recoverablePendingCandidate(for: targetDID) else {
             return
+        }
+        // A durable candidate makes recovery mandatory; never authorize the old anchor.
+        guard let currentAccount = await accountManager.getCurrentAccount(), currentAccount.did == targetDID else {
+            throw AuthError.invalidCredentials
         }
         guard let keychainCurrentDID = try await storage.getCurrentDID(), keychainCurrentDID == targetDID else {
-            return
+            throw AuthError.invalidCredentials
         }
-        guard let pendingData = try await storage.getPendingGatewayUpgradeData(for: targetDID),
-              let pendingState = try? JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
-        else {
-            return
-        }
-        guard pendingState.expectedDID == targetDID else {
-            return
-        }
-        guard Self.isExactPermissionCallbackBase(pendingState.callbackURL) else {
-            return
-        }
-        guard let candidateSession = pendingState.candidateSession,
-              let candidateGrants = pendingState.candidateGrantedScopes,
-              !candidateSession.isEmpty
-        else {
-            // Pre-candidate flows are left pending, not guessed.
-            return
-        }
+        let (pendingState, candidateSession, candidateGrants) = recovery
         guard let currentSession = try await storage.getGatewaySession(for: targetDID), !currentSession.isEmpty else {
-            return
+            throw GatewayError.missingSession
         }
 
         if currentSession == candidateSession {
@@ -531,17 +517,33 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         guard currentSession == pendingState.oldSession else {
-            // If current is any third session, do not touch it
-            return
+            throw GatewayError.invalidSession
         }
 
-        // Retry candidate commit + CAS + cleanup
+        // Retry candidate commit + CAS + cleanup.
         _ = try await commitAndPromoteCandidate(
             pendingState: pendingState,
             candidateSession: candidateSession,
             candidateGrants: candidateGrants,
             for: targetDID
         )
+    }
+
+    private func recoverablePendingCandidate(
+        for did: String
+    ) async throws -> (PendingGatewayUpgradeState, String, [String])? {
+        guard let pendingData = try await storage.getPendingGatewayUpgradeData(for: did) else {
+            return nil
+        }
+        let pendingState = try JSONCoders.decode(PendingGatewayUpgradeState.self, from: pendingData)
+        guard pendingState.expectedDID == did,
+              let candidateSession = pendingState.candidateSession,
+              let candidateGrants = pendingState.candidateGrantedScopes,
+              !candidateSession.isEmpty
+        else {
+            return nil
+        }
+        return (pendingState, candidateSession, candidateGrants)
     }
 
     // MARK: - Gateway Scope Upgrade
@@ -754,10 +756,9 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw AuthError.invalidCredentials
         }
 
-        // Exception: if pending candidate exists and current session equals candidate, cleanup+return stored grants.
         if let candidateSession = pendingState.candidateSession,
            currentSession == candidateSession {
-            try? await storage.deletePendingGatewayUpgradeData(for: expectedDID)
+            try await storage.deletePendingGatewayUpgradeData(for: expectedDID)
             return Set(pendingState.candidateGrantedScopes ?? [])
         }
 
@@ -797,6 +798,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         let codeItems = queryItems.filter { $0.name == "code" }
+        // /auth/upgrade/exchange retries require Nest to return a short-lived,
+        // idempotent receipt keyed by old bearer + code + nonce.
         guard codeItems.count == 1,
               let code = codeItems.first?.value,
               !code.isEmpty,
@@ -930,16 +933,25 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
     func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
         // Gateway manages token refresh automatically - client session is long-lived
-        // But we need to verify the session actually exists for the current account
         guard let currentAccount = await accountManager.getCurrentAccount() else {
             logger.warning("refreshTokenIfNeeded: No current account set")
             throw GatewayError.missingSession
         }
 
-        // If candidate+grants exist in pending state, retry recovery
-        try? await attemptRecoveryFromServerFailures(for: currentAccount.did)
+        if let recovery = try await recoverablePendingCandidate(for: currentAccount.did) {
+            let candidateSession = recovery.1
+            try await attemptRecoveryFromServerFailures(for: currentAccount.did)
+            guard let session = try await storage.getGatewaySession(for: currentAccount.did),
+                  session == candidateSession
+            else {
+                throw GatewayError.invalidSession
+            }
+            return .stillValid
+        }
 
-        guard (try? await storage.getGatewaySession(for: currentAccount.did)) != nil else {
+        guard let session = try await storage.getGatewaySession(for: currentAccount.did),
+              !session.isEmpty
+        else {
             logger.warning(
                 "refreshTokenIfNeeded: No gateway session found for DID: \(currentAccount.did.prefix(20))..."
             )
@@ -956,6 +968,18 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         if isRequestToGatewayOrigin(request, gatewayURL: gatewayURL) {
             switch classifyUnauthorizedGatewayResponse(data) {
             case let .terminal(reason):
+                if let account = await accountManager.getCurrentAccount(),
+                   let recovery = try await recoverablePendingCandidate(for: account.did)
+                {
+                    // A recoverable candidate owns the old anchor until CAS succeeds.
+                    try await attemptRecoveryFromServerFailures(for: account.did)
+                    guard let session = try await storage.getGatewaySession(for: account.did),
+                          session == recovery.1
+                    else {
+                        throw GatewayError.invalidSession
+                    }
+                    throw GatewayError.authenticationRequired
+                }
                 logger.warning(
                     "Gateway returned terminal auth error (reason: \(reason)) - clearing local session"
                 )
@@ -1030,7 +1054,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             LogManager.logError("ConfidentialGatewayStrategy - No current account set!")
             throw GatewayError.missingSession
         }
-
+        try await attemptRecoveryFromServerFailures(for: currentAccount.did)
         guard let session = try await storage.getGatewaySession(for: currentAccount.did) else {
             LogManager.logError(
                 "ConfidentialGatewayStrategy - No gateway session found for DID: \(currentAccount.did.prefix(20))..."
