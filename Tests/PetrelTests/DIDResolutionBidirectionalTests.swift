@@ -372,8 +372,11 @@ struct DIDResolutionBidirectionalTests {
             "did:web:example.com:..:x",
             "did:web:example.com:.",
             "did:web:example.com:port%3Aabc",
+            "did:web:example.com:path?evil",
+            "did:web:example.com:path#evil",
+            "did:web:example.com:path evil",
+            "did:web:example.com:path\u{1F600}",
         ]
-
         for did in invalidDIDs {
             await #expect(throws: (any Error).self, "Invalid did:web should be rejected: \(did)") {
                 try await resolver.resolveDIDToPDSURL(did: did)

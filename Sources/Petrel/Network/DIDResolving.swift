@@ -94,6 +94,13 @@ actor DIDResolutionService: DIDResolving {
     private let cache: NSCache<NSString, CacheEntry>
     internal nonisolated(unsafe) static var dnsTXTResolverOverride: (@Sendable (String) async throws -> [String])?
 
+    private static let allowedPercentEncodedPathSegmentCharacters: CharacterSet = {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.insert(charactersIn: "%")
+        allowed.remove(charactersIn: "/?#")
+        return allowed
+    }()
+
     static func didFromTXTRecord(_ txt: String) -> String? {
         let trimmed = txt.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -466,7 +473,8 @@ actor DIDResolutionService: DIDResolving {
                 guard !rawSegment.isEmpty,
                       rawSegment != ".",
                       rawSegment != "..",
-                      !rawSegment.contains("/") else {
+                      !rawSegment.contains("/"),
+                      rawSegment.unicodeScalars.allSatisfy({ Self.allowedPercentEncodedPathSegmentCharacters.contains($0) }) else {
                     throw DIDResolutionError.invalidDID(did)
                 }
                 guard let decoded = rawSegment.removingPercentEncoding,

@@ -819,23 +819,33 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
         "alt", "arpa", "example", "internal", "invalid", "local", "localhost", "onion",
     ]
 
-    /// Registration-time policy check for TLD validity (mirrors upstream isValidTld).
-    /// Takes a handle or TLD, extracts the final label, and returns false if it is in disallowedTLDs.
-    public static func isValidTLD(_ handleOrTLD: String) -> Bool {
-        guard let tld = handleOrTLD.split(separator: ".").last, !tld.isEmpty else {
-            return false
+    /// Registration-time policy check for TLD validity (mirrors upstream @atproto/syntax isValidTld exactly).
+    ///
+    /// Upstream implementation:
+    /// ```ts
+    /// export const isValidTld = (handle: string): boolean => {
+    ///   return !DISALLOWED_TLDS.some((tld) => {
+    ///     return handle.endsWith('.' + tld) || handle === tld
+    ///   })
+    /// }
+    /// ```
+    /// Note: Upstream is case-sensitive and checks `endsWith("." + tld) || handle == tld` against lowercase
+    /// DISALLOWED_TLDS without lowercasing the input (e.g. `isValidTld("SRI-NIC.ARPA")` returns `true`).
+    /// This is an upstream quirk preserved for exact interop fidelity.
+    public static func isValidTLD(_ handle: String) -> Bool {
+        !disallowedTLDs.contains { tld in
+            handle.hasSuffix("." + tld) || handle == tld
         }
-        return !disallowedTLDs.contains(String(tld).lowercased())
     }
 
     /// Registration-time policy check for TLD validity (alias matching upstream naming).
-    public static func isValidTld(_ handleOrTLD: String) -> Bool {
-        isValidTLD(handleOrTLD)
+    public static func isValidTld(_ handle: String) -> Bool {
+        isValidTLD(handle)
     }
+
     /// Returns true if this handle's TLD is in the registration-time disallowed list.
     public var hasDisallowedTLD: Bool {
-        guard let tld = value.split(separator: ".").last else { return false }
-        return Self.disallowedTLDs.contains(String(tld))
+        !Self.isValidTLD(value)
     }
 
     /// Returns true if this handle's TLD is in the registration-time disallowed list.

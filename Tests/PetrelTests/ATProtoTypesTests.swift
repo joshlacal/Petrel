@@ -209,7 +209,7 @@ struct ATProtoTypesTests {
             #expect(!Handle.isValidTLD("alice.onion"))
             #expect(!Handle.isValidTld("friend.expyuzz4wqqyqhjn.onion"))
             #expect(!Handle.isValidTld("laptop.local"))
-            #expect(!Handle.isValidTld("SRI-NIC.ARPA"))
+            #expect(Handle.isValidTld("SRI-NIC.ARPA"))
             #expect(Handle.isValidTld("alice.bsky.social"))
             #expect(Handle.isValidTld("john.test"))
             #expect(Handle.isValidTld("jan.test"))
