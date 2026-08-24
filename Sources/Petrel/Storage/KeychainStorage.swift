@@ -308,6 +308,10 @@ public actor KeychainStorage {
     private func scopeKey(for did: String) -> String {
         "\(namespace)|\(accessGroup ?? "")|\(did)"
     }
+    /// The mutation gate is shared by every DID in one keychain storage scope.
+    private var gatewayMutationScopeKey: String {
+        "\(namespace)|\(accessGroup ?? "")"
+    }
 
     public func accountScopeDID(for did: String) -> AccountMutationHub.ScopeDID {
         AccountMutationHub.ScopeDID(namespace: namespace, accessGroup: accessGroup, did: did)
@@ -642,6 +646,10 @@ public actor KeychainStorage {
     /// Saves the current DID to the keychain.
     /// - Parameter did: The DID to save as current
     public func saveCurrentDID(_ did: String) async throws {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+
         let key = makeKey("currentDID")
         let data = did.data(using: .utf8) ?? Data()
         let continuityTicket = await beginAuthContinuityMutation()
@@ -675,6 +683,10 @@ public actor KeychainStorage {
 
     /// Deletes the current DID from the keychain.
     public func deleteCurrentDID() async throws {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+
         let key = makeKey("currentDID")
         let continuityTicket = await beginAuthContinuityMutation()
         do {
@@ -691,7 +703,7 @@ public actor KeychainStorage {
 
     /// Saves the gateway session for a specific account (per-DID storage for multi-account support)
     func saveGatewaySession(_ session: String, for did: String) async throws {
-        let gate = Self.gatewayMutationCoordinator.gate(for: scopeKey(for: did))
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
         await gate.acquire()
         defer { gate.release() }
 
@@ -765,7 +777,7 @@ public actor KeychainStorage {
     }
     /// Deletes the gateway session for a specific account
     func deleteGatewaySession(for did: String) async throws {
-        let gate = Self.gatewayMutationCoordinator.gate(for: scopeKey(for: did))
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
         await gate.acquire()
         defer { gate.release() }
 
@@ -815,6 +827,20 @@ public actor KeychainStorage {
             throw error
         }
     }
+    /// Reads the selector directly, without any migration or mutation behavior.
+    private func readExactCurrentDID() async throws -> String? {
+        let key = makeKey("currentDID")
+        do {
+            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            guard let did = String(data: data, encoding: .utf8) else {
+                throw KeychainError.dataFormatError
+            }
+            return did
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return nil }
+            throw error
+        }
+    }
 
     /// Reads the exact per-DID gateway session directly without legacy migration or side effects.
     private func readExactPerDIDGatewaySession(for did: String) async throws -> String? {
@@ -842,11 +868,11 @@ public actor KeychainStorage {
         newSession: String,
         for did: String
     ) async throws -> Bool {
-        let gate = Self.gatewayMutationCoordinator.gate(for: scopeKey(for: did))
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
         await gate.acquire()
         defer { gate.release() }
 
-        guard let currentDID = try await getCurrentDID(), currentDID == did else {
+        guard let currentDID = try await readExactCurrentDID(), currentDID == did else {
             return false
         }
         guard let currentSession = try await readExactPerDIDGatewaySession(for: did),
