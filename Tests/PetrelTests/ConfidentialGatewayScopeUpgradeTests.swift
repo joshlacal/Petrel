@@ -116,6 +116,17 @@ private final class TestAsyncGate: @unchecked Sendable {
     }
 }
 
+private final class TestAtomicCounter: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value = 0
+    func increment() -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        value += 1
+        return value
+    }
+}
+
 private final class ThrowingStorageBackend: SecureStorage, @unchecked Sendable {
     let errorToThrow: Error
     init(errorToThrow: Error) { self.errorToThrow = errorToThrow }
@@ -3964,6 +3975,524 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             // Task 3 must have executed and succeeded without queue deadlock
             let scopes = try await task3.value
             XCTAssertTrue(scopes.contains("atproto"))
+        }
+    }
+
+    func testCompleteBlockedInCommitQueuesPrepareAuthenticatedRequestReturningCandidateBearer() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.complete.blocked.prepare.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let commitEntered = TestAsyncGate()
+            let commitRelease = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    commitEntered.open()
+                    commitRelease.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await strategy.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+            await commitEntered.wait()
+
+            // At this point, commit is blocked holding the coordinator lock.
+            // Pending candidate is in storage; storage gateway session is still oldSessionUUID.
+            let sessionWhileBlocked = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionWhileBlocked, oldSessionUUID, "Storage session is oldSessionUUID while commit is in flight")
+
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let prepareTask = Task {
+                try await strategy.prepareAuthenticatedRequest(req)
+            }
+
+            // Release commit
+            commitRelease.open()
+
+            let grants = try await completeTask.value
+            XCTAssertTrue(grants.contains("identity:handle"))
+
+            let authedReq = try await prepareTask.value
+            XCTAssertEqual(
+                authedReq.value(forHTTPHeaderField: "Authorization"),
+                "Bearer \(candidateUUID)",
+                "prepareAuthenticatedRequest must return the newly committed candidate session, never the old bearer"
+            )
+
+            let sessionAfter = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfter, candidateUUID)
+        }
+    }
+
+    func testCompleteBlockedInCommitQueuesPrepareWithContextReturningCandidateBearer() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.complete.blocked.prepare.ctx.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let commitEntered = TestAsyncGate()
+            let commitRelease = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    commitEntered.open()
+                    commitRelease.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "status": "committed",
+                        "session_id": "\(candidateUUID)",
+                        "did": "\(alice)",
+                        "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await strategy.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+            await commitEntered.wait()
+
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let prepareTask = Task {
+                try await strategy.prepareAuthenticatedRequestWithContext(req)
+            }
+
+            commitRelease.open()
+
+            _ = try await completeTask.value
+            let (authedReq, ctx) = try await prepareTask.value
+            XCTAssertEqual(
+                authedReq.value(forHTTPHeaderField: "Authorization"),
+                "Bearer \(candidateUUID)",
+                "prepareAuthenticatedRequestWithContext must return the candidate session"
+            )
+            XCTAssertNil(ctx.did)
+            XCTAssertNil(ctx.jkt)
+        }
+    }
+
+    func testRetryableCommitFailureQueuesPrepareWhichRunsRecoveryAndFailsClosedWhenRecoveryFails() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.retryable.commit.recovery.fail.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let commitEntered = TestAsyncGate()
+            let commitRelease = TestAsyncGate()
+            let commitCounter = TestAtomicCounter()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    let count = commitCounter.increment()
+
+                    if count == 1 {
+                        // First attempt from completeGatewayScopeUpgrade: block then fail retryably (503)
+                        commitEntered.open()
+                        commitRelease.waitBlocking()
+                        let response = HTTPURLResponse(
+                            url: request.url!,
+                            statusCode: 503,
+                            httpVersion: nil,
+                            headerFields: ["Content-Type": "application/json"]
+                        )!
+                        return (response, Data())
+                    } else {
+                        // Second attempt from recovery during prepare: fail terminal (400)
+                        let response = HTTPURLResponse(
+                            url: request.url!,
+                            statusCode: 400,
+                            httpVersion: nil,
+                            headerFields: ["Content-Type": "application/json"]
+                        )!
+                        let body = """
+                        {"error": "InvalidRequest", "message": "Commit rejected"}
+                        """.data(using: .utf8)!
+                        return (response, body)
+                    }
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await strategy.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+            await commitEntered.wait()
+
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let prepareTask = Task {
+                try await strategy.prepareAuthenticatedRequest(req)
+            }
+
+            // Release the first commit attempt to fail with 503
+            commitRelease.open()
+
+            do {
+                _ = try await completeTask.value
+                XCTFail("completeGatewayScopeUpgrade must throw on 503")
+            } catch {}
+
+            // Queued prepare runs recovery, which encounters 400 and throws.
+            // It MUST throw and NEVER return the old bearer.
+            do {
+                _ = try await prepareTask.value
+                XCTFail("prepareAuthenticatedRequest must throw and never return old bearer when recovery fails")
+            } catch {}
+
+            // Verify old session and pending upgrade remain intact (no destructive clear)
+            let sessionAfter = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfter, oldSessionUUID, "Old session remains intact in storage")
+            let pendingAfter = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfter, "Pending candidate remains in storage for subsequent recovery")
+        }
+    }
+
+    func testRetryableCommitFailureQueuesPrepareWhichRunsRecoveryAndSucceedsWithCandidateBearer() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.retryable.commit.recovery.success.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let candidateUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(oldSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let pendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": "\(candidateUUID)",
+                "candidateGrantedScopes": ["atproto", "transition:generic", "identity:handle"]
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let commitEntered = TestAsyncGate()
+            let commitRelease = TestAsyncGate()
+            let commitCounter = TestAtomicCounter()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/upgrade/commit" {
+                    let count = commitCounter.increment()
+
+                    if count == 1 {
+                        // First attempt fails retryably
+                        commitEntered.open()
+                        commitRelease.waitBlocking()
+                        let response = HTTPURLResponse(
+                            url: request.url!,
+                            statusCode: 503,
+                            httpVersion: nil,
+                            headerFields: ["Content-Type": "application/json"]
+                        )!
+                        return (response, Data())
+                    } else {
+                        // Second attempt from recovery succeeds
+                        let response = HTTPURLResponse(
+                            url: request.url!,
+                            statusCode: 200,
+                            httpVersion: nil,
+                            headerFields: ["Content-Type": "application/json"]
+                        )!
+                        let body = """
+                        {
+                            "status": "committed",
+                            "session_id": "\(candidateUUID)",
+                            "did": "\(alice)",
+                            "granted_scopes": ["atproto", "transition:generic", "identity:handle"]
+                        }
+                        """.data(using: .utf8)!
+                        return (response, body)
+                    }
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
+            let completeTask = Task {
+                try await strategy.completeGatewayScopeUpgrade(
+                    callbackURL: incomingCallback,
+                    for: alice
+                )
+            }
+            await commitEntered.wait()
+
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let prepareTask = Task {
+                try await strategy.prepareAuthenticatedRequest(req)
+            }
+
+            commitRelease.open()
+
+            do {
+                _ = try await completeTask.value
+                XCTFail("completeGatewayScopeUpgrade must throw on 503")
+            } catch {}
+
+            // Queued prepare runs recovery, which succeeds and returns candidate bearer
+            let authedReq = try await prepareTask.value
+            XCTAssertEqual(
+                authedReq.value(forHTTPHeaderField: "Authorization"),
+                "Bearer \(candidateUUID)",
+                "prepareAuthenticatedRequest after successful recovery must return candidate bearer"
+            )
+
+            let sessionAfter = try await storage.getGatewaySession(for: alice)
+            XCTAssertEqual(sessionAfter, candidateUUID, "Candidate promoted to active session")
+            let pendingAfter = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNil(pendingAfter, "Pending state deleted after successful recovery")
+        }
+    }
+
+    func testCallerCancellationOfQueuedPrepareCancelsCleanlyAndSubsequentPrepareSucceeds() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.queued.prepare.cancellation.\(UUID().uuidString)"
+            let initialSessionUUID = UUID().uuidString.lowercased()
+            let alice = self.aliceDID
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await storage.saveGatewaySession(initialSessionUUID, for: alice)
+            try await storage.saveCurrentDID(alice)
+            try await accountManager.updateAccountFromStorage(did: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: self.gatewayURL,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let op1Entered = TestAsyncGate()
+            let op1Release = TestAsyncGate()
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let path = request.url?.path ?? ""
+                if path == "/auth/session" {
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (response, body)
+                } else if path == "/auth/upgrade" {
+                    op1Entered.open()
+                    op1Release.waitBlocking()
+                    let response = HTTPURLResponse(
+                        url: request.url!,
+                        statusCode: 200,
+                        httpVersion: nil,
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    let body = """
+                    {"authorization_url":"https://auth.pds.test/oauth/authorize?req=123"}
+                    """.data(using: .utf8)!
+                    return (response, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            let task1 = Task {
+                try await strategy.startGatewayScopeUpgrade(
+                    requesting: ["identity:handle"],
+                    for: alice,
+                    callbackURL: Self.validCallbackBase
+                )
+            }
+            await op1Entered.wait()
+
+            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            let task2 = Task {
+                try await strategy.prepareAuthenticatedRequest(req)
+            }
+            let task3 = Task {
+                try await strategy.prepareAuthenticatedRequestWithContext(req)
+            }
+            let task4 = Task {
+                await strategy.tokensExist()
+            }
+
+            // Cancel task 2 while queued
+            task2.cancel()
+
+            // Release task 1
+            op1Release.open()
+
+            let authURL = try await task1.value
+            XCTAssertEqual(authURL.absoluteString, "https://auth.pds.test/oauth/authorize?req=123")
+
+            do {
+                _ = try await task2.value
+                XCTFail("task2 should have thrown CancellationError")
+            } catch is CancellationError {
+                // Expected
+            } catch {
+                XCTFail("task2 threw unexpected error: \(error)")
+            }
+
+            // Task 3 must execute and succeed without coordinator deadlock
+            let (authedReq3, ctx3) = try await task3.value
+            XCTAssertEqual(authedReq3.value(forHTTPHeaderField: "Authorization"), "Bearer \(initialSessionUUID)")
+            XCTAssertNil(ctx3.did)
+            XCTAssertNil(ctx3.jkt)
+
+            // Task 4 must execute and succeed
+            let tokensExist = await task4.value
+            XCTAssertTrue(tokensExist)
         }
     }
 }

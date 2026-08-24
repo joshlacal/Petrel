@@ -604,6 +604,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     func tokensExist() async -> Bool {
+        (try? await coordinator.run { [self] in
+            await self.tokensExistLocked()
+        }) ?? false
+    }
+
+    private func tokensExistLocked() async -> Bool {
         guard let currentAccount = await accountManager.getCurrentAccount() else {
             return false
         }
@@ -1127,21 +1133,29 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     // MARK: - AuthenticationProvider
 
     func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {
-        var request = request
-        let session = try await gatewaySession()
-        LogManager.logInfo(
-            "ConfidentialGatewayStrategy - Adding Bearer token to request: \(request.url?.absoluteString ?? "unknown")"
-        )
-        request.setValue("Bearer \(session)", forHTTPHeaderField: "Authorization")
-        return request
+        try await coordinator.run { [self] in
+            try await self.prepareAuthenticatedRequestLocked(request)
+        }
     }
 
     func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (
         URLRequest, AuthContext
     ) {
-        let authed = try await prepareAuthenticatedRequest(request)
-        // For gateway auth, we don't have DID/JKT at request time - gateway handles it
-        return (authed, AuthContext(did: nil, jkt: nil))
+        try await coordinator.run { [self] in
+            let authed = try await self.prepareAuthenticatedRequestLocked(request)
+            // For gateway auth, we don't have DID/JKT at request time - gateway handles it
+            return (authed, AuthContext(did: nil, jkt: nil))
+        }
+    }
+
+    private func prepareAuthenticatedRequestLocked(_ request: URLRequest) async throws -> URLRequest {
+        var request = request
+        let session = try await gatewaySessionLocked()
+        LogManager.logInfo(
+            "ConfidentialGatewayStrategy - Adding Bearer token to request: \(request.url?.absoluteString ?? "unknown")"
+        )
+        request.setValue("Bearer \(session)", forHTTPHeaderField: "Authorization")
+        return request
     }
 
     func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
@@ -1311,14 +1325,14 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     /// Gets the gateway session for the current account
-    private func gatewaySession() async throws -> String {
+    private func gatewaySessionLocked() async throws -> String {
         // Get the current account's DID
         guard let currentAccount = await accountManager.getCurrentAccount() else {
             LogManager.logError("ConfidentialGatewayStrategy - No current account set!")
             throw GatewayError.missingSession
         }
         if (try await recoverablePendingCandidate(for: currentAccount.did)) != nil {
-            try await attemptRecoveryFromServerFailures(for: currentAccount.did)
+            try await attemptRecoveryFromServerFailuresLocked(for: currentAccount.did)
         }
         guard let session = try await storage.getGatewaySession(for: currentAccount.did) else {
             LogManager.logError(
