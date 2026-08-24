@@ -271,14 +271,30 @@ struct DIDResolutionBidirectionalTests {
         """
         // But resolveHandle for attacker.bsky.social returns a DIFFERENT DID (e.g. did:plc:victim456)
         let resolveHandleJSON = #"{"did":"did:plc:victim456"}"#
+        let victimDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:victim456",
+            "alsoKnownAs": ["at://attacker.bsky.social"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://victim-pds.example.com"
+                }
+            ]
+        }
+        """
 
         DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:attacker123") { _ in
             (200, Data(attackerDocJSON.utf8), ["Content-Type": "application/json"])
         }
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:victim456") { _ in
+            (200, Data(victimDocJSON.utf8), ["Content-Type": "application/json"])
+        }
         DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { _ in
             (200, Data(resolveHandleJSON.utf8), ["Content-Type": "application/json"])
         }
-
         let networkService = NetworkService(baseURL: baseURL)
         let resolver = await DIDResolutionService(networkService: networkService)
 
@@ -295,11 +311,12 @@ struct DIDResolutionBidirectionalTests {
     func reverseResolutionFailureUnresolvable() async throws {
         DIDTestURLProtocol.reset()
         NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in nil }
+        DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
         defer {
             DIDTestURLProtocol.reset()
             NetworkService.setNetworkTestProtocolClasses(nil)
             NetworkService.dnsResolverOverride = nil
+            DIDResolutionService.dnsTXTResolverOverride = nil
         }
 
         // DID doc asserts an unresolvable handle
@@ -356,6 +373,194 @@ struct DIDResolutionBidirectionalTests {
                 try await resolver.resolveDIDToPDSURL(did: did)
             }
         }
+    }
+
+    @Test("Cancellation propagates and is never swallowed or converted to handle.invalid")
+    func cancellationPropagates() async throws {
+        DIDTestURLProtocol.reset()
+        NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in ["104.244.42.1"] }
+        DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
+        defer {
+            DIDTestURLProtocol.reset()
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
+            DIDResolutionService.dnsTXTResolverOverride = nil
+        }
+
+        let didDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:cancelled123",
+            "alsoKnownAs": ["at://slow.handle.test"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds.example.com"
+                }
+            ]
+        }
+        """
+
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:cancelled123") { _ in
+            (200, Data(didDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { _ in
+            (200, Data(#"{"did":"did:plc:cancelled123"}"#.utf8), ["Content-Type": "application/json"])
+        }
+
+        let networkService = NetworkService(baseURL: baseURL)
+        let resolver = await DIDResolutionService(networkService: networkService)
+
+        let task = Task {
+            try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:cancelled123")
+        }
+        task.cancel()
+
+        let result = await task.result
+        switch result {
+        case .success:
+            Issue.record("Expected cancellation to throw CancellationError, but got success")
+        case let .failure(error):
+            #expect(error is CancellationError)
+        }
+    }
+
+    @Test("Transient reverse resolution failure is not cached as invalid and retries on subsequent call")
+    func transientFailureIsNotCachedAndRetriesReverseCheck() async throws {
+        DIDTestURLProtocol.reset()
+        NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in ["104.244.42.1"] }
+        DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
+        defer {
+            DIDTestURLProtocol.reset()
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
+            DIDResolutionService.dnsTXTResolverOverride = nil
+        }
+
+        let didDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:transient123",
+            "alsoKnownAs": ["at://transient.bsky.social"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds.example.com"
+                }
+            ]
+        }
+        """
+
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:transient123") { _ in
+            (200, Data(didDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+
+        // First call: resolveHandle endpoint fails with transient 500 error
+        DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { _ in
+            (500, Data("InternalServerError".utf8), ["Content-Type": "text/plain"])
+        }
+
+        let networkService = NetworkService(baseURL: baseURL)
+        let resolver = await DIDResolutionService(networkService: networkService)
+
+        // First call returns PDS URL and degrades handle to handle.invalid for THIS call
+        let (firstHandle, firstPDSURL) = try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:transient123")
+        #expect(firstHandle == Handle.invalid)
+        #expect(firstPDSURL.absoluteString == "https://pds.example.com")
+
+        // Second call: resolveHandle endpoint recovers with 200 OK and matching DID
+        DIDTestURLProtocol.reset()
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:transient123") { _ in
+            (200, Data(didDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { _ in
+            (200, Data(#"{"did":"did:plc:transient123"}"#.utf8), ["Content-Type": "application/json"])
+        }
+
+        // Second call retries reverse check and returns verified handle!
+        let (secondHandle, secondPDSURL) = try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:transient123")
+        #expect(secondHandle == "transient.bsky.social")
+        #expect(secondPDSURL.absoluteString == "https://pds.example.com")
+
+        // Third call: wipes routes to prove verified result is now in cache
+        DIDTestURLProtocol.reset()
+        let (thirdHandle, thirdPDSURL) = try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:transient123")
+        #expect(thirdHandle == "transient.bsky.social")
+        #expect(thirdPDSURL.absoluteString == "https://pds.example.com")
+    }
+
+    @Test("Definitive reverse resolution mismatch is cached as invalid")
+    func definitiveMismatchIsCachedAsInvalid() async throws {
+        DIDTestURLProtocol.reset()
+        NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in ["104.244.42.1"] }
+        DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
+        defer {
+            DIDTestURLProtocol.reset()
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
+            DIDResolutionService.dnsTXTResolverOverride = nil
+        }
+
+        let attackerDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:cachedattacker123",
+            "alsoKnownAs": ["at://attacker.bsky.social"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://pds.example.com"
+                }
+            ]
+        }
+        """
+        // Reverse check succeeds with 200 and valid victim doc but returns a different DID (victim456)
+        let resolveHandleJSON = #"{"did":"did:plc:victim456"}"#
+        let victimDocJSON = """
+        {
+            "@context": ["https://www.w3.org/ns/did/v1"],
+            "id": "did:plc:victim456",
+            "alsoKnownAs": ["at://attacker.bsky.social"],
+            "service": [
+                {
+                    "id": "#atproto_pds",
+                    "type": "AtprotoPersonalDataServer",
+                    "serviceEndpoint": "https://victim-pds.example.com"
+                }
+            ]
+        }
+        """
+
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:cachedattacker123") { _ in
+            (200, Data(attackerDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "plc.directory/did:plc:victim456") { _ in
+            (200, Data(victimDocJSON.utf8), ["Content-Type": "application/json"])
+        }
+        DIDTestURLProtocol.installRoute(matching: "com.atproto.identity.resolveHandle") { _ in
+            (200, Data(resolveHandleJSON.utf8), ["Content-Type": "application/json"])
+        }
+        let networkService = NetworkService(baseURL: baseURL)
+        let resolver = await DIDResolutionService(networkService: networkService)
+
+        // First call: reverse check definitive mismatch -> returns handle.invalid
+        let (firstHandle, firstPDSURL) = try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:cachedattacker123")
+        #expect(firstHandle == Handle.invalid)
+        #expect(firstPDSURL.absoluteString == "https://pds.example.com")
+
+        // Wipe all routes so any new network request would fail
+        DIDTestURLProtocol.reset()
+
+        // Second call: served from cache as handle.invalid without making network calls
+        let (secondHandle, secondPDSURL) = try await resolver.resolveDIDToHandleAndPDSURL(did: "did:plc:cachedattacker123")
+        #expect(secondHandle == Handle.invalid)
+        #expect(secondPDSURL.absoluteString == "https://pds.example.com")
     }
 }
 
