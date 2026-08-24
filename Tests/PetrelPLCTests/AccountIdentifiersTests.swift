@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 import PetrelCore
 import PetrelCrypto
 @testable import PetrelPLC

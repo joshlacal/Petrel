@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 
 public enum PetrelPLCError: Error, Sendable, Equatable, CustomStringConvertible {
     case invalidIdentifier(String)

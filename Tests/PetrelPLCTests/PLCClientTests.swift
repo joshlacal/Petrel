@@ -1,5 +1,8 @@
 import Crypto
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 import PetrelCore
 import PetrelCrypto
 @testable import PetrelPLC
@@ -582,16 +585,76 @@ final class PLCClientTests: XCTestCase {
         }
     }
 
-    func testURLSessionPLCTransportCancelsOversizedStreamingResponse() async throws {
-        StreamingTestURLProtocol.tracker.reset()
+    func testURLSessionPLCTransportCancelsOversizedStreamingResponseWithExplicitSynchronization() async throws {
+        SynchronizedStreamingURLProtocol.coordinator.reset()
 
         let configuration = URLSessionConfiguration.ephemeral
-        configuration.protocolClasses = [StreamingTestURLProtocol.self]
+        configuration.protocolClasses = [SynchronizedStreamingURLProtocol.self]
         let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
 
         let request = PLCHTTPRequest(
             method: .get,
-            url: URL(string: "https://\(StreamingTestURLProtocol.testHost)/test")!,
+            url: URL(string: "https://\(SynchronizedStreamingURLProtocol.testHost)/test")!,
+            headers: [:],
+            body: nil,
+            timeout: 5,
+            maximumResponseBytes: 1_000
+        )
+
+        let executeTask = Task {
+            try await transport.execute(request)
+        }
+
+        await SynchronizedStreamingURLProtocol.coordinator.waitForStart()
+
+        let chunk1 = Data(repeating: 0x41, count: 600)
+        SynchronizedStreamingURLProtocol.coordinator.deliverChunk(chunk1)
+
+        let chunk2 = Data(repeating: 0x42, count: 600)
+        SynchronizedStreamingURLProtocol.coordinator.deliverChunk(chunk2)
+
+        await SynchronizedStreamingURLProtocol.coordinator.waitForStopLoading()
+        XCTAssertTrue(SynchronizedStreamingURLProtocol.coordinator.stopLoadingCalled)
+
+        let chunk3 = Data(repeating: 0x43, count: 500)
+        SynchronizedStreamingURLProtocol.coordinator.deliverChunk(chunk3)
+        SynchronizedStreamingURLProtocol.coordinator.failLoading(error: URLError(.cancelled))
+
+        do {
+            _ = try await executeTask.value
+            XCTFail("Expected execute to throw bound exceeded error")
+        } catch let error as PetrelPLCError {
+            guard case let .unavailable(message) = error else {
+                XCTFail("Expected unavailable error, got: \(error)")
+                return
+            }
+            XCTAssertEqual(message, "PLC HTTP response exceeded its bound")
+        } catch {
+            XCTFail("Unexpected error type: \(error)")
+        }
+
+        XCTAssertEqual(transport.lastAcceptedBytes, 600)
+        XCTAssertEqual(SynchronizedStreamingURLProtocol.coordinator.chunksSentAfterStop, 1)
+    }
+
+    func testURLSessionPLCTransportSingleCallbackExceedingLimitRejectsWithoutBuffering() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
+        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+
+        MockPLCHTTPURLProtocol.handler = { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, Data(repeating: 0x41, count: 50_000))
+        }
+
+        let request = PLCHTTPRequest(
+            method: .get,
+            url: URL(string: "https://mock.plc.test/large-single-chunk")!,
             headers: [:],
             body: nil,
             timeout: 5,
@@ -611,16 +674,77 @@ final class PLCClientTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
 
-        // Allow URLSession background queue a moment to finish invoking stopLoading
-        for _ in 0 ..< 20 {
-            if StreamingTestURLProtocol.tracker.isCancelled { break }
-            try? await Task.sleep(nanoseconds: 10_000_000) // 10ms
+        XCTAssertEqual(transport.lastAcceptedBytes, 0)
+    }
+
+    func testURLSessionPLCTransportPreCancelledTaskCompletesWithCancellationError() async throws {
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
+        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+
+        MockPLCHTTPURLProtocol.handler = { _ in
+            try? await Task.sleep(nanoseconds: 10_000_000_000)
+            return (HTTPURLResponse(), Data())
         }
 
-        // Verify that loading was cancelled and later chunks were not consumed
-        XCTAssertTrue(StreamingTestURLProtocol.tracker.isCancelled, "Loading should be cancelled when response bound is exceeded")
-        XCTAssertLessThan(StreamingTestURLProtocol.tracker.chunksSent, 5, "Later chunks should not be emitted after cancellation")
-        XCTAssertLessThanOrEqual(StreamingTestURLProtocol.tracker.bytesSent, 1_500, "Bytes emitted should be bounded around the threshold")
+        let request = PLCHTTPRequest(
+            method: .get,
+            url: URL(string: "https://mock.plc.test/pre-cancelled")!,
+            headers: [:],
+            body: nil,
+            timeout: 5,
+            maximumResponseBytes: 1_000
+        )
+
+        let task = Task {
+            try await transport.execute(request)
+        }
+        task.cancel()
+
+        let result: Result<PLCHTTPResponse, any Error> = await withThrowingTaskGroup(of: PLCHTTPResponse.self) { group in
+            group.addTask {
+                try await task.value
+            }
+            group.addTask {
+                try? await Task.sleep(nanoseconds: 2_000_000_000)
+                throw PetrelPLCError.unavailable("Watchdog timeout")
+            }
+            do {
+                let value = try await group.next()!
+                group.cancelAll()
+                return .success(value)
+            } catch {
+                group.cancelAll()
+                return .failure(error)
+            }
+        }
+
+        switch result {
+        case .success:
+            XCTFail("Expected CancellationError, got success")
+        case let .failure(error):
+            XCTAssertTrue(error is CancellationError, "Expected CancellationError, got: \(error)")
+        }
+    }
+
+    func testURLSessionPLCTransportDeinitInvalidatesSessionWithoutRetainCycle() throws {
+        weak var weakTransport: URLSessionPLCTransport?
+        weak var weakDelegate: AnyObject?
+
+        try {
+            let transport = try URLSessionPLCTransport(maximumTimeout: 5)
+            weakTransport = transport
+            weakDelegate = transport.delegate
+            XCTAssertNotNil(weakTransport)
+            XCTAssertNotNil(weakDelegate)
+        }()
+
+        XCTAssertNil(weakTransport, "URLSessionPLCTransport should deallocate when out of scope")
+    }
+
+    func testURLSessionPLCTransportExplicitInvalidation() throws {
+        let transport = try URLSessionPLCTransport(maximumTimeout: 5)
+        transport.invalidate()
     }
 
     func testURLSessionPLCTransportSuccessfulRequest() async throws {
@@ -924,51 +1048,128 @@ private struct UnsafeTransfer<T>: @unchecked Sendable {
     let value: T
 }
 
-final class StreamingTestURLProtocol: URLProtocol, @unchecked Sendable {
-    static let testHost = "streaming.test"
+final class SynchronizedStreamingURLProtocol: URLProtocol, @unchecked Sendable {
+    static let testHost = "sync-streaming.plc.test"
 
-    final class Tracker: @unchecked Sendable {
+    final class Coordinator: @unchecked Sendable {
         private let lock = NSLock()
-        private var _chunksSent = 0
-        private var _bytesSent = 0
-        private var _isCancelled = false
+        private var startContinuation: CheckedContinuation<Void, Never>?
+        private var stopContinuation: CheckedContinuation<Void, Never>?
+        private var isStartLoadingCalled = false
+        private var isStopLoadingCalled = false
+        private weak var currentProtocol: SynchronizedStreamingURLProtocol?
+        private var _chunksSentBeforeStop = 0
+        private var _chunksSentAfterStop = 0
+        private var _bytesSentBeforeStop = 0
+        private var _bytesSentAfterStop = 0
 
-        var chunksSent: Int {
-            lock.withLock { _chunksSent }
+        var stopLoadingCalled: Bool {
+            lock.withLock { isStopLoadingCalled }
         }
 
-        var bytesSent: Int {
-            lock.withLock { _bytesSent }
+        var chunksSentBeforeStop: Int {
+            lock.withLock { _chunksSentBeforeStop }
         }
 
-        var isCancelled: Bool {
-            lock.withLock { _isCancelled }
-        }
-
-        func recordChunk(bytes: Int) {
-            lock.withLock {
-                _chunksSent += 1
-                _bytesSent += bytes
-            }
-        }
-
-        func recordCancellation() {
-            lock.withLock {
-                _isCancelled = true
-            }
+        var chunksSentAfterStop: Int {
+            lock.withLock { _chunksSentAfterStop }
         }
 
         func reset() {
             lock.withLock {
-                _chunksSent = 0
-                _bytesSent = 0
-                _isCancelled = false
+                startContinuation = nil
+                stopContinuation = nil
+                isStartLoadingCalled = false
+                isStopLoadingCalled = false
+                currentProtocol = nil
+                _chunksSentBeforeStop = 0
+                _chunksSentAfterStop = 0
+                _bytesSentBeforeStop = 0
+                _bytesSentAfterStop = 0
+            }
+        }
+
+        func recordStart(_ instance: SynchronizedStreamingURLProtocol) {
+            let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+                currentProtocol = instance
+                isStartLoadingCalled = true
+                let cont = startContinuation
+                startContinuation = nil
+                return cont
+            }
+            continuation?.resume()
+        }
+
+        func waitForStart() async {
+            let alreadyStarted = lock.withLock { isStartLoadingCalled }
+            if alreadyStarted { return }
+            await withCheckedContinuation { continuation in
+                lock.withLock {
+                    if isStartLoadingCalled {
+                        continuation.resume()
+                    } else {
+                        startContinuation = continuation
+                    }
+                }
+            }
+        }
+
+        func recordStopLoading() {
+            let continuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
+                isStopLoadingCalled = true
+                let cont = stopContinuation
+                stopContinuation = nil
+                return cont
+            }
+            continuation?.resume()
+        }
+
+        func waitForStopLoading() async {
+            let alreadyCalled = lock.withLock { isStopLoadingCalled }
+            if alreadyCalled { return }
+            await withCheckedContinuation { continuation in
+                lock.withLock {
+                    if isStopLoadingCalled {
+                        continuation.resume()
+                    } else {
+                        stopContinuation = continuation
+                    }
+                }
+            }
+        }
+
+        func deliverChunk(_ data: Data) {
+            let (proto, client) = lock.withLock { () -> (SynchronizedStreamingURLProtocol?, (any URLProtocolClient)?) in
+                if isStopLoadingCalled {
+                    _chunksSentAfterStop += 1
+                    _bytesSentAfterStop += data.count
+                } else {
+                    _chunksSentBeforeStop += 1
+                    _bytesSentBeforeStop += data.count
+                }
+                return (currentProtocol, currentProtocol?.client)
+            }
+            if let proto, let client {
+                client.urlProtocol(proto, didLoad: data)
+            }
+        }
+
+        func failLoading(error: any Error) {
+            let (proto, client) = lock.withLock { (currentProtocol, currentProtocol?.client) }
+            if let proto, let client {
+                client.urlProtocol(proto, didFailWithError: error)
+            }
+        }
+
+        func finishLoading() {
+            let (proto, client) = lock.withLock { (currentProtocol, currentProtocol?.client) }
+            if let proto, let client {
+                client.urlProtocolDidFinishLoading(proto)
             }
         }
     }
 
-    static let tracker = Tracker()
-    private var streamTask: Task<Void, Never>?
+    static let coordinator = Coordinator()
 
     override class func canInit(with request: URLRequest) -> Bool {
         request.url?.host == testHost
@@ -987,30 +1188,11 @@ final class StreamingTestURLProtocol: URLProtocol, @unchecked Sendable {
             headerFields: ["Content-Type": "application/json"]
         )!
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-
-        // Emit 5 chunks of 500 bytes (total 2500 bytes).
-        let chunkData = Data(repeating: 0x41, count: 500)
-        let clientTransfer = UnsafeTransfer(value: self.client)
-        let protoTransfer = UnsafeTransfer(value: self)
-        streamTask = Task.detached {
-            for _ in 1 ... 5 {
-                if Task.isCancelled {
-                    Self.tracker.recordCancellation()
-                    return
-                }
-                Self.tracker.recordChunk(bytes: chunkData.count)
-                clientTransfer.value?.urlProtocol(protoTransfer.value, didLoad: chunkData)
-                try? await Task.sleep(nanoseconds: 20_000_000) // 20ms
-            }
-            if !Task.isCancelled {
-                clientTransfer.value?.urlProtocolDidFinishLoading(protoTransfer.value)
-            }
-        }
+        Self.coordinator.recordStart(self)
     }
 
     override func stopLoading() {
-        Self.tracker.recordCancellation()
-        streamTask?.cancel()
+        Self.coordinator.recordStopLoading()
     }
 }
 

@@ -1,4 +1,7 @@
 import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
 import PetrelCore
 import PetrelCrypto
 
@@ -70,7 +73,7 @@ public enum PLCSubmitSuccessResponsePolicy: String, Sendable, Equatable {
     case didPLCServer001 = "did-plc-server-0.0.1"
 }
 
-private final class PLCRequestContext: @unchecked Sendable {
+final class PLCRequestContext: @unchecked Sendable {
     let maximumResponseBytes: Int
     private let lock = NSLock()
     private var accumulatedData: Data
@@ -79,6 +82,10 @@ private final class PLCRequestContext: @unchecked Sendable {
     private var isTaskCancelled = false
     private var continuation: CheckedContinuation<PLCHTTPResponse, any Error>?
     private weak var task: URLSessionDataTask?
+
+    var acceptedBytes: Int {
+        lock.withLock { accumulatedData.count }
+    }
 
     init(maximumResponseBytes: Int, continuation: CheckedContinuation<PLCHTTPResponse, any Error>) {
         self.maximumResponseBytes = maximumResponseBytes
@@ -114,11 +121,13 @@ private final class PLCRequestContext: @unchecked Sendable {
     func didReceiveData(_ data: Data) {
         lock.withLock {
             guard !exceededBound && !isTaskCancelled else { return }
-            accumulatedData.append(data)
-            if accumulatedData.count > maximumResponseBytes {
+            let remaining = maximumResponseBytes - accumulatedData.count
+            guard remaining >= 0, data.count <= remaining else {
                 exceededBound = true
                 task?.cancel()
+                return
             }
+            accumulatedData.append(data)
         }
     }
 
@@ -128,7 +137,6 @@ private final class PLCRequestContext: @unchecked Sendable {
             task?.cancel()
         }
     }
-
     func didComplete(error: (any Error)?) {
         let (continuationToResume, result) = lock.withLock { () -> (CheckedContinuation<PLCHTTPResponse, any Error>?, Result<PLCHTTPResponse, any Error>) in
             guard let continuation = self.continuation else {
@@ -224,9 +232,14 @@ private final class ContextHolder: @unchecked Sendable {
     }
 }
 
-private final class PLCSessionDelegate: NSObject, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
+final class PLCSessionDelegate: NSObject, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
     private let lock = NSLock()
     private var contexts = [Int: PLCRequestContext]()
+    private var lastRecordedAcceptedBytes: Int = 0
+
+    var lastAcceptedBytes: Int {
+        lock.withLock { lastRecordedAcceptedBytes }
+    }
 
     func register(context: PLCRequestContext, for task: URLSessionDataTask) {
         lock.withLock {
@@ -237,10 +250,11 @@ private final class PLCSessionDelegate: NSObject, URLSessionTaskDelegate, URLSes
 
     func unregister(task: URLSessionTask) {
         lock.withLock {
-            _ = contexts.removeValue(forKey: task.taskIdentifier)
+            if let ctx = contexts.removeValue(forKey: task.taskIdentifier) {
+                lastRecordedAcceptedBytes = ctx.acceptedBytes
+            }
         }
     }
-
     private func context(for task: URLSessionTask) -> PLCRequestContext? {
         lock.withLock {
             contexts[task.taskIdentifier]
@@ -293,8 +307,20 @@ private final class PLCSessionDelegate: NSObject, URLSessionTaskDelegate, URLSes
 
 public final class URLSessionPLCTransport: PLCHTTPTransport, @unchecked Sendable {
     private let session: URLSession
-    private let delegate: PLCSessionDelegate
+    let delegate: PLCSessionDelegate
     private let maximumTimeout: TimeInterval
+
+    var lastAcceptedBytes: Int {
+        delegate.lastAcceptedBytes
+    }
+
+    deinit {
+        session.invalidateAndCancel()
+    }
+
+    public func invalidate() {
+        session.invalidateAndCancel()
+    }
 
     public convenience init(maximumTimeout: TimeInterval = 10) throws {
         let configuration = URLSessionConfiguration.ephemeral
@@ -314,7 +340,6 @@ public final class URLSessionPLCTransport: PLCHTTPTransport, @unchecked Sendable
         self.delegate = delegate
         self.session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
     }
-
     public func execute(_ request: PLCHTTPRequest) async throws -> PLCHTTPResponse {
         guard request.timeout > 0,
               request.timeout <= maximumTimeout,
@@ -343,8 +368,8 @@ public final class URLSessionPLCTransport: PLCHTTPTransport, @unchecked Sendable
                     continuation: continuation
                 )
                 let task = session.dataTask(with: urlRequest)
-                contextHolder.set(context: context, task: task)
                 delegate.register(context: context, for: task)
+                contextHolder.set(context: context, task: task)
                 task.resume()
             }
         } onCancel: {
