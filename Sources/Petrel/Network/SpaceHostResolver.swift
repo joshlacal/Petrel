@@ -73,9 +73,9 @@ extension SpaceAuthorityEndpoints {
         )
     }
 
-    private static func isSecureOrLoopback(_ url: URL) -> Bool {
+    static func isSecureOrLoopback(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
-        if scheme == "https" { return true }
+        if scheme == "https", let host = url.host, !host.isEmpty { return true }
         if scheme == "http", let host = url.host?.lowercased() {
             return host == "127.0.0.1" || host == "localhost" || host == "::1"
         }

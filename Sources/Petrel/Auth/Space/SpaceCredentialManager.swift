@@ -165,8 +165,14 @@ enum SpaceDPoP {
 public actor SpaceCredentialManager {
     public typealias DelegationTokenProvider = @Sendable (SpaceRef) async throws -> String
 
+    /// Provider that resolves a space authority DID to its space host XRPC endpoint URL.
+    ///
+    /// Note: SpaceAuthorityHostProvider returns only URL (spaceHost). SpaceAuthorityEndpoints.signingKeyFragment
+    /// has no consumer today; a future credential-signature verifier may want it.
+    public typealias SpaceAuthorityHostProvider = @Sendable (String) async throws -> URL
+
     private let client: ATProtoClient
-    private let resolver: SpaceHostResolver
+    private let authorityHostProvider: SpaceAuthorityHostProvider
     private let urlSession: URLSession
     private let delegationTokenProvider: DelegationTokenProvider
 
@@ -174,14 +180,15 @@ public actor SpaceCredentialManager {
     private var inFlight: [SpaceRef: Task<SpaceCredential, Error>] = [:]
     private var generations: [SpaceRef: UInt64] = [:]
 
+    /// Designated initializer taking a custom `authorityHostProvider`.
     public init(
         client: ATProtoClient,
-        resolver: SpaceHostResolver,
+        authorityHostProvider: @escaping SpaceAuthorityHostProvider,
         urlSession: URLSession = .shared,
-        delegationTokenProvider: (@Sendable (SpaceRef) async throws -> String)? = nil
+        delegationTokenProvider: DelegationTokenProvider? = nil
     ) {
         self.client = client
-        self.resolver = resolver
+        self.authorityHostProvider = authorityHostProvider
         self.urlSession = urlSession
         self.delegationTokenProvider = delegationTokenProvider ?? { [client] space in
             let (_, output) = try await client.com.atproto.space.getDelegationToken(
@@ -192,6 +199,23 @@ public actor SpaceCredentialManager {
             }
             return token
         }
+    }
+
+    /// Compatibility initializer delegating authority host resolution to `SpaceHostResolver`.
+    public init(
+        client: ATProtoClient,
+        resolver: SpaceHostResolver,
+        urlSession: URLSession = .shared,
+        delegationTokenProvider: DelegationTokenProvider? = nil
+    ) {
+        self.init(
+            client: client,
+            authorityHostProvider: { did in
+                try await resolver.resolve(authorityDID: did).spaceHost
+            },
+            urlSession: urlSession,
+            delegationTokenProvider: delegationTokenProvider
+        )
     }
 
     /// Cached credential for the space, exchanging a fresh one when absent
@@ -283,9 +307,9 @@ public actor SpaceCredentialManager {
 
     // MARK: - Private Helpers
 
-    private static func isSecureOrLoopback(_ url: URL) -> Bool {
+    static func isSecureOrLoopback(_ url: URL) -> Bool {
         guard let scheme = url.scheme?.lowercased() else { return false }
-        if scheme == "https" { return true }
+        if scheme == "https", let host = url.host, !host.isEmpty { return true }
         if scheme == "http", let host = url.host?.lowercased() {
             return host == "127.0.0.1" || host == "localhost" || host == "::1"
         }
@@ -298,16 +322,16 @@ public actor SpaceCredentialManager {
             throw SpaceCredentialError.invalidSpaceRef(space.uriString())
         }
 
-        let endpoints = try await resolver.resolve(authorityDID: authorityDID)
+        let spaceHost = try await authorityHostProvider(authorityDID)
         let delegationToken = try await delegationTokenProvider(space)
 
         let ephemeralKey = P256.Signing.PrivateKey()
 
         let exchangeURL: URL
         if #available(macOS 13.0, iOS 16.0, watchOS 9.0, tvOS 16.0, *) {
-            exchangeURL = endpoints.spaceHost.appending(path: "xrpc/com.atproto.space.getSpaceCredential")
+            exchangeURL = spaceHost.appending(path: "xrpc/com.atproto.space.getSpaceCredential")
         } else {
-            exchangeURL = endpoints.spaceHost.appendingPathComponent("xrpc/com.atproto.space.getSpaceCredential")
+            exchangeURL = spaceHost.appendingPathComponent("xrpc/com.atproto.space.getSpaceCredential")
         }
 
         guard Self.isSecureOrLoopback(exchangeURL) else {
@@ -337,7 +361,7 @@ public actor SpaceCredentialManager {
         }
 
         guard (200...299).contains(httpResponse.statusCode) else {
-            let host = endpoints.spaceHost.host ?? endpoints.spaceHost.absoluteString
+            let host = spaceHost.host ?? spaceHost.absoluteString
             let parsed = ATProtoErrorParser.parseGeneric(data: data, statusCode: httpResponse.statusCode)
             let errorName = parsed?.error
             let serverMessage = parsed?.message
@@ -361,7 +385,7 @@ public actor SpaceCredentialManager {
                 rawBody.localizedCaseInsensitiveContains("InvalidToken")
             )
             if isTokenRejected {
-                let evidence = await probeServerEvidence(spaceHost: endpoints.spaceHost)
+                let evidence = await probeServerEvidence(spaceHost: spaceHost)
                 throw SpaceCredentialError.tokenRejected(
                     host: host,
                     error: errorName ?? "InvalidDelegationToken",
