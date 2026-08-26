@@ -163,6 +163,128 @@ struct SpaceRefTests {
         }
     }
 
+    @Test("SpaceRef accepts valid canonical vectors")
+    func spaceRefAcceptsValidCanonicalVectors() throws {
+        let validURIs = [
+            "at://did:m:v/space/com.example.group/default",
+            "at://did:plc:asdf123/space/com.example.group/default",
+            "at://did:plc:owner/space/blue.catbird.circle/3abc",
+            "at://did:web:example.com/space/blue.catbird.circle/3abc",
+            "at://did:plc:owner/space/com.atproto.simplespace.space/tid123",
+            "at://did:plc:auth123/space/com.example.drive/self",
+            "at://did:plc:asdf123/space/com.example.group/test-key_123",
+            "at://did:plc:asdf123/space/com.example.group/2024-01-01",
+            "at://did:plc:asdf123/space/com.example.group/rkey:~._-",
+        ]
+
+        for uri in validURIs {
+            let ref = try SpaceRef(uriString: uri)
+            #expect(ref.uriString() == uri)
+            #expect(ref.description == uri)
+        }
+
+        let did2048 = "did:plc:" + String(repeating: "a", count: 2040)
+        let validDID2048URI = "at://\(did2048)/space/com.example.group/default"
+        let refDID2048 = try SpaceRef(uriString: validDID2048URI)
+        #expect(refDID2048.uriString() == validDID2048URI)
+
+        let nsid317 = "com.example." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 49)
+        let validNSID317URI = "at://did:plc:asdf123/space/\(nsid317)/default"
+        let refNSID317 = try SpaceRef(uriString: validNSID317URI)
+        #expect(refNSID317.uriString() == validNSID317URI)
+
+        let valid512 = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 512))"
+        let ref512 = try SpaceRef(uriString: valid512)
+        #expect(ref512.uriString() == valid512)
+    }
+
+    @Test("SpaceRef rejects all malformed vectors")
+    func spaceRefRejectsAllMalformedVectors() {
+        let did2049 = "did:plc:" + String(repeating: "a", count: 2041)
+        let nsid318 = "com.example." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 50)
+
+        let malformedURIs = [
+            // Scheme / prefix errors
+            "https://example.com/space/blue.catbird.circle/3abc",
+            "at:/did:plc:asdf123/space/com.example.group/default",
+            "AT://did:plc:asdf123/space/com.example.group/default",
+            // Segment count and structure errors
+            "at://did:plc:asdf123",
+            "at://did:plc:asdf123/space",
+            "at://did:plc:asdf123/space/com.example.group",
+            "at://did:plc:asdf123/space/com.example.group/default/extra",
+            "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
+            "at://did:plc:asdf123/com.atproto.feed.post/abc",
+            "at://did:plc:asdf123/space//default",
+            "at://did:plc:asdf123/space/com.example.group/",
+            "at:///space/com.example.group/default",
+            "at://did:plc:asdf123//com.example.group/default",
+            "at://did:plc:asdf123/other/com.example.group/default",
+            // Authority DID errors
+            "at://user.bsky.social/space/com.example.group/default",
+            "at://did::owner/space/blue.catbird.circle/3abc",
+            "at://did:plc:/space/blue.catbird.circle/3abc",
+            "at://invalid-did/space/blue.catbird.circle/3abc",
+            "at://did:plc:ünicode/space/com.example.group/default",
+            "at://\(did2049)/space/com.example.group/default",
+            // SpaceType NSID errors
+            "at://did:plc:asdf123/space/short/default",
+            "at://did:plc:asdf123/space/-bad.example/3abc",
+            "at://did:plc:asdf123/space/com.example.-group/default",
+            "at://did:plc:asdf123/space/com.example..group/default",
+            "at://did:plc:asdf123/space/1com.example.group/default",
+            "at://did:plc:asdf123/space/\(nsid318)/default",
+            // Skey RecordKey errors
+            "at://did:plc:asdf123/space/com.example.group/.",
+            "at://did:plc:asdf123/space/com.example.group/..",
+            "at://did:plc:asdf123/space/com.example.group/has space",
+            "at://did:plc:asdf123/space/com.example.group/has/slash",
+            "at://did:plc:asdf123/space/com.example.group/has@invalid",
+            "at://did:plc:asdf123/space/com.example.group/has%percent",
+        ]
+
+        for uri in malformedURIs {
+            #expect(throws: (any Error).self, "Expected rejection for: \(uri)") {
+                try SpaceRef(uriString: uri)
+            }
+        }
+
+        let overlengthSkey = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 513))"
+        #expect(throws: (any Error).self) {
+            try SpaceRef(uriString: overlengthSkey)
+        }
+
+        let overlengthURI = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 8200))"
+        #expect(throws: (any Error).self) {
+            try SpaceRef(uriString: overlengthURI)
+        }
+    }
+
+    @Test("SpaceRef component initializer routes through full validation")
+    func spaceRefComponentInitializerValidatesFullContract() throws {
+        let valid = try SpaceRef(spaceDID: "did:m:v", spaceType: "com.example.group", skey: "default")
+        #expect(valid.uriString() == "at://did:m:v/space/com.example.group/default")
+
+        let did2049 = "did:plc:" + String(repeating: "a", count: 2041)
+        #expect(throws: (any Error).self) {
+            try SpaceRef(spaceDID: did2049, spaceType: "com.example.group", skey: "default")
+        }
+
+        let nsid318 = "com.example." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 63) + "." + String(repeating: "a", count: 50)
+        #expect(throws: (any Error).self) {
+            try SpaceRef(spaceDID: "did:plc:asdf123", spaceType: nsid318, skey: "default")
+        }
+
+        #expect(throws: (any Error).self) {
+            try SpaceRef(spaceDID: "did:plc:asdf123", spaceType: "com.example.group", skey: "has%percent")
+        }
+        #expect(throws: (any Error).self) {
+            try SpaceRef(spaceDID: "did:plc:asdf123", spaceType: "com.example.group", skey: ".")
+        }
+        #expect(throws: (any Error).self) {
+            try SpaceRef(spaceDID: "did:plc:asdf123", spaceType: "com.example.group", skey: "..")
+        }
+    }
     // MARK: - Round-tripping
 
     @Test("SpaceRef round-trips through JSON byte-identically")

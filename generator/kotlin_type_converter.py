@@ -205,5 +205,12 @@ class KotlinTypeConverter(BaseTypeConverter):
             type_name = self.code_generator.class_name + convert_to_pascal_case(fragment)
             # No object prefix as definitions are top-level
             return type_name
-            
+        registry = getattr(self.code_generator.cycle_detector, 'schemas_by_ref', None)
+        if registry is not None:
+            fragment = fragment if separator else 'main'
+            qualified_ref = ref if separator else f"{ref}#main"
+            target = registry.get(qualified_ref)
+            if isinstance(target, dict) and target.get('type') == 'string' and 'enum' in target:
+                return convert_to_pascal_case(nsid) + "Defs" + convert_to_pascal_case(fragment)
+
         return convert_kotlin_ref(ref)
