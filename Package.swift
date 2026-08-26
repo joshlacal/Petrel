@@ -33,6 +33,10 @@ let package = Package(
             name: "PetrelPLC",
             targets: ["PetrelPLC"]
         ),
+        .library(
+            name: "PetrelJetstream",
+            targets: ["PetrelJetstream"]
+        ),
         .executable(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
@@ -48,6 +52,8 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-log.git", .upToNextMajor(from: "1.0.0")),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
         .package(url: "https://github.com/GigaBitcoin/secp256k1.swift.git", exact: "0.15.0"),
+        // Pinned to 1.5.7: release tag ships Package.swift with the `libzstd` product.
+        .package(url: "https://github.com/facebook/zstd.git", .upToNextMinor(from: "1.5.7")),
     ],
     targets: [
         // System library for libsecret (Linux only, ignored on other platforms)
@@ -125,6 +131,19 @@ let package = Package(
             ]
         ),
         .target(
+            name: "PetrelJetstream",
+            dependencies: [
+                "Petrel",
+                "PetrelCore",
+                "PetrelFirehose",
+                "SwiftCBOR",
+                .product(name: "libzstd", package: "zstd"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
             name: "PetrelPLC",
             dependencies: [
                 "PetrelCore",
@@ -158,6 +177,10 @@ let package = Package(
         .testTarget(
             name: "PetrelFirehoseTests",
             dependencies: ["PetrelFirehose", "PetrelRepo"]
+        ),
+        .testTarget(
+            name: "PetrelJetstreamTests",
+            dependencies: ["PetrelJetstream", "PetrelFirehose"]
         ),
         .testTarget(
             name: "PetrelPLCTests",
