@@ -472,10 +472,10 @@ class SpaceRef private constructor(
         private val nsidRegex = Regex(
             "^([a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\\.[a-zA-Z][a-zA-Z0-9]{0,62}$"
         )
-        private val recordKeyRegex = Regex("^[a-zA-Z0-9\\-_.:~%]+$")
+        private val recordKeyRegex = Regex("^[a-zA-Z0-9._:~-]+$")
 
         fun isValidDID(did: String): Boolean {
-            if (!did.startsWith("did:") || did.length !in 8..8192) return false
+            if (!did.startsWith("did:") || did.length !in 7..2048) return false
             val rest = did.substring(4)
             val colonIdx = rest.indexOf(':')
             if (colonIdx <= 0) return false
@@ -483,11 +483,11 @@ class SpaceRef private constructor(
             if (!method.all { it in 'a'..'z' }) return false
             val id = rest.substring(colonIdx + 1)
             if (id.isEmpty() || id.endsWith(":") || id.endsWith("%")) return false
-            return id.all { it.isLetterOrDigit() || it in "._:%-" }
+            return id.all { (it in 'a'..'z' || it in 'A'..'Z' || it in '0'..'9' || it in "._:%-") }
         }
 
         fun isValidNSID(nsid: String): Boolean {
-            if (nsid.isEmpty() || nsid.length > 584) return false
+            if (nsid.isEmpty() || nsid.length > 317) return false
             return nsidRegex.matches(nsid)
         }
 
@@ -519,15 +519,7 @@ class SpaceRef private constructor(
         }
 
         fun create(spaceDID: String, spaceType: String, skey: String): SpaceRef {
-            require(isValidDID(spaceDID)) { "invalid authority DID '$spaceDID'" }
-            require(isValidNSID(spaceType)) { "invalid spaceType NSID '$spaceType'" }
-            require(isValidRecordKey(skey)) { "invalid skey RecordKey '$skey'" }
-            return SpaceRef(
-                value = "at://$spaceDID/space/$spaceType/$skey",
-                spaceDID = spaceDID,
-                spaceType = spaceType,
-                skey = skey
-            )
+            return parse("at://$spaceDID/space/$spaceType/$skey")
         }
     }
 }

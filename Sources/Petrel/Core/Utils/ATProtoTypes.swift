@@ -286,13 +286,7 @@ public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameter
     }
 
     public init(spaceDID: String, spaceType: String, skey: String) throws {
-        _ = try DID(didString: spaceDID)
-        _ = try NSID(nsidString: spaceType)
-        _ = try RecordKey(keyString: skey)
-
-        self.spaceDID = spaceDID
-        self.spaceType = spaceType
-        self.skey = skey
+        try self.init(uriString: "at://\(spaceDID)/space/\(spaceType)/\(skey)")
     }
 
     /// Parses the three-part form only. A URI naming a record *within* a space
@@ -311,11 +305,13 @@ public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameter
             throw ATProtocolError.invalidURI("Invalid space ref: \(uriString)")
         }
 
-        try self.init(
-            spaceDID: String(segments[0]),
-            spaceType: String(segments[2]),
-            skey: String(segments[3])
-        )
+        let did = try DID(didString: String(segments[0]))
+        let nsid = try NSID(nsidString: String(segments[2]))
+        let rkey = try RecordKey(keyString: String(segments[3]))
+
+        self.spaceDID = did.didString()
+        self.spaceType = nsid.nsidString()
+        self.skey = rkey.value
     }
 
     public var description: String {
@@ -768,7 +764,7 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     public init(didString: String) throws {
         originalString = didString
 
-        guard didString.utf8.count <= 8192,
+        guard didString.utf8.count <= 2048,
               DID.isValidDID(didString)
         else {
             throw ATProtocolError.invalidURI("Invalid DID format or length")
@@ -787,6 +783,10 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 
     /// Gate a space URI's authority and author on being well-formed DIDs, as the space grammar requires.
     public static func isValidDID(_ did: String) -> Bool {
+        guard !did.isEmpty, did.utf8.count <= 2048, did.allSatisfy({ $0.isASCII }) else {
+            return false
+        }
+
         guard let regex = didRegex else {
             // Fallback validation without regex
             return did.hasPrefix("did:") && did.count > 4
@@ -1086,7 +1086,7 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
     /// Gate a space URI's type segment, as the space grammar requires.
     public static func isValidNSID(_ nsid: String) -> Bool {
         // Basic validation before regex
-        guard !nsid.isEmpty, nsid.count <= 584 else {
+        guard !nsid.isEmpty, nsid.utf8.count <= 317, nsid.allSatisfy({ $0.isASCII }) else {
             return false
         }
 
@@ -1144,7 +1144,7 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
     public let value: String
 
     /// Pattern for "any" record key format (https://atproto.com/specs/record-key allows "~")
-    private static let recordKeyPattern = "^[a-zA-Z0-9\\-_.:~%]+$"
+    private static let recordKeyPattern = "^[a-zA-Z0-9._:~-]+$"
 
     /// Cached compiled regex - compiled once, reused forever
     private static let recordKeyRegex: NSRegularExpression? = try? NSRegularExpression(pattern: recordKeyPattern, options: [])
@@ -1164,14 +1164,14 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
     }
     public static func isValidRecordKey(_ key: String) -> Bool {
         // Basic validation before regex
-        guard !key.isEmpty, key.utf8.count <= 512, key != ".", key != ".." else {
+        guard !key.isEmpty, key.utf8.count <= 512, key != ".", key != "..", key.allSatisfy({ $0.isASCII }) else {
             return false
         }
 
         guard let regex = recordKeyRegex else {
             // Fallback validation without regex
             return key.allSatisfy { char in
-                char.isLetter || char.isNumber || "-_.:~%".contains(char)
+                char.isLetter || char.isNumber || "._:~-".contains(char)
             }
         }
 
