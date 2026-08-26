@@ -1060,8 +1060,7 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
     public let name: String
 
     private static let nsidPattern =
-        "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\\.[a-zA-Z][a-zA-Z0-9]{0,62}$"
-
+        "^([a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\\.[a-zA-Z][a-zA-Z0-9]{0,62}$"
     /// Cached compiled regex - compiled once, reused forever
     private static let nsidRegex: NSRegularExpression? = try? NSRegularExpression(pattern: nsidPattern, options: [])
 

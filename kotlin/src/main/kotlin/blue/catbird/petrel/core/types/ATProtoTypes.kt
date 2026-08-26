@@ -452,8 +452,84 @@ object ATProtocolURISerializer : KSerializer<ATProtocolURI> {
  * ref does not parse as one.
  */
 @Serializable(with = SpaceRefSerializer::class)
-data class SpaceRef(val value: String) {
+class SpaceRef private constructor(
+    val value: String,
+    val spaceDID: String,
+    val spaceType: String,
+    val skey: String
+) {
     override fun toString(): String = value
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is SpaceRef) return false
+        return value == other.value
+    }
+
+    override fun hashCode(): Int = value.hashCode()
+
+    companion object {
+        private val nsidRegex = Regex(
+            "^([a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\\.[a-zA-Z][a-zA-Z0-9]{0,62}$"
+        )
+        private val recordKeyRegex = Regex("^[a-zA-Z0-9\\-_.:~%]+$")
+
+        fun isValidDID(did: String): Boolean {
+            if (!did.startsWith("did:") || did.length !in 8..8192) return false
+            val rest = did.substring(4)
+            val colonIdx = rest.indexOf(':')
+            if (colonIdx <= 0) return false
+            val method = rest.substring(0, colonIdx)
+            if (!method.all { it in 'a'..'z' }) return false
+            val id = rest.substring(colonIdx + 1)
+            if (id.isEmpty() || id.endsWith(":") || id.endsWith("%")) return false
+            return id.all { it.isLetterOrDigit() || it in "._:%-" }
+        }
+
+        fun isValidNSID(nsid: String): Boolean {
+            if (nsid.isEmpty() || nsid.length > 584) return false
+            return nsidRegex.matches(nsid)
+        }
+
+        fun isValidRecordKey(key: String): Boolean {
+            if (key.isEmpty() || key.length > 512 || key == "." || key == "..") return false
+            return recordKeyRegex.matches(key)
+        }
+
+        fun parse(uriString: String): SpaceRef {
+            require(uriString.startsWith("at://")) { "URI must start with 'at://'" }
+            require(uriString.length <= 8192) { "SpaceRef URI exceeds maximum length of 8192 bytes" }
+            val rest = uriString.substring(5)
+            val segments = rest.split("/")
+            require(segments.size == 4) { "URI must have exactly authority, 'space', spaceType, and skey segments" }
+            val authority = segments[0]
+            require(isValidDID(authority)) { "invalid authority DID '$authority'" }
+            require(segments[1] == "space") { "path segment after authority must be 'space', got '${segments[1]}'" }
+            val spaceType = segments[2]
+            require(isValidNSID(spaceType)) { "invalid spaceType NSID '$spaceType'" }
+            val skey = segments[3]
+            require(isValidRecordKey(skey)) { "invalid skey RecordKey '$skey'" }
+
+            return SpaceRef(
+                value = "at://$authority/space/$spaceType/$skey",
+                spaceDID = authority,
+                spaceType = spaceType,
+                skey = skey
+            )
+        }
+
+        fun create(spaceDID: String, spaceType: String, skey: String): SpaceRef {
+            require(isValidDID(spaceDID)) { "invalid authority DID '$spaceDID'" }
+            require(isValidNSID(spaceType)) { "invalid spaceType NSID '$spaceType'" }
+            require(isValidRecordKey(skey)) { "invalid skey RecordKey '$skey'" }
+            return SpaceRef(
+                value = "at://$spaceDID/space/$spaceType/$skey",
+                spaceDID = spaceDID,
+                spaceType = spaceType,
+                skey = skey
+            )
+        }
+    }
 }
 
 object SpaceRefSerializer : KSerializer<SpaceRef> {
@@ -465,6 +541,10 @@ object SpaceRefSerializer : KSerializer<SpaceRef> {
     }
 
     override fun deserialize(decoder: Decoder): SpaceRef {
-        return SpaceRef(decoder.decodeString())
+        return try {
+            SpaceRef.parse(decoder.decodeString())
+        } catch (e: IllegalArgumentException) {
+            throw SerializationException(e.message, e)
+        }
     }
 }
