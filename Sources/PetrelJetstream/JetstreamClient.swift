@@ -58,6 +58,9 @@ public struct JetstreamClientConfiguration: Sendable {
   public var downloadConcurrency: Int
   /// Whether to use zstd dictionary compression on the live WebSocket stream.
   public var compression: Bool
+  /// Raw API key for Bluesky-hosted metered replay HTTP endpoints
+  /// (`Authorization: Bearer <key>`); the live websocket needs no key.
+  public var apiKey: String?
   /// Persistent cursor storage for saving and resuming progress.
   public var cursorStorage: (any FirehoseCursorStorage)?
   /// HTTP transport used for XRPC requests and downloads.
@@ -74,6 +77,7 @@ public struct JetstreamClientConfiguration: Sendable {
     batchSize: Int = 64,
     downloadConcurrency: Int = 4,
     compression: Bool = false,
+    apiKey: String? = nil,
     cursorStorage: (any FirehoseCursorStorage)? = nil,
     transport: any JetstreamHTTPTransport = URLSessionJetstreamHTTPTransport(),
     sessionFactory: any FirehoseWebSocketSessionFactory = URLSessionFirehoseWebSocketFactory(),
@@ -81,6 +85,7 @@ public struct JetstreamClientConfiguration: Sendable {
   ) {
     self.host = host
     self.mode = mode
+    self.apiKey = apiKey
     self.filter = filter
     self.batchSize = batchSize
     self.downloadConcurrency = downloadConcurrency
@@ -151,7 +156,8 @@ private actor JetstreamClientRunner {
     self.configuration = configuration
     self.xrpcClient = JetstreamXRPCClient(
       host: configuration.host,
-      transport: configuration.transport
+      transport: configuration.transport,
+      apiKey: configuration.apiKey
     )
   }
 

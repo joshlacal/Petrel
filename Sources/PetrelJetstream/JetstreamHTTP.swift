@@ -164,16 +164,29 @@ public struct SnapshotPlan: Codable, Sendable, Equatable {
 public struct JetstreamXRPCClient: Sendable {
   public let host: URL
   public let transport: any JetstreamHTTPTransport
+  /// Raw API key for Bluesky-hosted metered replay endpoints; sent as
+  /// `Authorization: Bearer <key>` on every request. The live websocket
+  /// needs no key.
+  public let apiKey: String?
 
-  public init(host: URL, transport: any JetstreamHTTPTransport) {
+  public init(host: URL, transport: any JetstreamHTTPTransport, apiKey: String? = nil) {
     self.host = host
     self.transport = transport
+    self.apiKey = apiKey
+  }
+
+  private func makeRequest(url: URL, method: String) -> URLRequest {
+    var request = URLRequest(url: url)
+    request.httpMethod = method
+    if let apiKey {
+      request.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+    }
+    return request
   }
 
   public func planSnapshot(_ request: SnapshotPlanRequest) async throws -> SnapshotPlan {
     let url = try buildURL(nsid: "network.bsky.jetstream.planSnapshot")
-    var urlRequest = URLRequest(url: url)
-    urlRequest.httpMethod = "POST"
+    var urlRequest = makeRequest(url: url, method: "POST")
     urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
     urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
     urlRequest.httpBody = try JSONCoders.encode(request)
@@ -189,8 +202,7 @@ public struct JetstreamXRPCClient: Sendable {
       URLQueryItem(name: "blockIndex", value: String(blockIndex)),
     ]
     let url = try buildURL(nsid: "network.bsky.jetstream.getBlock", queryItems: queryItems)
-    var urlRequest = URLRequest(url: url)
-    urlRequest.httpMethod = "GET"
+    let urlRequest = makeRequest(url: url, method: "GET")
 
     let (data, response) = try await transport.data(for: urlRequest)
     try validateResponse(response, data: data)
@@ -202,8 +214,7 @@ public struct JetstreamXRPCClient: Sendable {
       URLQueryItem(name: "name", value: name),
     ]
     let url = try buildURL(nsid: "network.bsky.jetstream.getSegment", queryItems: queryItems)
-    var urlRequest = URLRequest(url: url)
-    urlRequest.httpMethod = "GET"
+    let urlRequest = makeRequest(url: url, method: "GET")
 
     let (tempURL, response) = try await transport.download(for: urlRequest)
     guard (200..<300).contains(response.statusCode) else {
@@ -231,8 +242,7 @@ public struct JetstreamXRPCClient: Sendable {
       queryItems = [URLQueryItem(name: "id", value: String(id))]
     }
     let url = try buildURL(nsid: "network.bsky.jetstream.getZstdDictionary", queryItems: queryItems)
-    var urlRequest = URLRequest(url: url)
-    urlRequest.httpMethod = "GET"
+    let urlRequest = makeRequest(url: url, method: "GET")
 
     let (data, response) = try await transport.data(for: urlRequest)
     try validateResponse(response, data: data)

@@ -96,4 +96,50 @@ final class JetstreamLiveSmokeTests: XCTestCase {
       XCTFail("Timed out waiting for live stream events from \(smokeURL)")
     }
   }
+
+  /// Bounded production replay smoke: plans and downloads the first ~2000
+  /// archive events via authenticated planSnapshot/getBlock/getSegment,
+  /// exercising the columnar decoder against real data. Byte-bounded by the
+  /// tiny (0, 2000] seq window. Requires JETSTREAM_SMOKE_URL and
+  /// JETSTREAM_API_KEY.
+  func testSnapshotReplayDecodesArchiveSlice() async throws {
+    guard let smokeURLString = ProcessInfo.processInfo.environment["JETSTREAM_SMOKE_URL"],
+      let smokeURL = URL(string: smokeURLString)
+    else {
+      throw XCTSkip("JETSTREAM_SMOKE_URL not set; skipping replay smoke test")
+    }
+    guard let apiKey = ProcessInfo.processInfo.environment["JETSTREAM_API_KEY"], !apiKey.isEmpty
+    else {
+      throw XCTSkip("JETSTREAM_API_KEY not set; skipping replay smoke test")
+    }
+
+    let config = JetstreamClientConfiguration(
+      host: smokeURL,
+      mode: .snapshotOnly(afterSeq: 0, beforeSeq: 2000),
+      batchSize: 256,
+      apiKey: apiKey,
+      backoff: FirehoseBackoffConfiguration(initialDelay: 0.5, maxDelay: 5.0, multiplier: 2.0)
+    )
+
+    let client = JetstreamClient(configuration: config)
+    var seqs: [Int64] = []
+    var decodedRecords = 0
+
+    for try await batch in client.events() {
+      for event in batch.events {
+        if let seq = event.seq { seqs.append(seq) }
+        if case let .commit(commit) = event, commit.recordJSON != nil,
+          commit.decodedRecord() != nil
+        {
+          decodedRecords += 1
+        }
+      }
+    }
+
+    XCTAssertFalse(seqs.isEmpty, "Expected events in the (0, 2000] archive window")
+    XCTAssertEqual(seqs, seqs.sorted(), "Seqs must arrive in ascending order")
+    XCTAssertLessThanOrEqual(seqs.max() ?? 0, 2000, "beforeSeq bound must hold")
+    XCTAssertGreaterThan(decodedRecords, 0, "Expected at least one decodable archive record")
+    print("[ReplaySmoke] events=\(seqs.count) decodedRecords=\(decodedRecords) maxSeq=\(seqs.max() ?? 0)")
+  }
 }
