@@ -1,5 +1,7 @@
 # Agent Guidelines for Petrel
 
+Agent instructions for Petrel (`CLAUDE.md` imports this file).
+
 Petrel is a Swift 6 SDK implementing the AT Protocol and Bluesky XRPC APIs for iOS, macOS, and Linux. The repository combines an automated code generator (`generator/`) that compiles Lexicon JSON schemas into strongly typed Swift and Kotlin models with a hand-written core networking and authentication layer (`Sources/Petrel/`).
 
 ## Quick Reference
