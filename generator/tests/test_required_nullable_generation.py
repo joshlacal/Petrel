@@ -38,6 +38,7 @@ class RequiredNullableGenerationTests(unittest.TestCase):
             "try container.encode(nullableCID, forKey: .nullableCID)",
             "try container.encode(requiredCount, forKey: .requiredCount)",
             "try container.encodeIfPresent(optionalNote, forKey: .optionalNote)",
+            "nullableScalar: String?, nullableCID: CID?, requiredCount: Int, optionalNote: String? = nil",
         )
         normalized = {line.strip() for line in generated.splitlines()}
         for line in expected_lines:
@@ -52,7 +53,14 @@ class RequiredNullableGenerationTests(unittest.TestCase):
             "try container.encodeIfPresent(nullableCID, forKey: .nullableCID)",
             normalized,
         )
-
+        self.assertNotIn(
+            "nullableScalar: String? = nil",
+            generated,
+        )
+        self.assertNotIn(
+            "nullableCID: CID? = nil",
+            generated,
+        )
     def test_kotlin_snapshot_distinguishes_required_nullable_from_optional(self):
         generated = KotlinCodeGenerator(required_nullable_lexicon()).convert()
 
@@ -161,6 +169,24 @@ class RequiredNullableGenerationTests(unittest.TestCase):
                 #"{{"nullableScalar":null,"nullableCID":7,"requiredCount":1}}"#.utf8
             )
             precondition((try? decoder.decode(Entry.self, from: malformedNullable)) == nil)
+
+            let defaultConstructed = Entry(
+                nullableScalar: "test",
+                nullableCID: nil,
+                requiredCount: 2
+            )
+            precondition(defaultConstructed.nullableScalar == "test")
+            precondition(defaultConstructed.nullableCID == nil)
+            precondition(defaultConstructed.requiredCount == 2)
+            precondition(defaultConstructed.optionalNote == nil)
+
+            let explicitConstructed = Entry(
+                nullableScalar: "test",
+                nullableCID: nil,
+                requiredCount: 2,
+                optionalNote: "custom"
+            )
+            precondition(explicitConstructed.optionalNote == "custom")
             """
         )
 

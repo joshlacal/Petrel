@@ -3,7 +3,7 @@
         {%- endfor %}
 
         public init({% for prop in properties -%}
-            {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
+            {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% if prop.wire_optional %} = nil{% endif %}{% endif %}{% if not loop.last %}, {% endif %}
         {%- endfor %}) {
             {%- for prop in properties %}
             self.{{ prop.name|sanitizeKeyword }} = {{ prop.name|sanitizeKeyword }}

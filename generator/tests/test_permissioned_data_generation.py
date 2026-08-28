@@ -290,7 +290,7 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         self.assertEqual(ordinary, explicit_false)
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "34109213bc71f4d8afd93aa09cca6aa848b19af227679855fb4453898a239c6a",
+            "7510eb47c53b9983007bba2ea7566dd31e9b40660943617f2774f92d3c26d6a9",
         )
 
     def test_server_contract_flag_false_preserves_direct_input_bytes(self):

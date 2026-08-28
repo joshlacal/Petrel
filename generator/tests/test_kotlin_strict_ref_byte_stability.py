@@ -162,16 +162,16 @@ class KotlinStrictRefByteStabilityTests(unittest.TestCase):
     def test_ordinary_swift_shapes_remain_byte_identical_to_pre_strict_ref_output(self):
         expected = {
             "blue.catbird.test.ordinaryObject": (
-                "ab7c83e886a644225cc4977c48e510734b1410ea879eed82369249eb82f442b5"
+                "3e6c64d3f955f3f2e7c76ff67b7f064464775c6681874090bfb5cd668c5ef99b"
             ),
             "blue.catbird.test.ordinaryProcedure": (
-                "53c5810bf3ad98bc4e4613f931cddbc0d815948eabee7a2a4bc13b2fda6011c3"
+                "6c7362fd8911567080c9103766f20195d3b44ad6604b144126baab46e2a8a585"
             ),
             "blue.catbird.test.ordinaryRecord": (
-                "525e1e4c87bab213f0c812b76c42de5d8a32a439d1327ca7eb1cb7335bc45657"
+                "64d9efecd9bfc95390371a71cae9960a42195e0c6fe697aaca511186bcfce9c4"
             ),
             "blue.catbird.test.ordinarySubscription": (
-                "585974cdccc8726ba2b75fa60b015893bd6d4fda9b7c27a416a9b91d277f6f5c"
+                "09d9b312435723060b7044ceec839df9a766b9c3ef319a6e782dfbcf7d414c7a"
             ),
         }
         for lexicon in ordinary_lexicons():
