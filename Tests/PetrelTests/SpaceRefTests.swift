@@ -163,6 +163,85 @@ struct SpaceRefTests {
         }
     }
 
+    @Test("SpaceRef accepts valid canonical vectors")
+    func spaceRefAcceptsValidCanonicalVectors() throws {
+        let validURIs = [
+            "at://did:plc:asdf123/space/com.example.group/default",
+            "at://did:plc:owner/space/blue.catbird.circle/3abc",
+            "at://did:web:example.com/space/blue.catbird.circle/3abc",
+            "at://did:plc:owner/space/com.atproto.simplespace.space/tid123",
+            "at://did:plc:auth123/space/com.example.drive/self",
+            "at://did:plc:asdf123/space/com.example.group/test-key_123",
+            "at://did:plc:asdf123/space/com.example.group/2024-01-01",
+            "at://did:plc:asdf123/space/com.example.group/rkey:~._-",
+        ]
+
+        for uri in validURIs {
+            let ref = try SpaceRef(uriString: uri)
+            #expect(ref.uriString() == uri)
+            #expect(ref.description == uri)
+        }
+
+        let valid512 = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 512))"
+        let ref512 = try SpaceRef(uriString: valid512)
+        #expect(ref512.uriString() == valid512)
+    }
+
+    @Test("SpaceRef rejects all malformed vectors")
+    func spaceRefRejectsAllMalformedVectors() {
+        let malformedURIs = [
+            // Scheme / prefix errors
+            "https://example.com/space/blue.catbird.circle/3abc",
+            "at:/did:plc:asdf123/space/com.example.group/default",
+            "AT://did:plc:asdf123/space/com.example.group/default",
+            // Segment count and structure errors
+            "at://did:plc:asdf123",
+            "at://did:plc:asdf123/space",
+            "at://did:plc:asdf123/space/com.example.group",
+            "at://did:plc:asdf123/space/com.example.group/default/extra",
+            "at://did:plc:asdf123/space/com.example.group/default/did:plc:user1/com.atproto.feed.post/abc123",
+            "at://did:plc:asdf123/com.atproto.feed.post/abc",
+            "at://did:plc:asdf123/space//default",
+            "at://did:plc:asdf123/space/com.example.group/",
+            "at:///space/com.example.group/default",
+            "at://did:plc:asdf123//com.example.group/default",
+            "at://did:plc:asdf123/other/com.example.group/default",
+            // Authority DID errors
+            "at://user.bsky.social/space/com.example.group/default",
+            "at://did::owner/space/blue.catbird.circle/3abc",
+            "at://did:plc:/space/blue.catbird.circle/3abc",
+            "at://invalid-did/space/blue.catbird.circle/3abc",
+            // SpaceType NSID errors
+            "at://did:plc:asdf123/space/short/default",
+            "at://did:plc:asdf123/space/-bad.example/3abc",
+            "at://did:plc:asdf123/space/com.example.-group/default",
+            "at://did:plc:asdf123/space/com.example..group/default",
+            "at://did:plc:asdf123/space/1com.example.group/default",
+            // Skey RecordKey errors
+            "at://did:plc:asdf123/space/com.example.group/.",
+            "at://did:plc:asdf123/space/com.example.group/..",
+            "at://did:plc:asdf123/space/com.example.group/has space",
+            "at://did:plc:asdf123/space/com.example.group/has/slash",
+            "at://did:plc:asdf123/space/com.example.group/has@invalid",
+        ]
+
+        for uri in malformedURIs {
+            #expect(throws: (any Error).self, "Expected rejection for: \(uri)") {
+                try SpaceRef(uriString: uri)
+            }
+        }
+
+        let overlengthSkey = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 513))"
+        #expect(throws: (any Error).self) {
+            try SpaceRef(uriString: overlengthSkey)
+        }
+
+        let overlengthURI = "at://did:plc:asdf123/space/com.example.group/\(String(repeating: "a", count: 8200))"
+        #expect(throws: (any Error).self) {
+            try SpaceRef(uriString: overlengthURI)
+        }
+    }
+
     // MARK: - Round-tripping
 
     @Test("SpaceRef round-trips through JSON byte-identically")

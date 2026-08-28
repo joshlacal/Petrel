@@ -17,9 +17,25 @@ data class ATProtoResponse<T>(
     val errorBody: String? = null
 )
 
-class NetworkService(
+open class NetworkService(
     private val baseUrl: String = "https://bsky.social",
-    private val logLevel: LogLevel = LogLevel.NONE
+    private val logLevel: LogLevel = LogLevel.NONE,
+    @PublishedApi
+    internal val client: HttpClient = HttpClient(CIO) {
+        install(ContentNegotiation) {
+            json(Json {
+                prettyPrint = true
+                isLenient = true
+                ignoreUnknownKeys = true
+            })
+        }
+        if (logLevel != LogLevel.NONE) {
+            install(Logging) {
+                logger = Logger.DEFAULT
+                level = logLevel
+            }
+        }
+    }
 ) {
     @PublishedApi
     internal val serviceDIDs = mutableMapOf<String, String>()
@@ -57,24 +73,28 @@ class NetworkService(
 
     fun getBaseUrl(): String = baseUrl
 
-    @PublishedApi
-    internal val client = HttpClient(CIO) {
-        install(ContentNegotiation) {
-            json(Json {
-                prettyPrint = true
-                isLenient = true
-                ignoreUnknownKeys = true
-            })
-        }
-        if (logLevel != LogLevel.NONE) {
-            install(Logging) {
-                logger = Logger.DEFAULT
-                level = logLevel
-            }
-        }
+    suspend inline fun <reified T> performRequest(
+        method: String,
+        endpoint: String,
+        queryParams: Map<String, String>? = null,
+        headers: Map<String, String> = emptyMap(),
+        body: Any? = null,
+        queryItems: Any? = null
+    ): ATProtoResponse<T> {
+        return performRequestInternal(
+            typeInfo = io.ktor.util.reflect.typeInfo<T>(),
+            method = method,
+            endpoint = endpoint,
+            queryParams = queryParams,
+            headers = headers,
+            body = body,
+            queryItems = queryItems
+        )
     }
 
-    suspend inline fun <reified T> performRequest(
+    @Suppress("UNCHECKED_CAST")
+    open suspend fun <T> performRequestInternal(
+        typeInfo: io.ktor.util.reflect.TypeInfo,
         method: String,
         endpoint: String,
         queryParams: Map<String, String>? = null,
@@ -135,7 +155,7 @@ class NetworkService(
 
             return if (statusCode in 200..299) {
                 try {
-                    val data = response.body<T>()
+                    val data = response.body<T>(typeInfo)
                     ATProtoResponse(statusCode, data)
                 } catch (e: Exception) {
                     System.err.println("[NetworkService] Deserialization failed for $endpoint: ${e.message}")
