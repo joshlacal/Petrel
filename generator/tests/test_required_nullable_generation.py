@@ -53,14 +53,9 @@ class RequiredNullableGenerationTests(unittest.TestCase):
             "try container.encodeIfPresent(nullableCID, forKey: .nullableCID)",
             normalized,
         )
-        self.assertNotIn(
-            "nullableScalar: String? = nil",
-            generated,
-        )
-        self.assertNotIn(
-            "nullableCID: CID? = nil",
-            generated,
-        )
+        self.assertNotIn("nullableScalar: String? = nil", generated)
+        self.assertNotIn("nullableCID: CID? = nil", generated)
+
     def test_kotlin_snapshot_distinguishes_required_nullable_from_optional(self):
         generated = KotlinCodeGenerator(required_nullable_lexicon()).convert()
 
