@@ -20,7 +20,7 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
     public let title: String
     public let updatedAt: ATProtocolDate?
 
-    public init(bskyPostRef: ComAtprotoRepoStrongRef?, content: SiteStandardDocumentContentUnion?, contributors: [Contributor]?, coverImage: Blob?, description: String?, labels: SiteStandardDocumentLabelsUnion?, links: SiteStandardDocumentLinksUnion?, path: String?, publishedAt: ATProtocolDate, site: URI, tags: [String]?, textContent: String?, title: String, updatedAt: ATProtocolDate?) {
+    public init(bskyPostRef: ComAtprotoRepoStrongRef? = nil, content: SiteStandardDocumentContentUnion? = nil, contributors: [Contributor]? = nil, coverImage: Blob? = nil, description: String? = nil, labels: SiteStandardDocumentLabelsUnion? = nil, links: SiteStandardDocumentLinksUnion? = nil, path: String? = nil, publishedAt: ATProtocolDate, site: URI, tags: [String]? = nil, textContent: String? = nil, title: String, updatedAt: ATProtocolDate? = nil) {
         self.bskyPostRef = bskyPostRef
         self.content = content
         self.contributors = contributors
@@ -333,7 +333,7 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
         public let role: String?
 
         public init(
-            did: DID, displayName: String?, role: String?
+            did: DID, displayName: String? = nil, role: String? = nil
         ) {
             self.did = did
             self.displayName = displayName

@@ -57,7 +57,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let associatedRefs: [ComAtprotoRepoStrongRef]?
 
         public init(
-            uri: URI, title: String, description: String, thumb: Blob?, associatedRefs: [ComAtprotoRepoStrongRef]?
+            uri: URI, title: String, description: String, thumb: Blob? = nil, associatedRefs: [ComAtprotoRepoStrongRef]? = nil
         ) {
             self.uri = uri
             self.title = title
@@ -255,7 +255,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let associatedProfiles: [AppBskyActorDefs.ProfileViewBasic]?
 
         public init(
-            uri: URI, title: String, description: String, thumb: URI?, createdAt: ATProtocolDate?, updatedAt: ATProtocolDate?, readingTime: Int?, labels: [ComAtprotoLabelDefs.Label]?, source: ViewExternalSource?, associatedRefs: [ComAtprotoRepoStrongRef]?, associatedProfiles: [AppBskyActorDefs.ProfileViewBasic]?
+            uri: URI, title: String, description: String, thumb: URI? = nil, createdAt: ATProtocolDate? = nil, updatedAt: ATProtocolDate? = nil, readingTime: Int? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, source: ViewExternalSource? = nil, associatedRefs: [ComAtprotoRepoStrongRef]? = nil, associatedProfiles: [AppBskyActorDefs.ProfileViewBasic]? = nil
         ) {
             self.uri = uri
             self.title = title
@@ -529,7 +529,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let theme: ViewExternalSourceTheme?
 
         public init(
-            uri: URI, icon: URI?, title: String, description: String?, theme: ViewExternalSourceTheme?
+            uri: URI, icon: URI? = nil, title: String, description: String? = nil, theme: ViewExternalSourceTheme? = nil
         ) {
             self.uri = uri
             self.icon = icon
@@ -672,7 +672,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         public let accentForegroundRGB: ColorRGB?
 
         public init(
-            backgroundRGB: ColorRGB?, foregroundRGB: ColorRGB?, accentRGB: ColorRGB?, accentForegroundRGB: ColorRGB?
+            backgroundRGB: ColorRGB? = nil, foregroundRGB: ColorRGB? = nil, accentRGB: ColorRGB? = nil, accentForegroundRGB: ColorRGB? = nil
         ) {
             self.backgroundRGB = backgroundRGB
             self.foregroundRGB = foregroundRGB

@@ -12,7 +12,7 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
     public let subjectTypes: [ComAtprotoModerationDefs.SubjectType]?
     public let subjectCollections: [NSID]?
 
-    public init(policies: AppBskyLabelerDefs.LabelerPolicies, labels: AppBskyLabelerServiceLabelsUnion?, createdAt: ATProtocolDate, reasonTypes: [ComAtprotoModerationDefs.ReasonType]?, subjectTypes: [ComAtprotoModerationDefs.SubjectType]?, subjectCollections: [NSID]?) {
+    public init(policies: AppBskyLabelerDefs.LabelerPolicies, labels: AppBskyLabelerServiceLabelsUnion? = nil, createdAt: ATProtocolDate, reasonTypes: [ComAtprotoModerationDefs.ReasonType]? = nil, subjectTypes: [ComAtprotoModerationDefs.SubjectType]? = nil, subjectCollections: [NSID]? = nil) {
         self.policies = policies
         self.labels = labels
         self.createdAt = createdAt

@@ -13,7 +13,7 @@ public enum AppBskyAgeassuranceDefs {
         public let access: AppBskyAgeassuranceDefs.Access
 
         public init(
-            lastInitiatedAt: ATProtocolDate?, status: AppBskyAgeassuranceDefs.Status, access: AppBskyAgeassuranceDefs.Access
+            lastInitiatedAt: ATProtocolDate? = nil, status: AppBskyAgeassuranceDefs.Status, access: AppBskyAgeassuranceDefs.Access
         ) {
             self.lastInitiatedAt = lastInitiatedAt
             self.status = status
@@ -107,7 +107,7 @@ public enum AppBskyAgeassuranceDefs {
         public let accountCreatedAt: ATProtocolDate?
 
         public init(
-            accountCreatedAt: ATProtocolDate?
+            accountCreatedAt: ATProtocolDate? = nil
         ) {
             self.accountCreatedAt = accountCreatedAt
         }
@@ -232,7 +232,7 @@ public enum AppBskyAgeassuranceDefs {
         public let rules: [ConfigRegionRulesUnion]
 
         public init(
-            platforms: [String]?, countryCode: String, regionCode: String?, minAccessAge: Int, additionalVerificationMethods: [String]?, rules: [ConfigRegionRulesUnion]
+            platforms: [String]? = nil, countryCode: String, regionCode: String? = nil, minAccessAge: Int, additionalVerificationMethods: [String]? = nil, rules: [ConfigRegionRulesUnion]
         ) {
             self.platforms = platforms
             self.countryCode = countryCode
@@ -885,7 +885,7 @@ public enum AppBskyAgeassuranceDefs {
         public let completeUa: String?
 
         public init(
-            createdAt: ATProtocolDate, attemptId: String, status: String, access: String, countryCode: String, regionCode: String?, email: String?, initIp: String?, initUa: String?, completeIp: String?, completeUa: String?
+            createdAt: ATProtocolDate, attemptId: String, status: String, access: String, countryCode: String, regionCode: String? = nil, email: String? = nil, initIp: String? = nil, initUa: String? = nil, completeIp: String? = nil, completeUa: String? = nil
         ) {
             self.createdAt = createdAt
             self.attemptId = attemptId

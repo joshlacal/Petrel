@@ -69,7 +69,7 @@ public enum AppBskyBookmarkDefs {
         public let item: BookmarkViewItemUnion
 
         public init(
-            subject: ComAtprotoRepoStrongRef, createdAt: ATProtocolDate?, item: BookmarkViewItemUnion
+            subject: ComAtprotoRepoStrongRef, createdAt: ATProtocolDate? = nil, item: BookmarkViewItemUnion
         ) {
             self.subject = subject
             self.createdAt = createdAt

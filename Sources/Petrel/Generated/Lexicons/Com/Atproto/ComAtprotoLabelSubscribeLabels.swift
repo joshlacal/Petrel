@@ -84,7 +84,7 @@ public enum ComAtprotoLabelSubscribeLabels {
         public let message: String?
 
         public init(
-            name: String, message: String?
+            name: String, message: String? = nil
         ) {
             self.name = name
             self.message = message

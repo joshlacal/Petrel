@@ -10,7 +10,7 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
     public let durationMinutes: Int?
     public let createdAt: ATProtocolDate
 
-    public init(status: String, embed: AppBskyActorStatusEmbedUnion?, durationMinutes: Int?, createdAt: ATProtocolDate) {
+    public init(status: String, embed: AppBskyActorStatusEmbedUnion? = nil, durationMinutes: Int? = nil, createdAt: ATProtocolDate) {
         self.status = status
         self.embed = embed
         self.durationMinutes = durationMinutes

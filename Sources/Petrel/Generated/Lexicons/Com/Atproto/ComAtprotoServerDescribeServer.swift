@@ -12,7 +12,7 @@ public enum ComAtprotoServerDescribeServer {
         public let termsOfService: URI?
 
         public init(
-            privacyPolicy: URI?, termsOfService: URI?
+            privacyPolicy: URI? = nil, termsOfService: URI? = nil
         ) {
             self.privacyPolicy = privacyPolicy
             self.termsOfService = termsOfService
@@ -99,7 +99,7 @@ public enum ComAtprotoServerDescribeServer {
         public let email: String?
 
         public init(
-            email: String?
+            email: String? = nil
         ) {
             self.email = email
         }

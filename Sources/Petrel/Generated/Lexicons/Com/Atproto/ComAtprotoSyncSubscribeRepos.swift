@@ -22,7 +22,7 @@ public enum ComAtprotoSyncSubscribeRepos {
         public let time: ATProtocolDate
 
         public init(
-            seq: Int, rebase: Bool, tooBig: Bool, repo: DID, commit: CID, rev: TID, since: TID?, blocks: Bytes, ops: [RepoOp], blobs: [CID], prevData: CID?, time: ATProtocolDate
+            seq: Int, rebase: Bool, tooBig: Bool, repo: DID, commit: CID, rev: TID, since: TID?, blocks: Bytes, ops: [RepoOp], blobs: [CID], prevData: CID? = nil, time: ATProtocolDate
         ) {
             self.seq = seq
             self.rebase = rebase
@@ -391,7 +391,7 @@ public enum ComAtprotoSyncSubscribeRepos {
         public let handle: Handle?
 
         public init(
-            seq: Int, did: DID, time: ATProtocolDate, handle: Handle?
+            seq: Int, did: DID, time: ATProtocolDate, handle: Handle? = nil
         ) {
             self.seq = seq
             self.did = did
@@ -504,7 +504,7 @@ public enum ComAtprotoSyncSubscribeRepos {
         public let status: String?
 
         public init(
-            seq: Int, did: DID, time: ATProtocolDate, active: Bool, status: String?
+            seq: Int, did: DID, time: ATProtocolDate, active: Bool, status: String? = nil
         ) {
             self.seq = seq
             self.did = did
@@ -629,7 +629,7 @@ public enum ComAtprotoSyncSubscribeRepos {
         public let message: String?
 
         public init(
-            name: String, message: String?
+            name: String, message: String? = nil
         ) {
             self.name = name
             self.message = message
@@ -711,7 +711,7 @@ public enum ComAtprotoSyncSubscribeRepos {
         public let prev: CID?
 
         public init(
-            action: String, path: String, cid: CID?, prev: CID?
+            action: String, path: String, cid: CID?, prev: CID? = nil
         ) {
             self.action = action
             self.path = path

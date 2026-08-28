@@ -12,7 +12,7 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
         public let listItem: AppBskyGraphDefs.ListItemView?
 
         public init(
-            starterPack: AppBskyGraphDefs.StarterPackView, listItem: AppBskyGraphDefs.ListItemView?
+            starterPack: AppBskyGraphDefs.StarterPackView, listItem: AppBskyGraphDefs.ListItemView? = nil
         ) {
             self.starterPack = starterPack
             self.listItem = listItem

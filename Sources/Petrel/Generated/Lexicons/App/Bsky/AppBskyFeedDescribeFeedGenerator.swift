@@ -68,7 +68,7 @@ public enum AppBskyFeedDescribeFeedGenerator {
         public let termsOfService: String?
 
         public init(
-            privacyPolicy: String?, termsOfService: String?
+            privacyPolicy: String? = nil, termsOfService: String? = nil
         ) {
             self.privacyPolicy = privacyPolicy
             self.termsOfService = termsOfService

@@ -16,7 +16,7 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
     public let pinnedPost: ComAtprotoRepoStrongRef?
     public let createdAt: ATProtocolDate?
 
-    public init(displayName: String?, description: String?, pronouns: String?, website: URI?, avatar: Blob?, banner: Blob?, labels: AppBskyActorProfileLabelsUnion?, joinedViaStarterPack: ComAtprotoRepoStrongRef?, pinnedPost: ComAtprotoRepoStrongRef?, createdAt: ATProtocolDate?) {
+    public init(displayName: String? = nil, description: String? = nil, pronouns: String? = nil, website: URI? = nil, avatar: Blob? = nil, banner: Blob? = nil, labels: AppBskyActorProfileLabelsUnion? = nil, joinedViaStarterPack: ComAtprotoRepoStrongRef? = nil, pinnedPost: ComAtprotoRepoStrongRef? = nil, createdAt: ATProtocolDate? = nil) {
         self.displayName = displayName
         self.description = description
         self.pronouns = pronouns

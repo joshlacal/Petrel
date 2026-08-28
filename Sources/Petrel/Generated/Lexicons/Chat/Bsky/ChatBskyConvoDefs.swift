@@ -174,7 +174,7 @@ public enum ChatBskyConvoDefs {
         public let replyTo: ReplyRef?
 
         public init(
-            text: String, facets: [AppBskyRichtextFacet]?, embed: MessageInputEmbedUnion?, replyTo: ReplyRef?
+            text: String, facets: [AppBskyRichtextFacet]? = nil, embed: MessageInputEmbedUnion? = nil, replyTo: ReplyRef? = nil
         ) {
             self.text = text
             self.facets = facets
@@ -363,7 +363,7 @@ public enum ChatBskyConvoDefs {
         public let sentAt: ATProtocolDate
 
         public init(
-            id: String, rev: String, text: String, facets: [AppBskyRichtextFacet]?, embed: MessageViewEmbedUnion?, reactions: [ReactionView]?, replyTo: MessageViewReplyToUnion?, sender: MessageViewSender, sentAt: ATProtocolDate
+            id: String, rev: String, text: String, facets: [AppBskyRichtextFacet]? = nil, embed: MessageViewEmbedUnion? = nil, reactions: [ReactionView]? = nil, replyTo: MessageViewReplyToUnion? = nil, sender: MessageViewSender, sentAt: ATProtocolDate
         ) {
             self.id = id
             self.rev = rev
@@ -893,7 +893,7 @@ public enum ChatBskyConvoDefs {
         public let approvedBy: SystemMessageReferredUser?
 
         public init(
-            member: SystemMessageReferredUser, role: ChatBskyActorDefs.MemberRole, approvedBy: SystemMessageReferredUser?
+            member: SystemMessageReferredUser, role: ChatBskyActorDefs.MemberRole, approvedBy: SystemMessageReferredUser? = nil
         ) {
             self.member = member
             self.role = role
@@ -1212,7 +1212,7 @@ public enum ChatBskyConvoDefs {
         public let newName: String?
 
         public init(
-            oldName: String?, newName: String?
+            oldName: String? = nil, newName: String? = nil
         ) {
             self.oldName = oldName
             self.newName = newName
@@ -1858,7 +1858,7 @@ public enum ChatBskyConvoDefs {
         public let kind: ConvoViewKindUnion?
 
         public init(
-            id: String, rev: String, members: [ChatBskyActorDefs.ProfileViewBasic], lastMessage: ConvoViewLastMessageUnion?, lastReaction: ConvoViewLastReactionUnion?, muted: Bool, status: ConvoStatus?, unreadCount: Int, kind: ConvoViewKindUnion?
+            id: String, rev: String, members: [ChatBskyActorDefs.ProfileViewBasic], lastMessage: ConvoViewLastMessageUnion? = nil, lastReaction: ConvoViewLastReactionUnion? = nil, muted: Bool, status: ConvoStatus? = nil, unreadCount: Int, kind: ConvoViewKindUnion? = nil
         ) {
             self.id = id
             self.rev = rev
@@ -2109,7 +2109,7 @@ public enum ChatBskyConvoDefs {
         public let unreadJoinRequestCount: Int?
 
         public init(
-            createdAt: ATProtocolDate, joinLink: ChatBskyGroupDefs.JoinLinkView?, joinRequestCount: Int?, lockStatus: ConvoLockStatus, lockStatusModerationOverride: Bool, memberCount: Int, memberLimit: Int, name: String, unreadJoinRequestCount: Int?
+            createdAt: ATProtocolDate, joinLink: ChatBskyGroupDefs.JoinLinkView? = nil, joinRequestCount: Int? = nil, lockStatus: ConvoLockStatus, lockStatusModerationOverride: Bool, memberCount: Int, memberLimit: Int, name: String, unreadJoinRequestCount: Int? = nil
         ) {
             self.createdAt = createdAt
             self.joinLink = joinLink
@@ -2672,7 +2672,7 @@ public enum ChatBskyConvoDefs {
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
 
         public init(
-            rev: String, convoId: String, message: LogCreateMessageMessageUnion, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
+            rev: String, convoId: String, message: LogCreateMessageMessageUnion, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil
         ) {
             self.rev = rev
             self.convoId = convoId
@@ -2961,7 +2961,7 @@ public enum ChatBskyConvoDefs {
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
 
         public init(
-            rev: String, convoId: String, message: LogAddReactionMessageUnion, reaction: ReactionView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
+            rev: String, convoId: String, message: LogAddReactionMessageUnion, reaction: ReactionView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil
         ) {
             self.rev = rev
             self.convoId = convoId
@@ -3089,7 +3089,7 @@ public enum ChatBskyConvoDefs {
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
 
         public init(
-            rev: String, convoId: String, message: LogRemoveReactionMessageUnion, reaction: ReactionView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
+            rev: String, convoId: String, message: LogRemoveReactionMessageUnion, reaction: ReactionView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil
         ) {
             self.rev = rev
             self.convoId = convoId

@@ -12,7 +12,7 @@ public enum ComAtprotoAdminDefs {
         public let ref: String?
 
         public init(
-            applied: Bool, ref: String?
+            applied: Bool, ref: String? = nil
         ) {
             self.applied = applied
             self.ref = ref
@@ -102,7 +102,7 @@ public enum ComAtprotoAdminDefs {
         public let threatSignatures: [ThreatSignature]?
 
         public init(
-            did: DID, handle: Handle, email: String?, relatedRecords: [ATProtocolValueContainer]?, indexedAt: ATProtocolDate, invitedBy: ComAtprotoServerDefs.InviteCode?, invites: [ComAtprotoServerDefs.InviteCode]?, invitesDisabled: Bool?, emailConfirmedAt: ATProtocolDate?, inviteNote: String?, deactivatedAt: ATProtocolDate?, threatSignatures: [ThreatSignature]?
+            did: DID, handle: Handle, email: String? = nil, relatedRecords: [ATProtocolValueContainer]? = nil, indexedAt: ATProtocolDate, invitedBy: ComAtprotoServerDefs.InviteCode? = nil, invites: [ComAtprotoServerDefs.InviteCode]? = nil, invitesDisabled: Bool? = nil, emailConfirmedAt: ATProtocolDate? = nil, inviteNote: String? = nil, deactivatedAt: ATProtocolDate? = nil, threatSignatures: [ThreatSignature]? = nil
         ) {
             self.did = did
             self.handle = handle
@@ -453,7 +453,7 @@ public enum ComAtprotoAdminDefs {
         public let recordUri: ATProtocolURI?
 
         public init(
-            did: DID, cid: CID, recordUri: ATProtocolURI?
+            did: DID, cid: CID, recordUri: ATProtocolURI? = nil
         ) {
             self.did = did
             self.cid = cid

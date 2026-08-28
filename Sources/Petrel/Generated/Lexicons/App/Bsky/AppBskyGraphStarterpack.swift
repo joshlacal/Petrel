@@ -12,7 +12,7 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
     public let feeds: [FeedItem]?
     public let createdAt: ATProtocolDate
 
-    public init(name: String, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, list: ATProtocolURI, feeds: [FeedItem]?, createdAt: ATProtocolDate) {
+    public init(name: String, description: String? = nil, descriptionFacets: [AppBskyRichtextFacet]? = nil, list: ATProtocolURI, feeds: [FeedItem]? = nil, createdAt: ATProtocolDate) {
         self.name = name
         self.description = description
         self.descriptionFacets = descriptionFacets

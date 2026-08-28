@@ -13,7 +13,7 @@ public enum ChatBskyModerationDefs {
         public let kind: ConvoViewKindUnion?
 
         public init(
-            id: String, rev: String, kind: ConvoViewKindUnion?
+            id: String, rev: String, kind: ConvoViewKindUnion? = nil
         ) {
             self.id = id
             self.rev = rev
@@ -148,7 +148,7 @@ public enum ChatBskyModerationDefs {
         public let name: String
 
         public init(
-            createdAt: ATProtocolDate, joinLink: ChatBskyGroupDefs.JoinLinkView?, joinRequestCount: Int, lockStatus: ChatBskyConvoDefs.ConvoLockStatus, memberCount: Int, memberLimit: Int, name: String
+            createdAt: ATProtocolDate, joinLink: ChatBskyGroupDefs.JoinLinkView? = nil, joinRequestCount: Int, lockStatus: ChatBskyConvoDefs.ConvoLockStatus, memberCount: Int, memberLimit: Int, name: String
         ) {
             self.createdAt = createdAt
             self.joinLink = joinLink

@@ -19,7 +19,7 @@ public enum AppBskyGraphDefs {
         public let indexedAt: ATProtocolDate?
 
         public init(
-            uri: ATProtocolURI, cid: CID, name: String, purpose: ListPurpose, avatar: URI?, listItemCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, viewer: ListViewerState?, indexedAt: ATProtocolDate?
+            uri: ATProtocolURI, cid: CID, name: String, purpose: ListPurpose, avatar: URI? = nil, listItemCount: Int? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, viewer: ListViewerState? = nil, indexedAt: ATProtocolDate? = nil
         ) {
             self.uri = uri
             self.cid = cid
@@ -246,7 +246,7 @@ public enum AppBskyGraphDefs {
         public let indexedAt: ATProtocolDate
 
         public init(
-            uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, name: String, purpose: ListPurpose, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: URI?, listItemCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, viewer: ListViewerState?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, name: String, purpose: ListPurpose, description: String? = nil, descriptionFacets: [AppBskyRichtextFacet]? = nil, avatar: URI? = nil, listItemCount: Int? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, viewer: ListViewerState? = nil, indexedAt: ATProtocolDate
         ) {
             self.uri = uri
             self.cid = cid
@@ -597,7 +597,7 @@ public enum AppBskyGraphDefs {
         public let indexedAt: ATProtocolDate
 
         public init(
-            uri: ATProtocolURI, cid: CID, record: ATProtocolValueContainer, creator: AppBskyActorDefs.ProfileViewBasic, list: ListViewBasic?, listItemsSample: [ListItemView]?, feeds: [AppBskyFeedDefs.GeneratorView]?, joinedWeekCount: Int?, joinedAllTimeCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: CID, record: ATProtocolValueContainer, creator: AppBskyActorDefs.ProfileViewBasic, list: ListViewBasic? = nil, listItemsSample: [ListItemView]? = nil, feeds: [AppBskyFeedDefs.GeneratorView]? = nil, joinedWeekCount: Int? = nil, joinedAllTimeCount: Int? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, indexedAt: ATProtocolDate
         ) {
             self.uri = uri
             self.cid = cid
@@ -859,7 +859,7 @@ public enum AppBskyGraphDefs {
         public let indexedAt: ATProtocolDate
 
         public init(
-            uri: ATProtocolURI, cid: CID, record: ATProtocolValueContainer, creator: AppBskyActorDefs.ProfileViewBasic, listItemCount: Int?, joinedWeekCount: Int?, joinedAllTimeCount: Int?, labels: [ComAtprotoLabelDefs.Label]?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: CID, record: ATProtocolValueContainer, creator: AppBskyActorDefs.ProfileViewBasic, listItemCount: Int? = nil, joinedWeekCount: Int? = nil, joinedAllTimeCount: Int? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, indexedAt: ATProtocolDate
         ) {
             self.uri = uri
             self.cid = cid
@@ -1068,7 +1068,7 @@ public enum AppBskyGraphDefs {
         public let blocked: ATProtocolURI?
 
         public init(
-            muted: Bool?, blocked: ATProtocolURI?
+            muted: Bool? = nil, blocked: ATProtocolURI? = nil
         ) {
             self.muted = muted
             self.blocked = blocked
@@ -1233,7 +1233,7 @@ public enum AppBskyGraphDefs {
         public let blockedByList: ATProtocolURI?
 
         public init(
-            did: DID, following: ATProtocolURI?, followedBy: ATProtocolURI?, blocking: ATProtocolURI?, blockedBy: ATProtocolURI?, blockingByList: ATProtocolURI?, blockedByList: ATProtocolURI?
+            did: DID, following: ATProtocolURI? = nil, followedBy: ATProtocolURI? = nil, blocking: ATProtocolURI? = nil, blockedBy: ATProtocolURI? = nil, blockingByList: ATProtocolURI? = nil, blockedByList: ATProtocolURI? = nil
         ) {
             self.did = did
             self.following = following

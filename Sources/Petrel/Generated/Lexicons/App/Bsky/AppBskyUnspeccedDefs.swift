@@ -182,7 +182,7 @@ public enum AppBskyUnspeccedDefs {
         public let link: String
 
         public init(
-            topic: String, displayName: String?, description: String?, link: String
+            topic: String, displayName: String? = nil, description: String? = nil, link: String
         ) {
             self.topic = topic
             self.displayName = displayName
@@ -307,7 +307,7 @@ public enum AppBskyUnspeccedDefs {
         public let dids: [DID]
 
         public init(
-            topic: String, displayName: String, description: String?, link: String, startedAt: ATProtocolDate, postCount: Int, status: String?, category: String?, dids: [DID]
+            topic: String, displayName: String, description: String? = nil, link: String, startedAt: ATProtocolDate, postCount: Int, status: String? = nil, category: String? = nil, dids: [DID]
         ) {
             self.topic = topic
             self.displayName = displayName
@@ -515,7 +515,7 @@ public enum AppBskyUnspeccedDefs {
         public let actors: [AppBskyActorDefs.ProfileViewBasic]
 
         public init(
-            topic: String, displayName: String, description: String?, link: String, startedAt: ATProtocolDate, postCount: Int, status: String?, category: String?, actors: [AppBskyActorDefs.ProfileViewBasic]
+            topic: String, displayName: String, description: String? = nil, link: String, startedAt: ATProtocolDate, postCount: Int, status: String? = nil, category: String? = nil, actors: [AppBskyActorDefs.ProfileViewBasic]
         ) {
             self.topic = topic
             self.displayName = displayName
@@ -722,7 +722,7 @@ public enum AppBskyUnspeccedDefs {
         public let mutedByViewer: Bool
 
         public init(
-            post: AppBskyFeedDefs.PostView, moreParents: Bool, moreReplies: Int, opThread: Bool, opThreadPostIndex: Int?, opThreadPostCount: Int?, hiddenByThreadgate: Bool, mutedByViewer: Bool
+            post: AppBskyFeedDefs.PostView, moreParents: Bool, moreReplies: Int, opThread: Bool, opThreadPostIndex: Int? = nil, opThreadPostCount: Int? = nil, hiddenByThreadgate: Bool, mutedByViewer: Bool
         ) {
             self.post = post
             self.moreParents = moreParents
@@ -1026,7 +1026,7 @@ public enum AppBskyUnspeccedDefs {
         public let status: String
 
         public init(
-            lastInitiatedAt: ATProtocolDate?, status: String
+            lastInitiatedAt: ATProtocolDate? = nil, status: String
         ) {
             self.lastInitiatedAt = lastInitiatedAt
             self.status = status
@@ -1112,7 +1112,7 @@ public enum AppBskyUnspeccedDefs {
         public let completeUa: String?
 
         public init(
-            createdAt: ATProtocolDate, status: String, attemptId: String, email: String?, initIp: String?, initUa: String?, completeIp: String?, completeUa: String?
+            createdAt: ATProtocolDate, status: String, attemptId: String, email: String? = nil, initIp: String? = nil, initUa: String? = nil, completeIp: String? = nil, completeUa: String? = nil
         ) {
             self.createdAt = createdAt
             self.status = status

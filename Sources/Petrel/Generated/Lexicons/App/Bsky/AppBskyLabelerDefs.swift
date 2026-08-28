@@ -17,7 +17,7 @@ public enum AppBskyLabelerDefs {
         public let labels: [ComAtprotoLabelDefs.Label]?
 
         public init(
-            uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, likeCount: Int?, viewer: LabelerViewerState?, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?
+            uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, likeCount: Int? = nil, viewer: LabelerViewerState? = nil, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]? = nil
         ) {
             self.uri = uri
             self.cid = cid
@@ -197,7 +197,7 @@ public enum AppBskyLabelerDefs {
         public let subjectCollections: [NSID]?
 
         public init(
-            uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, policies: AppBskyLabelerDefs.LabelerPolicies, likeCount: Int?, viewer: LabelerViewerState?, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?, reasonTypes: [ComAtprotoModerationDefs.ReasonType]?, subjectTypes: [ComAtprotoModerationDefs.SubjectType]?, subjectCollections: [NSID]?
+            uri: ATProtocolURI, cid: CID, creator: AppBskyActorDefs.ProfileView, policies: AppBskyLabelerDefs.LabelerPolicies, likeCount: Int? = nil, viewer: LabelerViewerState? = nil, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]? = nil, reasonTypes: [ComAtprotoModerationDefs.ReasonType]? = nil, subjectTypes: [ComAtprotoModerationDefs.SubjectType]? = nil, subjectCollections: [NSID]? = nil
         ) {
             self.uri = uri
             self.cid = cid
@@ -451,7 +451,7 @@ public enum AppBskyLabelerDefs {
         public let like: ATProtocolURI?
 
         public init(
-            like: ATProtocolURI?
+            like: ATProtocolURI? = nil
         ) {
             self.like = like
         }
@@ -516,7 +516,7 @@ public enum AppBskyLabelerDefs {
         public let labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]?
 
         public init(
-            labelValues: [ComAtprotoLabelDefs.LabelValue], labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]?
+            labelValues: [ComAtprotoLabelDefs.LabelValue], labelValueDefinitions: [ComAtprotoLabelDefs.LabelValueDefinition]? = nil
         ) {
             self.labelValues = labelValues
             self.labelValueDefinitions = labelValueDefinitions

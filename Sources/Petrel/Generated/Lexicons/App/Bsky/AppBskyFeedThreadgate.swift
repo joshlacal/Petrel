@@ -10,7 +10,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
     public let createdAt: ATProtocolDate
     public let hiddenReplies: [ATProtocolURI]?
 
-    public init(post: ATProtocolURI, allow: [AppBskyFeedThreadgateAllowUnion]?, createdAt: ATProtocolDate, hiddenReplies: [ATProtocolURI]?) {
+    public init(post: ATProtocolURI, allow: [AppBskyFeedThreadgateAllowUnion]? = nil, createdAt: ATProtocolDate, hiddenReplies: [ATProtocolURI]? = nil) {
         self.post = post
         self.allow = allow
         self.createdAt = createdAt

@@ -15,7 +15,7 @@ public struct AppBskyFeedPost: ATProtocolCodable, ATProtocolValue {
     public let tags: [String]?
     public let createdAt: ATProtocolDate
 
-    public init(text: String, entities: [Entity]?, facets: [AppBskyRichtextFacet]?, reply: ReplyRef?, embed: AppBskyFeedPostEmbedUnion?, langs: [LanguageCodeContainer]?, labels: AppBskyFeedPostLabelsUnion?, tags: [String]?, createdAt: ATProtocolDate) {
+    public init(text: String, entities: [Entity]? = nil, facets: [AppBskyRichtextFacet]? = nil, reply: ReplyRef? = nil, embed: AppBskyFeedPostEmbedUnion? = nil, langs: [LanguageCodeContainer]? = nil, labels: AppBskyFeedPostLabelsUnion? = nil, tags: [String]? = nil, createdAt: ATProtocolDate) {
         self.text = text
         self.entities = entities
         self.facets = facets

@@ -11,7 +11,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
     public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
     public let presentation: String?
 
-    public init(video: Blob, captions: [Caption]?, alt: String?, aspectRatio: AppBskyEmbedDefs.AspectRatio?, presentation: String?) {
+    public init(video: Blob, captions: [Caption]? = nil, alt: String? = nil, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil, presentation: String? = nil) {
         self.video = video
         self.captions = captions
         self.alt = alt
@@ -198,7 +198,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         public let presentation: String?
 
         public init(
-            cid: CID, playlist: URI, thumbnail: URI?, alt: String?, aspectRatio: AppBskyEmbedDefs.AspectRatio?, presentation: String?
+            cid: CID, playlist: URI, thumbnail: URI? = nil, alt: String? = nil, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil, presentation: String? = nil
         ) {
             self.cid = cid
             self.playlist = playlist
