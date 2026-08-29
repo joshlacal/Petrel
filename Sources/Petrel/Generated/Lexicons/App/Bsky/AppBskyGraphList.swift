@@ -13,7 +13,7 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
     public let labels: AppBskyGraphListLabelsUnion?
     public let createdAt: ATProtocolDate
 
-    public init(purpose: AppBskyGraphDefs.ListPurpose, name: String, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: Blob?, labels: AppBskyGraphListLabelsUnion?, createdAt: ATProtocolDate) {
+    public init(purpose: AppBskyGraphDefs.ListPurpose, name: String, description: String? = nil, descriptionFacets: [AppBskyRichtextFacet]? = nil, avatar: Blob? = nil, labels: AppBskyGraphListLabelsUnion? = nil, createdAt: ATProtocolDate) {
         self.purpose = purpose
         self.name = name
         self.description = description

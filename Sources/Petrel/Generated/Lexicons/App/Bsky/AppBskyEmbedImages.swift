@@ -55,7 +55,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
 
         public init(
-            image: Blob, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio?
+            image: Blob, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil
         ) {
             self.image = image
             self.alt = alt
@@ -208,7 +208,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
 
         public init(
-            thumb: URI, fullsize: URI, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio?
+            thumb: URI, fullsize: URI, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil
         ) {
             self.thumb = thumb
             self.fullsize = fullsize

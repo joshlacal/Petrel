@@ -14,7 +14,7 @@ public enum ComAtprotoServerCreateAppPassword {
         public let privileged: Bool?
 
         public init(
-            name: String, password: String, createdAt: ATProtocolDate, privileged: Bool?
+            name: String, password: String, createdAt: ATProtocolDate, privileged: Bool? = nil
         ) {
             self.name = name
             self.password = password

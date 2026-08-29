@@ -12,7 +12,7 @@ public enum ComAtprotoModerationCreateReport {
         public let meta: ATProtocolValueContainer?
 
         public init(
-            name: String, meta: ATProtocolValueContainer?
+            name: String, meta: ATProtocolValueContainer? = nil
         ) {
             self.name = name
             self.meta = meta

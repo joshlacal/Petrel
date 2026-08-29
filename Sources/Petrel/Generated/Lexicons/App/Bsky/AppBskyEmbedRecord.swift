@@ -119,7 +119,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         public let indexedAt: ATProtocolDate
 
         public init(
-            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, value: ATProtocolValueContainer, labels: [ComAtprotoLabelDefs.Label]?, replyCount: Int?, repostCount: Int?, likeCount: Int?, quoteCount: Int?, embeds: [ViewRecordEmbedsUnion]?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, value: ATProtocolValueContainer, labels: [ComAtprotoLabelDefs.Label]? = nil, replyCount: Int? = nil, repostCount: Int? = nil, likeCount: Int? = nil, quoteCount: Int? = nil, embeds: [ViewRecordEmbedsUnion]? = nil, indexedAt: ATProtocolDate
         ) {
             self.uri = uri
             self.cid = cid

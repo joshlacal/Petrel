@@ -8,7 +8,7 @@ public struct SiteStandardGraphSubscription: ATProtocolCodable, ATProtocolValue 
     public let createdAt: ATProtocolDate?
     public let publication: ATProtocolURI
 
-    public init(createdAt: ATProtocolDate?, publication: ATProtocolURI) {
+    public init(createdAt: ATProtocolDate? = nil, publication: ATProtocolURI) {
         self.createdAt = createdAt
         self.publication = publication
     }

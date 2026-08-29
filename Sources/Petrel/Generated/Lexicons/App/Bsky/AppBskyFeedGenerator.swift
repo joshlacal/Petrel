@@ -15,7 +15,7 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
     public let contentMode: String?
     public let createdAt: ATProtocolDate
 
-    public init(did: DID, displayName: String, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: Blob?, acceptsInteractions: Bool?, labels: AppBskyFeedGeneratorLabelsUnion?, contentMode: String?, createdAt: ATProtocolDate) {
+    public init(did: DID, displayName: String, description: String? = nil, descriptionFacets: [AppBskyRichtextFacet]? = nil, avatar: Blob? = nil, acceptsInteractions: Bool? = nil, labels: AppBskyFeedGeneratorLabelsUnion? = nil, contentMode: String? = nil, createdAt: ATProtocolDate) {
         self.did = did
         self.displayName = displayName
         self.description = description

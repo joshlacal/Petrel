@@ -11,7 +11,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
     public let keyPackage: Bytes?
     public let continuityProofs: [Bytes]?
 
-    public init(version: String, currentKey: Bytes, messageMe: MessageMe?, keyPackage: Bytes?, continuityProofs: [Bytes]?) {
+    public init(version: String, currentKey: Bytes, messageMe: MessageMe? = nil, keyPackage: Bytes? = nil, continuityProofs: [Bytes]? = nil) {
         self.version = version
         self.currentKey = currentKey
         self.messageMe = messageMe

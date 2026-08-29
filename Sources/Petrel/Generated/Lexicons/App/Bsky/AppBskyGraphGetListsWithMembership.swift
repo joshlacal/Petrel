@@ -12,7 +12,7 @@ public enum AppBskyGraphGetListsWithMembership {
         public let listItem: AppBskyGraphDefs.ListItemView?
 
         public init(
-            list: AppBskyGraphDefs.ListView, listItem: AppBskyGraphDefs.ListItemView?
+            list: AppBskyGraphDefs.ListView, listItem: AppBskyGraphDefs.ListItemView? = nil
         ) {
             self.list = list
             self.listItem = listItem

@@ -88,7 +88,7 @@ public struct AppBskyDraftDefs {
         public let threadgateAllow: [DraftThreadgateAllowUnion]?
 
         public init(
-            deviceId: String?, deviceName: String?, posts: [DraftPost], langs: [LanguageCodeContainer]?, postgateEmbeddingRules: [DraftPostgateEmbeddingRulesUnion]?, threadgateAllow: [DraftThreadgateAllowUnion]?
+            deviceId: String? = nil, deviceName: String? = nil, posts: [DraftPost], langs: [LanguageCodeContainer]? = nil, postgateEmbeddingRules: [DraftPostgateEmbeddingRulesUnion]? = nil, threadgateAllow: [DraftThreadgateAllowUnion]? = nil
         ) {
             self.deviceId = deviceId
             self.deviceName = deviceName
@@ -265,7 +265,7 @@ public struct AppBskyDraftDefs {
         public let embedRecords: [DraftEmbedRecord]?
 
         public init(
-            text: String, labels: DraftPostLabelsUnion?, embedImages: [DraftEmbedImage]?, embedGallery: DraftEmbedGallery?, embedVideos: [DraftEmbedVideo]?, embedExternals: [DraftEmbedExternal]?, embedRecords: [DraftEmbedRecord]?
+            text: String, labels: DraftPostLabelsUnion? = nil, embedImages: [DraftEmbedImage]? = nil, embedGallery: DraftEmbedGallery? = nil, embedVideos: [DraftEmbedVideo]? = nil, embedExternals: [DraftEmbedExternal]? = nil, embedRecords: [DraftEmbedRecord]? = nil
         ) {
             self.text = text
             self.labels = labels
@@ -748,7 +748,7 @@ public struct AppBskyDraftDefs {
         public let alt: String?
 
         public init(
-            localRef: DraftEmbedLocalRef, alt: String?
+            localRef: DraftEmbedLocalRef, alt: String? = nil
         ) {
             self.localRef = localRef
             self.alt = alt
@@ -829,7 +829,7 @@ public struct AppBskyDraftDefs {
         public let captions: [DraftEmbedCaption]?
 
         public init(
-            localRef: DraftEmbedLocalRef, alt: String?, captions: [DraftEmbedCaption]?
+            localRef: DraftEmbedLocalRef, alt: String? = nil, captions: [DraftEmbedCaption]? = nil
         ) {
             self.localRef = localRef
             self.alt = alt

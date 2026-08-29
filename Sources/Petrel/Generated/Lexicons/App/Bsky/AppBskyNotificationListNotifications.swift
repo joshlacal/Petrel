@@ -20,7 +20,7 @@ public enum AppBskyNotificationListNotifications {
         public let labels: [ComAtprotoLabelDefs.Label]?
 
         public init(
-            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileView, reason: String, reasonSubject: ATProtocolURI?, record: ATProtocolValueContainer, starterPack: AppBskyGraphDefs.StarterPackViewBasic?, isRead: Bool, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]?
+            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileView, reason: String, reasonSubject: ATProtocolURI? = nil, record: ATProtocolValueContainer, starterPack: AppBskyGraphDefs.StarterPackViewBasic? = nil, isRead: Bool, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]? = nil
         ) {
             self.uri = uri
             self.cid = cid

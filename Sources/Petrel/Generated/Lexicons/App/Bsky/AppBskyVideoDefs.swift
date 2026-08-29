@@ -18,7 +18,7 @@ public enum AppBskyVideoDefs {
         public let message: String?
 
         public init(
-            jobId: String, did: DID, state: String, progress: Int?, blob: Blob?, error: String?, failureCode: String?, message: String?
+            jobId: String, did: DID, state: String, progress: Int? = nil, blob: Blob? = nil, error: String? = nil, failureCode: String? = nil, message: String? = nil
         ) {
             self.jobId = jobId
             self.did = did

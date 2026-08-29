@@ -19,7 +19,7 @@ public enum ComAtprotoLabelDefs {
         public let sig: Bytes?
 
         public init(
-            ver: Int?, src: DID, uri: URI, cid: CID?, val: String, neg: Bool?, cts: ATProtocolDate, exp: ATProtocolDate?, sig: Bytes?
+            ver: Int? = nil, src: DID, uri: URI, cid: CID? = nil, val: String, neg: Bool? = nil, cts: ATProtocolDate, exp: ATProtocolDate? = nil, sig: Bytes? = nil
         ) {
             self.ver = ver
             self.src = src
@@ -352,7 +352,7 @@ public enum ComAtprotoLabelDefs {
         public let locales: [LabelValueDefinitionStrings]
 
         public init(
-            identifier: String, severity: String, blurs: String, defaultSetting: String?, adultOnly: Bool?, locales: [LabelValueDefinitionStrings]
+            identifier: String, severity: String, blurs: String, defaultSetting: String? = nil, adultOnly: Bool? = nil, locales: [LabelValueDefinitionStrings]
         ) {
             self.identifier = identifier
             self.severity = severity

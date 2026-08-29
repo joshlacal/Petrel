@@ -25,7 +25,7 @@ public enum AppBskyFeedDefs {
         public let debug: ATProtocolValueContainer?
 
         public init(
-            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, record: ATProtocolValueContainer, embed: PostViewEmbedUnion?, bookmarkCount: Int?, replyCount: Int?, repostCount: Int?, likeCount: Int?, quoteCount: Int?, indexedAt: ATProtocolDate, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, threadgate: ThreadgateView?, debug: ATProtocolValueContainer?
+            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, record: ATProtocolValueContainer, embed: PostViewEmbedUnion? = nil, bookmarkCount: Int? = nil, replyCount: Int? = nil, repostCount: Int? = nil, likeCount: Int? = nil, quoteCount: Int? = nil, indexedAt: ATProtocolDate, viewer: ViewerState? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, threadgate: ThreadgateView? = nil, debug: ATProtocolValueContainer? = nil
         ) {
             self.uri = uri
             self.cid = cid
@@ -378,7 +378,7 @@ public enum AppBskyFeedDefs {
         public let knownLikers: KnownLikers?
 
         public init(
-            repost: ATProtocolURI?, like: ATProtocolURI?, bookmarked: Bool?, threadMuted: Bool?, replyDisabled: Bool?, embeddingDisabled: Bool?, pinned: Bool?, knownLikers: KnownLikers?
+            repost: ATProtocolURI? = nil, like: ATProtocolURI? = nil, bookmarked: Bool? = nil, threadMuted: Bool? = nil, replyDisabled: Bool? = nil, embeddingDisabled: Bool? = nil, pinned: Bool? = nil, knownLikers: KnownLikers? = nil
         ) {
             self.repost = repost
             self.like = like
@@ -675,7 +675,7 @@ public enum AppBskyFeedDefs {
         public let rootAuthorLike: ATProtocolURI?
 
         public init(
-            rootAuthorLike: ATProtocolURI?
+            rootAuthorLike: ATProtocolURI? = nil
         ) {
             self.rootAuthorLike = rootAuthorLike
         }
@@ -743,7 +743,7 @@ public enum AppBskyFeedDefs {
         public let reqId: String?
 
         public init(
-            post: PostView, reply: ReplyRef?, reason: FeedViewPostReasonUnion?, feedContext: String?, reqId: String?
+            post: PostView, reply: ReplyRef? = nil, reason: FeedViewPostReasonUnion? = nil, feedContext: String? = nil, reqId: String? = nil
         ) {
             self.post = post
             self.reply = reply
@@ -893,7 +893,7 @@ public enum AppBskyFeedDefs {
         public let grandparentAuthor: AppBskyActorDefs.ProfileViewBasic?
 
         public init(
-            root: ReplyRefRootUnion, parent: ReplyRefParentUnion, grandparentAuthor: AppBskyActorDefs.ProfileViewBasic?
+            root: ReplyRefRootUnion, parent: ReplyRefParentUnion, grandparentAuthor: AppBskyActorDefs.ProfileViewBasic? = nil
         ) {
             self.root = root
             self.parent = parent
@@ -990,7 +990,7 @@ public enum AppBskyFeedDefs {
         public let indexedAt: ATProtocolDate
 
         public init(
-            by: AppBskyActorDefs.ProfileViewBasic, uri: ATProtocolURI?, cid: CID?, indexedAt: ATProtocolDate
+            by: AppBskyActorDefs.ProfileViewBasic, uri: ATProtocolURI? = nil, cid: CID? = nil, indexedAt: ATProtocolDate
         ) {
             self.by = by
             self.uri = uri
@@ -1145,7 +1145,7 @@ public enum AppBskyFeedDefs {
         public let threadContext: ThreadContext?
 
         public init(
-            post: PostView, parent: ThreadViewPostParentUnion?, replies: [ThreadViewPostRepliesUnion]?, threadContext: ThreadContext?
+            post: PostView, parent: ThreadViewPostParentUnion? = nil, replies: [ThreadViewPostRepliesUnion]? = nil, threadContext: ThreadContext? = nil
         ) {
             self.post = post
             self.parent = parent
@@ -1431,7 +1431,7 @@ public enum AppBskyFeedDefs {
         public let viewer: AppBskyActorDefs.ViewerState?
 
         public init(
-            did: DID, viewer: AppBskyActorDefs.ViewerState?
+            did: DID, viewer: AppBskyActorDefs.ViewerState? = nil
         ) {
             self.did = did
             self.viewer = viewer
@@ -1523,7 +1523,7 @@ public enum AppBskyFeedDefs {
         public let indexedAt: ATProtocolDate
 
         public init(
-            uri: ATProtocolURI, cid: CID, did: DID, creator: AppBskyActorDefs.ProfileView, displayName: String, description: String?, descriptionFacets: [AppBskyRichtextFacet]?, avatar: URI?, likeCount: Int?, acceptsInteractions: Bool?, labels: [ComAtprotoLabelDefs.Label]?, viewer: GeneratorViewerState?, contentMode: String?, indexedAt: ATProtocolDate
+            uri: ATProtocolURI, cid: CID, did: DID, creator: AppBskyActorDefs.ProfileView, displayName: String, description: String? = nil, descriptionFacets: [AppBskyRichtextFacet]? = nil, avatar: URI? = nil, likeCount: Int? = nil, acceptsInteractions: Bool? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, viewer: GeneratorViewerState? = nil, contentMode: String? = nil, indexedAt: ATProtocolDate
         ) {
             self.uri = uri
             self.cid = cid
@@ -1838,7 +1838,7 @@ public enum AppBskyFeedDefs {
         public let like: ATProtocolURI?
 
         public init(
-            like: ATProtocolURI?
+            like: ATProtocolURI? = nil
         ) {
             self.like = like
         }
@@ -1904,7 +1904,7 @@ public enum AppBskyFeedDefs {
         public let feedContext: String?
 
         public init(
-            post: ATProtocolURI, reason: SkeletonFeedPostReasonUnion?, feedContext: String?
+            post: ATProtocolURI, reason: SkeletonFeedPostReasonUnion? = nil, feedContext: String? = nil
         ) {
             self.post = post
             self.reason = reason
@@ -2100,7 +2100,7 @@ public enum AppBskyFeedDefs {
         public let lists: [AppBskyGraphDefs.ListViewBasic]?
 
         public init(
-            uri: ATProtocolURI?, cid: CID?, record: ATProtocolValueContainer?, lists: [AppBskyGraphDefs.ListViewBasic]?
+            uri: ATProtocolURI? = nil, cid: CID? = nil, record: ATProtocolValueContainer? = nil, lists: [AppBskyGraphDefs.ListViewBasic]? = nil
         ) {
             self.uri = uri
             self.cid = cid
@@ -2236,7 +2236,7 @@ public enum AppBskyFeedDefs {
         public let reqId: String?
 
         public init(
-            item: ATProtocolURI?, event: String?, feedContext: String?, reqId: String?
+            item: ATProtocolURI? = nil, event: String? = nil, feedContext: String? = nil, reqId: String? = nil
         ) {
             self.item = item
             self.event = event

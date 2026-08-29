@@ -15,7 +15,7 @@ public enum ComAtprotoSyncListRepos {
         public let status: String?
 
         public init(
-            did: DID, head: CID, rev: TID, active: Bool?, status: String?
+            did: DID, head: CID, rev: TID, active: Bool? = nil, status: String? = nil
         ) {
             self.did = did
             self.head = head

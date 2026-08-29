@@ -14,7 +14,7 @@ public enum ComAtprotoSyncListHosts {
         public let status: ComAtprotoSyncDefs.HostStatus?
 
         public init(
-            hostname: String, seq: Int?, accountCount: Int?, status: ComAtprotoSyncDefs.HostStatus?
+            hostname: String, seq: Int? = nil, accountCount: Int? = nil, status: ComAtprotoSyncDefs.HostStatus? = nil
         ) {
             self.hostname = hostname
             self.seq = seq

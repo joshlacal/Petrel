@@ -140,7 +140,7 @@ public enum ChatBskyGroupDefs {
         public let viewer: JoinLinkViewerState?
 
         public init(
-            convoId: String, code: String, name: String, owner: ChatBskyActorDefs.ProfileViewBasic, memberCount: Int, memberLimit: Int, requireApproval: Bool, joinRule: JoinRule, convo: ChatBskyConvoDefs.ConvoView?, viewer: JoinLinkViewerState?
+            convoId: String, code: String, name: String, owner: ChatBskyActorDefs.ProfileViewBasic, memberCount: Int, memberLimit: Int, requireApproval: Bool, joinRule: JoinRule, convo: ChatBskyConvoDefs.ConvoView? = nil, viewer: JoinLinkViewerState? = nil
         ) {
             self.convoId = convoId
             self.code = code
@@ -459,7 +459,7 @@ public enum ChatBskyGroupDefs {
         public let requestedAt: ATProtocolDate?
 
         public init(
-            requestedAt: ATProtocolDate?
+            requestedAt: ATProtocolDate? = nil
         ) {
             self.requestedAt = requestedAt
         }

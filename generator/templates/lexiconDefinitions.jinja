@@ -20,7 +20,7 @@
 
         public init(
             {% for prop in def_schema.properties -%}
-            {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
+            {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% if prop.wire_optional %} = nil{% endif %}{% endif %}{% if not loop.last %}, {% endif %}
             {%- endfor %}
         ) {
             {%- for prop in def_schema.properties %}
@@ -323,7 +323,7 @@
             {%- endfor %}
 
             public init({% for prop in sub_struct.properties -%}
-                {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}{% if not loop.last %}, {% endif %}
+                {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% if prop.wire_optional %} = nil{% endif %}{% endif %}{% if not loop.last %}, {% endif %}
             {%- endfor %}) {
                 {%- for prop in sub_struct.properties %}
                 self.{{ prop.name|sanitizeKeyword }} = {{ prop.name|sanitizeKeyword }}

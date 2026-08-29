@@ -10,7 +10,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
     public let detachedEmbeddingUris: [ATProtocolURI]?
     public let embeddingRules: [AppBskyFeedPostgateEmbeddingRulesUnion]?
 
-    public init(createdAt: ATProtocolDate, post: ATProtocolURI, detachedEmbeddingUris: [ATProtocolURI]?, embeddingRules: [AppBskyFeedPostgateEmbeddingRulesUnion]?) {
+    public init(createdAt: ATProtocolDate, post: ATProtocolURI, detachedEmbeddingUris: [ATProtocolURI]? = nil, embeddingRules: [AppBskyFeedPostgateEmbeddingRulesUnion]? = nil) {
         self.createdAt = createdAt
         self.post = post
         self.detachedEmbeddingUris = detachedEmbeddingUris

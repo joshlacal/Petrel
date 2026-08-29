@@ -8,7 +8,7 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
     public let allowIncoming: String
     public let allowGroupInvites: String?
 
-    public init(allowIncoming: String, allowGroupInvites: String?) {
+    public init(allowIncoming: String, allowGroupInvites: String? = nil) {
         self.allowIncoming = allowIncoming
         self.allowGroupInvites = allowGroupInvites
     }

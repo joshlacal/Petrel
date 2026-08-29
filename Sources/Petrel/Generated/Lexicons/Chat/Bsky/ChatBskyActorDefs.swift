@@ -21,7 +21,7 @@ public enum ChatBskyActorDefs {
         public let kind: ProfileViewBasicKindUnion?
 
         public init(
-            did: DID, handle: Handle, displayName: String?, avatar: URI?, associated: AppBskyActorDefs.ProfileAssociated?, viewer: AppBskyActorDefs.ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, createdAt: ATProtocolDate?, chatDisabled: Bool?, verification: AppBskyActorDefs.VerificationState?, kind: ProfileViewBasicKindUnion?
+            did: DID, handle: Handle, displayName: String? = nil, avatar: URI? = nil, associated: AppBskyActorDefs.ProfileAssociated? = nil, viewer: AppBskyActorDefs.ViewerState? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, createdAt: ATProtocolDate? = nil, chatDisabled: Bool? = nil, verification: AppBskyActorDefs.VerificationState? = nil, kind: ProfileViewBasicKindUnion? = nil
         ) {
             self.did = did
             self.handle = handle
@@ -335,7 +335,7 @@ public enum ChatBskyActorDefs {
         public let role: MemberRole
 
         public init(
-            addedBy: ProfileViewBasic?, role: MemberRole
+            addedBy: ProfileViewBasic? = nil, role: MemberRole
         ) {
             self.addedBy = addedBy
             self.role = role

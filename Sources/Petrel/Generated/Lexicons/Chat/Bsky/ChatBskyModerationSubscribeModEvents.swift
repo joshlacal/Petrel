@@ -16,7 +16,7 @@ public enum ChatBskyModerationSubscribeModEvents {
         public let user: DID
 
         public init(
-            convoId: String, createdAt: ATProtocolDate, messageId: String?, recipients: [DID], rev: String, user: DID
+            convoId: String, createdAt: ATProtocolDate, messageId: String? = nil, recipients: [DID], rev: String, user: DID
         ) {
             self.convoId = convoId
             self.createdAt = createdAt
@@ -1331,7 +1331,7 @@ public enum ChatBskyModerationSubscribeModEvents {
         public let rev: String
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int?, groupName: String?, method: String, ownerDid: DID?, rev: String
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int? = nil, groupName: String? = nil, method: String, ownerDid: DID? = nil, rev: String
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -1745,7 +1745,7 @@ public enum ChatBskyModerationSubscribeModEvents {
         public let updateType: String
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, joinLinkCode: String?, joinLinkFollowersOnly: Bool?, joinLinkRequiresApproval: Bool?, lockReason: String?, newName: String?, oldName: String?, ownerDid: DID, rev: String, updateType: String
+            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, joinLinkCode: String? = nil, joinLinkFollowersOnly: Bool? = nil, joinLinkRequiresApproval: Bool? = nil, lockReason: String? = nil, newName: String? = nil, oldName: String? = nil, ownerDid: DID, rev: String, updateType: String
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt

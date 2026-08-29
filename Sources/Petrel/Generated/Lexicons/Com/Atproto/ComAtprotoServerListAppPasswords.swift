@@ -13,7 +13,7 @@ public enum ComAtprotoServerListAppPasswords {
         public let privileged: Bool?
 
         public init(
-            name: String, createdAt: ATProtocolDate, privileged: Bool?
+            name: String, createdAt: ATProtocolDate, privileged: Bool? = nil
         ) {
             self.name = name
             self.createdAt = createdAt

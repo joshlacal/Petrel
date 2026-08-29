@@ -13,7 +13,7 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
     public let preferences: Preferences?
     public let url: URI
 
-    public init(basicTheme: SiteStandardThemeBasic?, description: String?, icon: Blob?, labels: SiteStandardPublicationLabelsUnion?, name: String, preferences: Preferences?, url: URI) {
+    public init(basicTheme: SiteStandardThemeBasic? = nil, description: String? = nil, icon: Blob? = nil, labels: SiteStandardPublicationLabelsUnion? = nil, name: String, preferences: Preferences? = nil, url: URI) {
         self.basicTheme = basicTheme
         self.description = description
         self.icon = icon
@@ -182,7 +182,7 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
         public let showInDiscover: Bool?
 
         public init(
-            showInDiscover: Bool?
+            showInDiscover: Bool? = nil
         ) {
             self.showInDiscover = showInDiscover
         }

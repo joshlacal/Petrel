@@ -9,7 +9,7 @@ public struct AppBskyFeedLike: ATProtocolCodable, ATProtocolValue {
     public let createdAt: ATProtocolDate
     public let via: ComAtprotoRepoStrongRef?
 
-    public init(subject: ComAtprotoRepoStrongRef, createdAt: ATProtocolDate, via: ComAtprotoRepoStrongRef?) {
+    public init(subject: ComAtprotoRepoStrongRef, createdAt: ATProtocolDate, via: ComAtprotoRepoStrongRef? = nil) {
         self.subject = subject
         self.createdAt = createdAt
         self.via = via

@@ -16,7 +16,7 @@ public enum ComAtprotoSpaceListRepoOps {
         public let value: ATProtocolValueContainer?
 
         public init(
-            rev: TID, collection: NSID, rkey: RecordKey, cid: CID?, prev: CID?, value: ATProtocolValueContainer?
+            rev: TID, collection: NSID, rkey: RecordKey, cid: CID?, prev: CID?, value: ATProtocolValueContainer? = nil
         ) {
             self.rev = rev
             self.collection = collection

@@ -13,7 +13,7 @@ public enum ComAtprotoRepoApplyWrites {
         public let value: ATProtocolValueContainer
 
         public init(
-            collection: NSID, rkey: RecordKey?, value: ATProtocolValueContainer
+            collection: NSID, rkey: RecordKey? = nil, value: ATProtocolValueContainer
         ) {
             self.collection = collection
             self.rkey = rkey
@@ -269,7 +269,7 @@ public enum ComAtprotoRepoApplyWrites {
         public let validationStatus: String?
 
         public init(
-            uri: ATProtocolURI, cid: CID, validationStatus: String?
+            uri: ATProtocolURI, cid: CID, validationStatus: String? = nil
         ) {
             self.uri = uri
             self.cid = cid
@@ -365,7 +365,7 @@ public enum ComAtprotoRepoApplyWrites {
         public let validationStatus: String?
 
         public init(
-            uri: ATProtocolURI, cid: CID, validationStatus: String?
+            uri: ATProtocolURI, cid: CID, validationStatus: String? = nil
         ) {
             self.uri = uri
             self.cid = cid

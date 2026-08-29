@@ -22,7 +22,7 @@ public struct AppBskyActorDefs {
         public let debug: ATProtocolValueContainer?
 
         public init(
-            did: DID, handle: Handle, displayName: String?, pronouns: String?, avatar: URI?, associated: ProfileAssociated?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, createdAt: ATProtocolDate?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
+            did: DID, handle: Handle, displayName: String? = nil, pronouns: String? = nil, avatar: URI? = nil, associated: ProfileAssociated? = nil, viewer: ViewerState? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, createdAt: ATProtocolDate? = nil, verification: VerificationState? = nil, status: StatusView? = nil, debug: ATProtocolValueContainer? = nil
         ) {
             self.did = did
             self.handle = handle
@@ -336,7 +336,7 @@ public struct AppBskyActorDefs {
         public let debug: ATProtocolValueContainer?
 
         public init(
-            did: DID, handle: Handle, displayName: String?, pronouns: String?, description: String?, avatar: URI?, associated: ProfileAssociated?, indexedAt: ATProtocolDate?, createdAt: ATProtocolDate?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
+            did: DID, handle: Handle, displayName: String? = nil, pronouns: String? = nil, description: String? = nil, avatar: URI? = nil, associated: ProfileAssociated? = nil, indexedAt: ATProtocolDate? = nil, createdAt: ATProtocolDate? = nil, viewer: ViewerState? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, verification: VerificationState? = nil, status: StatusView? = nil, debug: ATProtocolValueContainer? = nil
         ) {
             self.did = did
             self.handle = handle
@@ -703,7 +703,7 @@ public struct AppBskyActorDefs {
         public let debug: ATProtocolValueContainer?
 
         public init(
-            did: DID, handle: Handle, displayName: String?, description: String?, pronouns: String?, website: URI?, avatar: URI?, banner: URI?, followersCount: Int?, followsCount: Int?, postsCount: Int?, associated: ProfileAssociated?, joinedViaStarterPack: AppBskyGraphDefs.StarterPackViewBasic?, indexedAt: ATProtocolDate?, createdAt: ATProtocolDate?, viewer: ViewerState?, labels: [ComAtprotoLabelDefs.Label]?, pinnedPost: ComAtprotoRepoStrongRef?, verification: VerificationState?, status: StatusView?, debug: ATProtocolValueContainer?
+            did: DID, handle: Handle, displayName: String? = nil, description: String? = nil, pronouns: String? = nil, website: URI? = nil, avatar: URI? = nil, banner: URI? = nil, followersCount: Int? = nil, followsCount: Int? = nil, postsCount: Int? = nil, associated: ProfileAssociated? = nil, joinedViaStarterPack: AppBskyGraphDefs.StarterPackViewBasic? = nil, indexedAt: ATProtocolDate? = nil, createdAt: ATProtocolDate? = nil, viewer: ViewerState? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, pinnedPost: ComAtprotoRepoStrongRef? = nil, verification: VerificationState? = nil, status: StatusView? = nil, debug: ATProtocolValueContainer? = nil
         ) {
             self.did = did
             self.handle = handle
@@ -1217,7 +1217,7 @@ public struct AppBskyActorDefs {
         public let germ: ProfileAssociatedGerm?
 
         public init(
-            lists: Int?, feedgens: Int?, starterPacks: Int?, labeler: Bool?, chat: ProfileAssociatedChat?, activitySubscription: ProfileAssociatedActivitySubscription?, germ: ProfileAssociatedGerm?
+            lists: Int? = nil, feedgens: Int? = nil, starterPacks: Int? = nil, labeler: Bool? = nil, chat: ProfileAssociatedChat? = nil, activitySubscription: ProfileAssociatedActivitySubscription? = nil, germ: ProfileAssociatedGerm? = nil
         ) {
             self.lists = lists
             self.feedgens = feedgens
@@ -1420,7 +1420,7 @@ public struct AppBskyActorDefs {
         public let allowGroupInvites: String?
 
         public init(
-            allowIncoming: String, allowGroupInvites: String?
+            allowIncoming: String, allowGroupInvites: String? = nil
         ) {
             self.allowIncoming = allowIncoming
             self.allowGroupInvites = allowGroupInvites
@@ -1637,7 +1637,7 @@ public struct AppBskyActorDefs {
         public let activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
 
         public init(
-            muted: Bool?, mutedOnlyReposts: Bool?, mutedOnlyQuoteposts: Bool?, mutedByList: AppBskyGraphDefs.ListViewBasic?, blockedBy: Bool?, blocking: ATProtocolURI?, blockingByList: AppBskyGraphDefs.ListViewBasic?, following: ATProtocolURI?, followedBy: ATProtocolURI?, knownFollowers: KnownFollowers?, activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
+            muted: Bool? = nil, mutedOnlyReposts: Bool? = nil, mutedOnlyQuoteposts: Bool? = nil, mutedByList: AppBskyGraphDefs.ListViewBasic? = nil, blockedBy: Bool? = nil, blocking: ATProtocolURI? = nil, blockingByList: AppBskyGraphDefs.ListViewBasic? = nil, following: ATProtocolURI? = nil, followedBy: ATProtocolURI? = nil, knownFollowers: KnownFollowers? = nil, activitySubscription: AppBskyNotificationDefs.ActivitySubscription? = nil
         ) {
             self.muted = muted
             self.mutedOnlyReposts = mutedOnlyReposts
@@ -2101,7 +2101,7 @@ public struct AppBskyActorDefs {
         public let createdAt: ATProtocolDate
 
         public init(
-            issuer: DID, issuerDisplayName: String?, issuerHandle: Handle?, uri: ATProtocolURI, isValid: Bool, createdAt: ATProtocolDate
+            issuer: DID, issuerDisplayName: String? = nil, issuerHandle: Handle? = nil, uri: ATProtocolURI, isValid: Bool, createdAt: ATProtocolDate
         ) {
             self.issuer = issuer
             self.issuerDisplayName = issuerDisplayName
@@ -2306,7 +2306,7 @@ public struct AppBskyActorDefs {
         public let visibility: String
 
         public init(
-            labelerDid: DID?, label: String, visibility: String
+            labelerDid: DID? = nil, label: String, visibility: String
         ) {
             self.labelerDid = labelerDid
             self.label = label
@@ -2562,7 +2562,7 @@ public struct AppBskyActorDefs {
         public let timelineIndex: Int?
 
         public init(
-            pinned: [ATProtocolURI], saved: [ATProtocolURI], timelineIndex: Int?
+            pinned: [ATProtocolURI], saved: [ATProtocolURI], timelineIndex: Int? = nil
         ) {
             self.pinned = pinned
             self.saved = saved
@@ -2656,7 +2656,7 @@ public struct AppBskyActorDefs {
         public let birthDate: ATProtocolDate?
 
         public init(
-            birthDate: ATProtocolDate?
+            birthDate: ATProtocolDate? = nil
         ) {
             self.birthDate = birthDate
         }
@@ -2722,7 +2722,7 @@ public struct AppBskyActorDefs {
         public let isOverAge18: Bool?
 
         public init(
-            isOverAge13: Bool?, isOverAge16: Bool?, isOverAge18: Bool?
+            isOverAge13: Bool? = nil, isOverAge16: Bool? = nil, isOverAge18: Bool? = nil
         ) {
             self.isOverAge13 = isOverAge13
             self.isOverAge16 = isOverAge16
@@ -2837,7 +2837,7 @@ public struct AppBskyActorDefs {
         public let hideQuotePosts: Bool?
 
         public init(
-            feed: String, hideReplies: Bool?, hideRepliesByUnfollowed: Bool?, hideRepliesByLikeCount: Int?, hideReposts: Bool?, hideQuotePosts: Bool?
+            feed: String, hideReplies: Bool? = nil, hideRepliesByUnfollowed: Bool? = nil, hideRepliesByLikeCount: Int? = nil, hideReposts: Bool? = nil, hideQuotePosts: Bool? = nil
         ) {
             self.feed = feed
             self.hideReplies = hideReplies
@@ -3008,7 +3008,7 @@ public struct AppBskyActorDefs {
         public let sort: String?
 
         public init(
-            sort: String?
+            sort: String? = nil
         ) {
             self.sort = sort
         }
@@ -3132,7 +3132,7 @@ public struct AppBskyActorDefs {
         public let expiresAt: ATProtocolDate?
 
         public init(
-            id: String?, value: String, targets: [AppBskyActorDefs.MutedWordTarget], actorTarget: String?, expiresAt: ATProtocolDate?
+            id: String? = nil, value: String, targets: [AppBskyActorDefs.MutedWordTarget], actorTarget: String? = nil, expiresAt: ATProtocolDate? = nil
         ) {
             self.id = id
             self.value = value
@@ -3499,7 +3499,7 @@ public struct AppBskyActorDefs {
         public let nuxs: [AppBskyActorDefs.Nux]?
 
         public init(
-            activeProgressGuide: BskyAppProgressGuide?, isBetaUser: Bool?, queuedNudges: [String]?, nuxs: [AppBskyActorDefs.Nux]?
+            activeProgressGuide: BskyAppProgressGuide? = nil, isBetaUser: Bool? = nil, queuedNudges: [String]? = nil, nuxs: [AppBskyActorDefs.Nux]? = nil
         ) {
             self.activeProgressGuide = activeProgressGuide
             self.isBetaUser = isBetaUser
@@ -3691,7 +3691,7 @@ public struct AppBskyActorDefs {
         public let expiresAt: ATProtocolDate?
 
         public init(
-            id: String, completed: Bool, data: String?, expiresAt: ATProtocolDate?
+            id: String, completed: Bool, data: String? = nil, expiresAt: ATProtocolDate? = nil
         ) {
             self.id = id
             self.completed = completed
@@ -3808,7 +3808,7 @@ public struct AppBskyActorDefs {
         public let hideBadges: Bool?
 
         public init(
-            hideBadges: Bool?
+            hideBadges: Bool? = nil
         ) {
             self.hideBadges = hideBadges
         }
@@ -3873,7 +3873,7 @@ public struct AppBskyActorDefs {
         public let hideAllFeeds: Bool?
 
         public init(
-            hiddenFeedIds: [String]?, hideAllFeeds: Bool?
+            hiddenFeedIds: [String]? = nil, hideAllFeeds: Bool? = nil
         ) {
             self.hiddenFeedIds = hiddenFeedIds
             self.hideAllFeeds = hideAllFeeds
@@ -3961,7 +3961,7 @@ public struct AppBskyActorDefs {
         public let postgateEmbeddingRules: [PostInteractionSettingsPrefPostgateEmbeddingRulesUnion]?
 
         public init(
-            threadgateAllowRules: [PostInteractionSettingsPrefThreadgateAllowRulesUnion]?, postgateEmbeddingRules: [PostInteractionSettingsPrefPostgateEmbeddingRulesUnion]?
+            threadgateAllowRules: [PostInteractionSettingsPrefThreadgateAllowRulesUnion]? = nil, postgateEmbeddingRules: [PostInteractionSettingsPrefPostgateEmbeddingRulesUnion]? = nil
         ) {
             self.threadgateAllowRules = threadgateAllowRules
             self.postgateEmbeddingRules = postgateEmbeddingRules
@@ -4056,7 +4056,7 @@ public struct AppBskyActorDefs {
         public let isDisabled: Bool?
 
         public init(
-            uri: ATProtocolURI?, cid: CID?, status: String, record: ATProtocolValueContainer, embed: StatusViewEmbedUnion?, labels: [ComAtprotoLabelDefs.Label]?, expiresAt: ATProtocolDate?, isActive: Bool?, isDisabled: Bool?
+            uri: ATProtocolURI? = nil, cid: CID? = nil, status: String, record: ATProtocolValueContainer, embed: StatusViewEmbedUnion? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, expiresAt: ATProtocolDate? = nil, isActive: Bool? = nil, isDisabled: Bool? = nil
         ) {
             self.uri = uri
             self.cid = cid
