@@ -37,6 +37,9 @@ struct ServerConfigTests {
     #expect(config.deniedJkts.isEmpty)
     #expect(config.clientMetadata == nil)
     #expect(config.rateLimit == nil)
+    #expect(config.replayCapacity == 50_000)
+    #expect(config.deviceCapacity == 10_000)
+    #expect(config.rateLimitCapacity == 10_000)
   }
 
   @Test("Environment variables override file values")
@@ -62,6 +65,9 @@ struct ServerConfigTests {
         "CAB_ALLOWED_ORIGINS": "https://a.example,https://b.example",
         "CAB_REQUIRE_NONCE": "true",
         "CAB_DENIED_JKTS": "badjkt1,badjkt2",
+        "CAB_REPLAY_CAPACITY": "12345",
+        "CAB_DEVICE_CAPACITY": "6789",
+        "CAB_RATE_LIMIT_CAPACITY": "4321",
       ]
     )
     #expect(config.clientId == "https://env.example/meta.json")
@@ -71,6 +77,9 @@ struct ServerConfigTests {
     #expect(config.allowedOrigins == ["https://a.example", "https://b.example"])
     #expect(config.requireNonce == true)
     #expect(config.deniedJkts == ["badjkt1", "badjkt2"])
+    #expect(config.replayCapacity == 12345)
+    #expect(config.deviceCapacity == 6789)
+    #expect(config.rateLimitCapacity == 4321)
   }
 
   @Test("Env-only configuration works without a file")
@@ -185,5 +194,183 @@ struct ServerConfigTests {
     )
     let config = try ServerConfig.load(path: loopbackPath, environment: [:])
     #expect(config.publicUrl == "http://127.0.0.1:8080")
+  }
+
+  @Test("Validation rejects non-positive or out-of-range bounds with specific error details")
+  func rejectsInvalidBounds() throws {
+    // replay_capacity == 0
+    let path0 = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "replay_capacity": 0
+      }
+      """
+    )
+    #expect(throws: ConfigError.invalidValue(field: "replay_capacity", value: "0")) {
+      _ = try ServerConfig.load(path: path0, environment: [:])
+    }
+
+    // replay_capacity < 0
+    let pathNegReplay = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "replay_capacity": -1
+      }
+      """
+    )
+    #expect(throws: ConfigError.invalidValue(field: "replay_capacity", value: "-1")) {
+      _ = try ServerConfig.load(path: pathNegReplay, environment: [:])
+    }
+
+    // device_capacity == 0
+    let pathDevice0 = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "device_capacity": 0
+      }
+      """
+    )
+    #expect(throws: ConfigError.invalidValue(field: "device_capacity", value: "0")) {
+      _ = try ServerConfig.load(path: pathDevice0, environment: [:])
+    }
+
+    // device_capacity < 0
+    let pathNegDevice = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "device_capacity": -5
+      }
+      """
+    )
+    #expect(throws: ConfigError.invalidValue(field: "device_capacity", value: "-5")) {
+      _ = try ServerConfig.load(path: pathNegDevice, environment: [:])
+    }
+
+    // rate_limit_capacity == 0
+    let pathRL0 = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "rate_limit_capacity": 0
+      }
+      """
+    )
+    #expect(throws: ConfigError.invalidValue(field: "rate_limit_capacity", value: "0")) {
+      _ = try ServerConfig.load(path: pathRL0, environment: [:])
+    }
+
+    // rate_limit_capacity < 0
+    let pathNegRL = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "rate_limit_capacity": -10
+      }
+      """
+    )
+    #expect(throws: ConfigError.invalidValue(field: "rate_limit_capacity", value: "-10")) {
+      _ = try ServerConfig.load(path: pathNegRL, environment: [:])
+    }
+
+    // Port bounds: negative or > 65535 rejected, 0 accepted (ephemeral binding)
+    let pathNegPort = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "port": -1
+      }
+      """
+    )
+    #expect(throws: ConfigError.invalidValue(field: "port", value: "-1")) {
+      _ = try ServerConfig.load(path: pathNegPort, environment: [:])
+    }
+
+    let pathHugePort = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "port": 70000
+      }
+      """
+    )
+    #expect(throws: ConfigError.invalidValue(field: "port", value: "70000")) {
+      _ = try ServerConfig.load(path: pathHugePort, environment: [:])
+    }
+
+    let pathPort0 = try write(
+      """
+      {
+        "client_id": "https://cab.example.com/meta.json",
+        "public_url": "https://cab.example.com",
+        "keys": [{ "kid": "k1", "pem_base64": "aWdub3JlZA==" }],
+        "active_kid": "k1",
+        "port": 0
+      }
+      """
+    )
+    let configPort0 = try ServerConfig.load(path: pathPort0, environment: [:])
+    #expect(configPort0.port == 0)
+  }
+
+  @Test("Unparsable capacity or port environment variables throw invalidValue")
+  func unparsableEnvThrows() throws {
+    let baseEnv = [
+      "CAB_CLIENT_ID": "https://env.example/meta.json",
+      "CAB_PUBLIC_URL": "https://env.example",
+      "CAB_KEY_PEM_BASE64": "aWdub3JlZA==",
+      "CAB_KEY_KID": "envkey",
+    ]
+
+    var envReplay = baseEnv
+    envReplay["CAB_REPLAY_CAPACITY"] = "50_000"
+    #expect(throws: ConfigError.invalidValue(field: "replay_capacity", value: "50_000")) {
+      _ = try ServerConfig.load(path: nil, environment: envReplay)
+    }
+
+    var envDevice = baseEnv
+    envDevice["CAB_DEVICE_CAPACITY"] = "10k"
+    #expect(throws: ConfigError.invalidValue(field: "device_capacity", value: "10k")) {
+      _ = try ServerConfig.load(path: nil, environment: envDevice)
+    }
+
+    var envRateLimit = baseEnv
+    envRateLimit["CAB_RATE_LIMIT_CAPACITY"] = "invalid"
+    #expect(throws: ConfigError.invalidValue(field: "rate_limit_capacity", value: "invalid")) {
+      _ = try ServerConfig.load(path: nil, environment: envRateLimit)
+    }
+
+    var envPort = baseEnv
+    envPort["CAB_PORT"] = "http"
+    #expect(throws: ConfigError.invalidValue(field: "port", value: "http")) {
+      _ = try ServerConfig.load(path: nil, environment: envPort)
+    }
   }
 }

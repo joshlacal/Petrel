@@ -62,4 +62,36 @@ struct DeviceStoreTests {
     #expect(snapshot["device-1"] != nil)
     #expect(snapshot["device-5000"]?.requestCount == 2)
   }
+
+  @Test("Configurable capacity strictly bounds device store size")
+  func configurableCapacity() async {
+    let store = InMemoryDeviceStore(deniedJKTs: [], capacity: 10)
+    let base = Date(timeIntervalSince1970: 2_000_000)
+
+    for i in 0 ..< 25 {
+      await store.record(jkt: "dev-\(i)", now: base.addingTimeInterval(Double(i)))
+    }
+
+    let snapshot = await store.snapshot()
+    #expect(snapshot.count == 10)
+    #expect(snapshot["dev-0"] == nil)
+    #expect(snapshot["dev-24"] != nil)
+  }
+
+  @Test("Concurrent device records maintain thread safety and bounded capacity")
+  func concurrentDeviceRecords() async {
+    let store = InMemoryDeviceStore(deniedJKTs: [], capacity: 20)
+    let base = Date()
+
+    await withTaskGroup(of: Void.self) { group in
+      for i in 0 ..< 100 {
+        group.addTask {
+          await store.record(jkt: "concurrent-dev-\(i)", now: base)
+        }
+      }
+    }
+
+    let snapshot = await store.snapshot()
+    #expect(snapshot.count == 20)
+  }
 }

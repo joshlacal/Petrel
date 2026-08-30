@@ -6,6 +6,7 @@ public enum ConfigError: Error, Equatable, CustomStringConvertible {
   case unknownActiveKid(String)
   case invalidKeyMaterial(kid: String)
   case invalidURL(field: String, value: String)
+  case invalidValue(field: String, value: String)
 
   public var description: String {
     switch self {
@@ -14,6 +15,7 @@ public enum ConfigError: Error, Equatable, CustomStringConvertible {
     case let .unknownActiveKid(kid): "active_kid \"\(kid)\" is not in keys"
     case let .invalidKeyMaterial(kid): "key \"\(kid)\" has no loadable PEM (need pem_path or pem_base64 containing a P-256 private key)"
     case let .invalidURL(field, value): "\(field) must be an https URL (or http on 127.0.0.1/localhost for development): \(value)"
+    case let .invalidValue(field, value): "\(field) has invalid value: \(value)"
     }
   }
 }
@@ -65,7 +67,9 @@ public struct ServerConfig: Codable, Sendable, Equatable {
   public var deniedJkts: [String]
   public var clientMetadata: JSONValue?
   public var rateLimit: RateLimitConfig?
-
+  public var replayCapacity: Int
+  public var deviceCapacity: Int
+  public var rateLimitCapacity: Int
   enum CodingKeys: String, CodingKey {
     case clientId = "client_id"
     case publicUrl = "public_url"
@@ -83,6 +87,9 @@ public struct ServerConfig: Codable, Sendable, Equatable {
     case deniedJkts = "denied_jkts"
     case clientMetadata = "client_metadata"
     case rateLimit = "rate_limit"
+    case replayCapacity = "replay_capacity"
+    case deviceCapacity = "device_capacity"
+    case rateLimitCapacity = "rate_limit_capacity"
   }
 
   public init(from decoder: Decoder) throws {
@@ -103,8 +110,10 @@ public struct ServerConfig: Codable, Sendable, Equatable {
     deniedJkts = try container.decodeIfPresent([String].self, forKey: .deniedJkts) ?? []
     clientMetadata = try container.decodeIfPresent(JSONValue.self, forKey: .clientMetadata)
     rateLimit = try container.decodeIfPresent(RateLimitConfig.self, forKey: .rateLimit)
+    replayCapacity = try container.decodeIfPresent(Int.self, forKey: .replayCapacity) ?? 50_000
+    deviceCapacity = try container.decodeIfPresent(Int.self, forKey: .deviceCapacity) ?? 10_000
+    rateLimitCapacity = try container.decodeIfPresent(Int.self, forKey: .rateLimitCapacity) ?? 10_000
   }
-
   /// Loads config from an optional JSON file, then applies environment
   /// overrides, then validates. Env-only operation (path == nil) is supported.
   public static func load(
@@ -124,7 +133,12 @@ public struct ServerConfig: Codable, Sendable, Equatable {
     if let value = environment["CAB_CLIENT_ID"] { config.clientId = value }
     if let value = environment["CAB_PUBLIC_URL"] { config.publicUrl = value }
     if let value = environment["CAB_HOST"] { config.host = value }
-    if let value = environment["CAB_PORT"], let port = Int(value) { config.port = port }
+    if let value = environment["CAB_PORT"] {
+      guard let port = Int(value) else {
+        throw ConfigError.invalidValue(field: "port", value: value)
+      }
+      config.port = port
+    }
     if let value = environment["CAB_ACTIVE_KID"] { config.activeKid = value }
     if let value = environment["CAB_KEY_PEM_BASE64"] {
       // The env-provided key takes precedence over any file-configured
@@ -150,6 +164,24 @@ public struct ServerConfig: Codable, Sendable, Equatable {
         $0.trimmingCharacters(in: .whitespaces)
       }
     }
+    if let value = environment["CAB_REPLAY_CAPACITY"] {
+      guard let cap = Int(value) else {
+        throw ConfigError.invalidValue(field: "replay_capacity", value: value)
+      }
+      config.replayCapacity = cap
+    }
+    if let value = environment["CAB_DEVICE_CAPACITY"] {
+      guard let cap = Int(value) else {
+        throw ConfigError.invalidValue(field: "device_capacity", value: value)
+      }
+      config.deviceCapacity = cap
+    }
+    if let value = environment["CAB_RATE_LIMIT_CAPACITY"] {
+      guard let cap = Int(value) else {
+        throw ConfigError.invalidValue(field: "rate_limit_capacity", value: value)
+      }
+      config.rateLimitCapacity = cap
+    }
 
     try config.validate()
     return config
@@ -166,6 +198,17 @@ public struct ServerConfig: Codable, Sendable, Equatable {
     }
     for key in keys where key.pemPath == nil && key.pemBase64 == nil {
       throw ConfigError.invalidKeyMaterial(kid: key.kid)
+    }
+    guard replayCapacity > 0 else { throw ConfigError.invalidValue(field: "replay_capacity", value: "\(replayCapacity)") }
+    guard deviceCapacity > 0 else { throw ConfigError.invalidValue(field: "device_capacity", value: "\(deviceCapacity)") }
+    guard rateLimitCapacity > 0 else { throw ConfigError.invalidValue(field: "rate_limit_capacity", value: "\(rateLimitCapacity)") }
+    guard assertionTtlSeconds > 0 else { throw ConfigError.invalidValue(field: "assertion_ttl_seconds", value: "\(assertionTtlSeconds)") }
+    guard iatWindowSeconds > 0 else { throw ConfigError.invalidValue(field: "iat_window_seconds", value: "\(iatWindowSeconds)") }
+    guard port >= 0 && port <= 65535 else { throw ConfigError.invalidValue(field: "port", value: "\(port)") }
+    if let rl = rateLimit {
+      guard rl.requestsPerMinute > 0 else {
+        throw ConfigError.invalidValue(field: "requests_per_minute", value: "\(rl.requestsPerMinute)")
+      }
     }
   }
 

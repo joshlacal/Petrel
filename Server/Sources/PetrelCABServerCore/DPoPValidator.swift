@@ -41,6 +41,9 @@ public struct DPoPValidator: Sendable {
   public func validate(
     proof: String, now: Date = Date()
   ) throws -> (ValidatedProof, DPoPProofClaims) {
+    guard proof.count <= 8192 else {
+      throw CABRequestError.invalidDPoPProof("proof exceeds maximum length")
+    }
     let parts = proof.split(separator: ".", omittingEmptySubsequences: false)
     guard parts.count == 3 else {
       throw CABRequestError.invalidDPoPProof("malformed JWS")
@@ -101,6 +104,9 @@ public struct DPoPValidator: Sendable {
       claims = try JSONDecoder().decode(DPoPProofClaims.self, from: payloadData)
     } catch {
       throw CABRequestError.invalidDPoPProof("malformed claims")
+    }
+    guard !claims.jti.isEmpty, claims.jti.count <= 512 else {
+      throw CABRequestError.invalidDPoPProof("invalid or oversized jti")
     }
 
     guard claims.htm == "POST" else {
