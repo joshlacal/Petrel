@@ -155,6 +155,37 @@ struct AppleKeychainStoreTests {
         #expect(retrieved == testData)
     }
 
+    @Test("failed first probe does not poison subsequent resolutions")
+    func failedFirstProbeDoesNotPoisonSubsequentResolutions() throws {
+        let probeAttrs: [String: Any] = [kSecAttrAccessGroup as String: "TEAM12345.blue.catbird.retry-success"]
+        let recorder = KeychainOperationRecorder(
+            copyMatchingStatuses: [errSecAuthFailed, errSecSuccess, errSecSuccess, errSecSuccess],
+            copyMatchingResults: [nil, probeAttrs as CFDictionary, Data("first-read".utf8) as CFData, Data("second-read".utf8) as CFData],
+            updateStatuses: [errSecSuccess, errSecSuccess],
+            addStatuses: [errSecInteractionNotAllowed, errSecSuccess, errSecSuccess],
+            deleteStatuses: [errSecSuccess, errSecSuccess]
+        )
+        let store = AppleKeychainStore(operations: recorder.operations)
+
+        // Attempt 1: Add probe fails with interactionNotAllowed -> fail closed
+        #expect(throws: KeychainError.self) {
+            _ = try store.retrieve(key: "item", namespace: "test", accessGroup: nil)
+        }
+
+        // Attempt 2: Add probe succeeds, but copyMatching probe fails with authFailed -> fail closed
+        #expect(throws: KeychainError.self) {
+            _ = try store.retrieve(key: "item", namespace: "test", accessGroup: nil)
+        }
+
+        // Attempt 3: Probe succeeds completely -> access group resolved and cached, retrieve succeeds
+        let firstRead = try store.retrieve(key: "item", namespace: "test", accessGroup: nil)
+        #expect(firstRead == Data("first-read".utf8))
+
+        // Attempt 4: Success is cached -> subsequent operation succeeds without re-probing
+        let secondRead = try store.retrieve(key: "item", namespace: "test", accessGroup: nil)
+        #expect(secondRead == Data("second-read".utf8))
+    }
+
     @Test("default access group cache is instance-isolated")
     func defaultAccessGroupCacheIsInstanceIsolated() throws {
         // Store A fails closed

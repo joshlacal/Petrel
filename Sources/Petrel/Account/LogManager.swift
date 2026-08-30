@@ -57,6 +57,8 @@ public class LogManager {
         "/xrpc/com.atproto.server.createSession",
         "/xrpc/com.atproto.server.refreshSession",
         "/oauth/token", "/token",
+        "/auth/exchange", "/auth/session",
+        "/auth/upgrade/exchange", "/auth/upgrade/commit",
     ]
 
     // MARK: - Observer support (Swift Concurrency safe)
@@ -170,22 +172,29 @@ public class LogManager {
             debugMessage += "Headers: \(filteredHeaders)"
 
             // Don't log body for token endpoints or if it contains sensitive data
-            if let url = request.url,
-               !tokenEndpointPaths.contains(where: { url.path.contains($0) }),
-               let bodyData = request.httpBody,
-               let bodyString = String(data: bodyData, encoding: .utf8)
-            {
-                // Check if body might contain sensitive data
-                let lowerBody = bodyString.lowercased()
-                if lowerBody.contains("password") || lowerBody.contains("token") ||
-                    lowerBody.contains("client_secret") || lowerBody.contains("code")
+            if let url = request.url {
+                let normalizedPath = url.path.lowercased()
+                let isTokenEndpoint = tokenEndpointPaths.contains { endpoint in
+                    normalizedPath == endpoint || normalizedPath.hasSuffix(endpoint)
+                }
+                if !isTokenEndpoint,
+                   let bodyData = request.httpBody,
+                   let bodyString = String(data: bodyData, encoding: .utf8)
                 {
-                    debugMessage += "\nBody: [CONTAINS_SENSITIVE_DATA]"
-                } else {
-                    debugMessage += "\nBody: \(bodyString)"
+                    // Check if body might contain sensitive data
+                    let lowerBody = bodyString.lowercased()
+                    if lowerBody.contains("password") || lowerBody.contains("token") ||
+                        lowerBody.contains("client_secret") || lowerBody.contains("code") ||
+                        lowerBody.contains("session_id")
+                    {
+                        debugMessage += "\nBody: [CONTAINS_SENSITIVE_DATA]"
+                    } else {
+                        let maxLen = 1000
+                        let truncatedBody = bodyString.count > maxLen ? String(bodyString.prefix(maxLen)) + "… [truncated]" : bodyString
+                        debugMessage += "\nBody: \(truncatedBody)"
+                    }
                 }
             }
-
             logDebug(debugMessage, category: .network)
         #endif
     }
@@ -209,17 +218,21 @@ public class LogManager {
             debugMessage += "Headers: \(filteredHeaders)"
 
             // Don't log response body for token endpoints
-            if let url = response.url,
-               !tokenEndpointPaths.contains(where: { url.path.contains($0) })
-            {
-                if let responseString = String(data: data, encoding: .utf8) {
-                    // TEMPORARY: Truncation disabled for debugging
-                    debugMessage += "\nBody: \(responseString)"
+            if let url = response.url {
+                let normalizedPath = url.path.lowercased()
+                let isTokenEndpoint = tokenEndpointPaths.contains { endpoint in
+                    normalizedPath == endpoint || normalizedPath.hasSuffix(endpoint)
                 }
-            } else {
-                debugMessage += "\nBody: [TOKEN_ENDPOINT_RESPONSE]"
+                if !isTokenEndpoint {
+                    if let responseString = String(data: data, encoding: .utf8) {
+                        let maxLen = 1000
+                        let truncated = responseString.count > maxLen ? String(responseString.prefix(maxLen)) + "… [truncated]" : responseString
+                        debugMessage += "\nBody: \(truncated)"
+                    }
+                } else {
+                    debugMessage += "\nBody: [TOKEN_ENDPOINT_RESPONSE]"
+                }
             }
-
             logDebug(debugMessage, category: .network)
         #endif
     }

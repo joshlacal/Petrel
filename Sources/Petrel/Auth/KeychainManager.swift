@@ -235,14 +235,6 @@ enum KeychainManager {
         #endif
     }()
 
-    private static func accessGroupAttributes(_ accessGroup: String?) -> [String: Any] {
-        guard let accessGroup, !accessGroup.isEmpty else { return [:] }
-        #if canImport(Security)
-            return [kSecAttrAccessGroup as String: accessGroup]
-        #else
-            return [:]
-        #endif
-    }
     /// True when `error` reports that the item simply does not exist, as opposed to
     /// a storage failure. Callers use this to tell absence from "could not read",
     /// which must never be collapsed into the same nil.
@@ -697,32 +689,5 @@ enum KeychainManager {
             }
         }
     }
-
-    // MARK: - Gateway Session Management
-
-    /// Saves the gateway session ID
-    static func saveGatewaySession(_ session: String) throws {
-        guard let data = session.data(using: .utf8) else {
-            throw KeychainError.dataFormatError
-        }
-        try store(key: "gatewaySession", value: data, namespace: "catbird.gateway")
-    }
-
-    /// Retrieves the gateway session ID
-    static func getGatewaySession() throws -> String? {
-        do {
-            let data = try retrieve(key: "gatewaySession", namespace: "catbird.gateway")
-            return String(data: data, encoding: .utf8)
-        } catch {
-            if isItemNotFound(error) {
-                return nil
-            }
-            throw error
-        }
-    }
-
-    /// Deletes the gateway session ID
-    static func deleteGatewaySession() throws {
-        try delete(key: "gatewaySession", namespace: "catbird.gateway")
-    }
 }
+

@@ -849,7 +849,6 @@ public actor NetworkService: NetworkServiceProtocol {
             delegate: exactAuthDelegate,
             delegateQueue: nil
         )
-
         LogManager.logDebug("Network Service initialized")
     }
 
@@ -1038,9 +1037,12 @@ public actor NetworkService: NetworkServiceProtocol {
             return .unauthenticated
         }
 
+        let segments = path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        let isXRPC = segments.contains("xrpc")
+
         // In gateway mode, xrpc requests targeting the authorized gateway origin require auth
         if gatewayMode {
-            if path.contains("/xrpc/") {
+            if isXRPC {
                 if let baseOrigin = ExactAuthRequestOrigin(baseURL), origin == baseOrigin {
                     return .authenticated(recipient: origin)
                 }
@@ -1048,7 +1050,7 @@ public actor NetworkService: NetworkServiceProtocol {
             return .unauthenticated
         }
 
-        if path.contains("com.atproto.server.createSession") {
+        if segments.contains("com.atproto.server.createSession") {
             return .unauthenticated
         }
         // Standard OAuth mode - check metadata match
@@ -1070,7 +1072,7 @@ public actor NetworkService: NetworkServiceProtocol {
                   origin == resOrigin
         {
             return .authenticated(recipient: origin)
-        } else if let baseOrigin = ExactAuthRequestOrigin(baseURL), origin == baseOrigin, path.contains("/xrpc/") {
+        } else if let baseOrigin = ExactAuthRequestOrigin(baseURL), origin == baseOrigin, isXRPC {
             return .authenticated(recipient: origin)
         } else {
             return .unauthenticated

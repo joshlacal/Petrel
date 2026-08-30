@@ -110,53 +110,135 @@ public enum SpaceHostResolutionError: Error, LocalizedError, Equatable, Sendable
 public actor SpaceHostResolver {
     private let didResolver: any DIDResolving
     private let urlSession: URLSession
+    private let sessionDelegate: HardenedURLSessionDelegate?
 
     public init(didResolver: any DIDResolving) {
         self.didResolver = didResolver
-        self.urlSession = .shared
+        let config = URLSessionConfiguration.ephemeral
+        #if DEBUG
+        if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
+            config.protocolClasses = testClasses
+        }
+        #endif
+        let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+        self.sessionDelegate = delegate
+        self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
     }
 
     init(didResolver: any DIDResolving, urlSession: URLSession) {
         self.didResolver = didResolver
         self.urlSession = urlSession
+        self.sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
     }
-
     /// Resolves the space authority DID document and extracts endpoints.
     public func resolve(authorityDID: String) async throws -> SpaceAuthorityEndpoints {
         let doc = try await fetchDIDDocument(for: authorityDID)
         return try SpaceAuthorityEndpoints.extract(from: doc)
     }
 
+    private static let allowedPercentEncodedPathSegmentCharacters: CharacterSet = {
+        var allowed = CharacterSet.urlPathAllowed
+        allowed.insert(charactersIn: "%")
+        allowed.remove(charactersIn: "/?#")
+        return allowed
+    }()
+
     /// Pure helper to construct the canonical DID document URL for `did:plc:` and `did:web:` per specifications.
     public static func didDocumentURL(for did: String) throws -> URL {
-        let endpoint: String
         if did.starts(with: "did:plc:") {
-            endpoint = "https://plc.directory/\(did)"
-        } else if did.starts(with: "did:web:") {
-            let parts = did.split(separator: ":")
-            guard parts.count >= 3 else {
+            let endpoint = "https://plc.directory/\(did)"
+            guard let url = URL(string: endpoint) else {
                 throw SpaceHostResolutionError.invalidDID(did)
             }
-            let domain = String(parts[2])
-            if parts.count == 3 {
-                endpoint = "https://\(domain)/.well-known/did.json"
-            } else {
-                let path = parts[3...].joined(separator: "/")
-                endpoint = "https://\(domain)/\(path)/did.json"
+            return url
+        } else if did.starts(with: "did:web:") {
+            let parts = did.split(separator: ":", omittingEmptySubsequences: false)
+            guard parts.count >= 3, parts[0] == "did", parts[1] == "web" else {
+                throw SpaceHostResolutionError.invalidDID(did)
             }
+
+            let rawAuthority = String(parts[2])
+            let authorityParts = rawAuthority.components(separatedBy: "%3A")
+            guard (1 ... 2).contains(authorityParts.count),
+                  !authorityParts[0].contains("%"),
+                  !authorityParts[0].contains("/") else {
+                throw SpaceHostResolutionError.invalidDID(did)
+            }
+            let host = authorityParts[0]
+            guard !host.isEmpty else {
+                throw SpaceHostResolutionError.invalidDID(did)
+            }
+            let port: Int?
+            if authorityParts.count == 2 {
+                let portStr = authorityParts[1]
+                guard !portStr.isEmpty, !portStr.contains("%"), !portStr.contains("/"),
+                      let portNum = Int(portStr), (1 ... 65535).contains(portNum) else {
+                    throw SpaceHostResolutionError.invalidDID(did)
+                }
+                port = portNum
+            } else {
+                port = nil
+            }
+
+            let pathComponents = parts.dropFirst(3)
+            var components = URLComponents()
+            components.scheme = "https"
+            components.host = host
+            components.port = port
+
+            if pathComponents.isEmpty {
+                components.percentEncodedPath = "/.well-known/did.json"
+            } else {
+                var rawSegments: [String] = []
+                for component in pathComponents {
+                    let rawSegment = String(component)
+                    guard !rawSegment.isEmpty,
+                          rawSegment != ".",
+                          rawSegment != "..",
+                          !rawSegment.contains("/"),
+                          rawSegment.unicodeScalars.allSatisfy({ allowedPercentEncodedPathSegmentCharacters.contains($0) }) else {
+                        throw SpaceHostResolutionError.invalidDID(did)
+                    }
+                    guard let decoded = rawSegment.removingPercentEncoding,
+                          !decoded.isEmpty,
+                          decoded != ".",
+                          decoded != "..",
+                          !decoded.contains("/"),
+                          !decoded.contains("\\") else {
+                        throw SpaceHostResolutionError.invalidDID(did)
+                    }
+                    rawSegments.append(rawSegment)
+                }
+                components.percentEncodedPath = "/" + rawSegments.joined(separator: "/") + "/did.json"
+            }
+
+            guard let url = components.url else {
+                throw SpaceHostResolutionError.invalidDID(did)
+            }
+            return url
         } else {
             throw SpaceHostResolutionError.invalidDID(did)
         }
-
-        guard let url = URL(string: endpoint) else {
-            throw SpaceHostResolutionError.invalidDID(did)
-        }
-        return url
     }
 
-    /// Fetches and decodes the DID document using a given URLSession.
-    public static func fetchDIDDocument(for did: String, urlSession: URLSession = .shared) async throws -> DIDDocument {
+    /// Fetches and decodes the DID document using the hardened network path.
+    public static func fetchDIDDocument(
+        for did: String,
+        urlSession: URLSession? = nil
+    ) async throws -> DIDDocument {
+        try await fetchDIDDocument(for: did, urlSession: urlSession, sessionDelegate: nil)
+    }
+
+    package static func fetchDIDDocument(
+        for did: String,
+        urlSession: URLSession? = nil,
+        sessionDelegate: HardenedURLSessionDelegate? = nil
+    ) async throws -> DIDDocument {
         let url = try didDocumentURL(for: did)
+        guard try await NetworkService.validateURL(url) else {
+            throw SpaceHostResolutionError.networkError("Security validation failed for DID document URL")
+        }
+
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
@@ -164,7 +246,26 @@ public actor SpaceHostResolver {
         let data: Data
         let response: URLResponse
         do {
-            (data, response) = try await urlSession.data(for: request)
+            if let sessionDelegate {
+                let session = urlSession ?? URLSession.shared
+                (data, response) = try await NetworkService.executeDataTask(request, using: session, delegate: sessionDelegate)
+            } else if let urlSession {
+                if let delegate = urlSession.delegate as? HardenedURLSessionDelegate {
+                    (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: delegate)
+                } else {
+                    (data, response) = try await urlSession.data(for: request)
+                }
+            } else {
+                let config = URLSessionConfiguration.ephemeral
+                #if DEBUG
+                if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
+                    config.protocolClasses = testClasses
+                }
+                #endif
+                let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+                let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+                (data, response) = try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+            }
         } catch {
             throw SpaceHostResolutionError.networkError(error.localizedDescription)
         }
@@ -183,6 +284,6 @@ public actor SpaceHostResolver {
     }
 
     public func fetchDIDDocument(for did: String) async throws -> DIDDocument {
-        try await Self.fetchDIDDocument(for: did, urlSession: urlSession)
+        try await Self.fetchDIDDocument(for: did, urlSession: urlSession, sessionDelegate: sessionDelegate)
     }
 }

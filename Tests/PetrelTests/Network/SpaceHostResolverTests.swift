@@ -324,4 +324,34 @@ struct SpaceHostResolverTests {
         #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https://")!) == false)
         #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https:///path")!) == false)
     }
+
+    @Test("SpaceHostResolver.didDocumentURL validates did:web paths and rejects path traversal")
+    func didDocumentURLWebHardening() throws {
+        // Valid authority and subpaths
+        let url1 = try SpaceHostResolver.didDocumentURL(for: "did:web:example.com")
+        #expect(url1.absoluteString == "https://example.com/.well-known/did.json")
+
+        let url2 = try SpaceHostResolver.didDocumentURL(for: "did:web:example.com:users:alice")
+        #expect(url2.absoluteString == "https://example.com/users/alice/did.json")
+
+        let url3 = try SpaceHostResolver.didDocumentURL(for: "did:web:example.com%3A8443:users:bob")
+        #expect(url3.absoluteString == "https://example.com:8443/users/bob/did.json")
+
+        // Rejection of path traversal and illegal segments
+        #expect(throws: SpaceHostResolutionError.self) {
+            try SpaceHostResolver.didDocumentURL(for: "did:web:example.com:..")
+        }
+        #expect(throws: SpaceHostResolutionError.self) {
+            try SpaceHostResolver.didDocumentURL(for: "did:web:example.com:users:..:alice")
+        }
+        #expect(throws: SpaceHostResolutionError.self) {
+            try SpaceHostResolver.didDocumentURL(for: "did:web:example.com:users:%2e%2e:alice")
+        }
+        #expect(throws: SpaceHostResolutionError.self) {
+            try SpaceHostResolver.didDocumentURL(for: "did:web:example.com:users:a/b:alice")
+        }
+        #expect(throws: SpaceHostResolutionError.self) {
+            try SpaceHostResolver.didDocumentURL(for: "did:web:example.com%3A99999:alice")
+        }
+    }
 }

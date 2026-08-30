@@ -2,23 +2,25 @@ package blue.catbird.petrel.client
 
 import blue.catbird.petrel.network.NetworkService
 import kotlin.test.Test
-import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertNull
 
 class LegacyGatewayCallbackTest {
-    @Suppress("DEPRECATION")
     @Test
-    fun `legacy callback refuses session credentials from URL fragments`() {
+    fun `client uses secure strategy-backed gateway API and legacy shims are removed`() {
         val network = NetworkService("https://api.catbird.blue")
         val client = ATProtoClient(network)
 
-        assertFailsWith<UnsupportedOperationException> {
-            client.handleGatewayCallback(
-                "https://catbird.blue/oauth/callback#session_id=attacker-controlled-session",
-            )
-        }
+        // Verify legacy shims are removed from ATProtoClient class surface
+        val methods = client::class.java.methods.map { it.name }
+        assertFalse(methods.contains("restoreGatewaySession"))
+        assertFalse(methods.contains("clearGatewaySession"))
+        assertFalse(methods.contains("currentGatewaySessionId"))
+        assertFalse(methods.contains("createGatewayLoginUrl"))
+        assertFalse(methods.contains("handleGatewayCallback"))
+        assertFalse(methods.contains("gatewayLogout"))
 
-        assertNull(client.currentGatewaySessionId())
+        assertNull(client.getActiveDid())
         assertNull(network.authenticatedDID)
         assertNull(network.authorizationHeader)
     }

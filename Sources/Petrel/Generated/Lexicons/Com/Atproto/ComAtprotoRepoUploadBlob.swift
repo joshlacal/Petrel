@@ -101,7 +101,10 @@ extension ATProtoClient.Com.Atproto.Repo {
         let endpoint = "com.atproto.repo.uploadBlob"
 
         var dataToUpload = data
-        if stripMetadata, let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) {
+        if stripMetadata {
+            guard let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) else {
+                throw NetworkError.metadataStrippingFailed
+            }
             dataToUpload = strippedData
         }
         if mimeType.starts(with: "image/"), let compressedData = compressImage(dataToUpload) {

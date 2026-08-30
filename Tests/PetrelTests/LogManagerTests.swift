@@ -284,6 +284,28 @@ struct LogManagerTests {
         LogManager.logResponse(response, data: largeData)
     }
 
+    @Test("LogManager redacts response body for gateway credential endpoints")
+    func gatewayCredentialEndpointLogging() throws {
+        for path in ["/auth/exchange", "/auth/session", "/auth/upgrade/exchange", "/auth/upgrade/commit"] {
+            let url = try #require(URL(string: "https://gateway.catbird.blue\(path)"))
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: "1.1",
+                headerFields: ["Content-Type": "application/json"]
+            ))
+            let responseData = """
+            {
+                "session_id": "secret-session-uuid-12345",
+                "did": "did:plc:test12345"
+            }
+            """.data(using: .utf8)!
+
+            // Must not crash and must treat as token endpoint
+            LogManager.logResponse(response, data: responseData)
+        }
+    }
+
     @Test("LogManager should handle request with sensitive body")
     func sensitiveRequestBody() throws {
         let url = try #require(URL(string: "https://example.com/api/test"))

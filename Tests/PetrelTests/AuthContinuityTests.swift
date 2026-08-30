@@ -8,6 +8,19 @@ import XCTest
 final class AuthContinuityTests: XCTestCase {
     private let did = "did:plc:authcontinuity"
     private let gatewayURL = URL(string: "https://gateway.example")!
+    private var backend: GroupAwareInMemorySecureStorage!
+
+    override func setUp() async throws {
+        try await super.setUp()
+        backend = GroupAwareInMemorySecureStorage()
+        KeychainManager._setStorageOverride(backend)
+    }
+
+    override func tearDown() async throws {
+        KeychainManager._setStorageOverride(nil)
+        backend = nil
+        try await super.tearDown()
+    }
 
     private func makeClient(namespace: String) async throws -> (ATProtoClient, KeychainStorage) {
         let storage = KeychainStorage(namespace: namespace)

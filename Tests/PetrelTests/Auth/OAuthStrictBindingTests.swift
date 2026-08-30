@@ -84,14 +84,20 @@ private let testBobDID = "did:plc:strictbob98765432109876"
 private func withOAuthBindingTransport<T>(
     _ backend: InMemorySecureStorage,
     handler: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data),
-    _ body: () async throws -> T
+    _ body: @escaping () async throws -> T
 ) async throws -> T {
     try await withSerializedStorageOverrideTest {
         KeychainManager._setStorageOverride(backend)
         OAuthBindingTestURLProtocol.reset()
         OAuthBindingTestURLProtocol.setHandler(handler)
         NetworkService.setNetworkTestProtocolClasses([OAuthBindingTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
+        let testDNS: @Sendable (String) -> [String]? = { host in
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                return ["127.0.0.1"]
+            }
+            return ["93.184.216.34"]
+        }
+        NetworkService.dnsResolverOverride = testDNS
         defer {
             NetworkService.dnsResolverOverride = nil
             NetworkService.setNetworkTestProtocolClasses(nil)
@@ -312,7 +318,7 @@ struct OAuthStrictBindingTests {
 
             // Callback with attacker issuer must fail
             let evilCallback = URL(string: "\(testRedirectURI)?code=test_code_123&state=\(stateToken)&iss=\(evilAuthHost)")!
-            await #expect(throws: (any Error).self) {
+            await #expect(throws: AuthError.self) {
                 try await strategy.handleOAuthCallback(url: evilCallback)
             }
         }

@@ -1083,21 +1083,6 @@ public actor KeychainStorage {
         return true
     }
 
-    /// Legacy single-session methods for backward compatibility during migration
-    @available(*, deprecated, message: "Use saveGatewaySession(_:for:) for multi-account support")
-    func saveGatewaySession(_ session: String) async throws {
-        try await saveLegacyGatewaySession(session)
-    }
-
-    @available(*, deprecated, message: "Use getGatewaySession(for:) for multi-account support")
-    func getGatewaySession() async throws -> String? {
-        try await getLegacyGatewaySession()
-    }
-
-    @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
-    func deleteGatewaySession() async throws {
-        try await deleteLegacyGatewaySession()
-    }
 
     private func getLegacyGatewaySession() async throws -> String? {
         let key = makeKey("gatewaySession")

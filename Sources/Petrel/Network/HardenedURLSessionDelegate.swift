@@ -19,7 +19,7 @@ import Foundation
 package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
     private let maxRedirects = 5
     package let limits: NetworkResponseLimits
-    private let allowsRedirects: Bool
+    package let allowsRedirects: Bool
     private let resolver: @Sendable (String) async throws -> [String]
 
     package init(

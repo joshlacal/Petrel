@@ -10,11 +10,14 @@ import XCTest
 
 final class KeychainStorageRaceConditionTests: XCTestCase {
     var keychainStorage: KeychainStorage!
+    private var backend: GroupAwareInMemorySecureStorage!
     let testNamespace = "test.keychain.raceCondition"
     let testDID = "did:plc:test123456789"
 
     override func setUp() async throws {
         try await super.setUp()
+        backend = GroupAwareInMemorySecureStorage()
+        KeychainManager._setStorageOverride(backend)
         keychainStorage = KeychainStorage(namespace: testNamespace)
 
         // Clean up any existing test data (including temp/backup copies, which
@@ -33,6 +36,8 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         try? await keychainStorage.deleteSessionTemp(for: testDID)
         try? await keychainStorage.deleteSessionBackup(for: testDID)
         try? await keychainStorage.deleteGatewaySession(for: testDID)
+        KeychainManager._setStorageOverride(nil)
+        backend = nil
         try await super.tearDown()
     }
 
@@ -185,18 +190,22 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         XCTAssertNotNil(retrievedAccount)
     }
 
-    @available(*, deprecated, message: "Exercises the legacy gateway-session migration surface")
     func testLegacyGatewaySessionMigration() async throws {
         let account = createTestAccount()
 
         try await keychainStorage.saveAccount(account, for: testDID)
-        try await keychainStorage.saveGatewaySession("legacy-gateway-session")
+        try backend.store(
+            key: "gatewaySession",
+            value: Data("legacy-gateway-session".utf8),
+            namespace: testNamespace,
+            accessGroup: nil
+        )
 
         let migrated = try await keychainStorage.getGatewaySession(for: testDID)
         XCTAssertEqual(migrated, "legacy-gateway-session")
 
-        let legacy = try await keychainStorage.getGatewaySession()
-        XCTAssertNil(legacy)
+        let legacyData = try? await KeychainManager.retrieveAsync(key: "gatewaySession", namespace: testNamespace, accessGroup: nil)
+        XCTAssertNil(legacyData)
     }
 
     // MARK: - Concurrency Tests

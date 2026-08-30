@@ -40,7 +40,7 @@ struct AuthRecoveryIntegrationTests {
 
     @Test("Session recovery restores missing session from backup")
     func sessionRecoveryFromBackup() async throws {
-        try await withSerializedStorageOverrideTest {
+        try await withGroupAwareStorage {
             let storage = KeychainStorage(namespace: "test.session.recovery.\(UUID().uuidString)")
             let did = "did:plc:session-recovery-\(UUID().uuidString)"
 

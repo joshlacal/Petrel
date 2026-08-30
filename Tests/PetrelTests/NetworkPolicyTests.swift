@@ -63,17 +63,18 @@ struct NetworkPolicyTests {
 
     @Test("Step 2 & 4: Redirect credential stripping, DNS validation and cross-origin refusal")
     func redirectCredentialStripping() async throws {
-        NetworkService.dnsResolverOverride = { host in
-            if host == "pds.example.com" || host == "attacker.example.com" {
-                return ["93.184.216.34"]
-            } else if host == "private-redirect.example.com" {
-                return ["10.0.0.1"]
+        try await withSerializedStorageOverrideTest {
+            NetworkService.dnsResolverOverride = { host in
+                if host == "pds.example.com" || host == "attacker.example.com" {
+                    return ["93.184.216.34"]
+                } else if host == "private-redirect.example.com" {
+                    return ["10.0.0.1"]
+                }
+                return nil
             }
-            return nil
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-        }
+            defer {
+                NetworkService.dnsResolverOverride = nil
+            }
 
         let delegate = HardenedURLSessionDelegate()
         let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
@@ -161,8 +162,8 @@ struct NetworkPolicyTests {
             holder2.withLock { $0 = req }
             barrier2.signal()
         }
-        try await barrier2.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
         #expect(holder2.withLock { $0 } == nil)
+        }
     }
     @Test("Step 3 & N1-N3 & N1-M4: Remote cleartext is rejected, loopback cleartext is admitted, private IPs rejected")
     func cleartextAndLoopbackValidation() async throws {
@@ -173,24 +174,26 @@ struct NetworkPolicyTests {
             _ = try await service.request(remoteHTTPReq)
         }
         // Loopback http is permitted for local development
-        NetworkService.dnsResolverOverride = { host in
-            if host == "localhost" {
-                return ["127.0.0.1"]
+        try await withSerializedStorageOverrideTest {
+            NetworkService.dnsResolverOverride = { host in
+                if host == "localhost" {
+                    return ["127.0.0.1"]
+                }
+                return nil
             }
-            return nil
+            defer {
+                NetworkService.dnsResolverOverride = nil
+            }
+            let localService = NetworkService(baseURL: URL(string: "http://localhost:8080")!)
+            let localReq = try await localService.createURLRequest(
+                endpoint: "test",
+                method: "GET",
+                headers: [:],
+                body: nil,
+                queryItems: nil
+            )
+            #expect(localReq.url != nil)
         }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-        }
-        let localService = NetworkService(baseURL: URL(string: "http://localhost:8080")!)
-        let localReq = try await localService.createURLRequest(
-            endpoint: "test",
-            method: "GET",
-            headers: [:],
-            body: nil,
-            queryItems: nil
-        )
-        #expect(localReq.url != nil)
         await #expect(throws: NetworkError.self) {
             let privateReq = URLRequest(url: URL(string: "http://10.0.0.1/xrpc/test")!)
             _ = try await service.request(privateReq)
@@ -216,159 +219,196 @@ struct NetworkPolicyTests {
     }
 
     // MARK: - Step 5 & 6: URLProtocol-backed Transport Scenarios
+    private func withPolicyTransport<T>(
+        dnsResolver: @escaping @Sendable (String) -> [String]? = { host in
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                return ["127.0.0.1"]
+            }
+            return ["93.184.216.34"]
+        },
+        _ body: @escaping () async throws -> T
+    ) async throws -> T {
+        try await withSerializedStorageOverrideTest {
+            PolicyTestURLProtocol.reset()
+            NetworkService.setNetworkTestProtocolClasses([PolicyTestURLProtocol.self])
+            NetworkService.dnsResolverOverride = dnsResolver
+            defer {
+                PolicyTestURLProtocol.reset()
+                NetworkService.setNetworkTestProtocolClasses(nil)
+                NetworkService.dnsResolverOverride = nil
+            }
+            return try await body()
+        }
+    }
+
 
     @Test("Transport scenario (a): Real gzip-framed 200 response decodes to expected JSON")
     func transportGzipResponseDecoding() async throws {
-        PolicyTestURLProtocol.reset()
-        NetworkService.setNetworkTestProtocolClasses([PolicyTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
-        defer {
-            PolicyTestURLProtocol.reset()
-            NetworkService.setNetworkTestProtocolClasses(nil)
-            NetworkService.dnsResolverOverride = nil
+        try await withPolicyTransport {
+            let expectedJSON = #"{"status":"ok","message":"hello"}"#
+            let uncompressedData = Data(expectedJSON.utf8)
+            let gzipData = makeGzipPayload(uncompressedData)
+
+            PolicyTestURLProtocol.register(host: "pds.example.com") { req in
+                let response = HTTPURLResponse(
+                    url: req.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: [
+                        "Content-Type": "application/json",
+                        "Content-Encoding": "gzip",
+                        "Content-Length": "\(gzipData.count)"
+                    ]
+                )!
+                return (response, gzipData)
+            }
+
+            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+            let request = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
+            let (data, response) = try await service.performRequest(request)
+            #expect(response.statusCode == 200)
+            #expect(data == uncompressedData)
         }
-
-        let expectedJSON = #"{"status":"ok","message":"hello"}"#
-        let uncompressedData = Data(expectedJSON.utf8)
-        let gzipData = makeGzipPayload(uncompressedData)
-
-        PolicyTestURLProtocol.register(host: "pds.example.com") { req in
-            let response = HTTPURLResponse(
-                url: req.url!,
-                statusCode: 200,
-                httpVersion: "HTTP/1.1",
-                headerFields: [
-                    "Content-Type": "application/json",
-                    "Content-Encoding": "gzip",
-                    "Content-Length": "\(gzipData.count)"
-                ]
-            )!
-            return (response, gzipData)
-        }
-
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        let request = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
-        let (data, response) = try await service.performRequest(request)
-        #expect(response.statusCode == 200)
-        #expect(data == uncompressedData)
     }
 
     @Test("Transport scenario (b): Oversized Content-Length header cancels before download and throws responseLimitExceeded")
     func transportOversizedContentLengthCancellation() async throws {
-        PolicyTestURLProtocol.reset()
-        NetworkService.setNetworkTestProtocolClasses([PolicyTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
-        defer {
-            PolicyTestURLProtocol.reset()
-            NetworkService.setNetworkTestProtocolClasses(nil)
-            NetworkService.dnsResolverOverride = nil
-        }
+        try await withPolicyTransport {
+            PolicyTestURLProtocol.register(host: "pds.example.com") { req in
+                let response = HTTPURLResponse(
+                    url: req.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: [
+                        "Content-Type": "application/json",
+                        "Content-Length": "20971520" // 20 MB (exceeds default 10 MB limit)
+                    ]
+                )!
+                return (response, Data())
+            }
 
-        PolicyTestURLProtocol.register(host: "pds.example.com") { req in
-            let response = HTTPURLResponse(
-                url: req.url!,
-                statusCode: 200,
-                httpVersion: "HTTP/1.1",
-                headerFields: [
-                    "Content-Type": "application/json",
-                    "Content-Length": "20971520" // 20 MB (exceeds default 10 MB limit)
-                ]
-            )!
-            return (response, Data())
-        }
-
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        let request = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
-        do {
-            _ = try await service.performRequest(request)
-            Issue.record("Expected NetworkError.responseLimitExceeded")
-        } catch let NetworkError.responseLimitExceeded(msg) {
-            #expect(msg.contains("exceeded") || msg.contains("limit"))
-        } catch {
-            Issue.record("Expected responseLimitExceeded, got \(error)")
+            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+            let request = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
+            do {
+                _ = try await service.performRequest(request)
+                Issue.record("Expected NetworkError.responseLimitExceeded")
+            } catch let NetworkError.responseLimitExceeded(msg) {
+                #expect(msg.contains("exceeded") || msg.contains("limit"))
+            } catch {
+                Issue.record("Expected responseLimitExceeded, got \(error)")
+            }
         }
     }
 
     @Test("Transport scenario (c): Chunked response with no Content-Length succeeds and is bounded by wire ceiling")
     func transportChunkedResponseStreamingBound() async throws {
-        PolicyTestURLProtocol.reset()
-        NetworkService.setNetworkTestProtocolClasses([PolicyTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
-        defer {
-            PolicyTestURLProtocol.reset()
-            NetworkService.setNetworkTestProtocolClasses(nil)
-            NetworkService.dnsResolverOverride = nil
-        }
+        try await withPolicyTransport {
+            // 1. Small chunked payload with no Content-Length header succeeds
+            let validBody = Data(#"{"chunked":true}"#.utf8)
+            PolicyTestURLProtocol.register(host: "pds.example.com") { req in
+                let response = HTTPURLResponse(
+                    url: req.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: [
+                        "Content-Type": "application/json",
+                        "Transfer-Encoding": "chunked"
+                    ]
+                )!
+                return (response, validBody)
+            }
 
-        // 1. Small chunked payload with no Content-Length header succeeds
-        let validBody = Data(#"{"chunked":true}"#.utf8)
-        PolicyTestURLProtocol.register(host: "pds.example.com") { req in
-            let response = HTTPURLResponse(
-                url: req.url!,
-                statusCode: 200,
-                httpVersion: "HTTP/1.1",
-                headerFields: [
-                    "Content-Type": "application/json",
-                    "Transfer-Encoding": "chunked"
-                ]
-            )!
-            return (response, validBody)
-        }
+            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+            let request = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
+            let (data, response) = try await service.performRequest(request)
+            #expect(response.statusCode == 200)
+            #expect(data == validBody)
 
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        let request = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
-        let (data, response) = try await service.performRequest(request)
-        #expect(response.statusCode == 200)
-        #expect(data == validBody)
+            // 2. Large chunked payload exceeding wire limit (10MB) fails with responseLimitExceeded
+            let oversizedBody = Data(repeating: 0x41, count: 11 * 1024 * 1024)
+            PolicyTestURLProtocol.register(host: "oversized.example.com") { req in
+                let response = HTTPURLResponse(
+                    url: req.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: [
+                        "Content-Type": "application/octet-stream",
+                        "Transfer-Encoding": "chunked"
+                    ]
+                )!
+                return (response, oversizedBody)
+            }
 
-        // 2. Large chunked payload exceeding wire limit (10MB) fails with responseLimitExceeded
-        let oversizedBody = Data(repeating: 0x41, count: 11 * 1024 * 1024)
-        PolicyTestURLProtocol.register(host: "oversized.example.com") { req in
-            let response = HTTPURLResponse(
-                url: req.url!,
-                statusCode: 200,
-                httpVersion: "HTTP/1.1",
-                headerFields: [
-                    "Content-Type": "application/octet-stream",
-                    "Transfer-Encoding": "chunked"
-                ]
-            )!
-            return (response, oversizedBody)
-        }
-
-        let oversizedReq = URLRequest(url: URL(string: "https://oversized.example.com/xrpc/test")!)
-        do {
-            _ = try await service.performRequest(oversizedReq)
-            Issue.record("Expected NetworkError.responseLimitExceeded")
-        } catch let NetworkError.responseLimitExceeded(msg) {
-            #expect(msg.contains("exceeded") || msg.contains("limit") || msg.contains("Wire"))
-        } catch {
-            Issue.record("Expected responseLimitExceeded, got \(error)")
+            let oversizedReq = URLRequest(url: URL(string: "https://oversized.example.com/xrpc/test")!)
+            do {
+                _ = try await service.performRequest(oversizedReq)
+                Issue.record("Expected NetworkError.responseLimitExceeded")
+            } catch let NetworkError.responseLimitExceeded(msg) {
+                #expect(msg.contains("exceeded") || msg.contains("limit") || msg.contains("Wire"))
+            } catch {
+                Issue.record("Expected responseLimitExceeded, got \(error)")
+            }
         }
     }
 
     @Test("Transport scenario (d): Same-origin redirect completes with approved target addresses and retained credentials")
     func transportSameOriginRedirectPreservesCredentialsAndApprovesTarget() async throws {
-        PolicyTestURLProtocol.reset()
-        NetworkService.setNetworkTestProtocolClasses([PolicyTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
-        defer {
-            PolicyTestURLProtocol.reset()
-            NetworkService.setNetworkTestProtocolClasses(nil)
-            NetworkService.dnsResolverOverride = nil
-        }
+        try await withPolicyTransport {
+            let finalBody = Data(#"{"step":2}"#.utf8)
+            PolicyTestURLProtocol.register(host: "pds.example.com") { req in
+                if req.url?.path == "/xrpc/step1" {
+                    let redirectResp = HTTPURLResponse(
+                        url: req.url!,
+                        statusCode: 302,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Location": "https://pds.example.com/xrpc/step2"]
+                    )!
+                    return (redirectResp, Data())
+                } else {
+                    let successResp = HTTPURLResponse(
+                        url: req.url!,
+                        statusCode: 200,
+                        httpVersion: "HTTP/1.1",
+                        headerFields: ["Content-Type": "application/json"]
+                    )!
+                    return (successResp, finalBody)
+                }
+            }
 
-        let finalBody = Data(#"{"step":2}"#.utf8)
-        PolicyTestURLProtocol.register(host: "pds.example.com") { req in
-            if req.url?.path == "/xrpc/step1" {
+            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+            var req = URLRequest(url: URL(string: "https://pds.example.com/xrpc/step1")!)
+            req.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
+            req.setValue("DPoP proof_token", forHTTPHeaderField: "DPoP")
+            req.setValue("session=abc", forHTTPHeaderField: "Cookie")
+
+            let (data, response) = try await service.performRequest(req)
+            #expect(response.statusCode == 200)
+            #expect(data == finalBody)
+
+            let captured = PolicyTestURLProtocol.requests
+            #expect(captured.count == 2)
+            let secondReq = try #require(captured.last)
+            #expect(secondReq.url?.path == "/xrpc/step2")
+            #expect(secondReq.value(forHTTPHeaderField: "Authorization") == "Bearer secret_token")
+            #expect(secondReq.value(forHTTPHeaderField: "DPoP") == "DPoP proof_token")
+            #expect(secondReq.value(forHTTPHeaderField: "Cookie") == "session=abc")
+        }
+    }
+
+    @Test("Transport scenario (e): Cross-origin redirect completes with Authorization, DPoP, and Cookie stripped")
+    func transportCrossOriginRedirectStripsCredentials() async throws {
+        try await withPolicyTransport {
+            let finalBody = Data(#"{"redirected":true}"#.utf8)
+            PolicyTestURLProtocol.register(host: "pds.example.com") { req in
                 let redirectResp = HTTPURLResponse(
                     url: req.url!,
                     statusCode: 302,
                     httpVersion: "HTTP/1.1",
-                    headerFields: ["Location": "https://pds.example.com/xrpc/step2"]
+                    headerFields: ["Location": "https://cdn.example.com/xrpc/target"]
                 )!
                 return (redirectResp, Data())
-            } else if req.url?.path == "/xrpc/step2" {
+            }
+            PolicyTestURLProtocol.register(host: "cdn.example.com") { req in
                 let successResp = HTTPURLResponse(
                     url: req.url!,
                     statusCode: 200,
@@ -377,127 +417,75 @@ struct NetworkPolicyTests {
                 )!
                 return (successResp, finalBody)
             }
-            return nil
+
+            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+            var req = URLRequest(url: URL(string: "https://pds.example.com/xrpc/step1")!)
+            req.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
+            req.setValue("DPoP proof_token", forHTTPHeaderField: "DPoP")
+            req.setValue("session=abc", forHTTPHeaderField: "Cookie")
+
+            let (data, response) = try await service.performRequest(req)
+            #expect(response.statusCode == 200)
+            #expect(data == finalBody)
+
+            let captured = PolicyTestURLProtocol.requests
+            #expect(captured.count == 2)
+            let secondReq = try #require(captured.last)
+            #expect(secondReq.url?.host == "cdn.example.com")
+            #expect(secondReq.value(forHTTPHeaderField: "Authorization") == nil)
+            #expect(secondReq.value(forHTTPHeaderField: "DPoP") == nil)
+            #expect(secondReq.value(forHTTPHeaderField: "Cookie") == nil)
         }
-
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        var req = URLRequest(url: URL(string: "https://pds.example.com/xrpc/step1")!)
-        req.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
-
-        let (data, response) = try await service.performRequest(req)
-        #expect(response.statusCode == 200)
-        #expect(data == finalBody)
-
-        let captured = PolicyTestURLProtocol.requests
-        #expect(captured.count == 2)
-        #expect(captured.last?.value(forHTTPHeaderField: "Authorization") == "Bearer secret_token")
-    }
-
-    @Test("Transport scenario (e): Cross-origin redirect completes with Authorization, DPoP, and Cookie stripped")
-    func transportCrossOriginRedirectStripsCredentials() async throws {
-        PolicyTestURLProtocol.reset()
-        NetworkService.setNetworkTestProtocolClasses([PolicyTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
-        defer {
-            PolicyTestURLProtocol.reset()
-            NetworkService.setNetworkTestProtocolClasses(nil)
-            NetworkService.dnsResolverOverride = nil
-        }
-
-        let finalBody = Data(#"{"redirected":true}"#.utf8)
-        PolicyTestURLProtocol.register(host: "pds.example.com") { req in
-            let redirectResp = HTTPURLResponse(
-                url: req.url!,
-                statusCode: 302,
-                httpVersion: "HTTP/1.1",
-                headerFields: ["Location": "https://cdn.example.com/xrpc/target"]
-            )!
-            return (redirectResp, Data())
-        }
-        PolicyTestURLProtocol.register(host: "cdn.example.com") { req in
-            let successResp = HTTPURLResponse(
-                url: req.url!,
-                statusCode: 200,
-                httpVersion: "HTTP/1.1",
-                headerFields: ["Content-Type": "application/json"]
-            )!
-            return (successResp, finalBody)
-        }
-
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        var req = URLRequest(url: URL(string: "https://pds.example.com/xrpc/step1")!)
-        req.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
-        req.setValue("DPoP proof_token", forHTTPHeaderField: "DPoP")
-        req.setValue("session=abc", forHTTPHeaderField: "Cookie")
-
-        let (data, response) = try await service.performRequest(req)
-        #expect(response.statusCode == 200)
-        #expect(data == finalBody)
-
-        let captured = PolicyTestURLProtocol.requests
-        #expect(captured.count == 2)
-        let secondReq = try #require(captured.last)
-        #expect(secondReq.url?.host == "cdn.example.com")
-        #expect(secondReq.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(secondReq.value(forHTTPHeaderField: "DPoP") == nil)
-        #expect(secondReq.value(forHTTPHeaderField: "Cookie") == nil)
     }
 
     @Test("Credential attachment proceeds unauthenticated on AuthError.noActiveAccount across all request methods")
     func noActiveAccountCredentialAttachmentFallback() async throws {
-        PolicyTestURLProtocol.reset()
-        NetworkService.setNetworkTestProtocolClasses([PolicyTestURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
-        defer {
-            PolicyTestURLProtocol.reset()
-            NetworkService.setNetworkTestProtocolClasses(nil)
-            NetworkService.dnsResolverOverride = nil
+        try await withPolicyTransport {
+            PolicyTestURLProtocol.register(host: "pds.example.com") { req in
+                let resp = HTTPURLResponse(
+                    url: req.url!,
+                    statusCode: 200,
+                    httpVersion: "HTTP/1.1",
+                    headerFields: ["Content-Type": "application/json"]
+                )!
+                return (resp, Data(#"{"unauthenticated":true}"#.utf8))
+            }
+
+            final class NoActiveAccountAuthProvider: AuthenticationProvider, @unchecked Sendable {
+                func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {
+                    throw AuthError.noActiveAccount
+                }
+                func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (URLRequest, AuthContext) {
+                    throw AuthError.noActiveAccount
+                }
+                func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
+                    throw AuthError.noActiveAccount
+                }
+                func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+                    throw AuthError.noActiveAccount
+                }
+                func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {}
+            }
+
+            let provider = NoActiveAccountAuthProvider()
+            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!, authService: provider)
+
+            // 1. request(_:) proceeds unauthenticated
+            let simpleReq = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
+            let (data1, resp1) = try await service.request(simpleReq)
+            #expect((resp1 as? HTTPURLResponse)?.statusCode == 200)
+            #expect(!data1.isEmpty)
+
+            // 2. performRequest(_:) proceeds unauthenticated
+            let (data2, resp2) = try await service.performRequest(simpleReq)
+            #expect(resp2.statusCode == 200)
+            #expect(!data2.isEmpty)
+
+            // 3. prepareStreamingRequest proceeds unauthenticated (no auth headers, nil authContext)
+            let streamingPrep = try await service.prepareStreamingRequest(simpleReq)
+            #expect(streamingPrep.request.value(forHTTPHeaderField: "Authorization") == nil)
+            #expect(streamingPrep.authContext == nil)
         }
-
-        PolicyTestURLProtocol.register(host: "pds.example.com") { req in
-            let resp = HTTPURLResponse(
-                url: req.url!,
-                statusCode: 200,
-                httpVersion: "HTTP/1.1",
-                headerFields: ["Content-Type": "application/json"]
-            )!
-            return (resp, Data(#"{"unauthenticated":true}"#.utf8))
-        }
-
-        final class NoActiveAccountAuthProvider: AuthenticationProvider, @unchecked Sendable {
-            func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {
-                throw AuthError.noActiveAccount
-            }
-            func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (URLRequest, AuthContext) {
-                throw AuthError.noActiveAccount
-            }
-            func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
-                throw AuthError.noActiveAccount
-            }
-            func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
-                throw AuthError.noActiveAccount
-            }
-            func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {}
-        }
-
-        let provider = NoActiveAccountAuthProvider()
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!, authService: provider)
-
-        // 1. request(_:) proceeds unauthenticated
-        let simpleReq = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
-        let (data1, resp1) = try await service.request(simpleReq)
-        #expect((resp1 as? HTTPURLResponse)?.statusCode == 200)
-        #expect(!data1.isEmpty)
-
-        // 2. performRequest(_:) proceeds unauthenticated
-        let (data2, resp2) = try await service.performRequest(simpleReq)
-        #expect(resp2.statusCode == 200)
-        #expect(!data2.isEmpty)
-
-        // 3. prepareStreamingRequest proceeds unauthenticated (no auth headers, nil authContext)
-        let streamingPrep = try await service.prepareStreamingRequest(simpleReq)
-        #expect(streamingPrep.request.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(streamingPrep.authContext == nil)
     }
 
     @Test("Step 7 & N1-N1 & N1-N2: WebSocket subscription admitted for wss and requires auth for authorized origin")

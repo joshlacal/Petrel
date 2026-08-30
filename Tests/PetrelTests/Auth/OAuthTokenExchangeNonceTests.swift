@@ -160,13 +160,19 @@ private func nonceInProof(_ compactJWS: String) throws -> String? {
 private func withOAuthFlowTransport<T>(
     _ backend: InMemorySecureStorage,
     handler: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data),
-    _ body: () async throws -> T
+    _ body: @escaping () async throws -> T
 ) async throws -> T {
     try await withSerializedStorageOverrideTest {
         KeychainManager._setStorageOverride(backend)
         OAuthFlowURLProtocol.setHandler(handler)
         NetworkService.setNetworkTestProtocolClasses([OAuthFlowURLProtocol.self])
-        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
+        let testDNS: @Sendable (String) -> [String]? = { host in
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                return ["127.0.0.1"]
+            }
+            return ["93.184.216.34"]
+        }
+        NetworkService.dnsResolverOverride = testDNS
         defer {
             NetworkService.dnsResolverOverride = nil
             NetworkService.setNetworkTestProtocolClasses(nil)

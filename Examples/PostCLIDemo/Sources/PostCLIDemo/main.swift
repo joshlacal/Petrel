@@ -24,11 +24,12 @@ struct PostCLIDemo {
 
         do {
             // Initialize the client
-            let client = await ATProtoClient(
+            let client = try await ATProtoClient(
                 baseURL: URL(string: "https://bsky.social")!,
                 oauthConfig: OAuthConfig(
-                    clientId: "http://localhost",
-                    redirectUri: "http://localhost/callback"
+                    clientId: "https://client.example.com/client-metadata.json",
+                    redirectUri: "https://client.example.com/callback",
+                    scope: "atproto transition:generic"
                 ),
                 namespace: "com.example.postcli"
             )
@@ -199,19 +200,19 @@ struct PostCLIDemo {
             facets: nil,
             reply: nil,
             embed: nil,
-            langs: [LanguageCodeContainer(code: "en")],
+            langs: [LanguageCodeContainer(languageCode: "en")],
             labels: nil,
             tags: nil,
             createdAt: ATProtocolDate(date: Date())
         )
 
         // Wrap in ATProtocolValueContainer
-        let recordContainer = ATProtocolValueContainer(post)
+        let recordContainer = ATProtocolValueContainer.knownType(post)
 
         // Create the record
-        let input = try ComAtprotoRepoCreateRecord.Input(
-            repo: ATIdentifier(handle),
-            collection: NSID("app.bsky.feed.post"),
+        let input = ComAtprotoRepoCreateRecord.Input(
+            repo: try ATIdentifier(string: handle),
+            collection: try NSID(nsidString: "app.bsky.feed.post"),
             rkey: nil,
             validate: true,
             record: recordContainer,
@@ -237,7 +238,8 @@ struct PostCLIDemo {
     static func viewProfile(client: ATProtoClient, handle: String) async throws {
         print("\n👤 Fetching profile...")
 
-        let params = AppBskyActorGetProfile.Parameters(actor: handle)
+        let actor = try ATIdentifier(string: handle)
+        let params = AppBskyActorGetProfile.Parameters(actor: actor)
         let (responseCode, profile) = try await client.app.bsky.actor.getProfile(input: params)
 
         guard responseCode == 200, let profile = profile else {
@@ -270,5 +272,3 @@ struct PostCLIDemo {
     }
 }
 
-// Run the demo
-await PostCLIDemo.main()

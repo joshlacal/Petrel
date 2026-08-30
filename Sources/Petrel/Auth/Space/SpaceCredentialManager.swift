@@ -170,10 +170,10 @@ public actor SpaceCredentialManager {
     /// Note: SpaceAuthorityHostProvider returns only URL (spaceHost). SpaceAuthorityEndpoints.signingKeyFragment
     /// has no consumer today; a future credential-signature verifier may want it.
     public typealias SpaceAuthorityHostProvider = @Sendable (String) async throws -> URL
-
     private let client: ATProtoClient
     private let authorityHostProvider: SpaceAuthorityHostProvider
     private let urlSession: URLSession
+    private let sessionDelegate: HardenedURLSessionDelegate?
     private let delegationTokenProvider: DelegationTokenProvider
 
     private var cache: [SpaceRef: SpaceCredential] = [:]
@@ -184,12 +184,25 @@ public actor SpaceCredentialManager {
     public init(
         client: ATProtoClient,
         authorityHostProvider: @escaping SpaceAuthorityHostProvider,
-        urlSession: URLSession = .shared,
+        urlSession: URLSession? = nil,
         delegationTokenProvider: DelegationTokenProvider? = nil
     ) {
         self.client = client
         self.authorityHostProvider = authorityHostProvider
-        self.urlSession = urlSession
+        if let urlSession {
+            self.urlSession = urlSession
+            self.sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
+        } else {
+            let config = URLSessionConfiguration.ephemeral
+            #if DEBUG
+            if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
+                config.protocolClasses = testClasses
+            }
+            #endif
+            let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+            self.sessionDelegate = delegate
+            self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        }
         self.delegationTokenProvider = delegationTokenProvider ?? { [client] space in
             let (_, output) = try await client.com.atproto.space.getDelegationToken(
                 input: .init(space: space)
@@ -205,7 +218,7 @@ public actor SpaceCredentialManager {
     public init(
         client: ATProtoClient,
         resolver: SpaceHostResolver,
-        urlSession: URLSession = .shared,
+        urlSession: URLSession? = nil,
         delegationTokenProvider: DelegationTokenProvider? = nil
     ) {
         self.init(
@@ -279,6 +292,9 @@ public actor SpaceCredentialManager {
         guard Self.isSecureOrLoopback(url) else {
             throw SpaceCredentialError.insecureURL(url.absoluteString)
         }
+        guard try await NetworkService.validateURL(url) else {
+            throw SpaceCredentialError.insecureURL(url.absoluteString)
+        }
 
         let cred = try await credential(for: space)
         guard let privateKey = try? P256.Signing.PrivateKey(rawRepresentation: cred.keyRawRepresentation) else {
@@ -298,7 +314,16 @@ public actor SpaceCredentialManager {
         request.setValue("DPoP \(cred.token)", forHTTPHeaderField: "Authorization")
         request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
 
-        let (data, response) = try await urlSession.data(for: request)
+        let data: Data
+        let response: URLResponse
+        if let sessionDelegate {
+            (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: sessionDelegate)
+        } else if let delegate = urlSession.delegate as? HardenedURLSessionDelegate {
+            (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: delegate)
+        } else {
+            (data, response) = try await urlSession.data(for: request)
+        }
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SpaceCredentialError.invalidResponse
         }
@@ -337,6 +362,9 @@ public actor SpaceCredentialManager {
         guard Self.isSecureOrLoopback(exchangeURL) else {
             throw SpaceCredentialError.insecureURL(exchangeURL.absoluteString)
         }
+        guard try await NetworkService.validateURL(exchangeURL) else {
+            throw SpaceCredentialError.insecureURL(exchangeURL.absoluteString)
+        }
 
         let htu = canonicalHTU(exchangeURL)
         let dpopProof = try SpaceDPoP.proof(
@@ -355,11 +383,19 @@ public actor SpaceCredentialManager {
         let input = ComAtprotoSpaceGetSpaceCredential.Input(space: space)
         request.httpBody = try JSONEncoder().encode(input)
 
-        let (data, response) = try await urlSession.data(for: request)
+        let data: Data
+        let response: URLResponse
+        if let sessionDelegate {
+            (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: sessionDelegate)
+        } else if let delegate = urlSession.delegate as? HardenedURLSessionDelegate {
+            (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: delegate)
+        } else {
+            (data, response) = try await urlSession.data(for: request)
+        }
+
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SpaceCredentialError.invalidResponse
         }
-
         guard (200...299).contains(httpResponse.statusCode) else {
             let host = spaceHost.host ?? spaceHost.absoluteString
             let parsed = ATProtoErrorParser.parseGeneric(data: data, statusCode: httpResponse.statusCode)

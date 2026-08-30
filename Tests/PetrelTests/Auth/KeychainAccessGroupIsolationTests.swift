@@ -2,68 +2,6 @@ import Foundation
 @testable import Petrel
 import Testing
 
-private final class GroupAwareInMemorySecureStorage: SecureStorage, @unchecked Sendable {
-    private let lock = NSLock()
-    private var items: [String: Data] = [:]
-
-    private func fullKey(_ key: String, _ namespace: String, _ accessGroup: String?) -> String {
-        "\(namespace)|\(accessGroup ?? "")|\(key)"
-    }
-
-    func store(key: String, value: Data, namespace: String, accessGroup: String?) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        items[fullKey(key, namespace, accessGroup)] = value
-    }
-
-    func retrieve(key: String, namespace: String, accessGroup: String?) throws -> Data {
-        lock.lock()
-        defer { lock.unlock() }
-        guard let data = items[fullKey(key, namespace, accessGroup)] else {
-            throw KeychainError.itemRetrievalError(status: -25300)
-        }
-        return data
-    }
-
-    func delete(key: String, namespace: String, accessGroup: String?) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        let k = fullKey(key, namespace, accessGroup)
-        guard items.removeValue(forKey: k) != nil else {
-            throw KeychainError.deletionError(status: -25300)
-        }
-    }
-
-    func deleteAll(namespace: String, accessGroup: String?) throws {
-        lock.lock()
-        defer { lock.unlock() }
-        let prefix = "\(namespace)|\(accessGroup ?? "")|"
-        items = items.filter { !$0.key.hasPrefix(prefix) }
-    }
-
-    func storeDPoPKeyRepresentation(_ representation: Data, keyTag: String, accessGroup: String?) throws {
-        try store(key: keyTag, value: representation, namespace: "dpopkeys", accessGroup: accessGroup)
-    }
-
-    func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data {
-        try retrieve(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
-    }
-
-    func deleteDPoPKey(keyTag: String, accessGroup: String?) throws {
-        try delete(key: keyTag, namespace: "dpopkeys", accessGroup: accessGroup)
-    }
-}
-
-private func withGroupAwareStorage<T>(
-    _ body: () async throws -> T
-) async throws -> T {
-    try await withSerializedStorageOverrideTest {
-        let backend = GroupAwareInMemorySecureStorage()
-        KeychainManager._setStorageOverride(backend)
-        defer { KeychainManager._setStorageOverride(nil) }
-        return try await body()
-    }
-}
 
 @Suite("Keychain Access Group Isolation", .serialized)
 struct KeychainAccessGroupIsolationTests {

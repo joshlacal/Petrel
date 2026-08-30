@@ -71,9 +71,35 @@ private final class SpaceMockURLProtocol: URLProtocol {
 }
 
 private func makeMockSession() -> URLSession {
+    NetworkService.setNetworkTestProtocolClasses([SpaceMockURLProtocol.self])
+    NetworkService.dnsResolverOverride = { host in
+        if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+            return ["127.0.0.1"]
+        }
+        return ["93.184.216.34"]
+    }
     let config = URLSessionConfiguration.ephemeral
     config.protocolClasses = [SpaceMockURLProtocol.self]
-    return URLSession(configuration: config)
+    let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+    return URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+}
+
+private func withSpaceTestSession<T>(_ body: () async throws -> T) async throws -> T {
+    try await withSerializedStorageOverrideTest {
+        NetworkService.setNetworkTestProtocolClasses([SpaceMockURLProtocol.self])
+        NetworkService.dnsResolverOverride = { host in
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                return ["127.0.0.1"]
+            }
+            return ["93.184.216.34"]
+        }
+        defer {
+            SpaceMockURLProtocol.setHandler(nil)
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
+        }
+        return try await body()
+    }
 }
 
 // MARK: - SpaceDPoP Tests
@@ -194,7 +220,6 @@ struct SpaceCredentialManagerTests {
         func resolveDIDToPDSURL(did: String) async throws -> URL { URL(string: "https://pds.test")! }
         func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) { ("user.test", URL(string: "https://pds.test")!) }
     }
-
     @Test("exchange POSTs delegation token as Bearer with DPoP header, caches until expiry")
     func exchangeAndCache() async throws {
         let session = makeMockSession()
