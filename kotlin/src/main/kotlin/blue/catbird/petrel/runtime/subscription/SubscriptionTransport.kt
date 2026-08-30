@@ -47,6 +47,7 @@ suspend fun ATProtoClient.openSubscription(
     queryItems: List<Pair<String, String>>,
     hostOverride: String?,
     websocketClient: HttpClient?,
+    limits: CborLimits = CborLimits(),
     onFrame: suspend (CborFrame) -> Unit,
 ) {
     val wsUrl = buildSubscriptionUrl(
@@ -62,7 +63,7 @@ suspend fun ATProtoClient.openSubscription(
             for (frame in incoming) {
                 when (frame) {
                     is Frame.Binary -> {
-                        val parsed = parseBinaryFrame(frame.readBytes())
+                        val parsed = parseBinaryFrame(frame.readBytes(), limits)
                         if (parsed != null) onFrame(parsed)
                     }
                     is Frame.Text -> {
