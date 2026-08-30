@@ -20,7 +20,16 @@ public enum ATProtoWebSocketFrameDecoder {
             throw NetworkError.invalidResponse(description: "Empty WebSocket frame")
         }
 
-        let headerCBOR = try CBOR.decode([UInt8](data[offset...]))
+        let remainingData = Data(data[offset...])
+        do {
+            try DAGCBOR.decodeCBORPreflight(remainingData, allowTrailingBytes: true)
+        } catch {
+            throw NetworkError.invalidResponse(description: "CBOR preflight failed for header: \(error.localizedDescription)")
+        }
+
+        guard let headerCBOR = try? CBOR.decode([UInt8](remainingData)) else {
+            throw NetworkError.invalidResponse(description: "Invalid header format")
+        }
         guard case let .map(headerMap) = headerCBOR else {
             throw NetworkError.invalidResponse(description: "Invalid header format")
         }
@@ -38,9 +47,15 @@ public enum ATProtoWebSocketFrameDecoder {
             let headerData = headerCBOR.encode()
             offset += headerData.count
 
-            let payloadData = data[offset...]
-            let errorPayload = try CBOR.decode([UInt8](payloadData))
-
+            let payloadData = Data(data[offset...])
+            do {
+                try DAGCBOR.decodeCBORPreflight(payloadData)
+            } catch {
+                throw NetworkError.invalidResponse(description: "CBOR preflight failed for error payload: \(error.localizedDescription)")
+            }
+            guard let errorPayload = try? CBOR.decode([UInt8](payloadData)) else {
+                throw NetworkError.invalidResponse(description: "Failed to decode CBOR error payload")
+            }
             if case let .map(errorMap) = errorPayload,
                let errorNameCBOR = errorMap[CBOR.utf8String("error")],
                case let .utf8String(errorName) = errorNameCBOR
@@ -49,7 +64,6 @@ public enum ATProtoWebSocketFrameDecoder {
             }
             throw NetworkError.invalidResponse(description: "Unknown error frame")
         }
-
         guard op == 1 else {
             throw NetworkError.invalidResponse(description: "Unknown operation code: \(op)")
         }
@@ -67,7 +81,12 @@ public enum ATProtoWebSocketFrameDecoder {
             throw NetworkError.invalidResponse(description: "Missing payload in WebSocket frame")
         }
 
-        let payloadData = data[offset...]
+        let payloadData = Data(data[offset...])
+        do {
+            try DAGCBOR.decodeCBORPreflight(payloadData)
+        } catch {
+            throw NetworkError.invalidResponse(description: "CBOR preflight failed for payload: \(error.localizedDescription)")
+        }
         guard let payloadCBOR = try? CBOR.decode([UInt8](payloadData)) else {
             throw NetworkError.invalidResponse(description: "Failed to decode CBOR payload")
         }
@@ -91,9 +110,25 @@ public enum ATProtoWebSocketFrameDecoder {
     private static func cborToJSONValue(_ cbor: CBOR) throws -> Any {
         switch cbor {
         case let .unsignedInt(value):
+            guard value <= UInt64(Int.max) else {
+                throw NetworkError.invalidResponse(
+                    description: "CBOR unsigned integer \(value) exceeds Int.max"
+                )
+            }
             return Int(value)
         case let .negativeInt(value):
-            return -1 - Int(value)
+            guard value <= UInt64(Int64.max) else {
+                throw NetworkError.invalidResponse(
+                    description: "CBOR negative integer argument \(value) exceeds Int64 boundary"
+                )
+            }
+            let int64Val = -Int64(value) - 1
+            guard int64Val >= Int64(Int.min) && int64Val <= Int64(Int.max) else {
+                throw NetworkError.invalidResponse(
+                    description: "CBOR negative integer \(int64Val) underflows Int.min"
+                )
+            }
+            return Int(int64Val)
         case let .byteString(bytes):
             return ["$bytes": Data(bytes).base64EncodedString()]
         case let .utf8String(string):

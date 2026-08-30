@@ -122,6 +122,11 @@ public enum CARRepository {
         guard !data.isEmpty else {
             throw CARReaderError.decodingFailed("Empty CBOR data")
         }
+        do {
+            try DAGCBOR.decodeCBORPreflight(data)
+        } catch {
+            throw CARReaderError.decodingFailed("CBOR preflight failed: \(error.localizedDescription)")
+        }
         guard let cborItem = try? CBOR.decode([UInt8](data)) else {
             throw CARReaderError.decodingFailed("Failed to parse CBOR")
         }

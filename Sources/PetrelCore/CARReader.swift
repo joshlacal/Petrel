@@ -9,14 +9,15 @@ import SwiftCBOR
 
 // MARK: - CARReaderError
 
-public enum CARReaderError: LocalizedError {
+public enum CARReaderError: LocalizedError, Equatable {
     case invalidHeader(String)
     case invalidVarint
     case unexpectedEOF
     case invalidCID(String)
     case blockNotFound(String)
     case decodingFailed(String)
-
+    case blockCIDMismatch(String)
+    case duplicateBlockConflict(String)
     public var errorDescription: String? {
         switch self {
         case let .invalidHeader(msg): return "Invalid CAR header: \(msg)"
@@ -25,6 +26,8 @@ public enum CARReaderError: LocalizedError {
         case let .invalidCID(msg): return "Invalid CID: \(msg)"
         case let .blockNotFound(key): return "Block not found for key: \(key)"
         case let .decodingFailed(msg): return "Decoding failed: \(msg)"
+        case let .blockCIDMismatch(msg): return "Block CID mismatch: \(msg)"
+        case let .duplicateBlockConflict(msg): return "Duplicate block conflict: \(msg)"
         }
     }
 }
@@ -76,14 +79,30 @@ public class CARReader {
     public func readVarint() throws -> Int {
         var result: UInt64 = 0
         var shift: UInt64 = 0
+        var bytesRead = 0
 
         while offset < data.count {
             let byte = data[offset]
             offset += 1
+            bytesRead += 1
 
-            result |= UInt64(byte & 0x7F) << shift
+            // Reject oversized varint encodings (max 9 bytes for 64-bit varint)
+            guard bytesRead <= 9 else {
+                throw CARReaderError.invalidVarint
+            }
+
+            let valueBits = UInt64(byte & 0x7F)
+            if shift >= 64 || (shift == 63 && valueBits > 1) {
+                throw CARReaderError.invalidVarint
+            }
+
+            result |= valueBits << shift
 
             if byte & 0x80 == 0 {
+                // Reject non-canonical zero padding in multi-byte varints (e.g. 0x80 0x00, 0x81 0x00)
+                if bytesRead > 1 && byte == 0x00 {
+                    throw CARReaderError.invalidVarint
+                }
                 guard result <= UInt64(Int.max) else {
                     throw CARReaderError.invalidVarint
                 }
@@ -91,9 +110,6 @@ public class CARReader {
             }
 
             shift += 7
-            if shift > 63 {
-                throw CARReaderError.invalidVarint
-            }
         }
 
         throw CARReaderError.unexpectedEOF
@@ -104,12 +120,17 @@ public class CARReader {
     private func parseHeader() throws {
         let headerLength = try readVarint()
 
-        guard offset + headerLength <= data.count else {
+        guard data.count - offset >= headerLength else {
             throw CARReaderError.unexpectedEOF
         }
-
         let headerData = data[offset ..< (offset + headerLength)]
         offset += headerLength
+
+        do {
+            try DAGCBOR.decodeCBORPreflight(Data(headerData))
+        } catch {
+            throw CARReaderError.invalidHeader("CBOR preflight failed for header: \(error.localizedDescription)")
+        }
 
         guard let cbor = try? CBOR.decode([UInt8](headerData)) else {
             throw CARReaderError.invalidHeader("Failed to decode CBOR header")
@@ -170,20 +191,18 @@ public class CARReader {
             guard totalLength > 0 else {
                 throw CARReaderError.invalidVarint
             }
-            guard offset + totalLength <= data.count else {
+            guard data.count - offset >= totalLength else {
                 throw CARReaderError.unexpectedEOF
             }
 
             let blockDataStart = offset
             let blockEnd = blockDataStart + totalLength
 
-            // Parse CID from block: version + codec + multihash(algo + length + digest)
-            let cidStart = offset
-
             guard offset < blockEnd else { throw CARReaderError.unexpectedEOF }
             let version = data[offset]
             offset += 1
 
+            let parsedCID: CID
             if version == 0x12 {
                 // CIDv0 (starts with sha2-256 multihash directly) — rare but handle it
                 // sha2-256: code=0x12, length=0x20, then 32 bytes digest
@@ -191,39 +210,69 @@ public class CARReader {
                 let hashLen = data[offset]
                 offset += 1
                 let digestLen = Int(hashLen)
-                guard offset + digestLen <= blockEnd else { throw CARReaderError.unexpectedEOF }
+                guard digestLen == 32, blockEnd - offset >= digestLen else { throw CARReaderError.unexpectedEOF }
+                let digest = data[offset ..< (offset + digestLen)]
                 offset += digestLen
 
-                let cidData = data[cidStart ..< offset]
-                let dataOffset = offset
-                let dataLength = totalLength - (offset - blockDataStart)
-                rawBlockIndex[Data(cidData)] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
-                offset = blockEnd
-                continue
+                parsedCID = CID(codec: .dagPB, multihash: Multihash(algorithm: 0x12, length: 0x20, digest: Data(digest)))
+            } else if version == 0x01 {
+                // CIDv1
+                guard offset < blockEnd else { throw CARReaderError.unexpectedEOF }
+                let codecByte = data[offset]
+                offset += 1
+                guard let codec = CIDCodec(rawValue: codecByte) else {
+                    throw CARReaderError.invalidCID("Unsupported codec \(codecByte)")
+                }
+
+                // Multihash: algorithm + length + digest
+                guard offset < blockEnd else { throw CARReaderError.unexpectedEOF }
+                let algoByte = data[offset]
+                offset += 1
+
+                guard offset < blockEnd else { throw CARReaderError.unexpectedEOF }
+                let hashLen = data[offset]
+                offset += 1
+
+                let digestLen = Int(hashLen)
+                guard digestLen > 0, digestLen <= 64, blockEnd - offset >= digestLen else { throw CARReaderError.unexpectedEOF }
+                let digest = data[offset ..< (offset + digestLen)]
+                offset += digestLen
+
+                parsedCID = CID(codec: codec, multihash: Multihash(algorithm: algoByte, length: hashLen, digest: Data(digest)))
+            } else {
+                throw CARReaderError.invalidCID("Unsupported CID version \(version)")
             }
 
-            // CIDv1
-            guard offset < blockEnd else { throw CARReaderError.unexpectedEOF }
-            // Skip the one-byte codec. The full CID bytes are retained below.
-            offset += 1
-
-            // Multihash: algorithm + length + digest
-            guard offset < blockEnd else { throw CARReaderError.unexpectedEOF }
-            // Skip the one-byte hash algorithm. The full CID bytes are retained below.
-            offset += 1
-
-            guard offset < blockEnd else { throw CARReaderError.unexpectedEOF }
-            let hashLen = data[offset]
-            offset += 1
-
-            let digestLen = Int(hashLen)
-            guard offset + digestLen <= blockEnd else { throw CARReaderError.unexpectedEOF }
-            offset += digestLen
-
-            let cidData = data[cidStart ..< offset]
+            let cidData = parsedCID.bytes
             let dataOffset = offset
             let dataLength = totalLength - (offset - blockDataStart)
-            rawBlockIndex[Data(cidData)] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
+            let bodyData = data[dataOffset ..< (dataOffset + dataLength)]
+
+            // Verify multihash of body matches claimed CID (fail closed for all non-sha2-256 algorithms)
+            guard parsedCID.multihash.algorithm == Multihash.sha256Code,
+                  parsedCID.multihash.length == Multihash.sha256Length else {
+                throw CARReaderError.invalidCID(
+                    "Unsupported or unverifiable multihash algorithm 0x\(String(format: "%02X", parsedCID.multihash.algorithm))"
+                )
+            }
+            let computedMultihash = Multihash.sha256(Data(bodyData))
+            guard computedMultihash.digest == parsedCID.multihash.digest else {
+                throw CARReaderError.blockCIDMismatch(
+                    "Claimed CID \(parsedCID.string) does not match body digest"
+                )
+            }
+
+            // Check for conflicting duplicate CIDs
+            if let existing = rawBlockIndex[cidData] {
+                let existingBody = data[existing.dataOffset ..< (existing.dataOffset + existing.dataLength)]
+                guard existingBody == bodyData else {
+                    throw CARReaderError.duplicateBlockConflict(
+                        "Conflicting duplicate block for CID \(parsedCID.string)"
+                    )
+                }
+            } else {
+                rawBlockIndex[cidData] = BlockLocation(dataOffset: dataOffset, dataLength: dataLength)
+            }
 
             offset = blockEnd
         }
@@ -239,6 +288,12 @@ public class CARReader {
 
         let blockData = data[location.dataOffset ..< (location.dataOffset + location.dataLength)]
 
+        do {
+            try DAGCBOR.decodeCBORPreflight(Data(blockData))
+        } catch {
+            throw CARReaderError.decodingFailed("CBOR preflight failed for block \(cidBytes.hexEncodedString()): \(error.localizedDescription)")
+        }
+
         guard let cbor = try? CBOR.decode([UInt8](blockData)) else {
             throw CARReaderError.decodingFailed("Failed to decode CBOR for block \(cidBytes.hexEncodedString())")
         }
@@ -253,12 +308,8 @@ public class CARReader {
 
     /// Retrieves and decodes the CBOR block for a given CID hex string key (compatibility entry point).
     public func decodeBlock(for key: String) throws -> Any? {
-        if let hexData = Data(hexString: key), let location = rawBlockIndex[hexData] {
-            let blockData = data[location.dataOffset ..< (location.dataOffset + location.dataLength)]
-            guard let cbor = try? CBOR.decode([UInt8](blockData)) else {
-                throw CARReaderError.decodingFailed("Failed to decode CBOR for block \(key)")
-            }
-            return try DAGCBOR.decodeCBORItem(cbor)
+        if let hexData = Data(hexString: key) {
+            return try decodeBlock(for: hexData)
         }
         throw CARReaderError.blockNotFound(key)
     }

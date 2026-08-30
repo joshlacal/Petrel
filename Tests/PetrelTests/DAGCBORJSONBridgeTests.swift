@@ -353,6 +353,79 @@ struct DAGCBORJSONBridgeTests {
         #expect(!cborAppendData.isEmpty)
     }
 
+    // MARK: - Encoded CBOR Preflight and Bounds (F14)
+
+    @Test("CBOR nesting depth 64 succeeds and 65 throws before allocation")
+    func cborDepthLimitsEnforced() throws {
+        // Build nested arrays: depth 64 vs depth 65
+        var data64 = Data()
+        for _ in 0 ..< 64 {
+            data64.append(0x81) // Array of 1 element
+        }
+        data64.append(0x00) // Unsigned int 0
+
+        #expect(throws: Never.self) {
+            _ = try DAGCBOR.decodeCBORPreflight(data64)
+        }
+
+        var data65 = Data()
+        for _ in 0 ..< 65 {
+            data65.append(0x81) // Array of 1 element
+        }
+        data65.append(0x00)
+
+        #expect(throws: DAGCBORError.self) {
+            _ = try DAGCBOR.decodeCBORPreflight(data65)
+        }
+    }
+
+    @Test("Huge declared cardinality in tiny input fails preflight without allocation")
+    func hugeDeclaredCardinalityFailsPreflight() throws {
+        // A map declaring UInt64.max pairs in just 9 bytes
+        let hostileMap = Data([0xbb, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
+        #expect(throws: DAGCBORError.self) {
+            _ = try DAGCBOR.decodeCBORPreflight(hostileMap)
+        }
+
+        // An array declaring Int.max elements in 9 bytes
+        let hostileArray = Data([0x9b, 0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff])
+        #expect(throws: DAGCBORError.self) {
+            _ = try DAGCBOR.decodeCBORPreflight(hostileArray)
+        }
+    }
+
+    @Test("CBOR with unconsumed trailing bytes fails preflight")
+    func unconsumedTrailingBytesFailPreflight() throws {
+        let validCBOR = Data([0x01]) // Unsigned int 1
+        let withTrailing = validCBOR + Data([0x02])
+        #expect(throws: DAGCBORError.self) {
+            _ = try DAGCBOR.decodeCBORPreflight(withTrailing)
+        }
+    }
+
+    @Test("Map with duplicate or noncanonical unsorted keys fails preflight")
+    func duplicateOrUnsortedMapKeysFailPreflight() throws {
+        // Map with 2 keys: "z" then "a" (unsorted in DAG-CBOR)
+        let unsortedMap = Data([
+            0xa2, // map of 2 pairs
+            0x61, 0x7a, 0x01, // "z": 1
+            0x61, 0x61, 0x02, // "a": 2
+        ])
+        #expect(throws: DAGCBORError.self) {
+            _ = try DAGCBOR.decodeCBORPreflight(unsortedMap)
+        }
+
+        // Map with duplicate keys "a" then "a"
+        let duplicateMap = Data([
+            0xa2, // map of 2 pairs
+            0x61, 0x61, 0x01, // "a": 1
+            0x61, 0x61, 0x02, // "a": 2
+        ])
+        #expect(throws: DAGCBORError.self) {
+            _ = try DAGCBOR.decodeCBORPreflight(duplicateMap)
+        }
+    }
+
     private func isTag42(_ item: CBOR?) -> Bool {
         guard case let .tagged(tag, _) = item else { return false }
         return tag.rawValue == 42

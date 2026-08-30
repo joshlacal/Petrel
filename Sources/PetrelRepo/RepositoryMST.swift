@@ -50,18 +50,21 @@ public struct RepositoryMST: Sendable {
     private var knownEntries: [Entry]?
     private var knownLayer: Int?
     private let limits: PublicRepositoryLimits
+    private let context: RepositoryMSTMutationContext
     private init(
         blocks: any PublicRepositoryBlockSource,
         pointer: CID?,
         entries: [Entry]?,
         layer: Int?,
-        limits: PublicRepositoryLimits
+        limits: PublicRepositoryLimits,
+        context: RepositoryMSTMutationContext = RepositoryMSTMutationContext()
     ) {
         self.blocks = blocks
         self.pointer = pointer
         knownEntries = entries
         knownLayer = layer
         self.limits = limits
+        self.context = context
     }
 
     public static func load(
@@ -74,12 +77,14 @@ public struct RepositoryMST: Sendable {
         } catch {
             throw RepositoryMSTMutationError.blockCIDMismatch
         }
+        let context = RepositoryMSTMutationContext()
         return Self(
             blocks: blocks,
             pointer: rootCID,
             entries: nil,
             layer: nil,
-            limits: limits
+            limits: limits,
+            context: context
         )
     }
 
@@ -90,12 +95,14 @@ public struct RepositoryMST: Sendable {
             blocks: [.init(cid: cid, bytes: bytes)],
             maximumRelevantBytes: limits.maximumRelevantBlockBytes
         )
+        let context = RepositoryMSTMutationContext()
         return Self(
             blocks: source,
             pointer: cid,
             entries: [],
             layer: 0,
-            limits: limits
+            limits: limits,
+            context: context
         )
     }
 
@@ -303,7 +310,8 @@ public struct RepositoryMST: Sendable {
                 pointer: nil,
                 entries: [],
                 layer: layer - 1,
-                limits: limits
+                limits: limits,
+                context: context
             )
             let updatedChild = try await child.add(
                 path: path,
@@ -334,7 +342,8 @@ public struct RepositoryMST: Sendable {
             pointer: nil,
             entries: rootEntries,
             layer: keyDepth,
-            limits: limits
+            limits: limits,
+            context: context
         ).checked()
     }
 
@@ -432,22 +441,31 @@ public struct RepositoryMST: Sendable {
             pointer: nil,
             entries: [.tree(self)],
             layer: layer + 1,
-            limits: limits
+            limits: limits,
+            context: context
         ).checked()
     }
     // MARK: Loading and encoding
-    private mutating func loadNode() async throws -> (entries: [Entry], layer: Int) {
+    private mutating func loadNode(discoveryDepth: Int = 0) async throws -> (entries: [Entry], layer: Int) {
+        guard discoveryDepth <= 128 else {
+            throw RepositoryMSTMutationError.invalidLayer
+        }
         if let knownEntries, let knownLayer {
             return (knownEntries, knownLayer)
         }
         if let knownEntries {
-            let l = try await computeLayer(from: knownEntries)
+            let l = try await computeLayer(from: knownEntries, discoveryDepth: discoveryDepth)
             knownLayer = l
             return (knownEntries, l)
         }
-        guard let pointer, let bytes = try await blocks.block(for: pointer) else {
+        guard let pointer else {
             throw RepositoryMSTMutationError.missingBlock
         }
+        try context.visit(pointer, limits: limits)
+        guard let bytes = try await blocks.block(for: pointer) else {
+            throw RepositoryMSTMutationError.missingBlock
+        }
+        try context.recordBytes(bytes.count, limits: limits)
         do {
             try PublicRepositoryCID.validate(pointer, blockBytes: bytes)
         } catch {
@@ -474,7 +492,8 @@ public struct RepositoryMST: Sendable {
                 pointer: left,
                 entries: nil,
                 layer: childLayer,
-                limits: limits
+                limits: limits,
+                context: context
             )))
         }
         for leaf in leaves {
@@ -485,7 +504,8 @@ public struct RepositoryMST: Sendable {
                     pointer: right,
                     entries: nil,
                     layer: childLayer,
-                    limits: limits
+                    limits: limits,
+                    context: context
                 )))
             }
         }
@@ -504,27 +524,43 @@ public struct RepositoryMST: Sendable {
             }
             resolvedLayer = inferredLayer
         } else {
-            resolvedLayer = try await computeLayer(from: result)
+            resolvedLayer = try await computeLayer(from: result, discoveryDepth: discoveryDepth)
         }
         knownEntries = result
         knownLayer = resolvedLayer
         return (result, resolvedLayer)
     }
 
-    private func computeLayer(from entries: [Entry]) async throws -> Int {
+    private func computeLayer(from entries: [Entry], discoveryDepth: Int = 0) async throws -> Int {
         for entry in entries {
             if case let .leaf(leaf) = entry {
                 return leaf.path.keyDepth
             }
         }
-        for entry in entries {
-            if case var .tree(child) = entry {
-                let (_, childLayer) = try await child.loadNode()
-                guard childLayer < 128 else { throw RepositoryMSTMutationError.invalidLayer }
-                return childLayer + 1
+        // Iterative layer discovery with depth bounding to prevent stack exhaustion on chains of empty nodes
+        var currentEntries = entries
+        var accumulatedDepth = discoveryDepth
+        while accumulatedDepth <= 128 {
+            var foundTree: Self?
+            for entry in currentEntries {
+                if case let .leaf(leaf) = entry {
+                    return leaf.path.keyDepth + (accumulatedDepth - discoveryDepth)
+                }
+                if case let .tree(child) = entry, foundTree == nil {
+                    foundTree = child
+                }
             }
+            guard var child = foundTree else {
+                return accumulatedDepth - discoveryDepth
+            }
+            accumulatedDepth += 1
+            guard accumulatedDepth <= 128 else {
+                throw RepositoryMSTMutationError.invalidLayer
+            }
+            let (childEntries, _) = try await child.loadNode(discoveryDepth: accumulatedDepth)
+            currentEntries = childEntries
         }
-        return 0
+        throw RepositoryMSTMutationError.invalidLayer
     }
 
     private mutating func collectNewBlocks(into collector: inout NewBlockCollector) async throws -> CID {
@@ -668,7 +704,8 @@ public struct RepositoryMST: Sendable {
             pointer: nil,
             entries: entries,
             layer: layer ?? knownLayer,
-            limits: limits
+            limits: limits,
+            context: context
         ).checked()
     }
 
@@ -717,6 +754,29 @@ public struct RepositoryMST: Sendable {
         } catch {
             throw RepositoryMSTMutationError.blockCIDMismatch
         }
+    }
+}
+
+final class RepositoryMSTMutationContext: @unchecked Sendable {
+    private var loadedNodes = Set<CID>()
+    private var byteCount = 0
+    init() {}
+
+    func visit(_ cid: CID, limits: PublicRepositoryLimits) throws {
+        guard loadedNodes.insert(cid).inserted else {
+            return
+        }
+        guard loadedNodes.count <= limits.maximumMSTNodes else {
+            throw RepositoryMSTMutationError.nodeLimitExceeded
+        }
+    }
+
+    func recordBytes(_ count: Int, limits: PublicRepositoryLimits) throws {
+        let (next, overflow) = byteCount.addingReportingOverflow(count)
+        guard !overflow, next <= limits.maximumRelevantBlockBytes else {
+            throw RepositoryMSTMutationError.relevantBlockBudgetExceeded
+        }
+        byteCount = next
     }
 }
 

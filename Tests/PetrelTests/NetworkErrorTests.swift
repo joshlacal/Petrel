@@ -1,4 +1,57 @@
 import Foundation
+import SwiftCBOR
+
+private enum TestCBORWriter {
+    static func header(major: UInt8, argument: UInt64) -> Data {
+        let prefix = major << 5
+        var result = Data()
+        switch argument {
+        case 0 ..< 24:
+            result.append(prefix | UInt8(argument))
+        case 24 ... UInt64(UInt8.max):
+            result.append(prefix | 24)
+            result.append(UInt8(argument))
+        case (UInt64(UInt8.max) + 1) ... UInt64(UInt16.max):
+            result.append(prefix | 25)
+            var value = UInt16(argument).bigEndian
+            result.append(Data(bytes: &value, count: MemoryLayout<UInt16>.size))
+        case (UInt64(UInt16.max) + 1) ... UInt64(UInt32.max):
+            result.append(prefix | 26)
+            var value = UInt32(argument).bigEndian
+            result.append(Data(bytes: &value, count: MemoryLayout<UInt32>.size))
+        default:
+            result.append(prefix | 27)
+            var value = argument.bigEndian
+            result.append(Data(bytes: &value, count: MemoryLayout<UInt64>.size))
+        }
+        return result
+    }
+
+    static func uint(_ value: UInt64) -> Data {
+        header(major: 0, argument: value)
+    }
+
+    static func negative(_ value: Int64) -> Data {
+        header(major: 1, argument: UInt64(-1 - value))
+    }
+
+    static func text(_ value: String) -> Data {
+        let utf8 = Data(value.utf8)
+        return header(major: 3, argument: UInt64(utf8.count)) + utf8
+    }
+
+    static func map(_ pairs: [(String, Data)]) -> Data {
+        let sorted = pairs.sorted { a, b in
+            let aBytes = a.0.utf8
+            let bBytes = b.0.utf8
+            if aBytes.count != bBytes.count {
+                return aBytes.count < bBytes.count
+            }
+            return aBytes.lexicographicallyPrecedes(bBytes)
+        }
+        return sorted.reduce(header(major: 5, argument: UInt64(sorted.count))) { $0 + text($1.0) + $1.1 }
+    }
+}
 @testable import Petrel
 import Testing
 
@@ -42,6 +95,58 @@ struct NetworkErrorTests {
         let contentTypeError = NetworkError.invalidContentType(expected: "application/json", actual: "text/html")
         #expect(contentTypeError.localizedDescription.contains("application/json"))
         #expect(contentTypeError.localizedDescription.contains("text/html"))
+    }
+
+    @Test("WebSocket frame integer boundaries: Int.max succeeds and UInt64 > Int.max throws typed error")
+    func webSocketFrameIntegerBoundaries() throws {
+        // Frame header: op = 1, t = "#message"
+        let header = TestCBORWriter.map([
+            ("op", TestCBORWriter.uint(1)),
+            ("t", TestCBORWriter.text("#message")),
+        ])
+
+        // Payload with Int.max (within range)
+        let payloadValid = TestCBORWriter.map([
+            ("number", TestCBORWriter.uint(UInt64(Int.max))),
+        ])
+        let validFrame = header + payloadValid
+        let decodedValid = try ATProtoWebSocketFrameDecoder.decodeFrame(validFrame)
+        #expect(decodedValid.messageType == "#message")
+
+        // Payload with UInt64.max (> Int.max)
+        let payloadOverflow = TestCBORWriter.map([
+            ("number", TestCBORWriter.uint(UInt64.max)),
+        ])
+        let overflowFrame = header + payloadOverflow
+        #expect(throws: NetworkError.self) {
+            _ = try ATProtoWebSocketFrameDecoder.decodeFrame(overflowFrame)
+        }
+
+        // Payload with Int64.min (representable negative integer boundary: -Int64.max - 1 = Int64.min)
+        let payloadIntMin = TestCBORWriter.map([
+            ("number", TestCBORWriter.negative(Int64.min)),
+        ])
+        let intMinFrame = header + payloadIntMin
+        let decodedIntMin = try ATProtoWebSocketFrameDecoder.decodeFrame(intMinFrame)
+        #expect(decodedIntMin.messageType == "#message")
+
+        // Payload with negative integer underflowing Int64 boundary (arg = UInt64.max)
+        let payloadUnderflow = TestCBORWriter.map([
+            ("number", TestCBORWriter.header(major: 1, argument: UInt64.max)),
+        ])
+        let underflowFrame = header + payloadUnderflow
+        #expect(throws: NetworkError.self) {
+            _ = try ATProtoWebSocketFrameDecoder.decodeFrame(underflowFrame)
+        }
+
+        // Payload with negative integer underflowing Int64 boundary (arg = UInt64(Int64.max) + 1)
+        let payloadUnderflowBoundary = TestCBORWriter.map([
+            ("number", TestCBORWriter.header(major: 1, argument: UInt64(Int64.max) + 1)),
+        ])
+        let underflowBoundaryFrame = header + payloadUnderflowBoundary
+        #expect(throws: NetworkError.self) {
+            _ = try ATProtoWebSocketFrameDecoder.decodeFrame(underflowBoundaryFrame)
+        }
     }
 }
 
