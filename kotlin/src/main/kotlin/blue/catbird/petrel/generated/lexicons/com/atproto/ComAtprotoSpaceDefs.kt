@@ -17,17 +17,26 @@ object ComAtprotoSpaceDefsDefs {
 }
 
     /**
-     * A signed commit over the current state of a permissioned repo.
+     * A signed commit over the current state of a permissioned repo (v2 authenticated transition).
      */
     @Serializable
     data class ComAtprotoSpaceDefsSignedCommit(
-/** Commit format version, currently 1. Corresponds to the version in the ctx protocol tag (atproto-space-v1). */        @SerialName("ver")
-        val ver: Int,/** sha256 digest of the LtHash state (32 bytes). */        @SerialName("hash")
-        val hash: Bytes,/** Per-signature input keying material (32 random bytes) */        @SerialName("ikm")
-        val ikm: Bytes,/** Signature over ctx (space, author DID, rev, ikm) by the user's atproto signing key. Does not cover the repo hash. */        @SerialName("sig")
-        val sig: Bytes,/** HMAC-SHA256 over hash, keyed by HKDF-SHA256(ikm, info=ctx). Binds the repo hash to this commit's context. */        @SerialName("mac")
-        val mac: Bytes,/** Commit revision (TID), also bound into ctx. */        @SerialName("rev")
-        val rev: String    ) {
+/** Commit format version (1 for legacy v1, 2 for authenticated-transition v2). */        @SerialName("ver")
+        val ver: Int,/** Repository DID. */        @SerialName("did")
+        val did: DID? = null,/** Commit revision (TID), bound into the signed transcript. */        @SerialName("rev")
+        val rev: String,/** Previous commit revision (TID), if any. */        @SerialName("prevRev")
+        val prevRev: String? = null,/** sha256 digest of the new LtHash state (32 bytes). */        @SerialName("hash")
+        val hash: Bytes,/** sha256 digest of the previous LtHash state (32 bytes), if any. */        @SerialName("prevHash")
+        val prevHash: Bytes? = null,/** Cryptographic signature over the canonical commit domain and fields. */        @SerialName("sig")
+        val sig: Bytes,/** Canonical permissioned-space URI. */        @SerialName("space")
+        val space: ATProtocolURI? = null,/** Canonical operation path (collection/rkey) for record transitions. */        @SerialName("path")
+        val path: String? = null,/** Operation action (create, update, delete) for record transitions. */        @SerialName("action")
+        val action: String? = null,/** New record CID for create/update transitions. */        @SerialName("cid")
+        val cid: CID? = null,/** Previous record CID for update/delete transitions. */        @SerialName("prevCid")
+        val prevCid: CID? = null,/** Record value bytes or digest for create/update transitions. */        @SerialName("val")
+        val `val`: Bytes? = null,/** Per-signature input keying material (legacy v1 compatibility). */        @SerialName("ikm")
+        val ikm: Bytes? = null,/** HMAC digest (legacy v1 compatibility). */        @SerialName("mac")
+        val mac: Bytes? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSpaceDefsSignedCommit"
         }

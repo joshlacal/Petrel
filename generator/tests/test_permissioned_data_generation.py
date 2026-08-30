@@ -471,6 +471,124 @@ class PermissionedDataGenerationTests(unittest.TestCase):
             )
             self.assertEqual(run_result.returncode, 0, run_result.stderr)
 
+    def test_signed_commit_v2_canonical_fixed_vectors_artifact_validation(self):
+        fixture_path = GENERATOR_DIR / "tests" / "fixtures" / "commit_v2_vectors.json"
+        self.assertTrue(fixture_path.exists(), f"Fixture missing at {fixture_path}")
+        fixture = json.loads(fixture_path.read_text(encoding="utf-8"))
 
+        # 1. Domain and context validation
+        self.assertEqual(fixture["domain"], "atproto-space-v2")
+        ctx = fixture["context"]
+        self.assertEqual(ctx["space"], "at://did:plc:space/space/com.example.type/demo")
+        self.assertEqual(ctx["author"], "did:plc:author1234567890123456")
+        self.assertEqual(ctx["rev"], "3jzfcijpj2m2a")
+        self.assertEqual(ctx["prevRev"], "3jzfcijpj2m22")
+        self.assertEqual(ctx["action"], "create")
+        self.assertEqual(ctx["path"], "com.example.record/r1")
+        self.assertIsNone(ctx["prevCid"])
+
+        # 2. Canonical transcript validation against transcript_hex
+        domain_bytes = b"atproto-space-v2"
+        hash_bytes = bytes.fromhex(ctx["hash"])
+        prev_hash_bytes = bytes.fromhex(ctx["prevHash"])
+        cid_bytes = ctx["cid"].encode("utf-8") if ctx["cid"] else b""
+        prev_cid_bytes = ctx["prevCid"].encode("utf-8") if ctx["prevCid"] else b""
+        val_bytes = ctx["val"].encode("utf-8")
+
+        fields = [
+            ctx["space"].encode("utf-8"),
+            ctx["author"].encode("utf-8"),
+            ctx["rev"].encode("utf-8"),
+            ctx["prevRev"].encode("utf-8"),
+            hash_bytes,
+            prev_hash_bytes,
+            ctx["path"].encode("utf-8"),
+            ctx["action"].encode("utf-8"),
+            cid_bytes,
+            prev_cid_bytes,
+            val_bytes,
+        ]
+
+        expected_transcript = bytearray(domain_bytes)
+        for field in fields:
+            expected_transcript.extend(len(field).to_bytes(2, byteorder="big"))
+            expected_transcript.extend(field)
+
+        fixture_transcript = bytes.fromhex(fixture["transcript_hex"])
+        self.assertEqual(bytes(expected_transcript), fixture_transcript, "Canonical transcript bytes mismatch")
+
+        # 3. Cross-curve signature_hex and cbor_hex validation
+        curves = fixture["curves"]
+        self.assertEqual(set(curves.keys()), {"ed25519", "p256", "secp256k1"})
+        for curve_name, curve_data in curves.items():
+            sig_hex = curve_data["signature_hex"]
+            cbor_hex = curve_data["cbor_hex"]
+            pub_hex = curve_data["public_key_hex"]
+            priv_hex = curve_data["private_key_hex"]
+
+            # Validate hex decodability and length invariants
+            sig_bytes = bytes.fromhex(sig_hex)
+            self.assertEqual(len(sig_bytes), 64, f"{curve_name} signature must be 64 bytes")
+            cbor_bytes = bytes.fromhex(cbor_hex)
+            self.assertGreater(len(cbor_bytes), 100, f"{curve_name} CBOR must be non-empty")
+            priv_bytes = bytes.fromhex(priv_hex)
+            self.assertEqual(len(priv_bytes), 32, f"{curve_name} private key must be 32 bytes")
+            pub_bytes = bytes.fromhex(pub_hex)
+            self.assertIn(len(pub_bytes), [32, 33, 65], f"{curve_name} public key length unexpected")
+
+            # CBOR hex must contain context strings
+            cbor_str = cbor_bytes.decode("latin1")
+            self.assertIn(ctx["rev"], cbor_str, f"{curve_name} CBOR missing rev")
+            self.assertIn(ctx["author"], cbor_str, f"{curve_name} CBOR missing author")
+
+        # 4. Omission vectors descriptors validation
+        omissions = fixture["omission_vectors"]
+        self.assertEqual(len(omissions), 13, "Expected exactly 13 omission vector descriptors")
+        for omission in omissions:
+            name = omission["name"]
+            expected_err = omission["expected_error"]
+            self.assertTrue(name, "Omission descriptor missing name")
+            self.assertTrue(expected_err, "Omission descriptor missing expected_error")
+            has_omitted = "omitted_field" in omission
+            has_illegal = "illegal_field" in omission
+            self.assertTrue(has_omitted ^ has_illegal, f"{name} must specify either omitted_field or illegal_field")
+            if has_omitted:
+                self.assertIn(
+                    omission["omitted_field"],
+                    ["did", "space", "prev_rev", "prev_hash", "path", "action", "cid", "prev_cid", "val"],
+                )
+            if has_illegal:
+                self.assertIn(omission["illegal_field"], ["prev_cid", "cid"])
+
+    def test_signed_commit_v2_lexicon_schema_matches_canonical_fixed_vector_contract(self):
+        # Verify that defs.json defines all v2 fields matching the shared fixture contract
+        defs_path = GENERATOR_DIR / "lexicons" / "com" / "atproto" / "space" / "defs.json"
+        defs = json.loads(defs_path.read_text(encoding="utf-8"))
+        signed_commit = defs["defs"]["signedCommit"]
+        properties = signed_commit["properties"]
+        required = signed_commit["required"]
+
+        # Wire required fields
+        self.assertEqual(required, ["ver", "rev", "hash", "sig"])
+
+        # All v2 transition fields must be declared
+        expected_v2_fields = [
+            "ver", "did", "rev", "prevRev", "hash", "prevHash",
+            "path", "action", "cid", "prevCid", "val", "sig", "space", "ikm", "mac"
+        ]
+        for field in expected_v2_fields:
+            self.assertIn(field, properties, f"Missing {field} in signedCommit schema")
+
+        # Verify that Swift generator emits all v2 properties on SignedCommit
+        swift = SwiftCodeGenerator(defs).convert()
+        self.assertIn("public struct SignedCommit:", swift)
+        for field in ["prevRev", "prevHash", "path", "action", "cid", "prevCid", "val"]:
+            self.assertIn(field, swift)
+
+        # Verify that Kotlin generator emits all v2 properties on SignedCommit
+        kotlin = KotlinCodeGenerator(defs).convert()
+        self.assertIn("data class ComAtprotoSpaceDefsSignedCommit", kotlin)
+        for field in ["prevRev", "prevHash", "path", "action", "cid", "prevCid", "val"]:
+            self.assertIn(field, kotlin)
 if __name__ == "__main__":
     unittest.main()

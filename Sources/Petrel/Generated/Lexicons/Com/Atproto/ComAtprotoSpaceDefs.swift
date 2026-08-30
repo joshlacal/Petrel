@@ -9,21 +9,39 @@ public enum ComAtprotoSpaceDefs {
     public struct SignedCommit: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.defs#signedCommit"
         public let ver: Int
-        public let hash: Bytes
-        public let ikm: Bytes
-        public let sig: Bytes
-        public let mac: Bytes
+        public let did: DID?
         public let rev: TID
+        public let prevRev: TID?
+        public let hash: Bytes
+        public let prevHash: Bytes?
+        public let sig: Bytes
+        public let space: ATProtocolURI?
+        public let path: String?
+        public let action: String?
+        public let cid: CID?
+        public let prevCid: CID?
+        public let val: Bytes?
+        public let ikm: Bytes?
+        public let mac: Bytes?
 
         public init(
-            ver: Int, hash: Bytes, ikm: Bytes, sig: Bytes, mac: Bytes, rev: TID
+            ver: Int, did: DID? = nil, rev: TID, prevRev: TID? = nil, hash: Bytes, prevHash: Bytes? = nil, sig: Bytes, space: ATProtocolURI? = nil, path: String? = nil, action: String? = nil, cid: CID? = nil, prevCid: CID? = nil, val: Bytes? = nil, ikm: Bytes? = nil, mac: Bytes? = nil
         ) {
             self.ver = ver
-            self.hash = hash
-            self.ikm = ikm
-            self.sig = sig
-            self.mac = mac
+            self.did = did
             self.rev = rev
+            self.prevRev = prevRev
+            self.hash = hash
+            self.prevHash = prevHash
+            self.sig = sig
+            self.space = space
+            self.path = path
+            self.action = action
+            self.cid = cid
+            self.prevCid = prevCid
+            self.val = val
+            self.ikm = ikm
+            self.mac = mac
         }
 
         public init(from decoder: Decoder) throws {
@@ -35,16 +53,40 @@ public enum ComAtprotoSpaceDefs {
                 throw error
             }
             do {
+                did = try container.decodeIfPresent(DID.self, forKey: .did)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'did' — degrading to nil: \(error)")
+                did = nil
+            }
+            do {
+                rev = try container.decode(TID.self, forKey: .rev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                throw error
+            }
+            do {
+                prevRev = try container.decodeIfPresent(TID.self, forKey: .prevRev)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'prevRev' — degrading to nil: \(error)")
+                prevRev = nil
+            }
+            do {
                 hash = try container.decode(Bytes.self, forKey: .hash)
             } catch {
                 LogManager.logError("Decoding error for required property 'hash': \(error)")
                 throw error
             }
             do {
-                ikm = try container.decode(Bytes.self, forKey: .ikm)
+                prevHash = try container.decodeIfPresent(Bytes.self, forKey: .prevHash)
             } catch {
-                LogManager.logError("Decoding error for required property 'ikm': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'prevHash' — degrading to nil: \(error)")
+                prevHash = nil
             }
             do {
                 sig = try container.decode(Bytes.self, forKey: .sig)
@@ -53,16 +95,68 @@ public enum ComAtprotoSpaceDefs {
                 throw error
             }
             do {
-                mac = try container.decode(Bytes.self, forKey: .mac)
+                space = try container.decodeIfPresent(ATProtocolURI.self, forKey: .space)
             } catch {
-                LogManager.logError("Decoding error for required property 'mac': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'space' — degrading to nil: \(error)")
+                space = nil
             }
             do {
-                rev = try container.decode(TID.self, forKey: .rev)
+                path = try container.decodeIfPresent(String.self, forKey: .path)
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'path' — degrading to nil: \(error)")
+                path = nil
+            }
+            do {
+                action = try container.decodeIfPresent(String.self, forKey: .action)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'action' — degrading to nil: \(error)")
+                action = nil
+            }
+            do {
+                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                cid = nil
+            }
+            do {
+                prevCid = try container.decodeIfPresent(CID.self, forKey: .prevCid)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'prevCid' — degrading to nil: \(error)")
+                prevCid = nil
+            }
+            do {
+                val = try container.decodeIfPresent(Bytes.self, forKey: .val)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'val' — degrading to nil: \(error)")
+                val = nil
+            }
+            do {
+                ikm = try container.decodeIfPresent(Bytes.self, forKey: .ikm)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'ikm' — degrading to nil: \(error)")
+                ikm = nil
+            }
+            do {
+                mac = try container.decodeIfPresent(Bytes.self, forKey: .mac)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'mac' — degrading to nil: \(error)")
+                mac = nil
             }
         }
 
@@ -70,20 +164,82 @@ public enum ComAtprotoSpaceDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(ver, forKey: .ver)
-            try container.encode(hash, forKey: .hash)
-            try container.encode(ikm, forKey: .ikm)
-            try container.encode(sig, forKey: .sig)
-            try container.encode(mac, forKey: .mac)
+            try container.encodeIfPresent(did, forKey: .did)
             try container.encode(rev, forKey: .rev)
+            try container.encodeIfPresent(prevRev, forKey: .prevRev)
+            try container.encode(hash, forKey: .hash)
+            try container.encodeIfPresent(prevHash, forKey: .prevHash)
+            try container.encode(sig, forKey: .sig)
+            try container.encodeIfPresent(space, forKey: .space)
+            try container.encodeIfPresent(path, forKey: .path)
+            try container.encodeIfPresent(action, forKey: .action)
+            try container.encodeIfPresent(cid, forKey: .cid)
+            try container.encodeIfPresent(prevCid, forKey: .prevCid)
+            try container.encodeIfPresent(val, forKey: .val)
+            try container.encodeIfPresent(ikm, forKey: .ikm)
+            try container.encodeIfPresent(mac, forKey: .mac)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(ver)
-            hasher.combine(hash)
-            hasher.combine(ikm)
-            hasher.combine(sig)
-            hasher.combine(mac)
+            if let value = did {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(rev)
+            if let value = prevRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(hash)
+            if let value = prevHash {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(sig)
+            if let value = space {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = path {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = action {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = cid {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = prevCid {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = val {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = ikm {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = mac {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -91,19 +247,46 @@ public enum ComAtprotoSpaceDefs {
             if ver != other.ver {
                 return false
             }
+            if did != other.did {
+                return false
+            }
+            if rev != other.rev {
+                return false
+            }
+            if prevRev != other.prevRev {
+                return false
+            }
             if hash != other.hash {
                 return false
             }
-            if ikm != other.ikm {
+            if prevHash != other.prevHash {
                 return false
             }
             if sig != other.sig {
                 return false
             }
-            if mac != other.mac {
+            if space != other.space {
                 return false
             }
-            if rev != other.rev {
+            if path != other.path {
+                return false
+            }
+            if action != other.action {
+                return false
+            }
+            if cid != other.cid {
+                return false
+            }
+            if prevCid != other.prevCid {
+                return false
+            }
+            if val != other.val {
+                return false
+            }
+            if ikm != other.ikm {
+                return false
+            }
+            if mac != other.mac {
                 return false
             }
             return true
@@ -118,27 +301,76 @@ public enum ComAtprotoSpaceDefs {
             map = map.adding(key: "$type", value: Self.typeIdentifier)
             let verValue = try ver.toCBORValue()
             map = map.adding(key: "ver", value: verValue)
-            let hashValue = try hash.toCBORValue()
-            map = map.adding(key: "hash", value: hashValue)
-            let ikmValue = try ikm.toCBORValue()
-            map = map.adding(key: "ikm", value: ikmValue)
-            let sigValue = try sig.toCBORValue()
-            map = map.adding(key: "sig", value: sigValue)
-            let macValue = try mac.toCBORValue()
-            map = map.adding(key: "mac", value: macValue)
+            if let value = did {
+                let didValue = try value.toCBORValue()
+                map = map.adding(key: "did", value: didValue)
+            }
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
+            if let value = prevRev {
+                let prevRevValue = try value.toCBORValue()
+                map = map.adding(key: "prevRev", value: prevRevValue)
+            }
+            let hashValue = try hash.toCBORValue()
+            map = map.adding(key: "hash", value: hashValue)
+            if let value = prevHash {
+                let prevHashValue = try value.toCBORValue()
+                map = map.adding(key: "prevHash", value: prevHashValue)
+            }
+            let sigValue = try sig.toCBORValue()
+            map = map.adding(key: "sig", value: sigValue)
+            if let value = space {
+                let spaceValue = try value.toCBORValue()
+                map = map.adding(key: "space", value: spaceValue)
+            }
+            if let value = path {
+                let pathValue = try value.toCBORValue()
+                map = map.adding(key: "path", value: pathValue)
+            }
+            if let value = action {
+                let actionValue = try value.toCBORValue()
+                map = map.adding(key: "action", value: actionValue)
+            }
+            if let value = cid {
+                let cidValue = try value.toCBORValue()
+                map = map.adding(key: "cid", value: cidValue)
+            }
+            if let value = prevCid {
+                let prevCidValue = try value.toCBORValue()
+                map = map.adding(key: "prevCid", value: prevCidValue)
+            }
+            if let value = val {
+                let valValue = try value.toCBORValue()
+                map = map.adding(key: "val", value: valValue)
+            }
+            if let value = ikm {
+                let ikmValue = try value.toCBORValue()
+                map = map.adding(key: "ikm", value: ikmValue)
+            }
+            if let value = mac {
+                let macValue = try value.toCBORValue()
+                map = map.adding(key: "mac", value: macValue)
+            }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case ver
-            case hash
-            case ikm
-            case sig
-            case mac
+            case did
             case rev
+            case prevRev
+            case hash
+            case prevHash
+            case sig
+            case space
+            case path
+            case action
+            case cid
+            case prevCid
+            case val
+            case ikm
+            case mac
         }
     }
 }
