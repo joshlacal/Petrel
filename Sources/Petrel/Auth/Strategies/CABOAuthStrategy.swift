@@ -50,7 +50,54 @@ actor CABOAuthStrategy: AuthStrategy {
     // OAuth flow deduplication state
     private var oauthStartInProgress = false
     private var oauthStartTasks: [String: Task<(url: URL, state: String), Error>] = [:]
+    private var inFlightOAuthStateTokens: Set<String> = []
+    private var cancellationGeneration: UInt64 = 0
+    private var deniedStateTokens: Set<String> = []
 
+    private struct CanonicalOrigin: Equatable {
+        let scheme: String
+        let host: String
+        let port: Int
+    }
+
+    private static func canonicalOrigin(of url: URL) -> CanonicalOrigin? {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let scheme = components.scheme?.lowercased(),
+              let host = components.host?.lowercased(),
+              !host.isEmpty
+        else { return nil }
+        let defaultPort = (scheme == "https" || scheme == "wss") ? 443 : (scheme == "http" || scheme == "ws") ? 80 : 0
+        let effectivePort = components.port ?? defaultPort
+        return CanonicalOrigin(scheme: scheme, host: host, port: effectivePort)
+    }
+    private static func matchesRedirectURI(callbackURL: URL, expectedRedirectURI: String) -> Bool {
+        guard let expectedURL = URL(string: expectedRedirectURI),
+              let callbackComps = URLComponents(url: callbackURL, resolvingAgainstBaseURL: false),
+              let expectedComps = URLComponents(url: expectedURL, resolvingAgainstBaseURL: false)
+        else {
+            return false
+        }
+        guard let cbScheme = callbackComps.scheme?.lowercased(),
+              let expScheme = expectedComps.scheme?.lowercased(),
+              cbScheme == expScheme
+        else {
+            return false
+        }
+        let cbHost = callbackComps.host?.lowercased()
+        let expHost = expectedComps.host?.lowercased()
+        if cbHost != expHost {
+            return false
+        }
+        if callbackComps.port != expectedComps.port {
+            return false
+        }
+        let cbPath = callbackComps.path.isEmpty ? "/" : callbackComps.path
+        let expPath = expectedComps.path.isEmpty ? "/" : expectedComps.path
+        if cbPath != expPath {
+            return false
+        }
+        return true
+    }
     // MARK: - Initialization
 
     init(
@@ -132,41 +179,140 @@ actor CABOAuthStrategy: AuthStrategy {
     func handleOAuthCallback(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
         await emitProgress(.exchangingTokens)
 
+        // Handle explicit provider error callback
+        if let comps = URLComponents(url: url, resolvingAgainstBaseURL: false),
+           let items = comps.queryItems,
+           items.contains(where: { $0.name == "error" }) {
+            if let stateToken = await core.extractState(from: url) {
+                deniedStateTokens.insert(stateToken)
+                _ = try? await core.storage.consumeOAuthState(stateToken)
+                _ = try? await core.storage.deleteOAuthState(for: stateToken)
+                inFlightOAuthStateTokens.remove(stateToken)
+            }
+            throw AuthError.cancelled
+        }
+
         guard let code = await core.extractAuthorizationCode(from: url),
               let stateToken = await core.extractState(from: url)
         else { throw AuthError.invalidCallbackURL }
 
-        let storage = core.storage
-        guard let oauthState = try await storage.getOAuthState(for: stateToken) else {
+        if deniedStateTokens.contains(stateToken) {
             throw AuthError.invalidCallbackURL
+        }
+
+        let oauthConfig = core.oauthConfig
+        let storage = core.storage
+
+        // Atomically consume state before any other checks or network calls
+        let oauthState: OAuthState
+        do {
+            oauthState = try await storage.consumeOAuthState(stateToken)
+            inFlightOAuthStateTokens.remove(stateToken)
+        } catch {
+            throw AuthError.invalidCallbackURL
+        }
+
+        // Fail-closed validation on initiating trust tuple (Finding A1-04, A1-R2-04)
+        guard let expectedIssuer = oauthState.expectedIssuer,
+              let parsedIssuer = URL(string: expectedIssuer),
+              parsedIssuer.scheme != nil, parsedIssuer.host != nil,
+              let expectedJKT = oauthState.dpopJKT,
+              let persistedRedirectURI = oauthState.redirectURI,
+              let expectedPDSOrigin = oauthState.expectedPDSOrigin,
+              let expectedPDSOriginURL = URL(string: expectedPDSOrigin),
+              expectedPDSOriginURL.scheme != nil, expectedPDSOriginURL.host != nil,
+              let persistedTokenEndpoint = oauthState.tokenEndpoint,
+              let parsedTokenEndpoint = URL(string: persistedTokenEndpoint),
+              parsedTokenEndpoint.scheme != nil, parsedTokenEndpoint.host != nil
+        else {
+            throw AuthError.invalidCallbackURL
+        }
+
+        if oauthState.initialIdentifier != nil {
+            guard oauthState.expectedDID != nil else {
+                throw AuthError.invalidCallbackURL
+            }
+        }
+
+        // Strict normalized redirect URI verification against persisted initiating redirect URI (Finding A1-05)
+        guard Self.matchesRedirectURI(callbackURL: url, expectedRedirectURI: persistedRedirectURI) else {
+            throw AuthError.invalidCallbackURL
+        }
+
+        let callbackIss = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?
+            .first(where: { $0.name == "iss" })?
+            .value
+
+        if oauthConfig.requireIssInCallback {
+            guard let callbackIss else { throw AuthError.invalidCallbackURL }
+            guard callbackIss == expectedIssuer else { throw AuthError.invalidCallbackURL }
+        } else if let callbackIss {
+            guard callbackIss == expectedIssuer else { throw AuthError.invalidCallbackURL }
         }
 
         guard let keyData = oauthState.ephemeralDPoPKey else { throw AuthError.dpopKeyError }
         let ephemeralKey = try P256.Signing.PrivateKey(rawRepresentation: keyData)
 
-        try await storage.deleteOAuthState(for: stateToken)
+        let jwk = try await core.createJWK(from: ephemeralKey)
+        let thumbprint = try await core.calculateJWKThumbprint(jwk: jwk)
+        guard thumbprint == expectedJKT else {
+            throw AuthError.dpopKeyError
+        }
 
         guard let pdsURL = oauthState.targetPDSURL else { throw AuthError.invalidOAuthConfiguration }
-        let authServerURL = try await core.resolveAuthServer(for: pdsURL)
-        let metadata = try await core.fetchAuthorizationServerMetadata(authServerURL: authServerURL)
+
+        let tokenEndpoint = persistedTokenEndpoint
+        let authServerURL = parsedIssuer
 
         let tokenResponse = try await exchangeCodeForTokens(
             code: code,
             codeVerifier: oauthState.codeVerifier,
-            tokenEndpoint: metadata.tokenEndpoint,
-            issuer: metadata.issuer,
+            tokenEndpoint: tokenEndpoint,
+            issuer: expectedIssuer,
             authServerURL: authServerURL,
             ephemeralKey: ephemeralKey,
             initialNonce: oauthState.parResponseNonce,
             resourceURL: pdsURL
         )
 
-        guard let did = tokenResponse.sub else { throw AuthError.invalidResponse }
+        guard let did = tokenResponse.sub, !did.isEmpty else { throw AuthError.invalidResponse }
+        guard tokenResponse.tokenType.lowercased() == "dpop" else {
+            throw AuthError.invalidResponse
+        }
+
+        if let expectedDID = oauthState.expectedDID {
+            guard did == expectedDID else {
+                throw AuthError.invalidResponse
+            }
+        }
 
         // Resolve real PDS
         let didResolver = core.didResolver
         let (handle, actualPDS) = try await didResolver.resolveDIDToHandleAndPDSURL(did: did)
 
+        // Enforce exact canonical-origin equality for flows initiated with an identifier (login/add-account/re-auth)
+        if oauthState.initialIdentifier != nil {
+            guard let actualOrigin = Self.canonicalOrigin(of: actualPDS),
+                  let expectedOrigin = Self.canonicalOrigin(of: expectedPDSOriginURL),
+                  actualOrigin == expectedOrigin
+            else {
+                throw AuthError.invalidOAuthConfiguration
+            }
+        }
+
+        // For signup (initialIdentifier == nil) or when enforcePDSAuthorizationBinding is enabled,
+        // enforce that the resolved PDS declares authorization servers matching the initiating issuer
+        if oauthState.initialIdentifier == nil || oauthConfig.enforcePDSAuthorizationBinding {
+            let protectedResource = try await core.fetchProtectedResourceMetadata(pdsURL: actualPDS)
+            if let expectedIssuerURL = URL(string: expectedIssuer) {
+                guard protectedResource.authorizationServers.contains(expectedIssuerURL) ||
+                      protectedResource.authorizationServers.contains(authServerURL)
+                else {
+                    throw AuthError.invalidOAuthConfiguration
+                }
+            }
+        }
         // Persist DPoP Key and invalidate any prior cached key for this DID
         try await storage.saveDPoPKeyRepresentation(ephemeralKey.x963Representation, for: did)
         await core.clearDPoPKeyCache(for: did)
@@ -186,13 +332,15 @@ actor CABOAuthStrategy: AuthStrategy {
             grantedScopes: tokenResponse.grantedScopes
         )
 
+        let authMetadata = try? await core.fetchAuthorizationServerMetadata(authServerURL: authServerURL)
+
         // Create/Update Account
         let account = Account(
             did: did,
             handle: handle,
             pdsURL: actualPDS,
             protectedResourceMetadata: nil,
-            authorizationServerMetadata: metadata,
+            authorizationServerMetadata: authMetadata,
             bskyAppViewDID: oauthState.bskyAppViewDID ?? "",
             bskyChatDID: oauthState.bskyChatDID ?? ""
         )
@@ -262,9 +410,20 @@ actor CABOAuthStrategy: AuthStrategy {
     }
 
     func cancelOAuthFlow() async {
+        cancellationGeneration &+= 1
         oauthStartTasks.values.forEach { $0.cancel() }
         oauthStartTasks.removeAll()
         oauthStartInProgress = false
+        let storage = core.storage
+        for token in inFlightOAuthStateTokens {
+            deniedStateTokens.insert(token)
+            do {
+                try await storage.deleteOAuthState(for: token)
+            } catch {
+                LogManager.logWarning("Failed to delete OAuth state: \(error.localizedDescription)")
+            }
+        }
+        inFlightOAuthStateTokens.removeAll()
     }
 
     func tokensExist() async -> Bool {
@@ -354,11 +513,19 @@ actor CABOAuthStrategy: AuthStrategy {
 
         let didResolver = core.didResolver
         let pdsURL: URL
+        let expectedDID: String?
         if let identifier {
             await emitProgress(.resolvingHandle(identifier))
-            let did = try await didResolver.resolveHandleToDID(handle: identifier)
-            pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
+            if identifier.hasPrefix("did:") {
+                expectedDID = identifier
+                pdsURL = try await didResolver.resolveDIDToPDSURL(did: identifier)
+            } else {
+                let did = try await didResolver.resolveHandleToDID(handle: identifier)
+                expectedDID = did
+                pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
+            }
         } else {
+            expectedDID = nil
             pdsURL = URL(string: "https://bsky.social")!
         }
 
@@ -371,6 +538,9 @@ actor CABOAuthStrategy: AuthStrategy {
         let codeChallenge = await core.generateCodeChallenge(from: codeVerifier)
         let stateToken = UUID().uuidString
         let ephemeralKey = P256.Signing.PrivateKey()
+
+        let jwk = try await core.createJWK(from: ephemeralKey)
+        let dpopJKT = try await core.calculateJWKThumbprint(jwk: jwk)
 
         let oauthConfig = core.oauthConfig
 
@@ -403,11 +573,31 @@ actor CABOAuthStrategy: AuthStrategy {
             ephemeralDPoPKey: ephemeralKey.rawRepresentation,
             parResponseNonce: parNonce,
             bskyAppViewDID: bskyAppViewDID,
-            bskyChatDID: bskyChatDID
+            bskyChatDID: bskyChatDID,
+            expectedIssuer: metadata.issuer,
+            expectedPDSOrigin: pdsURL.absoluteString,
+            expectedDID: expectedDID,
+            redirectURI: oauthConfig.redirectUri,
+            dpopJKT: dpopJKT,
+            tokenEndpoint: metadata.tokenEndpoint,
+            authorizationEndpoint: metadata.authorizationEndpoint
         )
         let storage = core.storage
-        try await storage.saveOAuthState(oauthState)
+        let currentGen = cancellationGeneration
+        inFlightOAuthStateTokens.insert(stateToken)
+        do {
+            try await storage.saveOAuthState(oauthState)
+        } catch {
+            inFlightOAuthStateTokens.remove(stateToken)
+            throw error
+        }
 
+        if cancellationGeneration != currentGen || !inFlightOAuthStateTokens.contains(stateToken) {
+            deniedStateTokens.insert(stateToken)
+            _ = try? await storage.deleteOAuthState(for: stateToken)
+            inFlightOAuthStateTokens.remove(stateToken)
+            throw AuthError.cancelled
+        }
         guard var components = URLComponents(string: metadata.authorizationEndpoint) else {
             throw AuthError.invalidOAuthConfiguration
         }

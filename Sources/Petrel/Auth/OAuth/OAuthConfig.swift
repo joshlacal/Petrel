@@ -20,12 +20,12 @@ public struct OAuthConfig: Sendable {
 
     /// When true and the authorization server metadata declares support for `authorization_response_iss_parameter_supported`,
     /// require that the OAuth callback contain an `iss` query parameter matching the server issuer.
-    /// Defaults to `false` to avoid breaking existing integrations; enable for stricter verification.
+    /// Defaults to `true` for secure verification.
     public let requireIssInCallback: Bool
 
     /// When true, after exchanging the code and resolving the account DID to its PDS URL, verify that the PDS's
     /// protected resource metadata lists the same authorization server `issuer` used for the flow. If it does not,
-    /// the callback fails. Defaults to `false` for compatibility; enable to mirror stricter security checks.
+    /// the callback fails. Defaults to `true` for strict security binding.
     public let enforcePDSAuthorizationBinding: Bool
 
     /// Initializes a new OAuthConfig instance.
@@ -39,8 +39,8 @@ public struct OAuthConfig: Sendable {
         clientId: String,
         redirectUri: String,
         scope: String,
-        requireIssInCallback: Bool = false,
-        enforcePDSAuthorizationBinding: Bool = false
+        requireIssInCallback: Bool = true,
+        enforcePDSAuthorizationBinding: Bool = true
     ) {
         self.clientId = clientId
         self.redirectUri = redirectUri

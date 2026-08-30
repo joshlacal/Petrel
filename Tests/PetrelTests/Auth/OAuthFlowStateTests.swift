@@ -128,7 +128,9 @@ private func withStateTestTransport<T>(
         KeychainManager._setStorageOverride(backend)
         StateTestURLProtocol.setHandler(handler)
         NetworkService.setNetworkTestProtocolClasses([StateTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
         defer {
+            NetworkService.dnsResolverOverride = nil
             NetworkService.setNetworkTestProtocolClasses(nil)
             StateTestURLProtocol.setHandler(nil)
             KeychainManager._setStorageOverride(nil)

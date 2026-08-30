@@ -526,6 +526,12 @@ public actor NetworkService: NetworkServiceProtocol {
                 networkTestProtocolClasses = classes
             }
         }
+
+        static func getNetworkTestProtocolClasses() -> [AnyClass]? {
+            networkTestProtocolClassesLock.withLock {
+                networkTestProtocolClasses
+            }
+        }
     #endif
 
     /// When true, all xrpc requests require auth and go through the gateway
@@ -1026,7 +1032,7 @@ public actor NetworkService: NetworkServiceProtocol {
             return .unauthenticated
         }
 
-        // Public discovery endpoints are always unauthenticated
+        // Public discovery and unauthenticated endpoints
         let path = url.path
         if path.hasPrefix("/.well-known/") || path.hasPrefix("/oauth/") || url.host?.lowercased() == "plc.directory" {
             return .unauthenticated
@@ -1042,6 +1048,9 @@ public actor NetworkService: NetworkServiceProtocol {
             return .unauthenticated
         }
 
+        if path.contains("com.atproto.server.createSession") {
+            return .unauthenticated
+        }
         // Standard OAuth mode - check metadata match
         if let authServerMetadata = authorizationServerMetadata,
            let authServerURL = URL(string: authServerMetadata.issuer),
@@ -1096,7 +1105,7 @@ public actor NetworkService: NetworkServiceProtocol {
         // Perform the request using the internal session
         do {
             LogManager.logRequest(requestToSend)
-            let (data, response) = try await executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
+            let (data, response) = try await Self.executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
             authCtx_simple?.releaseAuthenticationLease()
 
             if let httpResponse = response as? HTTPURLResponse {
@@ -1264,12 +1273,12 @@ public actor NetworkService: NetworkServiceProtocol {
                 // Use deduplicator for non-refresh requests to prevent concurrent identical calls
                 let authIdentity = authCtx?.did ?? request.value(forHTTPHeaderField: "Authorization")
                 let (data, response) = if !skipTokenRefresh {
-                    try await requestDeduplicator.deduplicate(request: request, authIdentity: authIdentity) { @Sendable in
-                        return try await self.executeDataTask(request, using: self.session, delegate: self.sessionDelegate)
+                    try await requestDeduplicator.deduplicate(request: request, authIdentity: authIdentity) { @Sendable [session, sessionDelegate] in
+                        return try await Self.executeDataTask(request, using: session, delegate: sessionDelegate)
                     }
                 } else {
                     // Skip deduplication for refresh requests to avoid circular dependencies
-                    try await executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
+                    try await Self.executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
                 }
                 authCtx?.releaseAuthenticationLease()
 
@@ -1741,7 +1750,7 @@ public actor NetworkService: NetworkServiceProtocol {
             throw ExactAuthGeneratedRequestContinuityError()
         }
 
-        let (data, response) = try await executeDataTask(prepared, using: exactAuthSession, delegate: exactAuthSessionDelegate)
+        let (data, response) = try await Self.executeDataTask(prepared, using: exactAuthSession, delegate: exactAuthSessionDelegate)
         authCtx?.releaseAuthenticationLease()
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse(description: "Received non-HTTP response")
@@ -1761,7 +1770,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         return (data, httpResponse)
     }
-    private func executeDataTask(
+    static func executeDataTask(
         _ request: URLRequest,
         using targetSession: URLSession,
         delegate: HardenedURLSessionDelegate
@@ -1790,6 +1799,30 @@ public actor NetworkService: NetworkServiceProtocol {
         return (
             try ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: delegate.limits),
             rawResult.1
+        )
+    }
+
+    func executeUnauthenticatedRequest(
+        _ request: URLRequest
+    ) async throws -> (Data, URLResponse) {
+        guard let url = request.url else {
+            throw NetworkError.invalidURL
+        }
+        guard try await validateURL(url) else {
+            LogManager.logError("Security validation failed for unauthenticated request URL: \(LogManager.sanitizeURLForLogging(url))")
+            throw NetworkError.securityViolation
+        }
+        var sanitizedRequest = request
+        for header in ["Authorization", "DPoP", "Cookie", "Proxy-Authorization", "atproto-proxy"] {
+            sanitizedRequest.setValue(nil, forHTTPHeaderField: header)
+        }
+        if let userAgent = userAgent {
+            sanitizedRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        }
+        return try await Self.executeDataTask(
+            sanitizedRequest,
+            using: exactAuthSession,
+            delegate: exactAuthSessionDelegate
         )
     }
     private func isActiveExactAuthRequestScope(_ scope: ExactAuthGeneratedRequestScope) -> Bool {
@@ -2325,6 +2358,13 @@ public actor NetworkService: NetworkServiceProtocol {
     /// - Parameter url: The URL to validate.
     /// - Returns: A boolean indicating whether the URL is valid.
     private func validateURL(_ url: URL) async throws -> Bool {
+        try await Self.validateURL(url)
+    }
+
+    /// Validates the URL for security against scheme policy and DNS rebinding / private ranges.
+    /// - Parameter url: The URL to validate.
+    /// - Returns: A boolean indicating whether the URL is valid.
+    static func validateURL(_ url: URL) async throws -> Bool {
         guard let scheme = url.scheme?.lowercased() else {
             LogManager.logError("Missing URL scheme")
             return false

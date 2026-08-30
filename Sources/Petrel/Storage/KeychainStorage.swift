@@ -1909,8 +1909,8 @@ public actor KeychainStorage {
     // MARK: - Pending Gateway Login State Management
 
     /// Saves a pending gateway login state to the keychain.
-    public func savePendingGatewayLogin(_ state: PendingGatewayLoginState) async throws {
-        let key = makeKey("pendingGatewayLogin", stateToken: state.stateToken)
+    public func savePendingGatewayLogin(_ state: PendingGatewayLoginState, for stateKey: String? = nil) async throws {
+        let key = makeKey("pendingGatewayLogin", stateToken: stateKey ?? state.stateToken)
         let data = try encoder.encode(state)
         try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }

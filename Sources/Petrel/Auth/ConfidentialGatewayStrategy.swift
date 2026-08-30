@@ -292,6 +292,8 @@ private func effectivePort(for url: URL) -> Int? {
 /// The gateway handles ATProto OAuth (PAR, PKCE, DPoP) and token management.
 /// The client only stores a gateway session UUID and attaches it as a Bearer token.
 actor ConfidentialGatewayStrategy: AuthStrategy {
+    public static let defaultCallbackURL = URL(string: "https://catbird.blue/oauth/callback")!
+    public static let callbackOrigin = "https://catbird.blue"
     public static let permissionCallbackURL = URL(string: "https://catbird.blue/oauth/permission-callback")!
     public static let permissionCallbackOrigin = "https://catbird.blue"
     enum GatewayError: Error, LocalizedError {
@@ -472,19 +474,105 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     private let storage: KeychainStorage
     private let accountManager: AccountManaging
     private let urlSession: URLSession
+    private let sessionDelegate: HardenedURLSessionDelegate?
+    private var inFlightLoginStateTokens: Set<String> = []
+    private var cancellationGeneration: UInt64 = 0
+    private var deniedStateTokens: Set<String> = []
+    private var deniedStateTokensOrder: [String] = []
+    private static let maxDeniedStateTokens = 64
 
+    private func recordDeniedStateToken(_ token: String) {
+        guard !token.isEmpty else { return }
+        if deniedStateTokens.insert(token).inserted {
+            deniedStateTokensOrder.append(token)
+            if deniedStateTokensOrder.count > Self.maxDeniedStateTokens {
+                let oldest = deniedStateTokensOrder.removeFirst()
+                deniedStateTokens.remove(oldest)
+            }
+        }
+    }
+
+    private func consumeDeniedStateTokenIfPresent(_ token: String) -> Bool {
+        guard !token.isEmpty, deniedStateTokens.contains(token) else { return false }
+        deniedStateTokens.remove(token)
+        if let index = deniedStateTokensOrder.firstIndex(of: token) {
+            deniedStateTokensOrder.remove(at: index)
+        }
+        return true
+    }
     private static let sessionKey = "gatewaySession"
 
     init(
         gatewayURL: URL,
         storage: KeychainStorage,
         accountManager: AccountManaging,
-        urlSession: URLSession = .shared
+        urlSession: URLSession? = nil
     ) {
         self.gatewayURL = gatewayURL
         self.storage = storage
         self.accountManager = accountManager
-        self.urlSession = urlSession
+        if let urlSession {
+            self.urlSession = urlSession
+            self.sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
+        } else {
+            let config = URLSessionConfiguration.ephemeral
+            #if DEBUG
+            if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
+                config.protocolClasses = testClasses
+            }
+            #endif
+            let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+            self.sessionDelegate = delegate
+            self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        }
+    }
+
+    private func executeGatewayRequest(_ request: URLRequest) async throws -> (Data, URLResponse) {
+        guard let url = request.url else {
+            throw GatewayError.invalidGatewayURL
+        }
+        guard try await NetworkService.validateURL(url) else {
+            throw GatewayError.networkError(NetworkError.securityViolation)
+        }
+        guard let delegate = sessionDelegate else {
+            do {
+                let (data, response) = try await urlSession.data(for: request)
+                return (data, response)
+            } catch {
+                throw GatewayError.networkError(error)
+            }
+        }
+        do {
+            let (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: delegate)
+            return (data, response)
+        } catch let error as NetworkError {
+            throw GatewayError.networkError(error)
+        } catch {
+            throw GatewayError.networkError(error)
+        }
+    }
+
+    private func gatewayStateKey() -> String {
+        let scheme = gatewayURL.scheme?.lowercased() ?? "https"
+        let host = gatewayURL.host?.lowercased() ?? "gateway"
+        let port = gatewayURL.port.map { ":\($0)" } ?? ""
+        return "\(scheme)://\(host)\(port)"
+    }
+    private static func validateGatewayBaseURL(_ url: URL) throws {
+        guard let scheme = url.scheme?.lowercased() else {
+            throw GatewayError.invalidGatewayURL
+        }
+        guard let host = url.host?.lowercased(), !host.isEmpty else {
+            throw GatewayError.invalidGatewayURL
+        }
+        let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
+        if scheme == "http" {
+            guard isLocal else {
+                throw GatewayError.invalidGatewayURL
+            }
+        } else if scheme != "https" {
+            throw GatewayError.invalidGatewayURL
+        }
     }
 
     // MARK: - AuthStrategy
@@ -494,17 +582,87 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         bskyAppViewDID: String?,
         bskyChatDID: String?
     ) async throws -> URL {
+        try await startOAuthFlowWithState(
+            identifier: identifier,
+            bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID
+        ).url
+    }
+
+    func startOAuthFlowWithState(
+        identifier: String? = nil,
+        bskyAppViewDID: String? = nil,
+        bskyChatDID: String? = nil
+    ) async throws -> (url: URL, state: String) {
+        try await coordinator.run { [self] in
+            try await self.startOAuthFlowWithStateLocked(
+                identifier: identifier,
+                bskyAppViewDID: bskyAppViewDID,
+                bskyChatDID: bskyChatDID
+            )
+        }
+    }
+
+    private func startOAuthFlowWithStateLocked(
+        identifier: String?,
+        bskyAppViewDID: String?,
+        bskyChatDID: String?
+    ) async throws -> (url: URL, state: String) {
+        try Self.validateGatewayBaseURL(gatewayURL)
+
+        var rng = SystemRandomNumberGenerator()
+        var nonceBytes = [UInt8](repeating: 0, count: 32)
+        for i in 0..<32 {
+            nonceBytes[i] = rng.next()
+        }
+        let browserNonce = JWTBase64URL.encode(Data(nonceBytes))
+        let stateToken = UUID().uuidString
+
+        let expectedDID = (identifier?.hasPrefix("did:") == true) ? identifier : nil
+        let pending = PendingGatewayLoginState(
+            browserNonce: browserNonce,
+            stateToken: stateToken,
+            redirectURI: Self.defaultCallbackURL.absoluteString,
+            expectedDID: expectedDID,
+            createdAt: Date()
+        )
+        let currentGen = cancellationGeneration
+        inFlightLoginStateTokens.insert(stateToken)
+        inFlightLoginStateTokens.insert(gatewayStateKey())
+        do {
+            try await storage.savePendingGatewayLogin(pending, for: gatewayStateKey())
+            if stateToken != gatewayStateKey() {
+                try await storage.savePendingGatewayLogin(pending, for: stateToken)
+            }
+        } catch {
+            inFlightLoginStateTokens.remove(stateToken)
+            inFlightLoginStateTokens.remove(gatewayStateKey())
+            throw error
+        }
+
+        if cancellationGeneration != currentGen || !inFlightLoginStateTokens.contains(stateToken) {
+            try? await storage.deletePendingGatewayLogin(for: gatewayStateKey())
+            try? await storage.deletePendingGatewayLogin(for: stateToken)
+            inFlightLoginStateTokens.remove(stateToken)
+            inFlightLoginStateTokens.remove(gatewayStateKey())
+            throw AuthError.cancelled
+        }
         guard var components = URLComponents(url: gatewayURL, resolvingAgainstBaseURL: false) else {
             throw GatewayError.invalidGatewayURL
         }
         components.path = "/auth/login"
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "browser_nonce", value: browserNonce),
+            URLQueryItem(name: "redirect_to", value: Self.defaultCallbackURL.absoluteString)
+        ]
         if let identifier {
-            components.queryItems = [URLQueryItem(name: "identifier", value: identifier)]
+            queryItems.append(URLQueryItem(name: "identifier", value: identifier))
         }
+        components.queryItems = queryItems
         guard let url = components.url else {
             throw GatewayError.invalidGatewayURL
         }
-        return url
+        return (url, stateToken)
     }
 
     func startOAuthFlowForSignUp(
@@ -512,17 +670,96 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         bskyAppViewDID: String?,
         bskyChatDID: String?
     ) async throws -> URL {
+        try await coordinator.run { [self] in
+            try await self.startOAuthFlowForSignUpLocked(
+                pdsURL: pdsURL,
+                bskyAppViewDID: bskyAppViewDID,
+                bskyChatDID: bskyChatDID
+            )
+        }
+    }
+
+    private func startOAuthFlowForSignUpLocked(
+        pdsURL: URL?,
+        bskyAppViewDID: String?,
+        bskyChatDID: String?
+    ) async throws -> URL {
+        try Self.validateGatewayBaseURL(gatewayURL)
+
+        var rng = SystemRandomNumberGenerator()
+        var nonceBytes = [UInt8](repeating: 0, count: 32)
+        for i in 0..<32 {
+            nonceBytes[i] = rng.next()
+        }
+        let browserNonce = JWTBase64URL.encode(Data(nonceBytes))
+        let stateToken = UUID().uuidString
+
+        let pending = PendingGatewayLoginState(
+            browserNonce: browserNonce,
+            stateToken: stateToken,
+            redirectURI: Self.defaultCallbackURL.absoluteString,
+            expectedDID: nil,
+            createdAt: Date()
+        )
+        let currentGen = cancellationGeneration
+        inFlightLoginStateTokens.insert(stateToken)
+        inFlightLoginStateTokens.insert(gatewayStateKey())
+        do {
+            try await storage.savePendingGatewayLogin(pending, for: gatewayStateKey())
+            if stateToken != gatewayStateKey() {
+                try await storage.savePendingGatewayLogin(pending, for: stateToken)
+            }
+        } catch {
+            inFlightLoginStateTokens.remove(stateToken)
+            inFlightLoginStateTokens.remove(gatewayStateKey())
+            throw error
+        }
+
+        if cancellationGeneration != currentGen || !inFlightLoginStateTokens.contains(stateToken) {
+            try? await storage.deletePendingGatewayLogin(for: gatewayStateKey())
+            try? await storage.deletePendingGatewayLogin(for: stateToken)
+            inFlightLoginStateTokens.remove(stateToken)
+            inFlightLoginStateTokens.remove(gatewayStateKey())
+            throw AuthError.cancelled
+        }
         guard var components = URLComponents(url: gatewayURL, resolvingAgainstBaseURL: false) else {
             throw GatewayError.invalidGatewayURL
         }
         components.path = "/auth/login"
+        var queryItems: [URLQueryItem] = [
+            URLQueryItem(name: "browser_nonce", value: browserNonce),
+            URLQueryItem(name: "redirect_to", value: Self.defaultCallbackURL.absoluteString)
+        ]
         if let pdsURL {
-            components.queryItems = [URLQueryItem(name: "pds", value: pdsURL.absoluteString)]
+            queryItems.append(URLQueryItem(name: "pds", value: pdsURL.absoluteString))
         }
+        components.queryItems = queryItems
         guard let url = components.url else {
             throw GatewayError.invalidGatewayURL
         }
         return url
+    }
+
+    private struct GatewayExchangeRequestBody: Encodable, Sendable {
+        let code: String
+        let browser_nonce: String
+    }
+
+    private struct GatewayExchangeResponseBody: Decodable, Sendable {
+        let session_id: String
+    }
+
+    private static func isExactCallbackBase(_ url: URL) -> Bool {
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return false
+        }
+        guard components.scheme?.lowercased() == "https" else { return false }
+        guard components.host?.lowercased() == "catbird.blue" else { return false }
+        guard components.path == "/oauth/callback" else { return false }
+        guard components.user == nil && components.password == nil else { return false }
+        if let port = components.port, port != 443 { return false }
+        guard components.fragment == nil else { return false }
+        return true
     }
 
     func handleOAuthCallback(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
@@ -532,17 +769,128 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     private func handleOAuthCallbackLocked(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
-        // Gateway sends session_id in URL fragment: catbird.blue/oauth/callback#session_id=<uuid>
-        guard let fragment = url.fragment,
-              let sessionId = parseSessionIdFromFragment(fragment)
+        // Legacy fragment session path is strictly rejected
+        guard url.fragment == nil else {
+            throw GatewayError.invalidCallbackURL
+        }
+
+        guard Self.isExactCallbackBase(url) else {
+            throw GatewayError.invalidCallbackURL
+        }
+
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+              let queryItems = components.queryItems
         else {
             throw GatewayError.invalidCallbackURL
         }
 
-        // Fetch session details from gateway to get DID and handle FIRST
+        // On error callback, consume and purge pending state ONLY IF matching active flow
+        if queryItems.contains(where: { $0.name == "error" }) {
+            guard let stateParam = queryItems.first(where: { $0.name == "state" })?.value,
+                  !stateParam.isEmpty
+            else {
+                logger.debug("ConfidentialGatewayStrategy: Received error callback without state parameter; ignoring.")
+                throw GatewayError.invalidCallbackURL
+            }
+            guard let pending = try? await storage.consumePendingGatewayLogin(stateParam) else {
+                logger.debug("ConfidentialGatewayStrategy: Received error callback with unmatched state parameter; ignoring.")
+                throw GatewayError.invalidCallbackURL
+            }
+            recordDeniedStateToken(pending.stateToken)
+            try? await storage.deletePendingGatewayLogin(for: pending.stateToken)
+            try? await storage.deletePendingGatewayLogin(for: gatewayStateKey())
+            inFlightLoginStateTokens.remove(stateParam)
+            inFlightLoginStateTokens.remove(pending.stateToken)
+            inFlightLoginStateTokens.remove(gatewayStateKey())
+            throw AuthError.cancelled
+        }
+
+        guard let code = queryItems.first(where: { $0.name == "code" })?.value,
+              !code.isEmpty,
+              code.count <= 512
+        else {
+            throw GatewayError.invalidCallbackURL
+        }
+
+        let stateParam = queryItems.first(where: { $0.name == "state" })?.value
+        if let stateParam, !stateParam.isEmpty, consumeDeniedStateTokenIfPresent(stateParam) {
+            throw GatewayError.invalidCallbackURL
+        }
+        let stateKey = (stateParam != nil && !stateParam!.isEmpty) ? stateParam! : gatewayStateKey()
+        // Atomically consume state before any network calls
+        let pendingState: PendingGatewayLoginState
+        do {
+            pendingState = try await storage.consumePendingGatewayLogin(stateKey)
+            if stateKey == gatewayStateKey() {
+                try? await storage.deletePendingGatewayLogin(for: pendingState.stateToken)
+            } else {
+                try? await storage.deletePendingGatewayLogin(for: gatewayStateKey())
+            }
+            inFlightLoginStateTokens.remove(stateKey)
+            inFlightLoginStateTokens.remove(pendingState.stateToken)
+            inFlightLoginStateTokens.remove(gatewayStateKey())
+        } catch {
+            throw GatewayError.invalidCallbackURL
+        }
+
+        if consumeDeniedStateTokenIfPresent(pendingState.stateToken) {
+            throw GatewayError.invalidCallbackURL
+        }
+
+        // Validate callback redirect URI against the persisted initiating redirect URI
+        guard let expectedRedirect = URL(string: pendingState.redirectURI),
+              components.scheme?.lowercased() == expectedRedirect.scheme?.lowercased(),
+              components.host?.lowercased() == expectedRedirect.host?.lowercased(),
+              components.port == expectedRedirect.port,
+              (components.path.isEmpty ? "/" : components.path) == (expectedRedirect.path.isEmpty ? "/" : expectedRedirect.path)
+        else {
+            throw GatewayError.invalidCallbackURL
+        }
+
+        // Exchange code with browser nonce
+        var exchangeReq = URLRequest(url: gatewayURL.appendingPathComponent("auth/exchange"))
+        exchangeReq.httpMethod = "POST"
+        exchangeReq.setValue("https://catbird.blue", forHTTPHeaderField: "Origin")
+        exchangeReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        exchangeReq.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        let exchangeBody = GatewayExchangeRequestBody(code: code, browser_nonce: pendingState.browserNonce)
+        exchangeReq.httpBody = try JSONCoders.encode(exchangeBody)
+
+        let (data, response) = try await executeGatewayRequest(exchangeReq)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw GatewayError.invalidSession
+        }
+
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw GatewayError.sessionExpired
+            }
+            throw GatewayError.invalidSession
+        }
+
+        let exchangeResp: GatewayExchangeResponseBody
+        do {
+            exchangeResp = try JSONCoders.decode(GatewayExchangeResponseBody.self, from: data)
+        } catch {
+            throw GatewayError.invalidSession
+        }
+
+        let sessionId = exchangeResp.session_id
+        guard !sessionId.isEmpty, sessionId.count <= 256 else {
+            throw GatewayError.invalidSession
+        }
+
+        // Fetch session details from gateway to get authoritative DID and handle
         let sessionInfo = try await fetchSessionFromGateway(sessionId: sessionId)
         guard sessionInfo.active != false else {
             throw GatewayError.invalidSession
+        }
+
+        if let expectedDID = pendingState.expectedDID {
+            guard sessionInfo.did == expectedDID else {
+                throw GatewayError.invalidSession
+            }
         }
 
         // Inspect pending upgrade for sessionInfo.did BEFORE saving session / account / current mutations
@@ -552,9 +900,6 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 throw AuthError.invalidCredentials
             }
             if pendingState.hasCandidate {
-                // If candidate-bearing: mandatory attemptRecoveryFromServerFailuresLocked;
-                // regardless of recovery success, reject the ordinary callback without saving the third session
-                // (on success local candidate remains; on failure old+pending remain).
                 do {
                     try await attemptRecoveryFromServerFailuresLocked(for: sessionInfo.did)
                 } catch {
@@ -562,33 +907,20 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 }
                 throw GatewayError.invalidSession
             } else {
-                // If pre-candidate pending: reject callback and retain state; caller must cancel upgrade first.
                 throw GatewayError.invalidSession
             }
         }
 
         // Store the session ID keyed by DID (for multi-account support)
         try await saveGatewaySession(sessionId, for: sessionInfo.did)
-        // Create and save an Account object so the AccountManager can track this user
         let account = Account(
             did: sessionInfo.did,
             handle: sessionInfo.handle,
             pdsURL: gatewayURL
         )
-        LogManager.logInfo(
-            "ConfidentialGatewayStrategy - Saving account for DID: \(sessionInfo.did), pdsURL: \(gatewayURL)"
-        )
         try await storage.saveAccount(account, for: sessionInfo.did)
-
-        // Update AccountManager with the new account and set it as current
-        LogManager.logInfo(
-            "ConfidentialGatewayStrategy - Setting current account to DID: \(sessionInfo.did)"
-        )
         try await accountManager.updateAccountFromStorage(did: sessionInfo.did)
         try await accountManager.setCurrentAccount(did: sessionInfo.did)
-        LogManager.logInfo(
-            "ConfidentialGatewayStrategy - Account setup complete for DID: \(sessionInfo.did)"
-        )
 
         return (did: sessionInfo.did, handle: sessionInfo.handle, pdsURL: gatewayURL)
     }
@@ -663,7 +995,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 request.setValue("application/json", forHTTPHeaderField: "Content-Type")
 
                 do {
-                    let (data, response) = try await urlSession.data(for: request)
+                    let (data, response) = try await executeGatewayRequest(request)
                     if let httpResponse = response as? HTTPURLResponse {
                         logger.info("🚪 Gateway logout response: \(httpResponse.statusCode)")
                         if httpResponse.statusCode != 200 {
@@ -697,6 +1029,22 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     }
 
     private func cancelOAuthFlowLocked() async {
+        cancellationGeneration &+= 1
+        for token in inFlightLoginStateTokens where token != gatewayStateKey() {
+            recordDeniedStateToken(token)
+            do {
+                try await storage.deletePendingGatewayLogin(for: token)
+            } catch {
+                logger.warning("Failed to delete pending gateway login: \(error.localizedDescription)")
+            }
+        }
+        if let pending = try? await storage.consumePendingGatewayLogin(gatewayStateKey()) {
+            recordDeniedStateToken(pending.stateToken)
+            try? await storage.deletePendingGatewayLogin(for: pending.stateToken)
+        } else {
+            try? await storage.deletePendingGatewayLogin(for: gatewayStateKey())
+        }
+        inFlightLoginStateTokens.removeAll()
         guard let currentAccount = await accountManager.getCurrentAccount() else {
             return
         }
@@ -928,7 +1276,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await urlSession.data(for: request)
+            (data, response) = try await executeGatewayRequest(request)
         } catch {
             throw GatewayError.networkError(error)
         }
@@ -983,7 +1331,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let (commitData, commitResponse): (Data, URLResponse)
         do {
-            (commitData, commitResponse) = try await urlSession.data(for: commitReq)
+            (commitData, commitResponse) = try await executeGatewayRequest(commitReq)
         } catch {
             throw GatewayError.networkError(error)
         }
@@ -1109,6 +1457,10 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         if queryItems.contains(where: { $0.name == "error" }) {
+            guard queryItems.allSatisfy({ $0.name == "error" || $0.name == "error_description" }) else {
+                logger.debug("ConfidentialGatewayStrategy: Received invalid query parameters on scope upgrade error callback; ignoring.")
+                throw AuthError.invalidCallbackURL
+            }
             if !pendingState.hasCandidate {
                 try await storage.deletePendingGatewayUpgradeData(for: expectedDID)
             }
@@ -1143,7 +1495,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await urlSession.data(for: exchangeReq)
+            (data, response) = try await executeGatewayRequest(exchangeReq)
         } catch {
             throw GatewayError.networkError(error)
         }
@@ -1504,7 +1856,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw GatewayError.missingSession
         }
         LogManager.logDebug(
-            "ConfidentialGatewayStrategy - Found gateway session for \(currentAccount.did.prefix(20))...: \(session.prefix(8))..."
+            "ConfidentialGatewayStrategy - Found gateway session for \(currentAccount.did.prefix(20))..."
         )
         return session
     }
@@ -1513,14 +1865,6 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         try await storage.saveGatewaySession(session, for: did)
     }
 
-    /// Parse session_id from URL fragment (e.g., "session_id=abc123&foo=bar")
-    private func parseSessionIdFromFragment(_ fragment: String) -> String? {
-        let pairs = fragment.split(separator: "&").map { $0.split(separator: "=", maxSplits: 1) }
-        for pair in pairs where pair.count == 2 && pair[0] == "session_id" {
-            return String(pair[1])
-        }
-        return nil
-    }
 
     /// Fetch session details from gateway's /auth/session endpoint
     private func fetchSessionFromGateway(sessionId: String) async throws -> GatewaySessionInfo {
@@ -1531,7 +1875,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await urlSession.data(for: request)
+            (data, response) = try await executeGatewayRequest(request)
         } catch {
             throw GatewayError.networkError(error)
         }
