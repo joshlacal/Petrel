@@ -12,9 +12,9 @@ data class {{ message_union }}Unexpected(val type: String, val payload: kotlinx.
 
 {% endif %}
 /**
- * {{ description }}
+ * {{ description | escapeComment }}
  *
- * Endpoint: {{ endpoint }}
+ * Endpoint: {{ endpoint | escapeStringLiteral }}
  *
  * The returned [kotlinx.coroutines.flow.Flow] completes (or throws) when the
  * underlying WebSocket disconnects. Reconnect / cursor-resume is the caller's
@@ -25,7 +25,7 @@ fun {{ receiver_type }}.{{ function_name }}(
     {% endif %}hostOverride: String? = null,
     websocketClient: io.ktor.client.HttpClient? = null,
 ): kotlinx.coroutines.flow.Flow<{{ message_type }}> = kotlinx.coroutines.flow.flow {
-    val endpoint = "{{ endpoint }}"
+    val endpoint = "{{ endpoint | escapeStringLiteral }}"
     {% if has_parameters %}
     // List<Pair<String, String>> preserves repeated keys, which ATProto
     // array-valued query params rely on (e.g. `?collections=a&collections=b`).
@@ -48,14 +48,14 @@ fun {{ receiver_type }}.{{ function_name }}(
                     when (frame.header.t) {
                         {% for variant in variants %}
                         {% if variant.decodable %}
-                        "{{ variant.header_tag }}" -> {{ message_union }}.{{ variant.short_name }}(
+                        "{{ variant.header_tag | escapeStringLiteral }}" -> {{ message_union }}.{{ variant.short_name }}(
                             json.decodeFromJsonElement(
                                 blue.catbird.petrel.generated.{{ variant.payload_type }}.serializer(),
                                 frame.payload
                             )
                         )
                         {% else %}
-                        // "{{ variant.header_tag }}" -> payload type `{{ variant.payload_type }}` is
+                        // "{{ variant.header_tag | escapeLineComment }}" -> payload type `{{ variant.payload_type }}` is
                         // not a @Serializable class (e.g. a top-level `type: bytes`) — surfacing
                         // it via `Unexpected` until the generator grows primitive-ref support.
                         {% endif %}

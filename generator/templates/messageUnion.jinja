@@ -13,7 +13,7 @@ public enum Message: Codable, Sendable {
         
         switch type {
 {% for variant in variants %}
-        case "{{ variant.type_id }}":
+        case "{{ variant.type_id | escapeStringLiteral }}":
             let value = try {{ variant.type }}(from: decoder)
             self = .{{ variant.case_name }}(value)
 {% endfor %}

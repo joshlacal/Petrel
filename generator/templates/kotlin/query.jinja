@@ -1,12 +1,12 @@
 /**
- * {{ description }}
+ * {{ description | escapeComment }}
  *
- * Endpoint: {{ endpoint }}
+ * Endpoint: {{ endpoint | escapeStringLiteral }}
  */
 suspend fun {{ receiver_type }}.{{ function_name }}(
     {% if has_parameters %}parameters: {{ parameters_type }}{% endif %}
 ): ATProtoResponse<{% if output_type %}{{ output_type }}{% else %}Unit{% endif %}> {
-    val endpoint = "{{ endpoint }}"
+    val endpoint = "{{ endpoint | escapeStringLiteral }}"
 
     {% if has_parameters %}
     // List<Pair<String, String>> preserves repeated keys, which ATProto
@@ -20,7 +20,7 @@ suspend fun {{ receiver_type }}.{{ function_name }}(
         method = "GET",
         endpoint = endpoint,
         queryItems = queryItems,
-        headers = mapOf("Accept" to "{{ output_encoding }}"),
+        headers = mapOf("Accept" to "{{ output_encoding | escapeStringLiteral }}"),
         body = null
     )
 }

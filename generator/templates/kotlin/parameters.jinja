@@ -3,12 +3,12 @@
     data class {{ class_name }}Parameters(
         {% for prop in properties %}
         {% if prop.strict_decode %}
-        {% if prop.description %}// {{ prop.description }}{{ '\n        ' -}}{% endif %}
+        {% if prop.description %}// {{ prop.description | escapeLineComment }}{{ '\n        ' -}}{% endif %}
         @Serializable(with = {{ prop.strict_serializer }}::class){{ '\n' -}}
         {% else %}
-        {% if prop.description %}// {{ prop.description }}{% endif %}
+        {% if prop.description %}// {{ prop.description | escapeLineComment }}{% endif %}
         {% endif %}
-        @SerialName("{{ prop.name }}")
+        @SerialName("{{ prop.name | escapeStringLiteral }}")
         val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}
         {% endfor %}
     )
