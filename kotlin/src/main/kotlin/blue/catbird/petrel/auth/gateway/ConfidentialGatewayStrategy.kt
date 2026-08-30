@@ -1,6 +1,7 @@
 package blue.catbird.petrel.auth.gateway
 
 import blue.catbird.petrel.network.NetworkService
+import blue.catbird.petrel.network.NetworkOrigin
 import io.ktor.client.HttpClient
 import io.ktor.client.engine.cio.CIO
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
@@ -116,8 +117,16 @@ class ConfidentialGatewayStrategy(
      * parsed ktor [Url] so we can reliably compose paths and compare hosts
      * (see [handleUnauthorizedResponse]).
      */
-    private val gatewayUrl: Url = runCatching { Url(gatewayBaseUrl) }
-        .getOrElse { throw GatewayException.InvalidGatewayUrl() }
+    private val gatewayUrl: Url = runCatching {
+        val parsed = Url(gatewayBaseUrl)
+        val scheme = parsed.protocol.name.lowercase()
+        val isSecure = scheme == "https"
+        val isLoopback = parsed.host in setOf("127.0.0.1", "::1", "localhost")
+        if (!isSecure && !isLoopback) {
+            throw GatewayException.InvalidGatewayUrl()
+        }
+        parsed
+    }.getOrElse { throw GatewayException.InvalidGatewayUrl() }
 
     private val gatewayHost: String = gatewayUrl.host
 
@@ -208,6 +217,7 @@ class ConfidentialGatewayStrategy(
             currentAccount.setCurrentDid(info.did)
             // Keep NetworkService in lockstep so every subsequent XRPC call
             // attaches the right bearer.
+            networkService.authorizedOrigin = NetworkOrigin.fromUrl(gatewayUrl)
             networkService.authenticatedDID = info.did
             networkService.authorizationHeader = "Bearer $sessionId"
         }
@@ -278,6 +288,7 @@ class ConfidentialGatewayStrategy(
     suspend fun restoreSession(did: String): String? = mutex.withLock {
         val sessionId = storage.getSession(did) ?: return@withLock null
         currentAccount.setCurrentDid(did)
+        networkService.authorizedOrigin = NetworkOrigin.fromUrl(gatewayUrl)
         networkService.authenticatedDID = did
         networkService.authorizationHeader = "Bearer $sessionId"
         sessionId
