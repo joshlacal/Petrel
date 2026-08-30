@@ -62,21 +62,44 @@ public protocol FirehoseWebSocketSessionFactory: Sendable {
 
 public final class URLSessionFirehoseWebSocketSession: FirehoseWebSocketSession, @unchecked Sendable {
   private let task: URLSessionWebSocketTask
+  private let delegate: HardenedURLSessionDelegate?
 
   public init(task: URLSessionWebSocketTask) {
     self.task = task
+    self.delegate = nil
+    self.task.resume()
+  }
+
+  package init(task: URLSessionWebSocketTask, delegate: HardenedURLSessionDelegate?) {
+    self.task = task
+    self.delegate = delegate
     self.task.resume()
   }
 
   public func receiveMessage() async throws -> Data {
-    let message = try await task.receive()
-    switch message {
-    case let .data(data):
-      return data
-    case let .string(text):
-      return Data(text.utf8)
-    @unknown default:
-      throw FirehoseSubscriptionError.unsupportedMessageFormat
+    do {
+      let message = try await task.receive()
+      switch message {
+      case let .data(data):
+        return data
+      case .string:
+        throw FirehoseSubscriptionError.unsupportedMessageFormat
+      @unknown default:
+        throw FirehoseSubscriptionError.unsupportedMessageFormat
+      }
+    } catch {
+      if let delegate {
+        if delegate.contextManager.isSecurityViolation(for: task) {
+          delegate.contextManager.pruneCompletedTask(task)
+          throw NetworkError.securityViolation
+        }
+        if delegate.contextManager.isLimitExceeded(for: task) {
+          delegate.contextManager.pruneCompletedTask(task)
+          throw NetworkError.responseLimitExceeded("Response limit exceeded")
+        }
+        delegate.contextManager.pruneCompletedTask(task)
+      }
+      throw error
     }
   }
 
@@ -88,14 +111,39 @@ public final class URLSessionFirehoseWebSocketSession: FirehoseWebSocketSession,
 /// URLSession is internally thread-safe/reference-safe, but Swift FoundationNetworking 6.1 lacks Sendable annotation on Linux.
 public struct URLSessionFirehoseWebSocketFactory: FirehoseWebSocketSessionFactory, @unchecked Sendable {
   private let session: URLSession
+  private let delegate: HardenedURLSessionDelegate?
 
-  public init(session: URLSession = .shared) {
+  public init() {
+    let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+    let config = URLSessionConfiguration.ephemeral
+    self.delegate = delegate
+    self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+  }
+
+  public init(session: URLSession) {
     self.session = session
+    self.delegate = session.delegate as? HardenedURLSessionDelegate
+  }
+
+  public init(limits: NetworkResponseLimits) {
+    let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
+    let config = URLSessionConfiguration.ephemeral
+    self.delegate = delegate
+    self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
   }
 
   public func makeSession(url: URL) async throws -> any FirehoseWebSocketSession {
+    if !(try await NetworkService.validateURL(url)) {
+      throw NetworkError.securityViolation
+    }
     let task = session.webSocketTask(with: url)
-    return URLSessionFirehoseWebSocketSession(task: task)
+    let host = url.host?.lowercased() ?? ""
+    let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
+    if let delegate {
+      let addresses = try await NetworkService.resolveApprovedAddresses(host: host, isLocal: isLocal)
+      delegate.contextManager.setApprovedAddresses(addresses, for: task)
+    }
+    return URLSessionFirehoseWebSocketSession(task: task, delegate: delegate)
   }
 }
 
@@ -324,11 +372,15 @@ private actor FirehoseSubscriptionRunner {
         await stop()
         if Task.isCancelled { break }
         switch error {
-        case FirehoseSubscriptionError.duplicateSequence,
-             FirehoseSubscriptionError.cursorRegression,
-             FirehoseSubscriptionError.resynchronizationRequired,
-             FirehoseSubscriptionError.storageFailure,
-             FirehoseSubscriptionError.unacknowledgedSequenceGap:
+        case FirehoseSubscriptionError.connectionClosed:
+          break
+        case is URLError,
+             NetworkError.requestFailed:
+          break
+        case is FirehoseSubscriptionError,
+             is RelayVerifierError,
+             is NetworkError,
+             is DecodingError:
           continuation.finish(throwing: error)
           return
         default:

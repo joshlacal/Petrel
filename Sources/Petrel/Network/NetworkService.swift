@@ -451,9 +451,9 @@ public actor NetworkService: NetworkServiceProtocol {
     public let limits: NetworkResponseLimits
     private var authProvider: AuthenticationProvider?
     private var headers: [String: String] = [:]
-    private let sessionDelegate: HardenedURLSessionDelegate
-    private let exactAuthSessionDelegate: HardenedURLSessionDelegate
-    private let session: URLSession
+    nonisolated package let sessionDelegate: HardenedURLSessionDelegate
+    nonisolated package let exactAuthSessionDelegate: HardenedURLSessionDelegate
+    nonisolated package let session: URLSession
     private let exactAuthSession: URLSession
     private let jsonEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -480,9 +480,9 @@ public actor NetworkService: NetworkServiceProtocol {
         return queue
     }()
     #if DEBUG
-        nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
-        nonisolated(unsafe) static var dnsResolverOverride: (@Sendable (String) -> [String]?)?
-        nonisolated(unsafe) static var webSocketTaskOverride: (@Sendable (URLRequest) -> any WebSocketTaskProtocol)?
+        package nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
+        package nonisolated(unsafe) static var dnsResolverOverride: (@Sendable (String) -> [String]?)?
+        package nonisolated(unsafe) static var webSocketTaskOverride: (@Sendable (URLRequest) -> any WebSocketTaskProtocol)?
     #endif
     private var authContinuityRevision: UInt64 = 0
     private var authContinuityRevisionExhausted = false
@@ -2234,22 +2234,47 @@ public actor NetworkService: NetworkServiceProtocol {
                                     webSocketTask.cancel(with: .goingAway, reason: nil)
                                     return
                                 @unknown default:
-                                    break
+                                    LogManager.logError("Unknown yield result on subscription stream - terminating")
+                                    continuation.finish(throwing: NetworkError.invalidResponse(description: "Unknown stream yield result"))
+                                    webSocketTask.cancel(with: .goingAway, reason: nil)
+                                    return
                                 }
                             } catch {
                                 LogManager.logError("Failed to decode WebSocket frame: \(error)")
                                 continuation.finish(throwing: error)
+                                webSocketTask.cancel(with: .goingAway, reason: nil)
                                 return
                             }
 
-                        case .string:
-                            LogManager.logWarning("Received unexpected text frame on subscription")
+                        case let .string(text):
+                            LogManager.logError("Received unexpected text frame on subscription: \(text.utf8.count) bytes")
+                            continuation.finish(throwing: NetworkError.invalidResponse(description: "Unexpected text frame received on binary WebSocket subscription"))
+                            webSocketTask.cancel(with: .goingAway, reason: nil)
+                            return
 
                         @unknown default:
-                            break
+                            LogManager.logError("Received unknown WebSocket message type")
+                            continuation.finish(throwing: NetworkError.invalidResponse(description: "Unknown WebSocket message type"))
+                            webSocketTask.cancel(with: .goingAway, reason: nil)
+                            return
                         }
                     }
                 } catch {
+                    if let urlSessionTask = webSocketTask as? URLSessionTask {
+                        if self.sessionDelegate.contextManager.isSecurityViolation(for: urlSessionTask) {
+                            self.sessionDelegate.contextManager.pruneCompletedTask(urlSessionTask)
+                            LogManager.logError("WebSocket terminated due to security violation")
+                            continuation.finish(throwing: NetworkError.securityViolation)
+                            return
+                        }
+                        if self.sessionDelegate.contextManager.isLimitExceeded(for: urlSessionTask) {
+                            self.sessionDelegate.contextManager.pruneCompletedTask(urlSessionTask)
+                            LogManager.logError("WebSocket terminated due to response limit exceeded")
+                            continuation.finish(throwing: NetworkError.responseLimitExceeded("Response limit exceeded"))
+                            return
+                        }
+                        self.sessionDelegate.contextManager.pruneCompletedTask(urlSessionTask)
+                    }
                     if let urlError = error as? URLError, urlError.code == .cancelled {
                         LogManager.logInfo("WebSocket connection closed")
                         continuation.finish()
@@ -2276,9 +2301,7 @@ public actor NetworkService: NetworkServiceProtocol {
         do {
             return try jsonDecoder.decode(Message.self, from: decoded.jsonData)
         } catch {
-            if let jsonString = String(data: decoded.jsonData, encoding: .utf8) {
-                LogManager.logError("Failed to decode JSON for message type \(decoded.messageType): \(jsonString)")
-            }
+            LogManager.logError("Failed to decode JSON payload (\(decoded.jsonData.count) bytes) for message type: \(decoded.messageType)")
             throw error
         }
     }
@@ -2321,10 +2344,14 @@ public actor NetworkService: NetworkServiceProtocol {
         return host.isEmpty ? nil : host
     }
 
+    private func validateURL(_ url: URL) async throws -> Bool {
+        try await Self.validateURL(url)
+    }
+
     /// Validates the URL for security.
     /// - Parameter url: The URL to validate.
     /// - Returns: A boolean indicating whether the URL is valid.
-    private func validateURL(_ url: URL) async throws -> Bool {
+    package static func validateURL(_ url: URL) async throws -> Bool {
         guard let scheme = url.scheme?.lowercased() else {
             LogManager.logError("Missing URL scheme")
             return false
@@ -2346,20 +2373,13 @@ public actor NetworkService: NetworkServiceProtocol {
             return false
         }
 
-        do {
-            _ = try await Self.resolveApprovedAddresses(host: normalizedHost, isLocal: isLocalTarget)
-            return true
-        } catch is CancellationError {
-            throw CancellationError()
-        } catch {
-            LogManager.logError("Security validation failed for host \(normalizedHost): \(error)")
-            return false
-        }
+        _ = try await Self.resolveApprovedAddresses(host: normalizedHost, isLocal: isLocalTarget)
+        return true
     }
 
     /// Resolves and validates host IP addresses against private and reserved ranges.
     /// Returns the set of approved normalized IP addresses, or throws `NetworkError.securityViolation`.
-    static func resolveApprovedAddresses(host: String, isLocal: Bool) async throws -> Set<String> {
+    package static func resolveApprovedAddresses(host: String, isLocal: Bool) async throws -> Set<String> {
         let normalizedHost = host.lowercased()
         let rawAddresses: [String]
         #if canImport(Network)
@@ -2379,7 +2399,7 @@ public actor NetworkService: NetworkServiceProtocol {
         #endif
         let addresses = Set(rawAddresses.map { IPAddress.normalizeIPv4MappedIPv6($0) })
         guard !addresses.isEmpty else {
-            throw NetworkError.securityViolation
+            throw NetworkError.requestFailed
         }
         if isLocal {
             guard addresses.allSatisfy({ $0 == "127.0.0.1" || $0 == "::1" }) else {

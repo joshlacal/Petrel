@@ -16,13 +16,13 @@ import Foundation
     import FoundationNetworking
 #endif
 
-final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
+package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
     private let maxRedirects = 5
-    let limits: NetworkResponseLimits
+    package let limits: NetworkResponseLimits
     private let allowsRedirects: Bool
     private let resolver: @Sendable (String) async throws -> [String]
 
-    init(
+    package init(
         allowsRedirects: Bool = true,
         limits: NetworkResponseLimits = .default,
         resolver: @escaping @Sendable (String) async throws -> [String] = { try await NetworkService.resolveHostIPsOffActor(host: $0) }
@@ -32,24 +32,27 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         self.resolver = resolver
         super.init()
     }
-
-    final class TaskContextManager: @unchecked Sendable {
+    package final class TaskContextManager: @unchecked Sendable {
         private let lock = NSLock()
         private var taskContexts = [Int: TaskContext]()
+        // ponytail: bounded FIFO/LRU list for task violation status, 128 max capacity; pruned at task finish or FIFO eviction
+        private var securityViolatedTaskIDs = [Int]()
+        private var limitExceededTaskIDs = [Int]()
+        private let maxRetainedViolations = 128
 
-        func getContext(for task: URLSessionTask) -> TaskContext {
+        package func getContext(for task: URLSessionTask) -> TaskContext {
             lock.lock()
             defer { lock.unlock() }
             return taskContexts[task.taskIdentifier] ?? TaskContext()
         }
 
-        func register(_ task: URLSessionTask, completion: @escaping @Sendable (Result<(Data, URLResponse), Error>) -> Void) {
+        package func register(_ task: URLSessionTask, completion: @escaping @Sendable (Result<(Data, URLResponse), Error>) -> Void) {
             lock.lock()
             defer { lock.unlock() }
             taskContexts[task.taskIdentifier] = TaskContext(completion: completion)
         }
 
-        func updateContext(for task: URLSessionTask, update: (inout TaskContext) -> Void) {
+        package func updateContext(for task: URLSessionTask, update: (inout TaskContext) -> Void) {
             lock.lock()
             defer { lock.unlock() }
             var context = taskContexts[task.taskIdentifier] ?? TaskContext()
@@ -57,13 +60,19 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
             taskContexts[task.taskIdentifier] = context
         }
 
-        func addWireBytes(_ count: Int, for task: URLSessionTask, limit: Int) -> Bool {
+        package func addWireBytes(_ count: Int, for task: URLSessionTask, limit: Int) -> Bool {
             lock.lock()
             defer { lock.unlock() }
             var context = taskContexts[task.taskIdentifier] ?? TaskContext()
             context.wireBytesReceived += count
             if context.wireBytesReceived > limit {
                 context.limitExceeded = true
+                if !limitExceededTaskIDs.contains(task.taskIdentifier) {
+                    limitExceededTaskIDs.append(task.taskIdentifier)
+                    if limitExceededTaskIDs.count > maxRetainedViolations {
+                        limitExceededTaskIDs.removeFirst()
+                    }
+                }
                 taskContexts[task.taskIdentifier] = context
                 return true
             }
@@ -71,37 +80,70 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
             return false
         }
 
-        func recordSecurityViolation(for task: URLSessionTask) {
-            updateContext(for: task) { $0.securityViolation = true }
+        package func recordSecurityViolation(for task: URLSessionTask) {
+            lock.lock()
+            if !securityViolatedTaskIDs.contains(task.taskIdentifier) {
+                securityViolatedTaskIDs.append(task.taskIdentifier)
+                if securityViolatedTaskIDs.count > maxRetainedViolations {
+                    securityViolatedTaskIDs.removeFirst()
+                }
+            }
+            var context = taskContexts[task.taskIdentifier] ?? TaskContext()
+            context.securityViolation = true
+            taskContexts[task.taskIdentifier] = context
+            lock.unlock()
         }
 
-        func recordLimitExceeded(for task: URLSessionTask) {
-            updateContext(for: task) { $0.limitExceeded = true }
+        package func recordLimitExceeded(for task: URLSessionTask) {
+            lock.lock()
+            if !limitExceededTaskIDs.contains(task.taskIdentifier) {
+                limitExceededTaskIDs.append(task.taskIdentifier)
+                if limitExceededTaskIDs.count > maxRetainedViolations {
+                    limitExceededTaskIDs.removeFirst()
+                }
+            }
+            var context = taskContexts[task.taskIdentifier] ?? TaskContext()
+            context.limitExceeded = true
+            taskContexts[task.taskIdentifier] = context
+            lock.unlock()
         }
 
-        func hasAnySecurityViolation() -> Bool {
+        package func hasAnySecurityViolation() -> Bool {
             lock.lock()
             defer { lock.unlock() }
             return taskContexts.values.contains { $0.securityViolation }
         }
 
-        func hasAnyLimitExceeded() -> Bool {
+        package func hasAnyLimitExceeded() -> Bool {
             lock.lock()
             defer { lock.unlock() }
             return taskContexts.values.contains { $0.limitExceeded }
         }
 
-        func isSecurityViolation(for task: URLSessionTask) -> Bool {
+        package func isSecurityViolation(for task: URLSessionTask) -> Bool {
             lock.lock()
             defer { lock.unlock() }
-            return taskContexts[task.taskIdentifier]?.securityViolation ?? false
+            return securityViolatedTaskIDs.contains(task.taskIdentifier) || (taskContexts[task.taskIdentifier]?.securityViolation ?? false)
         }
 
-        func setApprovedAddresses(_ addresses: Set<String>, for task: URLSessionTask) {
+        package func isLimitExceeded(for task: URLSessionTask) -> Bool {
+            lock.lock()
+            defer { lock.unlock() }
+            return limitExceededTaskIDs.contains(task.taskIdentifier) || (taskContexts[task.taskIdentifier]?.limitExceeded ?? false)
+        }
+
+        package func pruneCompletedTask(_ task: URLSessionTask) {
+            lock.lock()
+            securityViolatedTaskIDs.removeAll { $0 == task.taskIdentifier }
+            limitExceededTaskIDs.removeAll { $0 == task.taskIdentifier }
+            lock.unlock()
+        }
+
+        package func setApprovedAddresses(_ addresses: Set<String>, for task: URLSessionTask) {
             updateContext(for: task) { $0.approvedAddresses = addresses }
         }
 
-        func approveRedirect(_ addresses: Set<String>, for task: URLSessionTask) {
+        package func approveRedirect(_ addresses: Set<String>, for task: URLSessionTask) {
             updateContext(for: task) {
                 $0.approvedAddresses = addresses
                 $0.data.removeAll(keepingCapacity: false)
@@ -110,24 +152,26 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
             }
         }
 
-        func setResponse(_ response: URLResponse, for task: URLSessionTask) {
+        package func setResponse(_ response: URLResponse, for task: URLSessionTask) {
             updateContext(for: task) { $0.response = response }
         }
-        func append(_ data: Data, for task: URLSessionTask) {
+        package func append(_ data: Data, for task: URLSessionTask) {
             updateContext(for: task) { $0.data.append(data) }
         }
 
-        func finish(_ task: URLSessionTask, error: Error?) {
+        package func finish(_ task: URLSessionTask, error: Error?) {
             lock.lock()
+            let wasViolated = securityViolatedTaskIDs.contains(task.taskIdentifier)
+            let wasLimitExceeded = limitExceededTaskIDs.contains(task.taskIdentifier)
             guard let context = taskContexts.removeValue(forKey: task.taskIdentifier) else {
                 lock.unlock()
                 return
             }
             let completion = context.completion
             let result: Result<(Data, URLResponse), Error>
-            if context.securityViolation {
+            if context.securityViolation || wasViolated {
                 result = .failure(NetworkError.securityViolation)
-            } else if context.limitExceeded {
+            } else if context.limitExceeded || wasLimitExceeded {
                 result = .failure(NetworkError.responseLimitExceeded("Response limit exceeded"))
             } else if let error {
                 result = .failure(error)
@@ -141,13 +185,13 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         }
     }
 
-    static func transportAddressesAreApproved(_ answers: [String], approved: Set<String>) -> Bool {
+    package static func transportAddressesAreApproved(_ answers: [String], approved: Set<String>) -> Bool {
         let normalized = Set(answers.map { IPAddress.normalizeIPv4MappedIPv6($0) })
         return !normalized.isEmpty
             && !normalized.contains(where: IPAddress.isPrivateOrReservedAddress)
             && !normalized.isDisjoint(with: approved)
     }
-    struct TaskContext {
+    package struct TaskContext {
         var redirectCount = 0
         var wireBytesReceived = 0
         var limitExceeded = false
@@ -158,11 +202,11 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         var completion: (@Sendable (Result<(Data, URLResponse), Error>) -> Void)? = nil
     }
 
-    let contextManager = TaskContextManager()
+    package let contextManager = TaskContextManager()
 
     // MARK: - URLSessionTaskDelegate
 
-    nonisolated func urlSession(
+    package nonisolated func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
         willPerformHTTPRedirection response: HTTPURLResponse,
@@ -255,7 +299,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
 
     // MARK: - URLSessionDataDelegate
 
-    nonisolated func urlSession(
+    package nonisolated func urlSession(
         _ session: URLSession,
         dataTask: URLSessionDataTask,
         didReceive response: URLResponse,
@@ -275,7 +319,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         completionHandler(.allow)
     }
 
-    nonisolated func urlSession(
+    package nonisolated func urlSession(
         _ session: URLSession,
         dataTask: URLSessionDataTask,
         didReceive data: Data
@@ -299,7 +343,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         }
     }
 
-    nonisolated func urlSession(
+    package nonisolated func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
         didReceive challenge: URLAuthenticationChallenge,
@@ -323,7 +367,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         }
     }
 
-    nonisolated func urlSession(
+    package nonisolated func urlSession(
         _ session: URLSession,
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
@@ -333,7 +377,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
 
     // MARK: - URLSessionTaskDelegate
 
-    nonisolated func urlSession(
+    package nonisolated func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
         didFinishCollecting metrics: URLSessionTaskMetrics
@@ -365,7 +409,7 @@ final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSession
         }
     }
 
-    nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
+    package nonisolated func urlSession(_ session: URLSession, task: URLSessionTask, didCompleteWithError error: Error?) {
         if let error {
             LogManager.logError("Task completed with error: \(error.localizedDescription)")
         }
