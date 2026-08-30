@@ -1340,7 +1340,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 // .itemStoreError: failure-atomic replacement preserves old state.
                 // .deletionError: cleanup failure after session state preserved.
                 return true
-            case .dataFormatError, .unableToCreateKey, .storageUnavailable, .itemRetrievalError:
+            case .dataFormatError, .unableToCreateKey, .storageUnavailable, .itemRetrievalError, .expiredState:
                 // Corrupted storage, uninitialized backend, or retrieval failures are terminal.
                 return false
             }
