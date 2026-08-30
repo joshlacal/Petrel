@@ -64,14 +64,15 @@ final class ExactAuthGeneratedRequestScopeState: @unchecked Sendable {
     }
 }
 
-struct ExactAuthRequestOrigin: Equatable {
-    let scheme: String
-    let host: String
-    let effectivePort: Int
+public struct ExactAuthRequestOrigin: Sendable, Equatable {
+    public let scheme: String
+    public let host: String
+    public let effectivePort: Int
 
-    init?(_ url: URL) {
+    public init?(_ url: URL) {
         guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              components.scheme?.lowercased() == "https",
+              let rawScheme = components.scheme?.lowercased(),
+              rawScheme == "https" || rawScheme == "wss",
               let host = components.host?.lowercased(),
               !host.isEmpty,
               components.user == nil,

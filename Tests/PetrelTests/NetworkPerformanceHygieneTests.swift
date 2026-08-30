@@ -2,9 +2,14 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
+#if canImport(Compression)
+    import Compression
+#endif
+import SwiftCBOR
 @testable import Petrel
 import Synchronization
 import Testing
+
 private actor Counter {
     var count = 0
     func increment() {
@@ -263,18 +268,20 @@ struct NetworkPerformanceHygieneTests {
 
     // MARK: - Task 7: NetworkService URL Validation and SSRF Mitigation Tests
 
-    @Test("NetworkService blocks private and loopback IP addresses")
+    @Test("NetworkService blocks private IP addresses and IPv4-mapped IPv6")
     func networkServiceBlocksPrivateIPs() async throws {
         let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
 
         let privateURLs = [
-            "http://127.0.0.1/xrpc/test",
             "http://10.0.0.1/xrpc/test",
             "http://192.168.1.1/xrpc/test",
             "http://172.16.0.1/xrpc/test",
             "http://169.254.1.1/xrpc/test",
             "http://0.0.0.0/xrpc/test",
-            "http://255.255.255.255/xrpc/test"
+            "http://255.255.255.255/xrpc/test",
+            "https://[::ffff:127.0.0.1]/xrpc/test",
+            "https://[::ffff:7f00:1]/xrpc/test",
+            "https://[::ffff:10.0.0.1]/xrpc/test"
         ]
 
         for urlString in privateURLs {
@@ -391,6 +398,136 @@ struct NetworkPerformanceHygieneTests {
             Issue.record("Expected CancellationError, but task.value completed successfully")
         case nil:
             Issue.record("Task result was missing")
+        }
+    }
+
+    // MARK: - Task N1: Byte Ceilings and Stream Bounds Tests
+
+    @Test("ContentDecoding framing heuristic handles declared-gzip-but-already-decoded payloads and wire limits")
+    func contentDecodingFramingHeuristic() throws {
+        let limits = NetworkResponseLimits(
+            maximumWireBytes: 1000,
+            maximumDecodedBytes: 5000,
+            maximumExpansionRatio: 10,
+            maximumDiagnosticBytes: 100
+        )
+
+        // 1. Declared gzip but already decoded by URLSession (starts with ASCII '{') passes through unmodified
+        let jsonText = #"{"status":"already-decoded"}"#
+        let jsonData = Data(jsonText.utf8)
+        let uncompressed = try ContentDecoding.decompressIfNeeded(jsonData, contentEncoding: "gzip", limits: limits)
+        #expect(uncompressed == jsonData)
+
+        // 2. Wire bytes exceeding limit throws responseLimitExceeded
+        let oversizedWire = Data(repeating: 0x41, count: 1001)
+        #expect(throws: NetworkError.self) {
+            try ContentDecoding.decompressIfNeeded(oversizedWire, contentEncoding: nil, limits: limits)
+        }
+
+        // 3. Exact boundary equal for wire is admitted
+        let exactWire = Data(repeating: 0x41, count: 1000)
+        #expect(throws: Never.self) {
+            let result = try ContentDecoding.decompressIfNeeded(exactWire, contentEncoding: nil, limits: limits)
+            #expect(result.count == 1000)
+        }
+    }
+
+    @Test("Step 7: WebSocket subscription stream drops overflow with typed error")
+    func subscriptionStreamOverflowTermination() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let seq: Int
+        }
+
+        // Construct a valid ATProto WebSocket frame
+        let headerCBOR: CBOR = .map([
+            .utf8String("op"): .unsignedInt(1),
+            .utf8String("t"): .utf8String("#commit")
+        ])
+        let payloadCBOR: CBOR = .map([
+            .utf8String("seq"): .unsignedInt(42)
+        ])
+        let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
+
+        final class MockOverflowWebSocketTask: WebSocketTaskProtocol, @unchecked Sendable {
+            private let frameData: Data
+            private let sentCount = Mutex<Int>(0)
+
+            init(frameData: Data) {
+                self.frameData = frameData
+            }
+
+            func resume() {}
+
+            func receive() async throws -> URLSessionWebSocketTask.Message {
+                let current = sentCount.withLock { count -> Int in
+                    count += 1
+                    return count
+                }
+                if current <= 1005 {
+                    return .data(frameData)
+                } else {
+                    // Sleep to prevent infinite loop after buffer overflows
+                    try await Task.sleep(nanoseconds: 1_000_000_000)
+                    return .data(frameData)
+                }
+            }
+
+            func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {}
+        }
+
+        NetworkService.dnsResolverOverride = { host in
+            if host == "pds.example.com" {
+                return ["93.184.216.34"]
+            }
+            return nil
+        }
+        NetworkService.webSocketTaskOverride = { _ in
+            MockOverflowWebSocketTask(frameData: frameBytes)
+        }
+        defer {
+            NetworkService.dnsResolverOverride = nil
+            NetworkService.webSocketTaskOverride = nil
+        }
+
+        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+        let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
+            endpoint: "com.atproto.sync.subscribeRepos",
+            parameters: nil
+        )
+        var caughtOverflow = false
+        do {
+            for try await _ in stream {
+                // Slow consumer to let the 1000-message producer buffer saturate and drop
+                try await Task.sleep(nanoseconds: 10_000_000)
+            }
+        } catch let error as NetworkError {
+            if case .streamOverflow = error {
+                caughtOverflow = true
+            }
+        } catch {
+            Issue.record("Unexpected error: \(error)")
+        }
+
+        #expect(caughtOverflow, "Expected NetworkService.subscribe to terminate throwing NetworkError.streamOverflow on drop")
+    }
+    @Test("Server-trust revalidation uses the delegate async resolver seam")
+    func serverTrustRevalidationSeam() async throws {
+        let url = URL(string: "https://pds.example.com/xrpc/test")!
+        let cases: [(String, @Sendable (String) async throws -> [String], Bool)] = [
+            ("matching approved addresses", { _ in ["93.184.216.34"] }, true),
+            ("different public addresses with intersection", { _ in ["93.184.216.34", "93.184.216.35"] }, true),
+            ("fully disjoint public addresses", { _ in ["93.184.216.35"] }, false),
+            ("private rebinding", { _ in ["10.0.0.1"] }, false),
+            ("resolver failure", { _ in throw URLError(.cannotFindHost) }, false)
+        ]
+        for (_, resolver, expected) in cases {
+            let delegate = HardenedURLSessionDelegate(resolver: resolver)
+            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            let task = session.dataTask(with: url)
+            delegate.contextManager.register(task) { _ in }
+            delegate.contextManager.setApprovedAddresses(["93.184.216.34"], for: task)
+            #expect(await delegate.serverTrustIsApproved(for: task, host: "pds.example.com") == expected)
         }
     }
 }

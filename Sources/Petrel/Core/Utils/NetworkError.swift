@@ -27,6 +27,8 @@ public enum NetworkError: Error {
     case invalidResponse(description: String)
     case unauthorized
     case securityViolation
+    case streamOverflow
+    case responseLimitExceeded(String)
 }
 
 extension NetworkError: LocalizedError {
@@ -70,6 +72,10 @@ extension NetworkError: LocalizedError {
             return "Unauthorized access."
         case .securityViolation:
             return "Network configuration issue detected. Please check your internet connection and try again."
+        case .streamOverflow:
+            return "The event stream buffer exceeded capacity and was terminated."
+        case let .responseLimitExceeded(description):
+            return "The response exceeded security limits: \(description)."
         }
     }
 

@@ -896,6 +896,51 @@ final class AuthContinuityTests: XCTestCase {
         let afterSessionDelete = await recorder.count
         XCTAssertEqual(afterSessionDelete, 6)
     }
+
+    func testRecipientAndOriginCredentialAttachmentRegression() async throws {
+        // Step 1: Exact-origin and recipient policy checks
+        let authorizedURL = URL(string: "https://pds.example.com:443/xrpc/app.bsky.actor.getProfile")!
+        let origin = try XCTUnwrap(ExactAuthRequestOrigin(authorizedURL))
+        XCTAssertEqual(origin.scheme, "https")
+        XCTAssertEqual(origin.host, "pds.example.com")
+        XCTAssertEqual(origin.effectivePort, 443)
+
+        let authedPolicy = RequestSecurityPolicy.authenticated(recipient: origin)
+        if case let .authenticated(recipient) = authedPolicy {
+            XCTAssertEqual(recipient, origin)
+        } else {
+            XCTFail("Expected authenticated policy with matching recipient")
+        }
+
+        let unauthedPolicy = RequestSecurityPolicy.unauthenticated
+        if case .unauthenticated = unauthedPolicy {
+            // expected
+        } else {
+            XCTFail("Expected unauthenticated policy")
+        }
+
+        // Cross-origin comparison
+        let crossOriginURL = URL(string: "https://other.example.com/xrpc/test")!
+        let crossOrigin = try XCTUnwrap(ExactAuthRequestOrigin(crossOriginURL))
+        XCTAssertNotEqual(origin, crossOrigin)
+
+        // Cleartext HTTP / WS rejection for non-loopback
+        let httpURL = URL(string: "http://pds.example.com/xrpc/test")!
+        XCTAssertNil(ExactAuthRequestOrigin(httpURL))
+        let wsURL = URL(string: "ws://pds.example.com/xrpc/test")!
+        XCTAssertNil(ExactAuthRequestOrigin(wsURL))
+
+        // Special-use and IPv4-mapped IPv6 rejection
+        XCTAssertTrue(IPAddress.isPrivateOrReservedAddress("127.0.0.1"))
+        XCTAssertTrue(IPAddress.isPrivateOrReservedAddress("10.0.0.1"))
+        XCTAssertTrue(IPAddress.isPrivateOrReservedAddress("169.254.1.1"))
+        XCTAssertTrue(IPAddress.isPrivateOrReservedAddress("::ffff:127.0.0.1"))
+        XCTAssertTrue(IPAddress.isPrivateOrReservedAddress("::ffff:10.0.0.1"))
+        XCTAssertTrue(IPAddress.isPrivateOrReservedAddress("::ffff:7f00:1"))
+        XCTAssertTrue(IPAddress.isPrivateOrReservedAddress("fe80::1"))
+        XCTAssertTrue(IPAddress.isPrivateOrReservedAddress("fc00::1"))
+        XCTAssertFalse(IPAddress.isPrivateOrReservedAddress("93.184.216.34"))
+    }
 }
 
 private actor SnapshotInterleavingGate {

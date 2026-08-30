@@ -83,7 +83,7 @@ final class HTTPErrorResponseTests: XCTestCase {
 
         let (data, response) = try await networkService
             .performRequestReturningHTTPErrorResponses(
-                request(path: "unauthorized"),
+                request(path: "xrpc/com.example.unauthorized"),
                 skipTokenRefresh: false
             )
 
@@ -102,7 +102,7 @@ final class HTTPErrorResponseTests: XCTestCase {
         )
         do {
             _ = try await networkService.performRequest(
-                request(path: "after-auth-retry"),
+                request(path: "xrpc/com.example.afterAuthRetry"),
                 skipTokenRefresh: false
             )
             XCTFail("Expected the nested preserving scope to be restored")
