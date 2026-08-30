@@ -35,4 +35,8 @@ public struct CABRequestError: Error, Sendable, Equatable {
   public static func rateLimited() -> CABRequestError {
     CABRequestError(status: 429, error: "rate_limited", description: "Too many requests")
   }
+
+  public static func temporarilyUnavailable(_ description: String = "Service temporarily unavailable") -> CABRequestError {
+    CABRequestError(status: 503, error: "temporarily_unavailable", description: description)
+  }
 }

@@ -39,7 +39,7 @@ swift Examples/SimplePostCLI.swift
 
 When prompted:
 1. Enter your handle (for example, `alice.bsky.social`).
-2. Enter an app password generated from your account settings.
+2. Enter an app password generated from your account settings (passwords are entered securely without terminal echo).
 3. Enter your post text.
 
 ## Run the Petrel CLI application
@@ -69,6 +69,10 @@ To create an app password:
 4. Copy the generated password token (`xxxx-xxxx-xxxx-xxxx`).
 
 App passwords can be revoked at any time from the same settings page without modifying your main account password.
+
+### Security note
+
+Interactive example scripts prompt for secrets securely on standard input with terminal echo disabled (`termios`). Do not pass passwords or credentials via command-line arguments, environment variables, or shell scripts where they may be exposed in process listings or shell history.
 
 ## Production authentication
 

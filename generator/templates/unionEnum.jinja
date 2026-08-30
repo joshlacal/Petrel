@@ -54,7 +54,7 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
 
         switch typeValue {
         {%- for variant in variants %}
-        case "{{ variant }}":
+        case "{{ variant | escapeStringLiteral }}":
             let value = try {{ variant | convertRefToSwift }}(from: decoder)
             self = .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
         {%- endfor %}
@@ -72,7 +72,7 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         switch self {
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            try container.encode("{{ variant }}", forKey: .type)
+            try container.encode("{{ variant | escapeStringLiteral }}", forKey: .type)
             try value.encode(to: encoder)
         {%- endfor %}
         case .unexpected(let container):
@@ -84,7 +84,7 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         switch self {
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            hasher.combine("{{ variant }}")
+            hasher.combine("{{ variant | escapeStringLiteral }}")
             hasher.combine(value)
         {%- endfor %}
         case .unexpected(let container):
@@ -128,7 +128,7 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         switch self {
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            map = map.adding(key: "$type", value: "{{ variant }}")
+            map = map.adding(key: "$type", value: "{{ variant | escapeStringLiteral }}")
             
             let valueDict = try value.toCBORValue()
 

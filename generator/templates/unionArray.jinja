@@ -68,7 +68,7 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
 
         switch typeValue {
         {%- for ref in refs %}
-        case "{{ ref.ref }}":
+        case "{{ ref.ref | escapeStringLiteral }}":
             let value = try {{ ref.swift_ref }}(from: decoder)
             self = .{{ ref.camel_case_label | lowerCamelCase }}(value)
         {%- endfor %}
@@ -84,7 +84,7 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
         switch self {
         {%- for ref in refs %}
         case .{{ ref.camel_case_label | lowerCamelCase }}(let value):
-            try container.encode("{{ ref.ref }}", forKey: .type)
+            try container.encode("{{ ref.ref | escapeStringLiteral }}", forKey: .type)
             try value.encode(to: encoder)
         {%- endfor %}
         case .unexpected(let ATProtocolValueContainer):
@@ -96,7 +96,7 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
         switch self {
         {%- for ref in refs %}
         case .{{ ref.camel_case_label | lowerCamelCase }}(let value):
-            hasher.combine("{{ ref.ref }}")
+            hasher.combine("{{ ref.ref | escapeStringLiteral }}")
             hasher.combine(value)
         {%- endfor %}
         case .unexpected(let ATProtocolValueContainer):
@@ -132,7 +132,7 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
         switch self {
         {%- for ref in refs %}
         case .{{ ref.camel_case_label | lowerCamelCase }}(let value):
-            map = map.adding(key: "$type", value: "{{ ref.ref }}")
+            map = map.adding(key: "$type", value: "{{ ref.ref | escapeStringLiteral }}")
             
             let valueDict = try value.toCBORValue()
 

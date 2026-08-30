@@ -1,5 +1,5 @@
 {% if description %}
-/// {{ description }}
+/// {{ description | escapeComment }}
 {% endif %}
 extension ATProtoClient.{{ template_namespace_name }} {
     {% if has_parameters %}
@@ -8,7 +8,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
     ) async throws -> AsyncThrowingStream<{{ message_type }}, Error> {
         let params = {{ input_struct_name }}({{ input_values }})
         return try await self.networkService.subscribe(
-            endpoint: "{{ endpoint }}",
+            endpoint: "{{ endpoint | escapeStringLiteral }}",
             parameters: params
         )
     }
@@ -16,14 +16,14 @@ extension ATProtoClient.{{ template_namespace_name }} {
     /// Alternative signature accepting input struct
     public func {{ subscription_name }}(input: {{ input_struct_name }}) async throws -> AsyncThrowingStream<{{ message_type }}, Error> {
         return try await self.networkService.subscribe(
-            endpoint: "{{ endpoint }}",
+            endpoint: "{{ endpoint | escapeStringLiteral }}",
             parameters: input
         )
     }
     {% else %}
     public func {{ subscription_name }}() async throws -> AsyncThrowingStream<{{ message_type }}, Error> {
         return try await self.networkService.subscribe(
-            endpoint: "{{ endpoint }}"
+            endpoint: "{{ endpoint | escapeStringLiteral }}"
         )
     }
     {% endif %}

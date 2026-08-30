@@ -65,8 +65,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          git clone --depth 1 --filter=blob:none --sparse https://github.com/bluesky-social/atproto.git /tmp/atproto
+          # Pinned upstream atproto revision (reviewed 2026-08-30, commit 328a4a86a999357eeae12a6da897bf686b4da88e)
+          mkdir -p /tmp/atproto
+          git -C /tmp/atproto init
+          git -C /tmp/atproto remote add origin https://github.com/bluesky-social/atproto.git
+          git -C /tmp/atproto config core.sparseCheckout true
           git -C /tmp/atproto sparse-checkout set lexicons
+          git -C /tmp/atproto fetch --depth 1 origin 328a4a86a999357eeae12a6da897bf686b4da88e
+          git -C /tmp/atproto checkout FETCH_HEAD
       - name: Sync standard namespaces
         shell: bash
         run: |

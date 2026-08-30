@@ -26,6 +26,51 @@ def to_snake_case(s: str) -> str:
     return ''.join(result)
 
 
+def escape_kotlin_comment(s: str) -> str:
+    """Escape arbitrary text for use in Kotlin Javadoc / KDoc /** */ comments."""
+    if not s:
+        return ""
+    s = s.replace("*/", "* /").replace("/*", "/ *")
+    s = s.replace("$", "\\$")
+    lines = s.splitlines()
+    return "\n * ".join(line.strip() for line in lines if line.strip())
+
+
+def escape_kotlin_line_comment(s: str) -> str:
+    """Escape arbitrary text for use in Kotlin single-line // comments."""
+    if not s:
+        return ""
+    s = s.replace("*/", "* /").replace("/*", "/ *")
+    s = s.replace("$", "\\$")
+    lines = s.splitlines()
+    return "\n// ".join(line.strip() for line in lines if line.strip())
+
+
+def escape_kotlin_string_literal(s: str) -> str:
+    """Escape arbitrary text for use in Kotlin double-quoted string literals."""
+    if not s:
+        return ""
+    escapes = {
+        '\\': '\\\\',
+        '"': '\\"',
+        '$': '\\$',
+        '\n': '\\n',
+        '\r': '\\r',
+        '\t': '\\t',
+        '\b': '\\b',
+        '\0': '\\u0000',
+    }
+    encoded = []
+    for char in s:
+        if char in escapes:
+            encoded.append(escapes[char])
+        elif ord(char) < 0x20 or ord(char) == 0x7f or char in ('\u2028', '\u2029'):
+            encoded.append(f"\\u{ord(char):04x}")
+        else:
+            encoded.append(char)
+    return "".join(encoded)
+
+
 def sanitize_kotlin_keyword(s: str) -> str:
     """Escape Kotlin keywords by wrapping in backticks."""
     keywords = {
@@ -62,7 +107,9 @@ class KotlinTemplateManager:
         self.env.filters['camelCase'] = to_camel_case
         self.env.filters['snakeCase'] = to_snake_case
         self.env.filters['sanitizeKeyword'] = sanitize_kotlin_keyword
-
+        self.env.filters['escapeComment'] = escape_kotlin_comment
+        self.env.filters['escapeLineComment'] = escape_kotlin_line_comment
+        self.env.filters['escapeStringLiteral'] = escape_kotlin_string_literal
         # Load all templates
         self.main_template = self.env.get_template('mainTemplate.jinja')
         self.properties_template = self.env.get_template('properties.jinja')

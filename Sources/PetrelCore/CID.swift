@@ -23,13 +23,17 @@ public protocol DAGCBORDecodable {
 public typealias DAGCBORCodable = DAGCBORDecodable & DAGCBOREncodable
 
 /// Error types for DAG-CBOR operations
-public enum DAGCBORError: Error {
+public enum DAGCBORError: Error, Equatable {
     case encodingFailed(String)
     case decodingFailed(String)
     case unsupportedType(String)
     case invalidCIDEncoding(String)
     case invalidMapKey
     case floatingPointNotAllowed
+    case depthLimitExceeded
+    case nodeLimitExceeded
+    case unconsumedTrailingBytes
+    case invalidLength
 }
 
 // MARK: - ================== CIDAsLink Wrapper ==================
@@ -622,6 +626,231 @@ public class DAGCBOR {
             )
         }
     }
+    // MARK: - Preflight Scanner
+
+    public struct PreflightLimits: Sendable, Equatable {
+        public var maximumDepth: Int
+        public var maximumNodes: Int
+        public var maximumContainerElements: Int
+
+        public static let standard = PreflightLimits(
+            maximumDepth: 64,
+            maximumNodes: 10_000,
+            maximumContainerElements: 65_536
+        )
+
+        public init(
+            maximumDepth: Int = 64,
+            maximumNodes: Int = 10_000,
+            maximumContainerElements: Int = 65_536
+        ) {
+            self.maximumDepth = maximumDepth
+            self.maximumNodes = maximumNodes
+            self.maximumContainerElements = maximumContainerElements
+        }
+    }
+
+    /// Scans raw bytes according to DAG-CBOR rules, enforcing depth, node count, container bounds,
+    /// key ordering/uniqueness, canonical integers, and exact consumption before allocating CBOR data structures.
+    public static func decodeCBORPreflight(_ data: Data, limits: PreflightLimits = .standard, allowTrailingBytes: Bool = false) throws {
+        guard !data.isEmpty else {
+            throw DAGCBORError.decodingFailed("Cannot decode empty data")
+        }
+        var scanner = PreflightScanner(bytes: Array(data), limits: limits)
+        try scanner.scanItem(depth: 0)
+        if !allowTrailingBytes {
+            guard scanner.offset == scanner.bytes.count else {
+                throw DAGCBORError.unconsumedTrailingBytes
+            }
+        }
+    }
+
+    private struct PreflightScanner {
+        let bytes: [UInt8]
+        var offset = 0
+        var nodeCount = 0
+        let limits: PreflightLimits
+
+        mutating func scanItem(depth: Int) throws {
+            guard depth <= limits.maximumDepth else {
+                throw DAGCBORError.depthLimitExceeded
+            }
+            nodeCount += 1
+            guard nodeCount <= limits.maximumNodes else {
+                throw DAGCBORError.nodeLimitExceeded
+            }
+            guard offset < bytes.count else {
+                throw DAGCBORError.decodingFailed("Unexpected end of CBOR bytes")
+            }
+
+            let initialByte = bytes[offset]
+            let major = initialByte >> 5
+
+            switch major {
+            case 0: // unsigned int
+                _ = try readArgument(major: 0)
+            case 1: // negative int
+                _ = try readArgument(major: 1)
+            case 2: // byte string
+                let length = try readLength(major: 2)
+                guard bytes.count - offset >= length else {
+                    throw DAGCBORError.invalidLength
+                }
+                offset += length
+            case 3: // text string
+                let length = try readLength(major: 3)
+                guard bytes.count - offset >= length else {
+                    throw DAGCBORError.invalidLength
+                }
+                let textBytes = bytes[offset ..< (offset + length)]
+                guard String(bytes: textBytes, encoding: .utf8) != nil else {
+                    throw DAGCBORError.decodingFailed("Invalid UTF-8 string")
+                }
+                offset += length
+            case 4: // array
+                let count = try readLength(major: 4)
+                guard count <= limits.maximumContainerElements,
+                      count <= bytes.count - offset else {
+                    throw DAGCBORError.invalidLength
+                }
+                for _ in 0 ..< count {
+                    try scanItem(depth: depth + 1)
+                }
+            case 5: // map
+                let count = try readLength(major: 5)
+                guard count <= limits.maximumContainerElements,
+                      count <= (bytes.count - offset) / 2 else {
+                    throw DAGCBORError.invalidLength
+                }
+                var previousKey: [UInt8]?
+                for _ in 0 ..< count {
+                    guard offset < bytes.count else {
+                        throw DAGCBORError.decodingFailed("Unexpected end of CBOR map key")
+                    }
+                    let keyMajor = bytes[offset] >> 5
+                    guard keyMajor == 3 else {
+                        throw DAGCBORError.invalidMapKey
+                    }
+                    let keyStart = offset
+                    let keyLength = try readLength(major: 3)
+                    guard bytes.count - offset >= keyLength else {
+                        throw DAGCBORError.invalidLength
+                    }
+                    let rawKey = Array(bytes[keyStart ..< (offset + keyLength)])
+                    offset += keyLength
+
+                    if let prev = previousKey {
+                        // In DAG-CBOR, map keys must be sorted canonically by length then lexicographically
+                        let isCanonical: Bool
+                        if prev.count == rawKey.count {
+                            isCanonical = prev.lexicographicallyPrecedes(rawKey)
+                        } else {
+                            isCanonical = prev.count < rawKey.count
+                        }
+                        guard isCanonical && prev != rawKey else {
+                            throw DAGCBORError.decodingFailed("Map keys are not strictly increasing or canonical")
+                        }
+                    }
+                    previousKey = rawKey
+
+                    // Scan value
+                    try scanItem(depth: depth + 1)
+                }
+            case 6: // tag
+                let tag = try readArgument(major: 6)
+                guard tag == 42 else {
+                    throw DAGCBORError.unsupportedType("Unsupported CBOR tag \(tag)")
+                }
+                // Tag 42 payload must be byte string starting with 0x00
+                guard offset < bytes.count, (bytes[offset] >> 5) == 2 else {
+                    throw DAGCBORError.invalidCIDEncoding("Tag 42 must contain byte string")
+                }
+                let length = try readLength(major: 2)
+                guard bytes.count - offset >= length else {
+                    throw DAGCBORError.invalidLength
+                }
+                guard length > 1, bytes[offset] == 0x00 else {
+                    throw DAGCBORError.invalidCIDEncoding("Tag 42 payload must start with 0x00")
+                }
+                offset += length
+            case 7: // simple/float/null/bool
+                let info = bytes[offset] & 0x1f
+                offset += 1
+                switch info {
+                case 20, 21, 22: // false, true, null
+                    break
+                default:
+                    throw DAGCBORError.floatingPointNotAllowed
+                }
+            default:
+                throw DAGCBORError.unsupportedType("Unsupported major type \(major)")
+            }
+        }
+
+        private mutating func readArgument(major: UInt8) throws -> UInt64 {
+            guard offset < bytes.count else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+            let info = bytes[offset] & 0x1f
+            guard (bytes[offset] >> 5) == major else {
+                throw DAGCBORError.decodingFailed("Unexpected major type")
+            }
+            offset += 1
+            switch info {
+            case 0 ..< 24:
+                return UInt64(info)
+            case 24:
+                guard offset < bytes.count else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+                let val = bytes[offset]
+                guard val >= 24 else { throw DAGCBORError.decodingFailed("Non-canonical integer") }
+                offset += 1
+                return UInt64(val)
+            case 25:
+                guard bytes.count - offset >= 2 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+                let val = (UInt16(bytes[offset]) << 8) | UInt16(bytes[offset + 1])
+                guard val > UInt16(UInt8.max) else { throw DAGCBORError.decodingFailed("Non-canonical integer") }
+                offset += 2
+                return UInt64(val)
+            case 26:
+                guard bytes.count - offset >= 4 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+                var val: UInt32 = 0
+                for i in 0 ..< 4 { val = (val << 8) | UInt32(bytes[offset + i]) }
+                guard val > UInt32(UInt16.max) else { throw DAGCBORError.decodingFailed("Non-canonical integer") }
+                offset += 4
+                return UInt64(val)
+            case 27:
+                guard bytes.count - offset >= 8 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+                var val: UInt64 = 0
+                for i in 0 ..< 8 { val = (val << 8) | UInt64(bytes[offset + i]) }
+                guard val > UInt64(UInt32.max) else { throw DAGCBORError.decodingFailed("Non-canonical integer") }
+                offset += 8
+                return val
+            default:
+                throw DAGCBORError.decodingFailed("Invalid CBOR argument info \(info)")
+            }
+        }
+
+        private mutating func readLength(major: UInt8) throws -> Int {
+            let arg = try readArgument(major: major)
+            guard arg <= UInt64(Int.max) else {
+                throw DAGCBORError.invalidLength
+            }
+            return Int(arg)
+        }
+    }
+}
+
+/// Default implementation for DAGCBORDecodable using standard Decodable
+/// Assumes the CBOR decodes to a structure representable as JSON first.
+/// Might need customization if direct CBOR -> Struct mapping is required.
+public extension DAGCBORDecodable where Self: Decodable {
+    static func decodedFromDAGCBOR(_ data: Data) throws -> Self {
+        try DAGCBOR.decodeCBORPreflight(data)
+        guard let cborItem = try? CBOR.decode([UInt8](data)) else {
+            throw DAGCBORError.decodingFailed("Failed to decode CBOR data")
+        }
+        let intermediateValue = try DAGCBOR.decodeCBORItem(cborItem)
+        let jsonData = try DAGCBORJSONBridge.jsonData(from: intermediateValue)
+        return try JSONCoders.decode(Self.self, from: jsonData)
+    }
 }
 
 // MARK: - ================== Default Protocol Implementations ==================
@@ -631,25 +860,6 @@ public extension DAGCBOREncodable {
     func encodedDAGCBOR() throws -> Data {
         let value = try toCBORValue()
         return try DAGCBOR.encodeValue(value)
-    }
-}
-
-/// Default implementation for DAGCBORDecodable using standard Decodable
-/// Assumes the CBOR decodes to a structure representable as JSON first.
-/// Might need customization if direct CBOR -> Struct mapping is required.
-public extension DAGCBORDecodable where Self: Decodable {
-    static func decodedFromDAGCBOR(_ data: Data) throws -> Self {
-        // Ensure data is not empty
-        guard !data.isEmpty else {
-            throw DAGCBORError.decodingFailed("Cannot decode empty data")
-        }
-        // Decode the top-level CBOR item
-        guard let cborItem = try? CBOR.decode([UInt8](data)) else {
-            throw DAGCBORError.decodingFailed("Failed to decode CBOR data. Data: \(data.hexDump())")
-        }
-        let intermediateValue = try DAGCBOR.decodeCBORItem(cborItem)
-        let jsonData = try DAGCBORJSONBridge.jsonData(from: intermediateValue)
-        return try JSONCoders.decode(Self.self, from: jsonData)
     }
 }
 

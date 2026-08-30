@@ -31,6 +31,75 @@ import java.util.logging.Logger
 private val cborLogger = Logger.getLogger("blue.catbird.petrel.runtime.subscription.CborFrames")
 
 /**
+ * Security resource limits for CBOR subscription frames.
+ */
+data class CborLimits(
+    val maxFrameBytes: Int = 5_000_000,
+    val maxDepth: Int = 64,
+    val maxNodes: Int = 10_000,
+    val maxDecodedBytes: Int = 15 * 1024 * 1024,
+)
+
+/**
+ * Exception thrown when a CBOR subscription frame exceeds configured resource limits.
+ */
+class CborLimitExceeded(
+    val reason: Reason,
+    message: String = "CBOR limit exceeded: $reason",
+) : IllegalArgumentException(message) {
+    enum class Reason {
+        FRAME_SIZE,
+        DEPTH,
+        NODES,
+        DECODED_BYTES,
+    }
+}
+
+/**
+ * Shared budget tracker carried through CBOR item scanning, parsing, and JSON conversion.
+ */
+internal class CborBudget(val limits: CborLimits = CborLimits()) {
+    var nodeCount: Int = 0
+        private set
+    var decodedBytes: Long = 0L
+        private set
+
+    fun checkDepth(depth: Int) {
+        if (depth > limits.maxDepth) {
+            throw CborLimitExceeded(CborLimitExceeded.Reason.DEPTH)
+        }
+    }
+
+    fun chargeNode() {
+        nodeCount++
+        if (nodeCount > limits.maxNodes) {
+            throw CborLimitExceeded(CborLimitExceeded.Reason.NODES)
+        }
+    }
+
+    fun checkNodes(count: Int) {
+        if (count < 0) {
+            throw CborLimitExceeded(CborLimitExceeded.Reason.NODES)
+        }
+        val next = nodeCount.toLong() + count.toLong()
+        if (next > limits.maxNodes.toLong()) {
+            throw CborLimitExceeded(CborLimitExceeded.Reason.NODES)
+        }
+    }
+
+    fun chargeDecodedBytes(bytes: Long) {
+        if (bytes < 0) {
+            throw CborLimitExceeded(CborLimitExceeded.Reason.DECODED_BYTES)
+        }
+        val next = decodedBytes + bytes
+        if (next > limits.maxDecodedBytes.toLong() || next < 0) {
+            throw CborLimitExceeded(CborLimitExceeded.Reason.DECODED_BYTES)
+        }
+        decodedBytes = next
+    }
+}
+
+/**
  * Header of an ATProto subscription WebSocket frame.
  *
  * `op == 1` indicates a normal message, `op == -1` indicates an error frame
@@ -64,12 +133,17 @@ private data class CborErrorPayload(
  * Parse a binary WebSocket frame into a [CborFrame], or `null` if the frame
  * cannot be decoded (malformed CBOR, truncated, etc.).
  *
+ * Throws [CborLimitExceeded] if the frame exceeds configured resource bounds.
  * Thread-safe (pure function over [data]).
  */
 @OptIn(ExperimentalSerializationApi::class)
-fun parseBinaryFrame(data: ByteArray): CborFrame? {
+fun parseBinaryFrame(data: ByteArray, limits: CborLimits = CborLimits()): CborFrame? {
+    if (data.size > limits.maxFrameBytes) {
+        throw CborLimitExceeded(CborLimitExceeded.Reason.FRAME_SIZE)
+    }
     return try {
-        val headerLength = CborItemScanner.measureItem(data, 0)
+        val budget = CborBudget(limits)
+        val headerLength = CborItemScanner.measureItem(data, 0, budget, depth = 1)
         if (headerLength <= 0 || headerLength > data.size) {
             cborLogger.warning("Invalid CBOR header length: $headerLength for ${data.size} bytes")
             return null
@@ -81,8 +155,12 @@ fun parseBinaryFrame(data: ByteArray): CborFrame? {
         // op == -1 is an error frame; payload shape is { error, message }.
         if (header.op == -1) {
             val payloadBytes = data.copyOfRange(headerLength, data.size)
+            val payloadLength = CborItemScanner.measureItem(payloadBytes, 0, budget, depth = 1)
+            if (payloadLength <= 0 || payloadLength > payloadBytes.size) {
+                return null
+            }
             val err = try {
-                Cbor.decodeFromByteArray<CborErrorPayload>(payloadBytes)
+                Cbor.decodeFromByteArray<CborErrorPayload>(payloadBytes.copyOfRange(0, payloadLength))
             } catch (e: Exception) {
                 CborErrorPayload(error = "UnknownServerError", message = e.message)
             }
@@ -94,8 +172,10 @@ fun parseBinaryFrame(data: ByteArray): CborFrame? {
         if (header.t.isBlank()) return null
 
         val payloadBytes = data.copyOfRange(headerLength, data.size)
-        val payload = decodeCborPayloadToJson(payloadBytes) ?: return null
+        val payload = decodeCborPayloadToJson(payloadBytes, budget) ?: return null
         CborFrame.Message(header, payload)
+    } catch (e: CborLimitExceeded) {
+        throw e
     } catch (e: Exception) {
         cborLogger.warning("Failed to parse binary CBOR frame: ${e.message}")
         null
@@ -105,11 +185,17 @@ fun parseBinaryFrame(data: ByteArray): CborFrame? {
 /**
  * Decode CBOR payload bytes to a [JsonObject] using the ATProto `$bytes` convention.
  * Returns `null` if the payload is not a map or cannot be parsed.
+ * Throws [CborLimitExceeded] if resource bounds are exceeded.
  */
-fun decodeCborPayloadToJson(payload: ByteArray): JsonObject? {
+fun decodeCborPayloadToJson(payload: ByteArray, limits: CborLimits = CborLimits()): JsonObject? =
+    decodeCborPayloadToJson(payload, CborBudget(limits))
+
+internal fun decodeCborPayloadToJson(payload: ByteArray, budget: CborBudget): JsonObject? {
     return try {
-        val (value, _) = CborValueParser.parse(payload, 0)
-        CborValueParser.toJsonElement(value) as? JsonObject
+        val (value, _) = CborValueParser.parse(payload, 0, budget, depth = 1)
+        CborValueParser.toJsonElement(value, budget, depth = 1) as? JsonObject
+    } catch (e: CborLimitExceeded) {
+        throw e
     } catch (e: Exception) {
         cborLogger.fine("CBOR payload parse failed: ${e.message}")
         null
@@ -129,8 +215,12 @@ internal object CborItemScanner {
     /**
      * Measure the total byte length of a CBOR item starting at [offset].
      * Returns -1 on error (truncated, unknown major type, etc.).
+     * Throws [CborLimitExceeded] if limits are violated.
      */
-    fun measureItem(data: ByteArray, offset: Int): Int {
+    fun measureItem(data: ByteArray, offset: Int, budget: CborBudget, depth: Int): Int {
+        budget.checkDepth(depth)
+        budget.chargeNode()
+
         if (offset >= data.size) return -1
 
         val initial = data[offset].toInt() and 0xFF
@@ -143,19 +233,25 @@ internal object CborItemScanner {
             0, 1 -> headerSize
             2, 3 -> {
                 if (additionalInfo == 31) {
-                    scanIndefiniteChunks(data, offset + 1)
+                    scanIndefiniteChunks(data, offset + 1, budget, depth + 1)
                 } else {
+                    if (argValue < 0 || argValue > Int.MAX_VALUE) return -1
+                    budget.chargeDecodedBytes(argValue)
                     val total = headerSize + argValue.toInt()
                     if (offset + total > data.size) -1 else total
                 }
             }
             4 -> {
                 if (additionalInfo == 31) {
-                    scanIndefiniteContainer(data, offset + 1, isMap = false)
+                    scanIndefiniteContainer(data, offset + 1, isMap = false, budget = budget, depth = depth + 1)
                 } else {
+                    if (argValue < 0 || argValue > budget.limits.maxNodes) {
+                        throw CborLimitExceeded(CborLimitExceeded.Reason.NODES)
+                    }
+                    budget.checkNodes(argValue.toInt())
                     var pos = offset + headerSize
                     for (i in 0 until argValue.toInt()) {
-                        val len = measureItem(data, pos)
+                        val len = measureItem(data, pos, budget, depth + 1)
                         if (len < 0) return -1
                         pos += len
                     }
@@ -164,14 +260,18 @@ internal object CborItemScanner {
             }
             5 -> {
                 if (additionalInfo == 31) {
-                    scanIndefiniteContainer(data, offset + 1, isMap = true)
+                    scanIndefiniteContainer(data, offset + 1, isMap = true, budget = budget, depth = depth + 1)
                 } else {
+                    if (argValue < 0 || argValue > budget.limits.maxNodes / 2) {
+                        throw CborLimitExceeded(CborLimitExceeded.Reason.NODES)
+                    }
+                    budget.checkNodes(argValue.toInt() * 2)
                     var pos = offset + headerSize
                     for (i in 0 until argValue.toInt()) {
-                        val keyLen = measureItem(data, pos)
+                        val keyLen = measureItem(data, pos, budget, depth + 1)
                         if (keyLen < 0) return -1
                         pos += keyLen
-                        val valLen = measureItem(data, pos)
+                        val valLen = measureItem(data, pos, budget, depth + 1)
                         if (valLen < 0) return -1
                         pos += valLen
                     }
@@ -179,7 +279,7 @@ internal object CborItemScanner {
                 }
             }
             6 -> {
-                val innerLen = measureItem(data, offset + headerSize)
+                val innerLen = measureItem(data, offset + headerSize, budget, depth + 1)
                 if (innerLen < 0) -1 else headerSize + innerLen
             }
             7 -> when (additionalInfo) {
@@ -229,30 +329,32 @@ internal object CborItemScanner {
         }
     }
 
-    private fun scanIndefiniteChunks(data: ByteArray, startPos: Int): Int {
+    private fun scanIndefiniteChunks(data: ByteArray, startPos: Int, budget: CborBudget, depth: Int): Int {
+        budget.checkDepth(depth)
         var pos = startPos
         while (pos < data.size) {
             if ((data[pos].toInt() and 0xFF) == 0xFF) {
                 return (pos + 1) - (startPos - 1)
             }
-            val len = measureItem(data, pos)
+            val len = measureItem(data, pos, budget, depth)
             if (len < 0) return -1
             pos += len
         }
         return -1
     }
 
-    private fun scanIndefiniteContainer(data: ByteArray, startPos: Int, isMap: Boolean): Int {
+    private fun scanIndefiniteContainer(data: ByteArray, startPos: Int, isMap: Boolean, budget: CborBudget, depth: Int): Int {
+        budget.checkDepth(depth)
         var pos = startPos
         while (pos < data.size) {
             if ((data[pos].toInt() and 0xFF) == 0xFF) {
                 return (pos + 1) - (startPos - 1)
             }
-            val len = measureItem(data, pos)
+            val len = measureItem(data, pos, budget, depth)
             if (len < 0) return -1
             pos += len
             if (isMap) {
-                val valLen = measureItem(data, pos)
+                val valLen = measureItem(data, pos, budget, depth)
                 if (valLen < 0) return -1
                 pos += valLen
             }
@@ -284,50 +386,71 @@ internal object CborValueParser {
         data class Tagged(val tag: Long, val inner: Value) : Value()
     }
 
-    fun parse(data: ByteArray, offset: Int): Pair<Value, Int> {
+    fun parse(data: ByteArray, offset: Int, budget: CborBudget, depth: Int): Pair<Value, Int> {
+        budget.checkDepth(depth)
+        budget.chargeNode()
+
         if (offset >= data.size) throw IllegalArgumentException("Unexpected end of CBOR at $offset")
 
         val initial = data[offset].toInt() and 0xFF
         val majorType = initial shr 5
         val additionalInfo = initial and 0x1F
         val (argValue, headerSize) = readArg(data, offset, additionalInfo)
+        if (headerSize < 0) throw IllegalArgumentException("Malformed CBOR header at $offset")
 
         return when (majorType) {
             0 -> Pair(Value.UInt(argValue), offset + headerSize)
             1 -> Pair(Value.NegInt(-1 - argValue), offset + headerSize)
             2 -> {
+                if (argValue < 0 || argValue > Int.MAX_VALUE) {
+                    throw IllegalArgumentException("Invalid CBOR byte string length: $argValue")
+                }
                 val start = offset + headerSize
                 val end = start + argValue.toInt()
+                if (end > data.size) throw IllegalArgumentException("Truncated CBOR byte string at $offset")
                 Pair(Value.ByteStr(data.copyOfRange(start, end)), end)
             }
             3 -> {
+                if (argValue < 0 || argValue > Int.MAX_VALUE) {
+                    throw IllegalArgumentException("Invalid CBOR text string length: $argValue")
+                }
+                budget.chargeDecodedBytes(argValue)
                 val start = offset + headerSize
                 val end = start + argValue.toInt()
+                if (end > data.size) throw IllegalArgumentException("Truncated CBOR text string at $offset")
                 Pair(Value.TextStr(String(data, start, argValue.toInt(), Charsets.UTF_8)), end)
             }
             4 -> {
+                if (argValue < 0 || argValue > budget.limits.maxNodes) {
+                    throw CborLimitExceeded(CborLimitExceeded.Reason.NODES)
+                }
+                budget.checkNodes(argValue.toInt())
                 var pos = offset + headerSize
-                val items = mutableListOf<Value>()
+                val items = ArrayList<Value>(minOf(argValue.toInt(), 1024))
                 for (i in 0 until argValue.toInt()) {
-                    val (item, newPos) = parse(data, pos)
+                    val (item, newPos) = parse(data, pos, budget, depth + 1)
                     items.add(item)
                     pos = newPos
                 }
                 Pair(Value.Arr(items), pos)
             }
             5 -> {
+                if (argValue < 0 || argValue > budget.limits.maxNodes / 2) {
+                    throw CborLimitExceeded(CborLimitExceeded.Reason.NODES)
+                }
+                budget.checkNodes(argValue.toInt() * 2)
                 var pos = offset + headerSize
-                val entries = mutableListOf<Pair<Value, Value>>()
+                val entries = ArrayList<Pair<Value, Value>>(minOf(argValue.toInt(), 1024))
                 for (i in 0 until argValue.toInt()) {
-                    val (key, kPos) = parse(data, pos)
-                    val (value, vPos) = parse(data, kPos)
+                    val (key, kPos) = parse(data, pos, budget, depth + 1)
+                    val (value, vPos) = parse(data, kPos, budget, depth + 1)
                     entries.add(Pair(key, value))
                     pos = vPos
                 }
                 Pair(Value.MapVal(entries), pos)
             }
             6 -> {
-                val (inner, newPos) = parse(data, offset + headerSize)
+                val (inner, newPos) = parse(data, offset + headerSize, budget, depth + 1)
                 Pair(Value.Tagged(argValue, inner), newPos)
             }
             7 -> when (additionalInfo) {
@@ -363,30 +486,36 @@ internal object CborValueParser {
      * Convert a parsed CBOR value to a [JsonElement].
      * Byte strings become `{"$bytes": "base64..."}` per the ATProto convention.
      */
-    fun toJsonElement(value: Value): JsonElement = when (value) {
-        is Value.UInt -> JsonPrimitive(value.v)
-        is Value.NegInt -> JsonPrimitive(value.v)
-        is Value.TextStr -> JsonPrimitive(value.v)
-        is Value.Bool -> JsonPrimitive(value.v)
-        is Value.Null -> JsonNull
-        is Value.Float64 -> JsonPrimitive(value.v)
-        is Value.ByteStr -> {
-            val base64 = Base64.getEncoder().encodeToString(value.v)
-            buildJsonObject { put("\$bytes", JsonPrimitive(base64)) }
-        }
-        is Value.Arr -> buildJsonArray { value.items.forEach { add(toJsonElement(it)) } }
-        is Value.MapVal -> buildJsonObject {
-            value.entries.forEach { (k, v) ->
-                val keyStr = when (k) {
-                    is Value.TextStr -> k.v
-                    is Value.UInt -> k.v.toString()
-                    is Value.NegInt -> k.v.toString()
-                    else -> k.toString()
-                }
-                put(keyStr, toJsonElement(v))
+    fun toJsonElement(value: Value, budget: CborBudget, depth: Int): JsonElement {
+        budget.checkDepth(depth)
+        return when (value) {
+            is Value.UInt -> JsonPrimitive(value.v)
+            is Value.NegInt -> JsonPrimitive(value.v)
+            is Value.TextStr -> JsonPrimitive(value.v)
+            is Value.Bool -> JsonPrimitive(value.v)
+            is Value.Null -> JsonNull
+            is Value.Float64 -> JsonPrimitive(value.v)
+            is Value.ByteStr -> {
+                val base64 = Base64.getEncoder().encodeToString(value.v)
+                budget.chargeDecodedBytes(base64.length.toLong())
+                buildJsonObject { put("\$bytes", JsonPrimitive(base64)) }
             }
+            is Value.Arr -> buildJsonArray {
+                value.items.forEach { add(toJsonElement(it, budget, depth + 1)) }
+            }
+            is Value.MapVal -> buildJsonObject {
+                value.entries.forEach { (k, v) ->
+                    val keyStr = when (k) {
+                        is Value.TextStr -> k.v
+                        is Value.UInt -> k.v.toString()
+                        is Value.NegInt -> k.v.toString()
+                        else -> k.toString()
+                    }
+                    put(keyStr, toJsonElement(v, budget, depth + 1))
+                }
+            }
+            is Value.Tagged -> toJsonElement(value.inner, budget, depth + 1)
         }
-        is Value.Tagged -> toJsonElement(value.inner)
     }
 
     private fun readArg(data: ByteArray, offset: Int, ai: Int): Pair<Long, Int> = when {

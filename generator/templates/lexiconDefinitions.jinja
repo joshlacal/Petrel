@@ -1,7 +1,7 @@
 {%- for name, def_schema in lex_definitions.items() %}
         public struct {{ name }}{{ def_schema.conformance }} {
             {%- set strict_ref_properties = def_schema.properties | selectattr('strict_decode') | list %}
-            public static let typeIdentifier = "{{ lexicon_id }}#{{ def_schema.wire_fragment }}"
+            public static let typeIdentifier = "{{ lexicon_id | escapeStringLiteral }}#{{ def_schema.wire_fragment | escapeStringLiteral }}"
 
         {%- for prop in def_schema.properties %}
             {%- if prop.boxed %}
@@ -262,40 +262,40 @@
             if let value = _{{ prop.name|sanitizeKeyword }}?.value {
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try value.toCBORValue()
-                map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
             } else {
-                map = map.adding(key: "{{ prop.name }}", value: NSNull())
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: NSNull())
             }
             {%- elif prop.optional -%}
             if let value = _{{ prop.name|sanitizeKeyword }}?.value {
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try value.toCBORValue()
-                map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
             }
             {%- else -%}
             {% set var_name = prop.name + 'Value' -%}
             let {{ var_name }} = try _{{ prop.name|sanitizeKeyword }}.value.toCBORValue()
-            map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+            map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
             {%- endif %}
             {%- else -%}
             {% if prop.required_nullable -%}
             if let value = {{ prop.name|sanitizeKeyword }} {
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try value.toCBORValue()
-                map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
             } else {
-                map = map.adding(key: "{{ prop.name }}", value: NSNull())
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: NSNull())
             }
             {%- elif prop.optional -%}
             if let value = {{ prop.name|sanitizeKeyword }} {
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try value.toCBORValue()
-                map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
             }
             {%- else -%}
             {% set var_name = prop.name + 'Value' -%}
             let {{ var_name }} = try {{ prop.name|sanitizeKeyword }}.toCBORValue()
-            map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+            map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
             {%- endif %}
             {%- endif %}
             {%- endfor %}
@@ -316,7 +316,7 @@
         {%- for sub_struct_name, sub_struct in def_schema.sub_structs.items() %}
         public struct {{ sub_struct_name }}{{ sub_struct.conformance }} {
             {%- set sub_strict_ref_properties = sub_struct.properties | selectattr('strict_decode') | list %}
-            public static let typeIdentifier = "{{ lexicon_id }}#{{ sub_struct.wire_fragment }}"
+            public static let typeIdentifier = "{{ lexicon_id | escapeStringLiteral }}#{{ sub_struct.wire_fragment | escapeStringLiteral }}"
 
             {%- for prop in sub_struct.properties %}
             public let {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
@@ -489,20 +489,20 @@
                 if let value = {{ prop.name|sanitizeKeyword }} {
                     {% set var_name = prop.name + 'Value' -%}
                     let {{ var_name }} = try value.toCBORValue()
-                    map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                    map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
                 } else {
-                    map = map.adding(key: "{{ prop.name }}", value: NSNull())
+                    map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: NSNull())
                 }
                 {%- elif prop.optional -%}
                 if let value = {{ prop.name|sanitizeKeyword }} {
                     {% set var_name = prop.name + 'Value' -%}
                     let {{ var_name }} = try value.toCBORValue()
-                    map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                    map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
                 }
                 {%- else -%}
                 {% set var_name = prop.name + 'Value' -%}
                 let {{ var_name }} = try {{ prop.name|sanitizeKeyword }}.toCBORValue()
-                map = map.adding(key: "{{ prop.name }}", value: {{ var_name }})
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ var_name }})
                 {%- endif %}
                 {%- endfor %}
                 return map

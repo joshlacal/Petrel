@@ -329,8 +329,79 @@ final class RepositoryMSTMutationTests: XCTestCase {
             XCTAssertEqual(error as? RepositoryMSTMutationError, expected)
         }
     }
-}
 
+    func testDeepEmptyNodeChainLayerDiscoveryIsBounded() async throws {
+        // Build a chain of 130 empty MST nodes where child is left pointer
+        var storage: [CID: Data] = [:]
+        let emptyNode = try RepositoryMSTCodec.encode(RepositoryMSTCodec.node(leaves: []))
+        let emptyCID = CID.fromDAGCBOR(emptyNode)
+        storage[emptyCID] = emptyNode
+
+        var currentCID = emptyCID
+        for _ in 0 ..< 130 {
+            let node = try RepositoryMSTCodec.encode(RepositoryMSTCodec.node(leaves: [], leftTreeCID: currentCID))
+            let cid = CID.fromDAGCBOR(node)
+            storage[cid] = node
+            currentCID = cid
+        }
+
+        let source = CountingBlockSource(storage)
+        let tree = try RepositoryMST.load(rootCID: currentCID, blocks: source)
+        let path = try PublicRepositoryPath(collection: "app.bsky.feed.post", recordKey: "0")
+
+        // Looking up or mutating should fail with typed budget/layer error instead of exhausting call stack
+        do {
+            _ = try await tree.get(path)
+            XCTFail("Expected layer discovery failure")
+        } catch let error as RepositoryMSTMutationError {
+            XCTAssertTrue(error == .invalidLayer || error == .relevantBlockBudgetExceeded || error == .nodeLimitExceeded)
+        }
+    }
+
+    func testTransactionWideNodeExhaustionFailsBeforeStackExhaustion() async throws {
+        // Build a multi-node tree
+        var records: [(PublicRepositoryPath, PreparedPublicRecord)] = []
+        for i in 0 ..< 20 {
+            let path = try PublicRepositoryPath(collection: "app.bsky.feed.post", recordKey: "\(i)")
+            let rec = try preparedRecord(path: path, text: "\(i)")
+            records.append((path, rec))
+        }
+
+        var tree = try RepositoryMST.empty()
+        for (p, r) in records {
+            tree = try await tree.adding(path: p, recordCID: r.cid)
+        }
+
+        let materialized = try await tree.materialized()
+        // Ensure the tree actually has > 2 blocks
+        XCTAssertGreaterThan(materialized.newBlocks.blocks.count, 2)
+
+        let source = CountingBlockSource(materialized.newBlocks.blocks)
+
+        let customLimits = try PublicRepositoryLimits(
+            maximumRecordBlockBytes: 1_000_000,
+            maximumCARBytes: PublicRepositoryLimits.requiredStreamingCARBytes,
+            maximumCARBlocks: 10,
+            maximumMSTNodes: 2,
+            maximumMSTEntriesPerNode: 10,
+            maximumCBORNestingDepth: 64
+        )
+
+        var loadedTree = try RepositoryMST.load(rootCID: materialized.rootCID, blocks: source, limits: customLimits)
+
+        // Mutating loaded tree with very tight node limit (maximumMSTNodes = 2) should exceed node limit during traversal
+        let newPath = try PublicRepositoryPath(collection: "app.bsky.feed.post", recordKey: "999")
+        let newRec = try preparedRecord(path: newPath, text: "999")
+
+        do {
+            loadedTree = try await loadedTree.adding(path: newPath, recordCID: newRec.cid)
+            _ = try await loadedTree.materialized()
+            XCTFail("Expected nodeLimitExceeded error")
+        } catch let error as RepositoryMSTMutationError {
+            XCTAssertEqual(error, .nodeLimitExceeded)
+        }
+    }
+}
 private actor CountingBlockSource: PublicRepositoryBlockSource {
     private let storage: [CID: Data]
     private(set) var readCount = 0

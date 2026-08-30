@@ -29,6 +29,7 @@ public enum NetworkError: Error {
     case securityViolation
     case streamOverflow
     case responseLimitExceeded(String)
+    case metadataStrippingFailed
 }
 
 extension NetworkError: LocalizedError {
@@ -76,6 +77,8 @@ extension NetworkError: LocalizedError {
             return "The event stream buffer exceeded capacity and was terminated."
         case let .responseLimitExceeded(description):
             return "The response exceeded security limits: \(description)."
+        case .metadataStrippingFailed:
+            return "Failed to strip image metadata before upload or metadata stripping is unavailable on this platform."
         }
     }
 
@@ -101,6 +104,8 @@ extension NetworkError: LocalizedError {
             return "Application configuration is incomplete."
         case .securityViolation:
             return "Your network configuration may be blocking the connection to the AT Protocol server."
+        case .metadataStrippingFailed:
+            return "Metadata sanitization is required by default but failed or is unsupported on the current platform."
         case .serverError:
             return "The server encountered an error."
         case .invalidResponse:
@@ -130,6 +135,8 @@ extension NetworkError: LocalizedError {
             return "Please restart the app. If the problem persists, contact support."
         case .securityViolation:
             return "Try switching to a different network or disabling VPN/proxy if enabled."
+        case .metadataStrippingFailed:
+            return "Explicitly disable metadata stripping if you intend to upload original unmodified image bytes."
         default:
             return "Please try again or contact support if the problem persists."
         }

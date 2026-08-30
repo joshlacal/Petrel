@@ -243,4 +243,257 @@ struct OAuthFlowStateTests {
             }
         }
     }
+
+    @Test("consumeOAuthState is atomic, single-use, and validates maximum age")
+    func testConsumeOAuthStateSingleUseAndExpiry() async throws {
+        let backend = InMemorySecureStorage()
+        try await withSerializedStorageOverrideTest {
+            KeychainManager._setStorageOverride(backend)
+            defer { KeychainManager._setStorageOverride(nil) }
+
+            let namespace = "test.consume.oauth.\(UUID().uuidString)"
+            let storage = KeychainStorage(namespace: namespace)
+
+            let token = "valid-state-token-123"
+            let now = Date()
+            let state = OAuthState(
+                stateToken: token,
+                codeVerifier: "test-code-verifier-456",
+                createdAt: now,
+                initialIdentifier: "test.bsky.social",
+                targetPDSURL: URL(string: "https://pds.example.com")!
+            )
+
+            try await storage.saveOAuthState(state)
+
+            // First consumption succeeds
+            let consumed = try await storage.consumeOAuthState(token, now: now, maximumAge: 600)
+            #expect(consumed.stateToken == token)
+            #expect(consumed.codeVerifier == "test-code-verifier-456")
+
+            // Second consumption throws (replayed / single-use)
+            await #expect(throws: (any Error).self) {
+                try await storage.consumeOAuthState(token, now: now, maximumAge: 600)
+            }
+
+            // State is gone from storage
+            #expect(try await storage.getOAuthState(for: token) == nil)
+
+            // Expired state test
+            let expiredToken = "expired-token-789"
+            let expiredState = OAuthState(
+                stateToken: expiredToken,
+                codeVerifier: "expired-verifier",
+                createdAt: now.addingTimeInterval(-700)
+            )
+            try await storage.saveOAuthState(expiredState)
+
+            // Consuming expired state throws expiredState
+            do {
+                _ = try await storage.consumeOAuthState(expiredToken, now: now, maximumAge: 600)
+                #expect(Bool(false), "Expected expiredState error to be thrown")
+            } catch let error as KeychainError {
+                switch error {
+                case .expiredState:
+                    #expect(true)
+                default:
+                    #expect(Bool(false), "Expected KeychainError.expiredState, got \(error)")
+                }
+            } catch {
+                #expect(Bool(false), "Expected KeychainError.expiredState, got \(error)")
+            }
+
+            // Expired state was purged on consume attempt
+            #expect(try await storage.getOAuthState(for: expiredToken) == nil)
+
+            // Undecodable state is purged on consume attempt
+            let corruptToken = "corrupt-token-000"
+            let corruptKey = "oauthState.\(corruptToken)"
+            try KeychainManager.store(key: corruptKey, value: Data("not-json-data".utf8), namespace: namespace)
+            do {
+                _ = try await storage.consumeOAuthState(corruptToken, now: now, maximumAge: 600)
+                #expect(Bool(false), "Expected decoding error to be thrown")
+            } catch {
+                // Expected decode error
+                #expect(true)
+            }
+            #expect(try await storage.getOAuthState(for: corruptToken) == nil)
+        }
+    }
+
+    @Test("consumePendingGatewayLogin is atomic, single-use, and validates maximum age")
+    func testConsumePendingGatewayLoginSingleUseAndExpiry() async throws {
+        let backend = InMemorySecureStorage()
+        try await withSerializedStorageOverrideTest {
+            KeychainManager._setStorageOverride(backend)
+            defer { KeychainManager._setStorageOverride(nil) }
+
+            let namespace = "test.consume.gateway.\(UUID().uuidString)"
+            let storage = KeychainStorage(namespace: namespace)
+
+            let token = "gateway-state-token-123"
+            let now = Date()
+            let loginState = PendingGatewayLoginState(
+                browserNonce: "random-browser-nonce-43-chars-long-abc12345",
+                stateToken: token,
+                redirectURI: "blue.catbird.atprotodrive:/callback",
+                expectedDID: "did:plc:testexpected123",
+                createdAt: now
+            )
+
+            try await storage.savePendingGatewayLogin(loginState)
+
+            // First consumption succeeds
+            let consumed = try await storage.consumePendingGatewayLogin(token, now: now, maximumAge: 600)
+            #expect(consumed.stateToken == token)
+            #expect(consumed.browserNonce == "random-browser-nonce-43-chars-long-abc12345")
+            #expect(consumed.expectedDID == "did:plc:testexpected123")
+
+            // Second consumption throws (replayed / single-use)
+            await #expect(throws: (any Error).self) {
+                try await storage.consumePendingGatewayLogin(token, now: now, maximumAge: 600)
+            }
+
+            // State is gone from storage
+            #expect(try await storage.getPendingGatewayLogin(for: token) == nil)
+
+            // Expired state test
+            let expiredToken = "expired-gateway-token"
+            let expiredLogin = PendingGatewayLoginState(
+                browserNonce: "nonce-expired",
+                stateToken: expiredToken,
+                redirectURI: "blue.catbird.atprotodrive:/callback",
+                createdAt: now.addingTimeInterval(-700)
+            )
+            try await storage.savePendingGatewayLogin(expiredLogin)
+
+            // Consuming expired state throws expiredState
+            do {
+                _ = try await storage.consumePendingGatewayLogin(expiredToken, now: now, maximumAge: 600)
+                #expect(Bool(false), "Expected expiredState error to be thrown")
+            } catch let error as KeychainError {
+                switch error {
+                case .expiredState:
+                    #expect(true)
+                default:
+                    #expect(Bool(false), "Expected KeychainError.expiredState, got \(error)")
+                }
+            } catch {
+                #expect(Bool(false), "Expected KeychainError.expiredState, got \(error)")
+            }
+
+            // Expired state was purged on consume attempt
+            #expect(try await storage.getPendingGatewayLogin(for: expiredToken) == nil)
+
+            // Undecodable state is purged on consume attempt
+            let corruptToken = "corrupt-gateway-000"
+            let corruptKey = "pendingGatewayLogin.\(corruptToken)"
+            try KeychainManager.store(key: corruptKey, value: Data("not-json-data".utf8), namespace: namespace)
+            do {
+                _ = try await storage.consumePendingGatewayLogin(corruptToken, now: now, maximumAge: 600)
+                #expect(Bool(false), "Expected decoding error to be thrown")
+            } catch {
+                #expect(true)
+            }
+            #expect(try await storage.getPendingGatewayLogin(for: corruptToken) == nil)
+        }
+    }
+
+    @Test("concurrent consumeOAuthState calls for the same token allow exactly one winner")
+    func testConcurrentConsumeOAuthState() async throws {
+        let backend = InMemorySecureStorage()
+        try await withSerializedStorageOverrideTest {
+            KeychainManager._setStorageOverride(backend)
+            defer { KeychainManager._setStorageOverride(nil) }
+
+            let namespace = "test.concurrent.consume.oauth.\(UUID().uuidString)"
+            let storage = KeychainStorage(namespace: namespace)
+
+            let token = "concurrent-token-\(UUID().uuidString)"
+            let now = Date()
+            let state = OAuthState(
+                stateToken: token,
+                codeVerifier: "verifier-xyz",
+                createdAt: now,
+                initialIdentifier: "test.bsky.social",
+                targetPDSURL: URL(string: "https://pds.example.com")!
+            )
+            try await storage.saveOAuthState(state)
+
+            let concurrency = 10
+            let results = await withTaskGroup(of: Result<OAuthState, any Error>.self) { group in
+                for _ in 0..<concurrency {
+                    group.addTask {
+                        do {
+                            let consumed = try await storage.consumeOAuthState(token, now: now, maximumAge: 600)
+                            return .success(consumed)
+                        } catch {
+                            return .failure(error)
+                        }
+                    }
+                }
+                var collected: [Result<OAuthState, any Error>] = []
+                for await res in group {
+                    collected.append(res)
+                }
+                return collected
+            }
+
+            let successes = results.filter { if case .success = $0 { return true } else { return false } }
+            let failures = results.filter { if case .failure = $0 { return true } else { return false } }
+
+            #expect(successes.count == 1, "Exactly one concurrent consume must succeed, got \(successes.count)")
+            #expect(failures.count == concurrency - 1, "Remaining concurrent consumes must fail, got \(failures.count)")
+            #expect(try await storage.getOAuthState(for: token) == nil)
+        }
+    }
+
+    @Test("concurrent consumePendingGatewayLogin calls for the same token allow exactly one winner")
+    func testConcurrentConsumePendingGatewayLogin() async throws {
+        let backend = InMemorySecureStorage()
+        try await withSerializedStorageOverrideTest {
+            KeychainManager._setStorageOverride(backend)
+            defer { KeychainManager._setStorageOverride(nil) }
+
+            let namespace = "test.concurrent.consume.gateway.\(UUID().uuidString)"
+            let storage = KeychainStorage(namespace: namespace)
+
+            let token = "concurrent-gateway-token-\(UUID().uuidString)"
+            let now = Date()
+            let loginState = PendingGatewayLoginState(
+                browserNonce: "random-browser-nonce-43-chars-long-abc12345",
+                stateToken: token,
+                redirectURI: "blue.catbird.atprotodrive:/callback",
+                expectedDID: "did:plc:testexpected123",
+                createdAt: now
+            )
+            try await storage.savePendingGatewayLogin(loginState)
+
+            let concurrency = 10
+            let results = await withTaskGroup(of: Result<PendingGatewayLoginState, any Error>.self) { group in
+                for _ in 0..<concurrency {
+                    group.addTask {
+                        do {
+                            let consumed = try await storage.consumePendingGatewayLogin(token, now: now, maximumAge: 600)
+                            return .success(consumed)
+                        } catch {
+                            return .failure(error)
+                        }
+                    }
+                }
+                var collected: [Result<PendingGatewayLoginState, any Error>] = []
+                for await res in group {
+                    collected.append(res)
+                }
+                return collected
+            }
+
+            let successes = results.filter { if case .success = $0 { return true } else { return false } }
+            let failures = results.filter { if case .failure = $0 { return true } else { return false } }
+
+            #expect(successes.count == 1, "Exactly one concurrent consume must succeed, got \(successes.count)")
+            #expect(failures.count == concurrency - 1, "Remaining concurrent consumes must fail, got \(failures.count)")
+            #expect(try await storage.getPendingGatewayLogin(for: token) == nil)
+        }
+    }
 }

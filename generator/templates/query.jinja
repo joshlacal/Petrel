@@ -1,15 +1,14 @@
 {% if output_encoding == "text/event-stream" %}
 extension ATProtoClient.{{ template_namespace_name }} {
     // MARK: - {{ query_name | lowerCamelCase }}
-
-    /// {{ description }}
+    /// {{ description | escapeComment }}
     /// {% if input_struct_name %}
     /// - Parameter input: The input parameters for the request
     /// {% endif %}
     /// - Returns: AsyncThrowingStream of events from the Server-Sent Events stream
     /// - Throws: NetworkError if the request fails or the connection cannot be established
     public func {{ query_name | lowerCamelCase }}({% if input_struct_name %}input: {{ input_struct_name }}{% endif %}) async throws -> AsyncThrowingStream<{{ output_type }}, Error> {
-        let endpoint = "{{ endpoint }}"
+        let endpoint = "{{ endpoint | escapeStringLiteral }}"
 
         {% if input_struct_name %}
         let queryItems = input.asQueryItems()
@@ -19,13 +18,13 @@ extension ATProtoClient.{{ template_namespace_name }} {
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
-            headers: ["Accept": "{{ output_encoding }}"],
+            headers: ["Accept": "{{ output_encoding | escapeStringLiteral }}"],
             body: nil,
             queryItems: queryItems
         )
 
         // Determine service DID for this endpoint
-        let serviceDID = await networkService.getServiceDID(for: "{{ endpoint }}")
+        let serviceDID = await networkService.getServiceDID(for: "{{ endpoint | escapeStringLiteral }}")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
 
         return AsyncThrowingStream { continuation in
@@ -93,7 +92,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
                                             let event = try decoder.decode({{ output_type }}.self, from: jsonData)
                                             continuation.yield(event)
                                         } catch {
-                                            LogManager.logError("Failed to decode SSE event for {{ endpoint }}: \(error)")
+                                            LogManager.logError("Failed to decode SSE event for {{ endpoint | escapeStringLiteral }}: \(error)")
                                             // Continue processing other events
                                         }
                                     }
@@ -121,15 +120,14 @@ extension ATProtoClient.{{ template_namespace_name }} {
 {% else %}
 extension ATProtoClient.{{ template_namespace_name }} {
     // MARK: - {{ query_name | lowerCamelCase }}
-
-    /// {{ description }}
+    /// {{ description | escapeComment }}
     /// {% if input_struct_name %}
     /// - Parameter input: The input parameters for the request
     /// {% endif %}
     /// - Returns: A tuple containing the HTTP response code and the decoded response data
     /// - Throws: NetworkError if the request fails or the response cannot be processed
     public func {{ query_name | lowerCamelCase }}({% if input_struct_name %}input: {{ input_struct_name }}{% endif %}) async throws -> (responseCode: Int, data: {{ output_type }}?) {
-        let endpoint = "{{ endpoint }}"
+        let endpoint = "{{ endpoint | escapeStringLiteral }}"
 
         {% if input_struct_name %}
         let queryItems = input.asQueryItems()
@@ -139,13 +137,13 @@ extension ATProtoClient.{{ template_namespace_name }} {
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
-            headers: ["Accept": "{{ output_encoding }}"],
+            headers: ["Accept": "{{ output_encoding | escapeStringLiteral }}"],
             body: nil,
             queryItems: queryItems
         )
 
         // Determine service DID for this endpoint
-        let serviceDID = await networkService.getServiceDID(for: "{{ endpoint }}")
+        let serviceDID = await networkService.getServiceDID(for: "{{ endpoint | escapeStringLiteral }}")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
         let (responseData, response) = try await networkService.{% if has_errors or emit_xrpc_error_parsing %}performRequestReturningHTTPErrorResponses{% else %}performRequest{% endif %}(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
@@ -158,11 +156,11 @@ extension ATProtoClient.{{ template_namespace_name }} {
             // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
             {% else %}
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: "nil")
+                throw NetworkError.invalidContentType(expected: "{{ output_encoding | escapeStringLiteral }}", actual: "nil")
             }
 
-            if !contentType.lowercased().contains("{{ output_encoding.lower() }}") {
-                throw NetworkError.invalidContentType(expected: "{{ output_encoding }}", actual: contentType)
+            if !contentType.lowercased().contains("{{ output_encoding.lower() | escapeStringLiteral }}") {
+                throw NetworkError.invalidContentType(expected: "{{ output_encoding | escapeStringLiteral }}", actual: contentType)
             }
             {% endif %}
 
@@ -173,7 +171,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for {{ endpoint }}: \(error)")
+                LogManager.logError("Failed to decode successful response for {{ endpoint | escapeStringLiteral }}: \(error)")
                 return (responseCode, nil)
             }{% else %}let decodedData = {{ output_type }}(data: responseData)
             return (responseCode, decodedData){% endif %}

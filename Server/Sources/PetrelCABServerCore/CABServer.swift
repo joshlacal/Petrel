@@ -28,15 +28,23 @@ public struct CABServer: Sendable {
     // memory must outlast that whole span, not just one side of it, or a
     // jti near the boundary could be replayed after its record expires but
     // while the proof itself is still within the acceptance window.
-    replayStore = ReplayStore(ttl: TimeInterval(config.iatWindowSeconds * 2))
+    replayStore = ReplayStore(
+      ttl: TimeInterval(config.iatWindowSeconds * 2),
+      capacity: config.replayCapacity
+    )
     nonceService = NonceService(secretBase64: config.nonceSecretBase64)
-    deviceStore = InMemoryDeviceStore(deniedJKTs: config.deniedJkts)
+    deviceStore = InMemoryDeviceStore(
+      deniedJKTs: config.deniedJkts,
+      capacity: config.deviceCapacity
+    )
     minter = AssertionMinter(
       clientId: config.clientId,
       signingKey: loadedKeyStore.activeKey,
       ttl: TimeInterval(config.assertionTtlSeconds)
     )
-    rateLimiter = config.rateLimit.map { RateLimiter(requestsPerMinute: $0.requestsPerMinute) }
+    rateLimiter = config.rateLimit.map {
+      RateLimiter(requestsPerMinute: $0.requestsPerMinute, maxKeys: config.rateLimitCapacity)
+    }
   }
 
   static func assertionEndpoint(publicUrl: String) -> String {
@@ -110,19 +118,6 @@ public struct CABServer: Sendable {
             throw CABRequestError.useDPoPNonce()
           }
         }
-        guard await replayStore.checkAndInsert(validated.jti) else {
-          throw CABRequestError.invalidDPoPProof("jti replayed")
-        }
-        if await deviceStore.isDenied(jkt: validated.jkt) {
-          context.logger.warning(
-            "device refused", metadata: ["jkt": .string(validated.jkt)]
-          )
-          throw CABRequestError.accessDenied("device refused by policy")
-        }
-        if let rateLimiter, await rateLimiter.allow(key: "jkt:\(validated.jkt)") == false {
-          throw CABRequestError.rateLimited()
-        }
-        await deviceStore.record(jkt: validated.jkt, now: Date())
 
         struct AssertionForm: Decodable {
           let aud: String?
@@ -133,7 +128,31 @@ public struct CABServer: Sendable {
         guard let aud = form?.aud, !aud.isEmpty else {
           throw CABRequestError.invalidRequest("missing aud")
         }
+        guard aud.count <= 2048 else {
+          throw CABRequestError.invalidRequest("aud exceeds maximum length")
+        }
         try CABServer.checkAud(aud, allowlist: config.audAllowlist)
+
+        if await deviceStore.isDenied(jkt: validated.jkt) {
+          context.logger.warning(
+            "device refused", metadata: ["jkt": .string(validated.jkt)]
+          )
+          throw CABRequestError.accessDenied("device refused by policy")
+        }
+
+        if let rateLimiter, await rateLimiter.allow(key: "jkt:\(validated.jkt)") == false {
+          throw CABRequestError.rateLimited()
+        }
+
+        switch await replayStore.checkAndInsert(validated.jti) {
+        case .fresh:
+          break
+        case .replayed:
+          throw CABRequestError.invalidDPoPProof("jti replayed")
+        case .saturated:
+          throw CABRequestError.temporarilyUnavailable("replay store saturated")
+        }
+        await deviceStore.record(jkt: validated.jkt, now: Date())
 
         let assertion = try minter.mint(aud: aud, jkt: validated.jkt)
         context.logger.info(

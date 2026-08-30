@@ -2,7 +2,7 @@
 {% if def.type == 'data_class' %}
 {% if def.description %}
     /**
-     * {{ def.description }}
+     * {{ def.description | escapeComment }}
      */
 {% endif %}
     @Serializable
@@ -11,31 +11,31 @@
         {% for prop in def.properties %}
         {% if def.security_strict_documentation %}
         {% if prop.description %}
-        /** {{ prop.description }} */
+        /** {{ prop.description | escapeComment }} */
         {% endif %}
         {% if prop.strict_decode %}@Serializable(with = {{ prop.strict_serializer }}::class){{ '\n' -}}{% endif %}
-        @SerialName("{{ prop.name }}")
+        @SerialName("{{ prop.name | escapeStringLiteral }}")
         val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}{{ '\n' -}}
         {% else %}
         {% if prop.strict_decode %}
-        {% if prop.description %}/** {{ prop.description }} */{{ '\n        ' -}}{% endif %}
+        {% if prop.description %}/** {{ prop.description | escapeComment }} */{{ '\n        ' -}}{% endif %}
         @Serializable(with = {{ prop.strict_serializer }}::class){{ '\n' -}}
         {% else %}
-        {% if prop.description %}/** {{ prop.description }} */{% endif %}
+        {% if prop.description %}/** {{ prop.description | escapeComment }} */{% endif %}
         {% endif %}
-        @SerialName("{{ prop.name }}")
+        @SerialName("{{ prop.name | escapeStringLiteral }}")
         val {{ prop.name | sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %} = null{% endif %}{% if not loop.last %},{% endif %}
         {% endif %}
         {% endfor %}
     ) {
         companion object {
-            const val TYPE_IDENTIFIER = "{{ lexicon_id }}#{{ def.name | camelCase }}"
+            const val TYPE_IDENTIFIER = "{{ lexicon_id | escapeStringLiteral }}#{{ def.name | camelCase | escapeStringLiteral }}"
         }
     }
     {% else %}
     class {{ def.name }} {
         companion object {
-            const val TYPE_IDENTIFIER = "{{ lexicon_id }}#{{ def.name | camelCase }}"
+            const val TYPE_IDENTIFIER = "{{ lexicon_id | escapeStringLiteral }}#{{ def.name | camelCase | escapeStringLiteral }}"
         }
     }
     {% endif %}
@@ -43,7 +43,7 @@
 {% elif def.type == 'type_alias' %}
 {% if def.description %}
     /**
-     * {{ def.description }}
+     * {{ def.description | escapeComment }}
      */
 {% endif %}
     typealias {{ def.name }} = {{ def.target }}

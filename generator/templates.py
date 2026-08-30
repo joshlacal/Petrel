@@ -21,6 +21,37 @@ SWIFT_KEYWORDS = {
 }
 
 
+def escape_swift_comment(s: str) -> str:
+    """Escape arbitrary text for use in Swift comments (single-line /// or //)."""
+    if not s:
+        return ""
+    s = s.replace("*/", "* /").replace("/*", "/ *")
+    s = s.replace("\\(", "\\ (")
+    lines = s.splitlines()
+    return "\n/// ".join(line.strip() for line in lines if line.strip())
+def escape_swift_string_literal(s: str) -> str:
+    """Escape arbitrary text for use in Swift double-quoted string literals."""
+    if not s:
+        return ""
+    escapes = {
+        '\\': '\\\\',
+        '"': '\\"',
+        '\n': '\\n',
+        '\r': '\\r',
+        '\t': '\\t',
+        '\0': '\\0',
+    }
+    encoded = []
+    for char in s:
+        if char in escapes:
+            encoded.append(escapes[char])
+        elif ord(char) < 0x20 or ord(char) == 0x7f or char in ('\u2028', '\u2029'):
+            encoded.append(f"\\u{{{ord(char):x}}}")
+        else:
+            encoded.append(char)
+    return "".join(encoded)
+
+
 def sanitize_swift_keyword(s: str) -> str:
     """Escape Swift reserved keywords by wrapping in backticks.
 
@@ -33,7 +64,6 @@ def sanitize_swift_keyword(s: str) -> str:
         return f'`{s}`'
     return s
 
-
 class TemplateManager:
     def __init__(self):
         script_dir = os.path.dirname(os.path.realpath(__file__))
@@ -44,7 +74,8 @@ class TemplateManager:
         self.env.filters['convertRefToSwift'] = self.convert_ref_to_swift
         self.env.filters['enum_case'] = self.enum_case_filter
         self.env.filters['sanitizeKeyword'] = sanitize_swift_keyword
-
+        self.env.filters['escapeComment'] = escape_swift_comment
+        self.env.filters['escapeStringLiteral'] = escape_swift_string_literal
         self.main_template = self.env.get_template('mainTemplate.jinja')
         self.properties_template = self.env.get_template('properties.jinja')
         self.query_parameters_template = self.env.get_template('parameters.jinja')

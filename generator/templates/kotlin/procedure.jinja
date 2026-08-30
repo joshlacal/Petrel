@@ -1,13 +1,13 @@
 /**
- * {{ description }}
+ * {{ description | escapeComment }}
  *
- * Endpoint: {{ endpoint }}
+ * Endpoint: {{ endpoint | escapeStringLiteral }}
  */
 suspend fun {{ receiver_type }}.{{ function_name }}(
     {% if has_input and has_parameters %}input: {{ input_type }},
     params: {{ parameters_type }}{% elif has_input %}input: {{ input_type }}{% elif has_parameters %}params: {{ parameters_type }}{% endif %}
 ): ATProtoResponse<{% if output_type %}{{ output_type }}{% else %}Unit{% endif %}> {
-    val endpoint = "{{ endpoint }}"
+    val endpoint = "{{ endpoint | escapeStringLiteral }}"
 
     {% if has_input %}
     {% if is_blob_upload %}
@@ -17,11 +17,11 @@ suspend fun {{ receiver_type }}.{{ function_name }}(
     {% elif is_binary_data %}
     // Binary data
     val body = input.data
-    val contentType = "{{ input_encoding }}"
+    val contentType = "{{ input_encoding | escapeStringLiteral }}"
     {% else %}
     // JSON serialization
     val body = Json.encodeToString(input)
-    val contentType = "{{ input_encoding }}"
+    val contentType = "{{ input_encoding | escapeStringLiteral }}"
     {% endif %}
     {% else %}
     val body: String? = null
@@ -42,7 +42,7 @@ suspend fun {{ receiver_type }}.{{ function_name }}(
         queryItems = queryItems,
         headers = mapOf(
             "Content-Type" to contentType,
-            "Accept" to "{{ output_encoding }}"
+            "Accept" to "{{ output_encoding | escapeStringLiteral }}"
         ),
         body = body
     )
