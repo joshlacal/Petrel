@@ -468,7 +468,7 @@ final class FirehoseSubscriptionTests: XCTestCase {
 
   func testBoundedStreamOverflowTerminatesWithResynchronizationRequired() async throws {
     var frames: [Data] = []
-    for i in 1 ... 10 {
+    for i in 1 ... 50 {
       frames.append(try FirehoseFrameEncoder.identityFrame(
         seq: Int64(i),
         material: .init(did: did, handle: nil, time: time)
@@ -479,7 +479,7 @@ final class FirehoseSubscriptionTests: XCTestCase {
     let factory = FakeWebSocketFactory(sessions: [session])
     let storage = InMemoryFirehoseCursorStorage()
 
-    // Buffer limit of 2: producing messages without consumer reading will overflow
+    // Buffer limit of 2: producing messages faster than slow consumer will overflow
     let subscription = FirehoseSubscription(
       url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
       cursorStorage: storage,
@@ -488,12 +488,12 @@ final class FirehoseSubscriptionTests: XCTestCase {
     )
 
     let stream = subscription.events()
-    // Wait until the session has delivered enough messages to overflow the 2-slot buffer
-    await session.waitForDeliveryCount(atLeast: 3)
-
     var caughtError: Error?
     do {
-      for try await _ in stream {}
+      for try await _ in stream {
+        // Slow consumer to let the 2-slot producer buffer saturate and drop
+        try await Task.sleep(nanoseconds: 20_000_000)
+      }
     } catch {
       caughtError = error
     }
@@ -507,6 +507,153 @@ final class FirehoseSubscriptionTests: XCTestCase {
     XCTAssertEqual(backoff.nextDelay(after: 4.0), 8.0)
     XCTAssertEqual(backoff.nextDelay(after: 8.0), 8.0)
     XCTAssertEqual(backoff.nextDelay(after: 16.0), 8.0)
+  }
+
+  func testRelayVerifierRevisionRollbackTerminatesStreamImmediatelyWithoutReconnecting() async throws {
+    let session = FakeWebSocketSession(messages: [], errorAfterMessages: RelayVerifierError.revisionRollback)
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    let stream = subscription.events()
+    var caughtError: Error?
+    do {
+      for try await _ in stream {}
+    } catch {
+      caughtError = error
+    }
+
+    XCTAssertEqual(caughtError as? RelayVerifierError, .revisionRollback)
+  }
+
+  func testURLSessionFirehoseWebSocketFactoryRejectsSSRFAndCleartextRemote() async throws {
+    let factory = URLSessionFirehoseWebSocketFactory()
+    do {
+      _ = try await factory.makeSession(url: URL(string: "http://relay.remote.com/xrpc/com.atproto.sync.subscribeRepos")!)
+      XCTFail("Expected cleartext remote URL to be rejected")
+    } catch let error as NetworkError {
+      guard case .securityViolation = error else {
+        XCTFail("Expected .securityViolation, got \(error)")
+        return
+      }
+    } catch {
+      XCTFail("Expected NetworkError.securityViolation, got \(error)")
+    }
+  }
+
+  func testURLSessionFirehoseWebSocketSessionPropagatesSecurityViolation() async throws {
+    let delegate = HardenedURLSessionDelegate()
+    let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+    defer { session.invalidateAndCancel() }
+    let task = session.webSocketTask(with: URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
+    delegate.contextManager.recordSecurityViolation(for: task)
+    task.cancel()
+    let wsSession = URLSessionFirehoseWebSocketSession(task: task, delegate: delegate)
+    do {
+      _ = try await wsSession.receiveMessage()
+      XCTFail("Expected security violation error")
+    } catch let error as NetworkError {
+      guard case .securityViolation = error else {
+        XCTFail("Expected .securityViolation, got \(error)")
+        return
+      }
+    } catch {
+      XCTFail("Expected NetworkError.securityViolation, got \(error)")
+    }
+  }
+
+  func testRelayVerifierFrameDecodeFailureTerminatesStreamImmediatelyWithoutReconnecting() async throws {
+    let session = FakeWebSocketSession(messages: [], errorAfterMessages: RelayVerifierError.invalidCBOR)
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    let stream = subscription.events()
+    var caughtError: Error?
+    do {
+      for try await _ in stream {}
+    } catch {
+      caughtError = error
+    }
+
+    XCTAssertEqual(caughtError as? RelayVerifierError, .invalidCBOR)
+  }
+  func testStreamRetriesOnTransientDNSOrConnectivityFailure() async throws {
+    let frame = try FirehoseFrameEncoder.identityFrame(
+      seq: 1,
+      material: .init(did: did, handle: "alice.test", time: time)
+    )
+    let successSession = FakeWebSocketSession(messages: [frame])
+
+    // Custom factory that fails first attempt with URLError(.cannotFindHost) then succeeds
+    actor FlakyFactory: FirehoseWebSocketSessionFactory {
+      var attempts = 0
+      let successSession: any FirehoseWebSocketSession
+      init(successSession: any FirehoseWebSocketSession) {
+        self.successSession = successSession
+      }
+      func makeSession(url: URL) async throws -> any FirehoseWebSocketSession {
+        attempts += 1
+        if attempts == 1 {
+          throw URLError(.cannotFindHost)
+        }
+        return successSession
+      }
+    }
+
+    let factory = FlakyFactory(successSession: successSession)
+    let storage = InMemoryFirehoseCursorStorage()
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    var received: [FirehoseSubscriptionEvent] = []
+    let stream = subscription.events()
+    for try await event in stream {
+      received.append(event)
+      if received.count == 1 { break }
+    }
+
+    XCTAssertEqual(received.count, 1)
+    guard case let .event(.identity(identity)) = received.first else {
+      return XCTFail("expected identity event")
+    }
+    XCTAssertEqual(identity.seq, 1)
+    let attempts = await factory.attempts
+    XCTAssertEqual(attempts, 2, "Expected subscription to retry after transient DNS failure and succeed on second attempt")
+  }
+  func testURLSessionFirehoseWebSocketFactoryDoesNotMapDNSFailureToSecurityViolation() async throws {
+    let factory = URLSessionFirehoseWebSocketFactory()
+    NetworkService.dnsResolverOverride = { _ in [] } // simulates getaddrinfo returning no addresses (offline / DNS down)
+    defer {
+      NetworkService.dnsResolverOverride = nil
+    }
+
+    do {
+      _ = try await factory.makeSession(url: URL(string: "wss://relay.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
+      XCTFail("Expected makeSession to fail when host cannot be resolved")
+    } catch let error as NetworkError {
+      if case .securityViolation = error {
+        XCTFail("DNS resolution failure / offline state should NOT throw NetworkError.securityViolation; should throw requestFailed or URLError")
+      }
+    } catch {
+      // Non-security error (e.g. URLError, NetworkError.requestFailed) is expected
+    }
   }
 }
 

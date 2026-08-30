@@ -530,4 +530,412 @@ struct NetworkPerformanceHygieneTests {
             #expect(await delegate.serverTrustIsApproved(for: task, host: "pds.example.com") == expected)
         }
     }
+
+    private enum TestCBORHelper {
+        static func header(major: UInt8, argument: UInt64) -> Data {
+            let prefix = major << 5
+            var result = Data()
+            switch argument {
+            case 0 ..< 24:
+                result.append(prefix | UInt8(argument))
+            case 24 ... UInt64(UInt8.max):
+                result.append(prefix | 24)
+                result.append(UInt8(argument))
+            case (UInt64(UInt8.max) + 1) ... UInt64(UInt16.max):
+                result.append(prefix | 25)
+                var value = UInt16(argument).bigEndian
+                result.append(Data(bytes: &value, count: MemoryLayout<UInt16>.size))
+            case (UInt64(UInt16.max) + 1) ... UInt64(UInt32.max):
+                result.append(prefix | 26)
+                var value = UInt32(argument).bigEndian
+                result.append(Data(bytes: &value, count: MemoryLayout<UInt32>.size))
+            default:
+                result.append(prefix | 27)
+                var value = argument.bigEndian
+                result.append(Data(bytes: &value, count: MemoryLayout<UInt64>.size))
+            }
+            return result
+        }
+
+        static func uint(_ value: UInt64) -> Data {
+            header(major: 0, argument: value)
+        }
+
+        static func text(_ value: String) -> Data {
+            let utf8 = Data(value.utf8)
+            return header(major: 3, argument: UInt64(utf8.count)) + utf8
+        }
+
+        static func map(_ pairs: [(String, Data)]) -> Data {
+            let sorted = pairs.sorted { a, b in
+                let aBytes = a.0.utf8
+                let bBytes = b.0.utf8
+                if aBytes.count != bBytes.count {
+                    return aBytes.count < bBytes.count
+                }
+                return aBytes.lexicographicallyPrecedes(bBytes)
+            }
+            return sorted.reduce(header(major: 5, argument: UInt64(sorted.count))) { $0 + text($1.0) + $1.1 }
+        }
+    }
+
+    // MARK: - Task N3: Swift Network Facade Parser, Stream, and Security Failure Integration Tests
+
+    private final class MockSubscriptionWebSocketTask: WebSocketTaskProtocol, @unchecked Sendable {
+        private let message: URLSessionWebSocketTask.Message
+        private let sent = Mutex<Bool>(false)
+        private let onCancel: (@Sendable () -> Void)?
+
+        init(message: URLSessionWebSocketTask.Message, onCancel: (@Sendable () -> Void)? = nil) {
+            self.message = message
+            self.onCancel = onCancel
+        }
+
+        func resume() {}
+
+        func receive() async throws -> URLSessionWebSocketTask.Message {
+            let alreadySent = sent.withLock { isSent -> Bool in
+                let prev = isSent
+                isSent = true
+                return prev
+            }
+            if !alreadySent {
+                return message
+            } else {
+                try await Task.sleep(nanoseconds: 1_000_000_000)
+                throw URLError(.cancelled)
+            }
+        }
+
+        func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+            onCancel?()
+        }
+    }
+
+    private static func runSubscriptionWithTask<Message: Codable & Sendable>(
+        task: any WebSocketTaskProtocol,
+        endpoint: String = "com.atproto.sync.subscribeRepos"
+    ) async throws -> Result<[Message], Error> {
+        NetworkService.dnsResolverOverride = { host in
+            if host == "pds.example.com" { return ["93.184.216.34"] }
+            return nil
+        }
+        NetworkService.webSocketTaskOverride = { _ in
+            task
+        }
+        defer {
+            NetworkService.dnsResolverOverride = nil
+            NetworkService.webSocketTaskOverride = nil
+        }
+
+        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+        let stream: AsyncThrowingStream<Message, Error> = try await service.subscribe(
+            endpoint: endpoint,
+            parameters: nil
+        )
+
+        var items: [Message] = []
+        do {
+            for try await item in stream {
+                items.append(item)
+            }
+            return .success(items)
+        } catch {
+            return .failure(error)
+        }
+    }
+
+    @Test("Facade: Subscription frame with unsigned integer exceeding Int.max throws typed NetworkError.invalidResponse")
+    func subscriptionWideUnsignedIntegerThrowsTypedError() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let seq: Int
+        }
+
+        let headerCBOR: CBOR = .map([
+            .utf8String("op"): .unsignedInt(1),
+            .utf8String("t"): .utf8String("#commit")
+        ])
+        let payloadCBOR: CBOR = .map([
+            .utf8String("seq"): .unsignedInt(UInt64.max)
+        ])
+        let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
+        let task = MockSubscriptionWebSocketTask(message: .data(frameBytes))
+
+        let result: Result<[TestSubMessage], Error> = try await Self.runSubscriptionWithTask(task: task)
+        guard case let .failure(error) = result else {
+            Issue.record("Expected subscription to fail on wide unsigned integer, but succeeded")
+            return
+        }
+        guard let networkError = error as? NetworkError,
+              case let .invalidResponse(description) = networkError,
+              description.contains("exceeds Int.max") else {
+            Issue.record("Expected NetworkError.invalidResponse with 'exceeds Int.max', got: \(error)")
+            return
+        }
+    }
+
+    @Test("Facade: Subscription frame with negative integer underflow throws typed NetworkError.invalidResponse")
+    func subscriptionNegativeIntegerUnderflowThrowsTypedError() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let seq: Int
+        }
+
+        let header = TestCBORHelper.map([
+            ("op", TestCBORHelper.uint(1)),
+            ("t", TestCBORHelper.text("#commit")),
+        ])
+        let payloadUnderflow = TestCBORHelper.map([
+            ("seq", TestCBORHelper.header(major: 1, argument: UInt64.max)),
+        ])
+        let frameBytes = header + payloadUnderflow
+        let task = MockSubscriptionWebSocketTask(message: .data(frameBytes))
+
+        let result: Result<[TestSubMessage], Error> = try await Self.runSubscriptionWithTask(task: task)
+        guard case let .failure(error) = result else {
+            Issue.record("Expected subscription to fail on negative integer underflow, but succeeded")
+            return
+        }
+        guard let networkError = error as? NetworkError,
+              case let .invalidResponse(description) = networkError,
+              description.contains("underflows Int.min") || description.contains("exceeds Int64 boundary") else {
+            Issue.record("Expected NetworkError.invalidResponse with underflow description, got: \(error)")
+            return
+        }
+    }
+
+    @Test("Facade: Subscription frame exceeding CBOR depth limit (>64) throws typed NetworkError.invalidResponse")
+    func subscriptionParserDepthLimitExceededThrowsTypedError() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let seq: Int
+        }
+
+        let headerCBOR: CBOR = .map([
+            .utf8String("op"): .unsignedInt(1),
+            .utf8String("t"): .utf8String("#commit")
+        ])
+        var nested: CBOR = .utf8String("leaf")
+        for _ in 0..<70 {
+            nested = .array([nested])
+        }
+        let payloadCBOR: CBOR = .map([
+            .utf8String("data"): nested
+        ])
+        let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
+        let task = MockSubscriptionWebSocketTask(message: .data(frameBytes))
+
+        let result: Result<[TestSubMessage], Error> = try await Self.runSubscriptionWithTask(task: task)
+        guard case let .failure(error) = result else {
+            Issue.record("Expected subscription to fail on CBOR depth limit, but succeeded")
+            return
+        }
+        guard let networkError = error as? NetworkError,
+              case let .invalidResponse(description) = networkError,
+              description.contains("CBOR preflight failed") else {
+            Issue.record("Expected NetworkError.invalidResponse with preflight failure description, got: \(error)")
+            return
+        }
+    }
+
+    @Test("Facade: Subscription server error frame (op == -1) surfaces typed NetworkError.serverError")
+    func subscriptionServerErrorFrameThrowsTypedError() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let seq: Int
+        }
+
+        let headerCBOR: CBOR = .map([
+            .utf8String("op"): .unsignedInt(UInt64(bitPattern: -1)),
+            .utf8String("t"): .utf8String("#error")
+        ])
+        let payloadCBOR: CBOR = .map([
+            .utf8String("error"): .utf8String("ConsumerTooSlow")
+        ])
+        let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
+        let task = MockSubscriptionWebSocketTask(message: .data(frameBytes))
+
+        let result: Result<[TestSubMessage], Error> = try await Self.runSubscriptionWithTask(task: task)
+        guard case let .failure(error) = result else {
+            Issue.record("Expected subscription to fail on server error frame, but succeeded")
+            return
+        }
+        guard let networkError = error as? NetworkError,
+              case let .serverError(code, message) = networkError,
+              code == 400, message == "ConsumerTooSlow" else {
+            Issue.record("Expected NetworkError.serverError(code: 400, message: 'ConsumerTooSlow'), got: \(error)")
+            return
+        }
+    }
+
+    @Test("Facade: Subscription unexpected text frame fails closed with typed NetworkError.invalidResponse and cancels task")
+    func subscriptionUnexpectedTextFrameThrowsTypedError() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let seq: Int
+        }
+
+        let cancelled = Mutex<Bool>(false)
+        let task = MockSubscriptionWebSocketTask(
+            message: .string("{\"unexpected\": \"text_frame\"}"),
+            onCancel: { cancelled.withLock { $0 = true } }
+        )
+
+        let result: Result<[TestSubMessage], Error> = try await Self.runSubscriptionWithTask(task: task)
+        guard case let .failure(error) = result else {
+            Issue.record("Expected subscription to fail on unexpected text frame, but succeeded")
+            return
+        }
+        guard let networkError = error as? NetworkError,
+              case let .invalidResponse(description) = networkError,
+              description.contains("Unexpected text frame") else {
+            Issue.record("Expected NetworkError.invalidResponse for unexpected text frame, got: \(error)")
+            return
+        }
+        #expect(cancelled.withLock { $0 }, "Expected underlying webSocketTask to be cancelled on text frame rejection")
+    }
+
+    @Test("Facade: Subscription payload schema mismatch propagates typed DecodingError and cancels task")
+    func subscriptionPayloadSchemaMismatchThrowsTypedDecodingError() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let requiredField: String
+        }
+
+        let headerCBOR: CBOR = .map([
+            .utf8String("op"): .unsignedInt(1),
+            .utf8String("t"): .utf8String("#commit")
+        ])
+        let payloadCBOR: CBOR = .map([
+            .utf8String("wrongField"): .utf8String("value")
+        ])
+        let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
+        let cancelled = Mutex<Bool>(false)
+        let task = MockSubscriptionWebSocketTask(
+            message: .data(frameBytes),
+            onCancel: { cancelled.withLock { $0 = true } }
+        )
+
+        let result: Result<[TestSubMessage], Error> = try await Self.runSubscriptionWithTask(task: task)
+        guard case let .failure(error) = result else {
+            Issue.record("Expected subscription to fail on schema mismatch, but succeeded")
+            return
+        }
+        #expect(error is DecodingError, "Expected DecodingError to be thrown rather than swallowed, got \(error)")
+        #expect(cancelled.withLock { $0 }, "Expected underlying webSocketTask to be cancelled on decode error")
+    }
+
+    @Test("Facade: Subscription cancelled due to delegate security violation surfaces typed NetworkError.securityViolation")
+    func subscriptionSecurityViolationSurfacesTypedError() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let seq: Int
+        }
+
+        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+        let wsTask = service.session.webSocketTask(with: URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
+        service.sessionDelegate.contextManager.recordSecurityViolation(for: wsTask)
+        wsTask.cancel()
+
+        // Even if the delegate finishes and clears taskContext, the security violation is retained durably
+        service.sessionDelegate.contextManager.finish(wsTask, error: URLError(.cancelled))
+
+        NetworkService.dnsResolverOverride = { host in
+            if host == "pds.example.com" { return ["93.184.216.34"] }
+            return nil
+        }
+        NetworkService.webSocketTaskOverride = { _ in
+            wsTask
+        }
+        defer {
+            NetworkService.dnsResolverOverride = nil
+            NetworkService.webSocketTaskOverride = nil
+        }
+
+        let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
+            endpoint: "com.atproto.sync.subscribeRepos",
+            parameters: nil
+        )
+
+        var caughtSecurityViolation = false
+        do {
+            for try await _ in stream {
+                Issue.record("Expected subscription to fail on security violation, but received message")
+            }
+        } catch let error as NetworkError {
+            if case .securityViolation = error {
+                caughtSecurityViolation = true
+            } else {
+                Issue.record("Expected NetworkError.securityViolation, got: \(error)")
+            }
+        } catch {
+            Issue.record("Caught unexpected non-NetworkError: \(error)")
+        }
+
+        #expect(caughtSecurityViolation, "Expected NetworkError.securityViolation to be thrown to caller rather than completing stream with empty EOF")
+    }
+
+    @Test("Facade: Subscription cancelled due to delegate response limit exceeded surfaces typed NetworkError.responseLimitExceeded")
+    func subscriptionLimitExceededSurfacesTypedError() async throws {
+        struct TestSubMessage: Codable, Sendable {
+            let seq: Int
+        }
+
+        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+        let wsTask = service.session.webSocketTask(with: URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
+        service.sessionDelegate.contextManager.recordLimitExceeded(for: wsTask)
+        wsTask.cancel()
+
+        service.sessionDelegate.contextManager.finish(wsTask, error: URLError(.cancelled))
+
+        NetworkService.dnsResolverOverride = { host in
+            if host == "pds.example.com" { return ["93.184.216.34"] }
+            return nil
+        }
+        NetworkService.webSocketTaskOverride = { _ in
+            wsTask
+        }
+        defer {
+            NetworkService.dnsResolverOverride = nil
+            NetworkService.webSocketTaskOverride = nil
+        }
+
+        let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
+            endpoint: "com.atproto.sync.subscribeRepos",
+            parameters: nil
+        )
+
+        var caughtLimitExceeded = false
+        do {
+            for try await _ in stream {
+                Issue.record("Expected subscription to fail on response limit exceeded, but received message")
+            }
+        } catch let error as NetworkError {
+            if case .responseLimitExceeded = error {
+                caughtLimitExceeded = true
+            } else {
+                Issue.record("Expected NetworkError.responseLimitExceeded, got: \(error)")
+            }
+        } catch {
+            Issue.record("Caught unexpected non-NetworkError: \(error)")
+        }
+
+        #expect(caughtLimitExceeded, "Expected NetworkError.responseLimitExceeded to be thrown to caller")
+    }
+    @Test("Delegate task completion prunes context and durable violation sets without leaking")
+    func delegateTaskCompletionPrunesContextAndSets() async throws {
+        let delegate = HardenedURLSessionDelegate()
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+        defer { session.invalidateAndCancel() }
+
+        let url = URL(string: "https://pds.example.com/xrpc/test")!
+        let task = session.dataTask(with: url)
+
+        delegate.contextManager.register(task) { _ in }
+        delegate.contextManager.recordSecurityViolation(for: task)
+        #expect(delegate.contextManager.isSecurityViolation(for: task))
+        #expect(!delegate.contextManager.hasAnySecurityViolation() || delegate.contextManager.getContext(for: task).securityViolation)
+
+        // Pruning at task consumption point clears the task from violation sets
+        delegate.contextManager.finish(task, error: URLError(.cancelled))
+        delegate.contextManager.pruneCompletedTask(task)
+
+        #expect(!delegate.contextManager.isSecurityViolation(for: task))
+        #expect(!delegate.contextManager.hasAnySecurityViolation())
+        #expect(!delegate.contextManager.hasAnyLimitExceeded())
+    }
 }
