@@ -8,6 +8,8 @@ public enum FirehoseFrameLimits {
   public static let maximumCommitBlocksBytes = 2_000_000
   public static let maximumSyncBlocksBytes = 10_000
   public static let maximumOps = 200
+  public static let maximumDepth = 64
+  public static let maximumAggregateNodes = 10_000
   public static let maximumSequence: Int64 = 9_007_199_254_740_991
 
   /// `1 <= seq <= maximumSequence`. The exhausted sentinel

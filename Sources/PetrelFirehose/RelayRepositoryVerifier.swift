@@ -84,12 +84,14 @@ public enum RelayFullRepositoryVerifier {
     car: Data,
     expected: RelayRepositoryHead,
     verifier: any PublicRepositoryCommitVerifier,
+    storage: any RelayAcceptedHeadStorage,
     maximumCARBytes: Int = PublicRepositoryLimits.standard.maximumCARBytes
   ) async throws -> RelayVerifiedFullRepository {
     let state = try await RelayRepositoryVerificationState.fullSnapshot(
       car: car,
       expected: expected,
       verifier: verifier,
+      storage: storage,
       maximumCARBytes: maximumCARBytes
     )
     return .init(snapshot: state.snapshot)
@@ -118,8 +120,22 @@ public struct RelayRepositoryVerificationState: Sendable {
     car: Data,
     expected: RelayRepositoryHead,
     verifier: any PublicRepositoryCommitVerifier,
+    storage: any RelayAcceptedHeadStorage,
     maximumCARBytes: Int = PublicRepositoryLimits.standard.maximumCARBytes
   ) async throws -> Self {
+    do {
+      if let accepted = try await storage.loadAcceptedHead(for: expected.did) {
+        let acceptedTID = try PublicRepositoryTID(accepted.revision)
+        let expectedTID = try PublicRepositoryTID(expected.revision)
+        guard acceptedTID < expectedTID else {
+          throw RelayVerifierError.revisionRollback
+        }
+      }
+    } catch let error as RelayVerifierError {
+      throw error
+    } catch {
+      throw RelayVerifierError.storageFailure
+    }
     let verified = try await verifyCAR(
       car,
       expectedRoot: expected.commitCID,
@@ -129,6 +145,11 @@ public struct RelayRepositoryVerificationState: Sendable {
       maximumCARBytes: maximumCARBytes
     )
     try verifyHead(verified.snapshot.head, expected: expected)
+    do {
+      try await storage.saveAcceptedHead(verified.snapshot.head)
+    } catch {
+      throw RelayVerifierError.storageFailure
+    }
     return .init(
       snapshot: verified.snapshot,
       payloadKind: .fullSnapshot,
@@ -138,8 +159,22 @@ public struct RelayRepositoryVerificationState: Sendable {
 
   public static func activationSync(
     _ event: RelaySyncEvent,
-    verifier: any PublicRepositoryCommitVerifier
+    verifier: any PublicRepositoryCommitVerifier,
+    storage: any RelayAcceptedHeadStorage
   ) async throws -> Self {
+    do {
+      if let accepted = try await storage.loadAcceptedHead(for: event.did) {
+        let acceptedTID = try PublicRepositoryTID(accepted.revision)
+        let eventTID = try PublicRepositoryTID(event.rev)
+        guard acceptedTID < eventTID else {
+          throw RelayVerifierError.revisionRollback
+        }
+      }
+    } catch let error as RelayVerifierError {
+      throw error
+    } catch {
+      throw RelayVerifierError.storageFailure
+    }
     let verified = try await verifyCommitAnnouncement(event, verifier: verifier)
     guard verified.commit.descriptor.did == event.did else {
       throw RelayVerifierError.repositoryDIDMismatch
@@ -165,6 +200,11 @@ public struct RelayRepositoryVerificationState: Sendable {
       records: [:],
       mstDigest: mstDigest(mstBlocks)
     )
+    do {
+      try await storage.saveAcceptedHead(snapshot.head)
+    } catch {
+      throw RelayVerifierError.storageFailure
+    }
     return .init(
       snapshot: snapshot,
       payloadKind: .commitAnnouncement,
@@ -177,8 +217,28 @@ public struct RelayRepositoryVerificationState: Sendable {
 
   public func synchronizing(
     _ event: RelaySyncEvent,
-    verifier: any PublicRepositoryCommitVerifier
+    verifier: any PublicRepositoryCommitVerifier,
+    storage: any RelayAcceptedHeadStorage
   ) async throws -> Self {
+    do {
+      if let accepted = try await storage.loadAcceptedHead(for: event.did) {
+        let acceptedTID = try PublicRepositoryTID(accepted.revision)
+        let eventTID = try PublicRepositoryTID(event.rev)
+        if acceptedTID > eventTID {
+          throw RelayVerifierError.revisionRollback
+        }
+        if acceptedTID == eventTID {
+          guard accepted.commitCID == snapshot.commitCID,
+                accepted.dataCID == snapshot.dataCID else {
+            throw RelayVerifierError.revisionRollback
+          }
+        }
+      }
+    } catch let error as RelayVerifierError {
+      throw error
+    } catch {
+      throw RelayVerifierError.storageFailure
+    }
     let verified = try await Self.verifyCommitAnnouncement(event, verifier: verifier)
     guard verified.commit.descriptor.did == event.did,
           event.did == snapshot.did else {
@@ -194,6 +254,11 @@ public struct RelayRepositoryVerificationState: Sendable {
     guard verified.commit.descriptor.dataCID == snapshot.dataCID else {
       throw RelayVerifierError.finalDataCIDMismatch
     }
+    do {
+      try await storage.saveAcceptedHead(snapshot.head)
+    } catch {
+      throw RelayVerifierError.storageFailure
+    }
     return .init(
       snapshot: snapshot,
       payloadKind: .commitAnnouncement,
@@ -201,17 +266,24 @@ public struct RelayRepositoryVerificationState: Sendable {
     )
   }
 
-  // Note on diff-only verification:
-  // An incremental diff-only verification walk was attempted and reverted.
-  // The blocker is that repository-wide ceilings (maximumMSTNodes, maximumCARBytes)
-  // require persisted per-CID reference counts to maintain correctly under node splits,
-  // layer changes, deletions, and reused blocks without drifting or causing memory leaks.
-  // Any future attempt to narrow this path requires a dedicated parity harness that invokes
-  // both the full and incremental verifiers across complex mutation histories before landing.
   public func applying(
     commit event: RelayCommitEvent,
-    verifier: any PublicRepositoryCommitVerifier
+    verifier: any PublicRepositoryCommitVerifier,
+    storage: any RelayAcceptedHeadStorage
   ) async throws -> Self {
+    do {
+      if let accepted = try await storage.loadAcceptedHead(for: event.repo) {
+        let acceptedTID = try PublicRepositoryTID(accepted.revision)
+        let eventTID = try PublicRepositoryTID(event.rev)
+        guard acceptedTID < eventTID else {
+          throw RelayVerifierError.revisionRollback
+        }
+      }
+    } catch let error as RelayVerifierError {
+      throw error
+    } catch {
+      throw RelayVerifierError.storageFailure
+    }
     guard event.blocks.count <= FirehoseFrameLimits.maximumCommitBlocksBytes else {
       throw RelayVerifierError.commitBlocksTooLarge
     }
@@ -228,13 +300,17 @@ public struct RelayRepositoryVerificationState: Sendable {
       previous: snapshot,
       current: verified.snapshot
     )
+    do {
+      try await storage.saveAcceptedHead(verified.snapshot.head)
+    } catch {
+      throw RelayVerifierError.storageFailure
+    }
     return .init(
       snapshot: verified.snapshot,
       payloadKind: .commitDiff,
       reachableBlocks: verified.reachableBlocks
     )
   }
-
   private static func verifyCAR(
     _ car: Data,
     expectedRoot: CID?,

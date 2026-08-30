@@ -9,6 +9,7 @@ final class PublicRelayVerifierTests: XCTestCase {
   private let did = "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
   private let rev0 = "3jzfcijpj2z2a"
   private let rev1 = "3jzfcijpj2z2b"
+  private let rev2 = "3jzfcijpj2z2c"
   private let time = "2026-08-08T12:00:00.000Z"
 
   func testDecoderAcceptsHandDerivedCanonicalIdentityFrame() throws {
@@ -349,10 +350,12 @@ final class PublicRelayVerifierTests: XCTestCase {
       commitCID: genesis.commitCID,
       dataCID: genesis.emptyMSTCID
     )
+    let storage = InMemoryRelayAcceptedHeadStorage()
     let verified = try await RelayFullRepositoryVerifier.verify(
       car: genesis.car,
       expected: expected,
       verifier: verifier,
+      storage: storage,
       maximumCARBytes: genesis.car.count
     )
     XCTAssertEqual(verified.head, expected)
@@ -367,10 +370,10 @@ final class PublicRelayVerifierTests: XCTestCase {
         car: genesis.car,
         expected: expected,
         verifier: verifier,
+        storage: InMemoryRelayAcceptedHeadStorage(),
         maximumCARBytes: genesis.car.count - 1
       )
     }
-
     var malformed = genesis.car
     malformed.removeLast()
     await assertAsyncError(.invalidRepositoryCAR) {
@@ -378,10 +381,10 @@ final class PublicRelayVerifierTests: XCTestCase {
         car: malformed,
         expected: expected,
         verifier: verifier,
+        storage: InMemoryRelayAcceptedHeadStorage(),
         maximumCARBytes: genesis.car.count
       )
     }
-
     let wrongKey = P256PublicRepositoryCommitVerifier(
       publicKey: P256.Signing.PrivateKey().publicKey
     )
@@ -390,10 +393,10 @@ final class PublicRelayVerifierTests: XCTestCase {
         car: genesis.car,
         expected: expected,
         verifier: wrongKey,
+        storage: InMemoryRelayAcceptedHeadStorage(),
         maximumCARBytes: genesis.car.count
       )
     }
-
     await assertAsyncError(.commitCIDMismatch) {
       _ = try await RelayFullRepositoryVerifier.verify(
         car: genesis.car,
@@ -402,6 +405,7 @@ final class PublicRelayVerifierTests: XCTestCase {
           commitCID: sampleCID(77), dataCID: genesis.emptyMSTCID
         ),
         verifier: verifier,
+        storage: InMemoryRelayAcceptedHeadStorage(),
         maximumCARBytes: genesis.car.count
       )
     }
@@ -421,13 +425,14 @@ final class PublicRelayVerifierTests: XCTestCase {
       commitCID: genesis.commitCID,
       dataCID: genesis.emptyMSTCID
     )
+    let storage424 = InMemoryRelayAcceptedHeadStorage()
     let initial = try await RelayRepositoryVerificationState.fullSnapshot(
       car: genesis.car,
       expected: initialHead,
       verifier: verifier,
+      storage: storage424,
       maximumCARBytes: genesis.car.count
     )
-
     let path = try PublicRepositoryPath(
       collection: "app.bsky.feed.post",
       recordKey: "a"
@@ -472,8 +477,7 @@ final class PublicRelayVerifierTests: XCTestCase {
       prevDataCID: genesis.emptyMSTCID,
       time: time
     )
-    let current = try await initial.applying(commit: event, verifier: verifier)
-    XCTAssertEqual(current.snapshot.revision, rev1)
+    let current = try await initial.applying(commit: event, verifier: verifier, storage: storage424)
     XCTAssertEqual(current.snapshot.commitCID, commit.commitCID)
     XCTAssertEqual(current.snapshot.dataCID, materialized.rootCID)
     XCTAssertEqual(current.snapshot.records, [path.mstKey: record.cid])
@@ -487,13 +491,14 @@ final class PublicRelayVerifierTests: XCTestCase {
       revision: rev0,
       signingKey: key
     )
+    let storage490 = InMemoryRelayAcceptedHeadStorage()
     var state = try await RelayRepositoryVerificationState.fullSnapshot(
       car: genesis.car,
       expected: .init(did: did, revision: rev0, commitCID: genesis.commitCID, dataCID: genesis.emptyMSTCID),
       verifier: verifier,
+      storage: storage490,
       maximumCARBytes: genesis.car.count
     )
-
     let pathA = try PublicRepositoryPath(collection: "app.bsky.feed.post", recordKey: "a")
     let pathB = try PublicRepositoryPath(collection: "app.bsky.feed.post", recordKey: "b")
     let recordA = try PublicRepositoryRecordCodec.prepare(
@@ -525,8 +530,7 @@ final class PublicRelayVerifierTests: XCTestCase {
       ops: [.init(action: .create, path: pathA.mstKey, cid: recordA.cid, prev: nil)],
       prevDataCID: genesis.emptyMSTCID, time: time
     )
-    state = try await state.applying(commit: event, verifier: verifier)
-    XCTAssertEqual(state.snapshot.records, [pathA.mstKey: recordA.cid])
+    state = try await state.applying(commit: event, verifier: verifier, storage: storage490)
 
     // Commit 2: Create pathB pointing to same recordA.cid, but OMITS recordA.bytes from diffBlocks!
     let prevDataCID1 = mat.rootCID
@@ -553,11 +557,252 @@ final class PublicRelayVerifierTests: XCTestCase {
       ops: [.init(action: .create, path: pathB.mstKey, cid: recordA.cid, prev: nil)],
       prevDataCID: prevDataCID1, time: time
     )
-    state = try await state.applying(commit: event, verifier: verifier)
+    state = try await state.applying(commit: event, verifier: verifier, storage: storage490)
     XCTAssertEqual(state.snapshot.records, [
       pathA.mstKey: recordA.cid,
       pathB.mstKey: recordA.cid,
     ])
+  }
+  func testRollbackAndStaleCommitRejection() async throws {
+    let key1 = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 1, count: 32))
+    let verifier1 = P256PublicRepositoryCommitVerifier(publicKey: key1.publicKey)
+    let genesis1 = try PublicRepositoryGenesisCodec.create(
+      did: did,
+      revision: rev0,
+      signingKey: key1
+    )
+    let storage = InMemoryRelayAcceptedHeadStorage()
+    var state1 = try await RelayRepositoryVerificationState.fullSnapshot(
+      car: genesis1.car,
+      expected: .init(did: did, revision: rev0, commitCID: genesis1.commitCID, dataCID: genesis1.emptyMSTCID),
+      verifier: verifier1,
+      storage: storage,
+      maximumCARBytes: genesis1.car.count
+    )
+
+    let pathA = try PublicRepositoryPath(collection: "app.bsky.feed.post", recordKey: "a")
+    let recordA = try PublicRepositoryRecordCodec.prepare(
+      PublicRecord(["$type": .string(pathA.collection), "text": .string("first")]),
+      for: pathA
+    )
+    let tree1 = try await RepositoryMST.empty().adding(path: pathA, recordCID: recordA.cid)
+    let mat1 = try await tree1.materialized()
+    let commit1 = try await PublicRepositoryCommitCodec.prepare(
+      did: did,
+      revision: "3jzfcijpj2z2b",
+      dataCID: mat1.rootCID,
+      currentRevision: rev0,
+      signer: P256PublicRepositoryCommitSigner(privateKey: key1)
+    )
+    var diffBlocks1 = [PublicRepositoryBlock(cid: commit1.commitCID, bytes: commit1.signedCommitBytes)]
+    for cid in mat1.newBlocks.cids {
+      let blockBytes = try await mat1.newBlocks.block(for: cid)
+      diffBlocks1.append(.init(cid: cid, bytes: try XCTUnwrap(blockBytes)))
+    }
+    diffBlocks1.append(.init(cid: recordA.cid, bytes: recordA.bytes))
+    var sink = TestCARSink()
+    _ = try await PublicRepositoryCAR.write(rootCID: commit1.commitCID, blocks: TestCARBlockStream(diffBlocks1), to: sink)
+    let event1 = RelayCommitEvent(
+      seq: 4, repo: did, commitCID: commit1.commitCID, rev: "3jzfcijpj2z2b", since: rev0,
+      blocks: await sink.data,
+      ops: [.init(action: .create, path: pathA.mstKey, cid: recordA.cid, prev: nil)],
+      prevDataCID: genesis1.emptyMSTCID, time: time
+    )
+    state1 = try await state1.applying(commit: event1, verifier: verifier1, storage: storage)
+    XCTAssertEqual(state1.snapshot.revision, "3jzfcijpj2z2b")
+
+    // Commit 2: revision rev2 ("3jzfcijpj2z2c")
+    let pathB = try PublicRepositoryPath(collection: "app.bsky.feed.post", recordKey: "b")
+    let recordB = try PublicRepositoryRecordCodec.prepare(
+      PublicRecord(["$type": .string(pathB.collection), "text": .string("second")]),
+      for: pathB
+    )
+    let tree2 = try await tree1.adding(path: pathB, recordCID: recordB.cid)
+    let mat2 = try await tree2.materialized()
+    let commit2 = try await PublicRepositoryCommitCodec.prepare(
+      did: did,
+      revision: "3jzfcijpj2z2c",
+      dataCID: mat2.rootCID,
+      currentRevision: "3jzfcijpj2z2b",
+      signer: P256PublicRepositoryCommitSigner(privateKey: key1)
+    )
+    var diffBlocks2 = [PublicRepositoryBlock(cid: commit2.commitCID, bytes: commit2.signedCommitBytes)]
+    for cid in mat2.newBlocks.cids {
+      let blockBytes = try await mat2.newBlocks.block(for: cid)
+      diffBlocks2.append(.init(cid: cid, bytes: try XCTUnwrap(blockBytes)))
+    }
+    diffBlocks2.append(.init(cid: recordB.cid, bytes: recordB.bytes))
+    sink = TestCARSink()
+    _ = try await PublicRepositoryCAR.write(rootCID: commit2.commitCID, blocks: TestCARBlockStream(diffBlocks2), to: sink)
+    let event2 = RelayCommitEvent(
+      seq: 5, repo: did, commitCID: commit2.commitCID, rev: "3jzfcijpj2z2c", since: "3jzfcijpj2z2b",
+      blocks: await sink.data,
+      ops: [.init(action: .create, path: pathB.mstKey, cid: recordB.cid, prev: nil)],
+      prevDataCID: mat1.rootCID, time: time
+    )
+    state1 = try await state1.applying(commit: event2, verifier: verifier1, storage: storage)
+    XCTAssertEqual(state1.snapshot.revision, "3jzfcijpj2z2c")
+
+    // Case 1: Replay older valid signed commit1 (rev1 < rev2) -> reject with revisionRollback
+    await assertAsyncError(.revisionRollback) {
+      _ = try await state1.applying(commit: event1, verifier: verifier1, storage: storage)
+    }
+
+    // Case 2: Replay equal valid signed commit2 (rev2 == rev2) -> reject with revisionRollback
+    await assertAsyncError(.revisionRollback) {
+      _ = try await state1.applying(commit: event2, verifier: verifier1, storage: storage)
+    }
+
+    // Case 3: Reverse delta with older/equal revision -> reject with revisionRollback
+    let reverseCommit = try await PublicRepositoryCommitCodec.prepare(
+      did: did,
+      revision: "3jzfcijpj2z2b",
+      dataCID: mat1.rootCID,
+      currentRevision: rev0,
+      signer: P256PublicRepositoryCommitSigner(privateKey: key1)
+    )
+    let reverseBlocks = [PublicRepositoryBlock(cid: reverseCommit.commitCID, bytes: reverseCommit.signedCommitBytes)]
+    sink = TestCARSink()
+    _ = try await PublicRepositoryCAR.write(rootCID: reverseCommit.commitCID, blocks: TestCARBlockStream(reverseBlocks), to: sink)
+    let reverseEvent = RelayCommitEvent(
+      seq: 6, repo: did, commitCID: reverseCommit.commitCID, rev: "3jzfcijpj2z2b", since: "3jzfcijpj2z2c",
+      blocks: await sink.data,
+      ops: [.init(action: .delete, path: pathB.mstKey, cid: nil, prev: recordB.cid)],
+      prevDataCID: mat2.rootCID, time: time
+    )
+    await assertAsyncError(.revisionRollback) {
+      _ = try await state1.applying(commit: reverseEvent, verifier: verifier1, storage: storage)
+    }
+
+    // Case 4: Process restart (fresh state, same persistent storage) -> rejects stale commit1
+    let restartedState = try await RelayRepositoryVerificationState.fullSnapshot(
+      car: genesis1.car,
+      expected: .init(did: did, revision: rev0, commitCID: genesis1.commitCID, dataCID: genesis1.emptyMSTCID),
+      verifier: verifier1,
+      storage: InMemoryRelayAcceptedHeadStorage(),
+      maximumCARBytes: genesis1.car.count
+    )
+    await assertAsyncError(.revisionRollback) {
+      _ = try await restartedState.applying(commit: event1, verifier: verifier1, storage: storage)
+    }
+
+    // Case 5: Two DIDs isolation
+    let did2 = "did:plc:otheruser12345678901234"
+    let key2 = try P256.Signing.PrivateKey(rawRepresentation: Data(repeating: 2, count: 32))
+    let verifier2 = P256PublicRepositoryCommitVerifier(publicKey: key2.publicKey)
+    let genesis2 = try PublicRepositoryGenesisCodec.create(
+      did: did2,
+      revision: rev0,
+      signingKey: key2
+    )
+    var state2 = try await RelayRepositoryVerificationState.fullSnapshot(
+      car: genesis2.car,
+      expected: .init(did: did2, revision: rev0, commitCID: genesis2.commitCID, dataCID: genesis2.emptyMSTCID),
+      verifier: verifier2,
+      storage: storage,
+      maximumCARBytes: genesis2.car.count
+    )
+    // DID 2 can advance to rev1 ("3jzfcijpj2z2b") because DID 2's accepted head is rev0
+    let commit2_did2 = try await PublicRepositoryCommitCodec.prepare(
+      did: did2,
+      revision: "3jzfcijpj2z2b",
+      dataCID: mat1.rootCID,
+      currentRevision: rev0,
+      signer: P256PublicRepositoryCommitSigner(privateKey: key2)
+    )
+    var diffBlocks2_did2 = [PublicRepositoryBlock(cid: commit2_did2.commitCID, bytes: commit2_did2.signedCommitBytes)]
+    for cid in mat1.newBlocks.cids {
+      let blockBytes = try await mat1.newBlocks.block(for: cid)
+      diffBlocks2_did2.append(.init(cid: cid, bytes: try XCTUnwrap(blockBytes)))
+    }
+    diffBlocks2_did2.append(.init(cid: recordA.cid, bytes: recordA.bytes))
+    sink = TestCARSink()
+    _ = try await PublicRepositoryCAR.write(rootCID: commit2_did2.commitCID, blocks: TestCARBlockStream(diffBlocks2_did2), to: sink)
+    let event2_did2 = RelayCommitEvent(
+      seq: 7, repo: did2, commitCID: commit2_did2.commitCID, rev: "3jzfcijpj2z2b", since: rev0,
+      blocks: await sink.data,
+      ops: [.init(action: .create, path: pathA.mstKey, cid: recordA.cid, prev: nil)],
+      prevDataCID: genesis2.emptyMSTCID, time: time
+    )
+    state2 = try await state2.applying(commit: event2_did2, verifier: verifier2, storage: storage)
+    XCTAssertEqual(state2.snapshot.revision, "3jzfcijpj2z2b")
+
+    // Case 6: Storage failure fails closed
+    let failingStorage = FailingRelayAcceptedHeadStorage()
+    await assertAsyncError(.storageFailure) {
+      _ = try await state1.applying(commit: event1, verifier: verifier1, storage: failingStorage)
+    }
+  }
+
+  func testFrameBudgetLimitsAndChargeBeforeAllocation() throws {
+    // 5,000,001 bytes frame -> frameTooLarge
+    let overLimitFrame = Data(repeating: 0, count: FirehoseFrameLimits.maximumFrameBytes + 1)
+    XCTAssertThrowsError(try RelayFrameDecoder.decode(overLimitFrame)) {
+      XCTAssertEqual($0 as? RelayVerifierError, .frameTooLarge)
+    }
+
+    // 5,000,000 bytes frame -> accepting boundary (does not throw frameTooLarge)
+    // Construct a valid info frame of exactly 5,000,000 bytes
+    let exactFrame = infoFrame(exactByteCount: FirehoseFrameLimits.maximumFrameBytes)
+    XCTAssertEqual(exactFrame.count, FirehoseFrameLimits.maximumFrameBytes)
+    XCTAssertNoThrow(try RelayFrameDecoder.decode(exactFrame))
+
+    // Compact million-count array in body with trailing bytes: major type 4 (0x80 | 26 = 0x9a), count 1,000,000 = 0x000f4240, with 5 trailing bytes
+    // Pre-fix decoder passed count <= 1_000_000 and allocated ~1M elements before failing on truncated element.
+    // Post-fix charge-before-allocation check (argument <= remainingBytes) must reject immediately with truncatedFrame before allocation.
+    let validHeader = encode(.map([("op", .unsigned(1)), ("t", .text("#identity"))]))
+    let compactMillionArrayBody: [UInt8] = [0x9a, 0x00, 0x0f, 0x42, 0x40, 0x01, 0x02, 0x03, 0x04, 0x05] // array of 1,000,000 with 5 trailing bytes
+    let attackFrame1 = validHeader + Data(compactMillionArrayBody)
+    XCTAssertThrowsError(try RelayFrameDecoder.decode(attackFrame1)) {
+      XCTAssertEqual($0 as? RelayVerifierError, .truncatedFrame)
+    }
+
+    // Truncated input: array claiming 10 elements with 0 bytes remaining
+    let truncatedArrayBody: [UInt8] = [0x8a] // array(10), 0 remaining bytes
+    let attackFrame2 = validHeader + Data(truncatedArrayBody)
+    XCTAssertThrowsError(try RelayFrameDecoder.decode(attackFrame2)) {
+      XCTAssertEqual($0 as? RelayVerifierError, .truncatedFrame)
+    }
+
+    // Depth 64 (accepting boundary) vs Depth 65 (rejection boundary)
+    var depth64Bytes = [UInt8]()
+    for _ in 0 ..< 64 { depth64Bytes.append(0x81) }
+    depth64Bytes.append(0x00)
+    var depth64Reader = CanonicalRelayCBORReader(Data(depth64Bytes))
+    XCTAssertNoThrow(try depth64Reader.read())
+
+    var depth65Bytes = [UInt8]()
+    for _ in 0 ..< 65 { depth65Bytes.append(0x81) }
+    depth65Bytes.append(0x00)
+    var depth65Reader = CanonicalRelayCBORReader(Data(depth65Bytes))
+    XCTAssertThrowsError(try depth65Reader.read()) {
+      XCTAssertEqual($0 as? RelayCBORReaderError, .invalid)
+    }
+    let attackFrameDepth65 = validHeader + Data(depth65Bytes)
+    XCTAssertThrowsError(try RelayFrameDecoder.decode(attackFrameDepth65)) {
+      XCTAssertEqual($0 as? RelayVerifierError, .invalidCBOR)
+    }
+
+    // Aggregate node limit: 10,000 aggregate nodes (accepting boundary) vs 10,001 (rejection boundary)
+    // Array of 9,999 1-byte integers = 1 root array node + 9,999 item nodes = 10,000 nodes
+    var nodes10000 = [UInt8]()
+    nodes10000.append(contentsOf: [0x99, 0x27, 0x0f]) // array(9999) in CBOR
+    nodes10000.append(contentsOf: repeatElement(UInt8(0x00), count: 9999))
+    var reader10000 = CanonicalRelayCBORReader(Data(nodes10000))
+    XCTAssertNoThrow(try reader10000.read())
+
+    // 1 root array node + 10,000 item nodes = 10,001 nodes (rejection boundary)
+    var nodes10001 = [UInt8]()
+    nodes10001.append(contentsOf: [0x99, 0x27, 0x10]) // array(10000) in CBOR
+    nodes10001.append(contentsOf: repeatElement(UInt8(0x00), count: 10000))
+    var reader10001 = CanonicalRelayCBORReader(Data(nodes10001))
+    XCTAssertThrowsError(try reader10001.read()) {
+      XCTAssertEqual($0 as? RelayCBORReaderError, .invalid)
+    }
+    let attackFrameNodes10001 = validHeader + Data(nodes10001)
+    XCTAssertThrowsError(try RelayFrameDecoder.decode(attackFrameNodes10001)) {
+      XCTAssertEqual($0 as? RelayVerifierError, .invalidCBOR)
+    }
   }
 
   func testSyncVerifierTreatsCommitOnlyCARAsAnnouncementNotDiffOrSnapshot() async throws {
@@ -584,17 +829,50 @@ final class PublicRelayVerifierTests: XCTestCase {
       rev: rev0,
       time: time
     )
+    let syncStorage = InMemoryRelayAcceptedHeadStorage()
     let activated = try await RelayRepositoryVerificationState.activationSync(
       sync,
-      verifier: verifier
+      verifier: verifier,
+      storage: syncStorage
     )
     XCTAssertEqual(activated.payloadKind, .commitAnnouncement)
     XCTAssertFalse(activated.payloadKind.isDiff)
     XCTAssertEqual(activated.snapshot.records, [:])
-
-    let manual = try await activated.synchronizing(sync, verifier: verifier)
+    let manual = try await activated.synchronizing(sync, verifier: verifier, storage: syncStorage)
     XCTAssertEqual(manual.snapshot, activated.snapshot)
     XCTAssertEqual(manual.payloadKind, .commitAnnouncement)
+
+    // Replaying an older sync event against the populated syncStorage (where rev0 is accepted) must fail with revisionRollback
+    let olderSync = RelaySyncEvent(
+      seq: 2,
+      did: did,
+      blocks: commitOnly,
+      rev: "3jzfaaaaaaa2a",
+      time: time
+    )
+    await assertAsyncError(.revisionRollback) {
+      _ = try await activated.synchronizing(olderSync, verifier: verifier, storage: syncStorage)
+    }
+  }
+
+  func testConcurrentInterleavedApplyingCannotRegressAcceptedHead() async throws {
+    let storage = InMemoryRelayAcceptedHeadStorage()
+    let head1 = RelayRepositoryHead(did: did, revision: rev1, commitCID: sampleCID(1), dataCID: sampleCID(2))
+    let head2 = RelayRepositoryHead(did: did, revision: rev2, commitCID: sampleCID(3), dataCID: sampleCID(4))
+
+    // First, head2 (newer revision) is saved
+    try await storage.saveAcceptedHead(head2)
+    let current = try await storage.loadAcceptedHead(for: did)
+    XCTAssertEqual(current?.revision, rev2)
+
+    // A racing stale task attempting to save head1 (older revision) must be rejected with revisionRollback
+    await assertAsyncError(.revisionRollback) {
+      try await storage.saveAcceptedHead(head1)
+    }
+
+    // Persisted head remains head2
+    let afterRace = try await storage.loadAcceptedHead(for: did)
+    XCTAssertEqual(afterRace?.revision, rev2)
   }
 
   func testFinalStateComparisonRejectsRevisionCommitDataProjectionAndMSTMutations() throws {
@@ -955,4 +1233,10 @@ private extension RelayRepositorySnapshot {
       mstDigest: mstDigest ?? self.mstDigest
     )
   }
+}
+
+private actor FailingRelayAcceptedHeadStorage: RelayAcceptedHeadStorage {
+  struct Boom: Error, Equatable {}
+  func loadAcceptedHead(for did: String) async throws -> RelayRepositoryHead? { throw Boom() }
+  func saveAcceptedHead(_ head: RelayRepositoryHead) async throws { throw Boom() }
 }
