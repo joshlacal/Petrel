@@ -9,6 +9,11 @@
 //
 
 import Foundation
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#endif
 import Petrel
 
 @main
@@ -39,7 +44,7 @@ struct PostCLIDemo {
 
             print("\nEnter your app password:")
             print("(Generate one at https://bsky.app/settings/app-passwords)")
-            guard let password = readLine()?.trimmingCharacters(in: .whitespaces),
+            guard let password = readSecret()?.trimmingCharacters(in: .whitespaces),
                   !password.isEmpty
             else {
                 print("❌ Password is required")
@@ -97,6 +102,44 @@ struct PostCLIDemo {
             print("\n❌ Error: \(error)")
             exit(1)
         }
+    }
+
+    private static func readSecret(prompt: String? = nil) -> String? {
+        if let prompt {
+            print(prompt, terminator: "")
+            fflush(stdout)
+        }
+
+        let descriptor = STDIN_FILENO
+        guard isatty(descriptor) != 0 else {
+            return readLine(strippingNewline: true)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        var originalTermios = termios()
+        guard tcgetattr(descriptor, &originalTermios) == 0 else {
+            print("\n❌ Error: Failed to inspect terminal attributes for secure password input")
+            exit(1)
+        }
+
+        var noEchoTermios = originalTermios
+        #if canImport(Darwin)
+        noEchoTermios.c_lflag &= ~UInt(ECHO)
+        #else
+        noEchoTermios.c_lflag &= ~tcflag_t(ECHO)
+        #endif
+
+        guard tcsetattr(descriptor, TCSANOW, &noEchoTermios) == 0 else {
+            print("\n❌ Error: Failed to disable terminal echo for secure password input")
+            exit(1)
+        }
+
+        defer {
+            tcsetattr(descriptor, TCSANOW, &originalTermios)
+            print("")
+            fflush(stdout)
+        }
+
+        return readLine(strippingNewline: true)?.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     static func postMessage(client: ATProtoClient, handle: String) async throws {

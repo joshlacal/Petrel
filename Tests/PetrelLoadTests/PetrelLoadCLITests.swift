@@ -2,7 +2,11 @@ import Foundation
 import Petrel
 @testable import PetrelLoad
 import Testing
-
+#if canImport(Darwin)
+import Darwin
+#elseif canImport(Glibc)
+import Glibc
+#endif
 @Suite("PetrelLoad CLI")
 struct PetrelLoadCLITests {
     @Test("Supported value and flag options are parsed")
@@ -234,7 +238,7 @@ struct PetrelLoadCLITests {
         }
     }
 
-    @Test("OAuth completion instructions preserve the configured callback identity")
+    @Test("OAuth completion instructions preserve the configured callback identity and use stdin")
     func configuredCallbackInstructions() {
         let configuration = OAuthConfig(
             clientId: "https://client.example/oauth-client-metadata.json",
@@ -250,9 +254,252 @@ struct PetrelLoadCLITests {
         #expect(instructions.contains("com.example.client:/callback"))
         #expect(instructions.contains("--client-id \"https://client.example/oauth-client-metadata.json\""))
         #expect(instructions.contains("--redirect-uri \"com.example.client:/callback\""))
+        #expect(instructions.contains("--oauth-complete-stdin"))
         #expect(instructions.contains("application registered for that URI"))
         #expect(instructions.contains("PetrelLoad exits after printing these instructions"))
+        #expect(!instructions.contains("<PASTE_CALLBACK_URL>"))
         #expect(!instructions.contains("browser's address bar"))
+    }
+
+    @Test("Callback data-path parses raw/encoded shell characters as inert data")
+    func callbackDataPathPreservesInertPayloadsWithoutShellSyntax() throws {
+        let parsedArgs = try PetrelLoadCLI.parseArgs([
+            "PetrelLoad",
+            "--namespace", "com.example.petrel",
+            "--endpoint", "app.bsky.actor.getProfile",
+            "--client-id", "https://client.example/oauth-client-metadata.json",
+            "--redirect-uri", "com.example.client:/callback",
+            "--oauth-complete-stdin",
+        ])
+        #expect(parsedArgs["oauth-complete-stdin"] == "true")
+
+        let parsedDashArgs = try PetrelLoadCLI.parseArgs([
+            "PetrelLoad",
+            "--namespace", "com.example.petrel",
+            "--endpoint", "app.bsky.actor.getProfile",
+            "--client-id", "https://client.example/oauth-client-metadata.json",
+            "--redirect-uri", "com.example.client:/callback",
+            "--oauth-complete", "-",
+        ])
+        #expect(parsedDashArgs["oauth-complete"] == "-")
+
+        let rawPayloads = [
+            "com.example.client:/callback?code=$(whoami)&state=`id`",
+            "https://example.com/callback?code=abc'def\"ghi&state=$HOME",
+            "com.example.client:/callback?code=foo%20bar&state=baz\n",
+            "  com.example.client:/callback?code=test  \r\n",
+        ]
+
+        for payload in rawPayloads {
+            let pipe = Pipe()
+            pipe.fileHandleForWriting.write(Data(payload.utf8))
+            try pipe.fileHandleForWriting.close()
+            let readString = try PetrelLoadCLI.readCallback(from: pipe.fileHandleForReading)
+            try pipe.fileHandleForReading.close()
+            let parsedURL = try #require(PetrelLoadCLI.parseCallbackURL(readString))
+            #expect(parsedURL.scheme != nil)
+            #expect(!parsedURL.absoluteString.contains("\n"))
+            #expect(!parsedURL.absoluteString.contains("\r"))
+            let components = try #require(URLComponents(url: parsedURL, resolvingAgainstBaseURL: false))
+            #expect(components.queryItems != nil && !components.queryItems!.isEmpty)
+        }
+
+        // Explicitly assert that shell metacharacters in query parameter values are preserved as inert literal strings
+        let inertTestURL = try #require(PetrelLoadCLI.parseCallbackURL("com.example.client:/callback?code=$(whoami)&state=`id`"))
+        let inertComponents = try #require(URLComponents(url: inertTestURL, resolvingAgainstBaseURL: false))
+        #expect(inertComponents.queryItems?.first(where: { $0.name == "code" })?.value == "$(whoami)")
+        #expect(inertComponents.queryItems?.first(where: { $0.name == "state" })?.value == "`id`")
+
+        let quotesTestURL = try #require(PetrelLoadCLI.parseCallbackURL("https://example.com/callback?code=abc'def\"ghi&state=$HOME"))
+        let quotesComponents = try #require(URLComponents(url: quotesTestURL, resolvingAgainstBaseURL: false))
+        #expect(quotesComponents.queryItems?.first(where: { $0.name == "code" })?.value == "abc'def\"ghi")
+        #expect(quotesComponents.queryItems?.first(where: { $0.name == "state" })?.value == "$HOME")
+    }
+
+    @Test("Callback reading from stdin consumes chunked input to EOF")
+    func callbackReadingConsumesChunkedInput() async throws {
+        let pipe = Pipe()
+        let part1 = "https://example.com/callback?code="
+        let part2 = "secret-oauth-code-12345&state=xyz987"
+        let fullURLString = part1 + part2
+
+        pipe.fileHandleForWriting.write(Data(part1.utf8))
+
+        let writingTask = Task { @Sendable () -> Void in
+            try? await Task.sleep(nanoseconds: 30_000_000)
+            pipe.fileHandleForWriting.write(Data(part2.utf8))
+            try? pipe.fileHandleForWriting.close()
+        }
+
+        let readResult = try PetrelLoadCLI.readCallback(from: pipe.fileHandleForReading)
+        _ = await writingTask.result
+        try pipe.fileHandleForReading.close()
+        #expect(readResult == fullURLString)
+        let parsedURL = try #require(PetrelLoadCLI.parseCallbackURL(readResult))
+        #expect(parsedURL.absoluteString == fullURLString)
+    }
+
+    @Test("Empty or invalid stdin fails closed during OAuth completion")
+    func emptyOrInvalidStdinFailsClosed() throws {
+        // Empty pipe -> EOF
+        let emptyPipe = Pipe()
+        try emptyPipe.fileHandleForWriting.close()
+        #expect(throws: PetrelLoadCLI.CallbackReadError.emptyInput) {
+            _ = try PetrelLoadCLI.readCallback(from: emptyPipe.fileHandleForReading)
+        }
+        try emptyPipe.fileHandleForReading.close()
+
+        // Whitespace only
+        let whitespacePipe = Pipe()
+        whitespacePipe.fileHandleForWriting.write(Data("   \n\t  \r\n".utf8))
+        try whitespacePipe.fileHandleForWriting.close()
+        #expect(throws: PetrelLoadCLI.CallbackReadError.whitespaceOnly) {
+            _ = try PetrelLoadCLI.readCallback(from: whitespacePipe.fileHandleForReading)
+        }
+        try whitespacePipe.fileHandleForReading.close()
+
+        // Invalid UTF-8
+        let invalidUTF8Pipe = Pipe()
+        invalidUTF8Pipe.fileHandleForWriting.write(Data([0xFF, 0xFE, 0xFD]))
+        try invalidUTF8Pipe.fileHandleForWriting.close()
+        #expect(throws: PetrelLoadCLI.CallbackReadError.invalidUTF8) {
+            _ = try PetrelLoadCLI.readCallback(from: invalidUTF8Pipe.fileHandleForReading)
+        }
+        try invalidUTF8Pipe.fileHandleForReading.close()
+    }
+
+    @Test("Passing OAuth callback URL as command argument is rejected")
+    func oauthCompleteWithURLArgumentIsRejected() throws {
+        #expect(throws: PetrelLoadCLI.ArgumentError.invalidValue(option: "oauth-complete", value: "https://example.com/callback?code=123")) {
+            _ = try PetrelLoadCLI.parseArgs([
+                "PetrelLoad",
+                "--namespace", "com.example.petrel",
+                "--endpoint", "app.bsky.actor.getProfile",
+                "--client-id", "https://client.example/oauth-client-metadata.json",
+                "--redirect-uri", "com.example.client:/callback",
+                "--oauth-complete", "https://example.com/callback?code=123",
+            ])
+        }
+    }
+
+    @Test("Pseudo-terminal secret reading hides input and restores echo on normal and EOF exit")
+    func pseudoTerminalSecretReading() async throws {
+        var masterFD: Int32 = 0
+        var slaveFD: Int32 = 0
+        let ptyResult = openpty(&masterFD, &slaveFD, nil, nil, nil)
+        #expect(ptyResult == 0)
+        defer {
+            if masterFD >= 0 {
+                close(masterFD)
+            }
+            if slaveFD >= 0 {
+                close(slaveFD)
+            }
+        }
+
+        #expect(isatty(slaveFD) != 0)
+
+        var initialTermios = termios()
+        #expect(tcgetattr(slaveFD, &initialTermios) == 0)
+        #if canImport(Darwin)
+        let initialEchoOn = (initialTermios.c_lflag & UInt(ECHO)) != 0
+        #else
+        let initialEchoOn = (initialTermios.c_lflag & tcflag_t(ECHO)) != 0
+        #endif
+        #expect(initialEchoOn)
+        let secret = "correct-horse-battery-staple-4647"
+        let targetMasterFD = masterFD
+        let writerTask = Task { @Sendable () -> Void in
+            try await Task.sleep(nanoseconds: 50_000_000) // 50ms to allow tcsetattr to apply no-echo
+            let writeData = "\(secret)\n"
+            _ = writeData.utf8CString.withUnsafeBufferPointer { ptr in
+                write(targetMasterFD, ptr.baseAddress, writeData.utf8.count)
+            }
+        }
+
+        let readResult = try PetrelLoadCLI.readSecret(from: slaveFD)
+        _ = await writerTask.result
+        #expect(readResult == secret)
+
+        var postTermios = termios()
+        #expect(tcgetattr(slaveFD, &postTermios) == 0)
+        #if canImport(Darwin)
+        let postEchoOn = (postTermios.c_lflag & UInt(ECHO)) != 0
+        #else
+        let postEchoOn = (postTermios.c_lflag & tcflag_t(ECHO)) != 0
+        #endif
+        #expect(postEchoOn)
+
+        let flags = fcntl(masterFD, F_GETFL)
+        _ = fcntl(masterFD, F_SETFL, flags | O_NONBLOCK)
+        var buffer = [UInt8](repeating: 0, count: 1024)
+        let bytesRead = read(masterFD, &buffer, buffer.count)
+        if bytesRead > 0 {
+            let echoed = String(decoding: buffer[0..<bytesRead], as: UTF8.self)
+            #expect(!echoed.contains(secret))
+        }
+
+        // EOF read
+        close(masterFD)
+        masterFD = -1
+        let eofResult = try PetrelLoadCLI.readSecret(from: slaveFD)
+        #expect(eofResult == nil)
+        var postEofTermios = termios()
+        #expect(tcgetattr(slaveFD, &postEofTermios) == 0)
+        #if canImport(Darwin)
+        #expect((postEofTermios.c_lflag & UInt(ECHO)) != 0)
+        #else
+        #expect((postEofTermios.c_lflag & tcflag_t(ECHO)) != 0)
+        #endif
+
+        // Piped non-TTY read
+        let pipe = Pipe()
+        let pipeSecret = "piped-password-1234"
+        pipe.fileHandleForWriting.write(Data("\(pipeSecret)\n".utf8))
+        try pipe.fileHandleForWriting.close()
+        let pipedResult = try PetrelLoadCLI.readSecret(from: pipe.fileHandleForReading.fileDescriptor)
+        try pipe.fileHandleForReading.close()
+        #expect(pipedResult == pipeSecret)
+    }
+
+    @Test("Secret reading fails immediately on terminal attribute error")
+    func secretReadingRejectsTermiosFailureOnTTY() throws {
+        var masterFD: Int32 = -1
+        var slaveFD: Int32 = -1
+        let ptyResult = openpty(&masterFD, &slaveFD, nil, nil, nil)
+        #expect(ptyResult == 0)
+        defer {
+            if masterFD >= 0 { close(masterFD) }
+            if slaveFD >= 0 { close(slaveFD) }
+        }
+
+        #expect(isatty(slaveFD) != 0)
+
+        // Injecting an error into tcgetattr on a valid, open TTY descriptor throws SecretReaderError.terminalAttributeError
+        #expect(throws: PetrelLoadCLI.SecretReaderError.self) {
+            _ = try PetrelLoadCLI.readSecret(
+                from: slaveFD,
+                tcgetattrFn: { _, _ in -1 }
+            )
+        }
+
+        // Injecting an error into tcsetattr on a valid, open TTY descriptor throws SecretReaderError.terminalAttributeError
+        #expect(throws: PetrelLoadCLI.SecretReaderError.self) {
+            _ = try PetrelLoadCLI.readSecret(
+                from: slaveFD,
+                tcsetattrFn: { _, _, _ in -1 }
+            )
+        }
+
+        // Ensure ECHO flag is preserved after terminal attribute failure
+        var postTermios = termios()
+        #expect(tcgetattr(slaveFD, &postTermios) == 0)
+        #if canImport(Darwin)
+        let echoOn = (postTermios.c_lflag & UInt(ECHO)) != 0
+        #else
+        let echoOn = (postTermios.c_lflag & tcflag_t(ECHO)) != 0
+        #endif
+        #expect(echoOn)
     }
 
     @Test("Scenario plans distinguish concurrent load from serial state checks")
