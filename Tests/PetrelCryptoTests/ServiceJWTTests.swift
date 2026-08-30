@@ -646,6 +646,186 @@ final class ServiceJWTTests: XCTestCase {
         let noExpToken = "\(noExpInput).\(JWTBase64URL.encode(noExpSig))"
         XCTAssertThrowsError(try ServiceJWT.verify(noExpToken, publicKey: verifier))
     }
+
+    // MARK: - Request Body Digest ("req") Claim Tests
+
+    func testRequestBodyDigestRoundTripAndSignatureBinding() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let digest = "swan.space.notify-write.v1:did:plc:abcdef:rev1:commit1"
+        let verifierP256 = ATProtoJWTVerificationKey.p256(p256Key.publicKey)
+
+        // ES256 mint with requestBodyDigest
+        let tokenP256 = try ServiceJWT.mint(
+            issuer: issuerPLC,
+            audience: audience,
+            method: "com.atproto.space.notifyWrite",
+            eventID: "req-test-1",
+            requestBodyDigest: digest,
+            key: p256Key,
+            now: now
+        )
+
+        // Verify wire JSON contains "req"
+        let parts = tokenP256.split(separator: ".")
+        let payloadData = try JWTBase64URL.decode(String(parts[1]))
+        let rawJSON = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        XCTAssertTrue(rawJSON.contains("\"req\":"))
+
+        // Inspect
+        let inspected = try ServiceJWT.inspect(tokenP256)
+        XCTAssertEqual(inspected.claims.requestBodyDigest, digest)
+
+        // Verify without expected digest
+        let verifiedUnchecked = try ServiceJWT.verify(tokenP256, publicKey: verifierP256, now: now)
+        XCTAssertEqual(verifiedUnchecked.requestBodyDigest, digest)
+
+        // Verify with matching expected digest
+        let verifiedMatching = try ServiceJWT.verify(
+            tokenP256,
+            publicKey: verifierP256,
+            expectedAudience: audience,
+            expectedMethod: "com.atproto.space.notifyWrite",
+            expectedRequestBodyDigest: digest,
+            now: now
+        )
+        XCTAssertEqual(verifiedMatching.requestBodyDigest, digest)
+
+        // Verify with mismatched expected digest
+        XCTAssertThrowsError(
+            try ServiceJWT.verify(
+                tokenP256,
+                publicKey: verifierP256,
+                expectedRequestBodyDigest: "different-digest",
+                now: now
+            )
+        ) { error in
+            XCTAssertEqual(error as? PetrelCryptoError, .unauthorized("service authentication request body digest mismatch"))
+        }
+
+        // Tamper with payload req digest -> signature fails
+        let tamperedJSON = rawJSON.replacingOccurrences(of: digest, with: "tampered-digest-value")
+        let tamperedPayload = JWTBase64URL.encode(Data(tamperedJSON.utf8))
+        let tamperedToken = "\(parts[0]).\(tamperedPayload).\(parts[2])"
+        XCTAssertThrowsError(
+            try ServiceJWT.verify(tamperedToken, publicKey: verifierP256, now: now)
+        ) { error in
+            XCTAssertEqual(error as? PetrelCryptoError, .unauthorized("service authentication signature is invalid"))
+        }
+
+        // ES256K mint with requestBodyDigest
+        let secpKey = try secp256k1.Signing.PrivateKey()
+        let verifierSecp = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.dataRepresentation)
+        let tokenSecp = try ServiceJWT.mint(
+            issuer: issuerPLC,
+            audience: audience,
+            method: "com.atproto.space.notifyDeleted",
+            eventID: "req-secp-1",
+            requestBodyDigest: digest,
+            key: secpKey,
+            now: now
+        )
+        let verifiedSecp = try ServiceJWT.verify(
+            tokenSecp,
+            publicKey: verifierSecp,
+            expectedRequestBodyDigest: digest,
+            now: now
+        )
+        XCTAssertEqual(verifiedSecp.requestBodyDigest, digest)
+    }
+
+    func testRequestBodyDigestOptionalForGenericCallers() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let token = try ServiceJWT.mint(
+            issuer: issuerPLC,
+            audience: audience,
+            method: "app.bsky.actor.getProfile",
+            eventID: "generic-call-1",
+            key: p256Key,
+            now: now
+        )
+        let verifier = ATProtoJWTVerificationKey.p256(p256Key.publicKey)
+
+        // Wire JSON should not have "req"
+        let parts = token.split(separator: ".")
+        let payloadData = try JWTBase64URL.decode(String(parts[1]))
+        let rawJSON = try XCTUnwrap(String(data: payloadData, encoding: .utf8))
+        XCTAssertFalse(rawJSON.contains("\"req\""))
+
+        // Inspect & verify
+        let inspected = try ServiceJWT.inspect(token)
+        XCTAssertNil(inspected.claims.requestBodyDigest)
+
+        let verified = try ServiceJWT.verify(token, publicKey: verifier, now: now)
+        XCTAssertNil(verified.requestBodyDigest)
+
+        // Verification fails if caller expected a digest but token has none
+        XCTAssertThrowsError(
+            try ServiceJWT.verify(
+                token,
+                publicKey: verifier,
+                expectedRequestBodyDigest: "expected-some-digest",
+                now: now
+            )
+        ) { error in
+            XCTAssertEqual(error as? PetrelCryptoError, .unauthorized("service authentication request body digest mismatch"))
+        }
+    }
+
+    func testRequestBodyDigestValidationNegatives() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let verifier = ATProtoJWTVerificationKey.p256(p256Key.publicKey)
+
+        // Empty string digest is rejected on mint
+        XCTAssertThrowsError(
+            try ServiceJWT.mint(
+                issuer: issuerPLC,
+                audience: audience,
+                method: "com.atproto.space.notifyWrite",
+                eventID: "neg-1",
+                requestBodyDigest: "",
+                key: p256Key,
+                now: now
+            )
+        )
+
+        // Whitespace/unprintable digest is rejected on mint
+        XCTAssertThrowsError(
+            try ServiceJWT.mint(
+                issuer: issuerPLC,
+                audience: audience,
+                method: "com.atproto.space.notifyWrite",
+                eventID: "neg-2",
+                requestBodyDigest: "has spaces in digest",
+                key: p256Key,
+                now: now
+            )
+        )
+
+        // Oversized digest (> 4096 bytes) is rejected on mint
+        let oversized = String(repeating: "a", count: 4097)
+        XCTAssertThrowsError(
+            try ServiceJWT.mint(
+                issuer: issuerPLC,
+                audience: audience,
+                method: "com.atproto.space.notifyWrite",
+                eventID: "neg-3",
+                requestBodyDigest: oversized,
+                key: p256Key,
+                now: now
+            )
+        )
+
+        // Hand-crafted token with empty "req" claim rejected by shape validation
+        let headerData = try JSONEncoder().encode(["alg": "ES256", "typ": "JWT"])
+        let emptyReqJSON = "{\"iss\":\"\(issuerPLC)\",\"aud\":\"\(audience)\",\"exp\":1700000060,\"lxm\":\"com.atproto.space.notifyWrite\",\"jti\":\"empty-req\",\"req\":\"\"}"
+        let emptyReqInput = "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(Data(emptyReqJSON.utf8)))"
+        let emptyReqSig = try P256WireSignature.sign(Data(emptyReqInput.utf8), using: p256Key)
+        let emptyReqToken = "\(emptyReqInput).\(JWTBase64URL.encode(emptyReqSig))"
+
+        XCTAssertThrowsError(try ServiceJWT.verify(emptyReqToken, publicKey: verifier)) { error in
+            XCTAssertEqual(error as? PetrelCryptoError, .unauthorized("service authentication token is invalid"))
+        }
+    }
 }
 
 private func highSVariant(of canonicalSignature: Data) -> Data {

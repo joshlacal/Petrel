@@ -10,9 +10,11 @@ public struct ServiceJWTClaims: Codable, Sendable, Equatable {
     public let exp: Int64
     public let lxm: String?
     public let jti: String?
+    public let requestBodyDigest: String?
 
     enum CodingKeys: String, CodingKey {
         case iss, aud, iat, exp, lxm, jti
+        case requestBodyDigest = "req"
     }
 
     public init(
@@ -21,7 +23,8 @@ public struct ServiceJWTClaims: Codable, Sendable, Equatable {
         iat: Int64? = nil,
         exp: Int64,
         lxm: String? = nil,
-        jti: String? = nil
+        jti: String? = nil,
+        requestBodyDigest: String? = nil
     ) {
         self.iss = iss
         self.aud = aud
@@ -29,6 +32,7 @@ public struct ServiceJWTClaims: Codable, Sendable, Equatable {
         self.exp = exp
         self.lxm = lxm
         self.jti = jti
+        self.requestBodyDigest = requestBodyDigest
     }
 }
 
@@ -94,6 +98,7 @@ public enum ServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: ServiceJWTSigningKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
@@ -102,6 +107,7 @@ public enum ServiceJWT {
               isPrintable(audience, maximumBytes: 4096),
               isValidNSID(method),
               isPrintable(eventID, maximumBytes: 256),
+              validServiceRequestBodyDigest(requestBodyDigest),
               lifetime > 0, lifetime <= maximumLifetime,
               lifetime.rounded(.towardZero) == lifetime,
               now.timeIntervalSince1970.isFinite else {
@@ -127,9 +133,9 @@ public enum ServiceJWT {
             iat: iat,
             exp: exp,
             lxm: method,
-            jti: eventID
+            jti: eventID,
+            requestBodyDigest: requestBodyDigest
         )
-
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
         let headerData = try encoder.encode(Header(alg: alg, typ: "JWT"))
@@ -161,6 +167,7 @@ public enum ServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: P256.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
@@ -170,6 +177,7 @@ public enum ServiceJWT {
             audience: audience,
             method: method,
             eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
             key: .p256(key),
             now: now,
             lifetime: lifetime
@@ -181,6 +189,7 @@ public enum ServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: secp256k1.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
@@ -190,6 +199,7 @@ public enum ServiceJWT {
             audience: audience,
             method: method,
             eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
             key: .secp256k1(key),
             now: now,
             lifetime: lifetime
@@ -201,6 +211,7 @@ public enum ServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: P256.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
@@ -210,6 +221,7 @@ public enum ServiceJWT {
             audience: audience,
             method: method,
             eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
             key: .p256(key),
             now: now,
             lifetime: lifetime
@@ -221,6 +233,7 @@ public enum ServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: secp256k1.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
@@ -230,6 +243,7 @@ public enum ServiceJWT {
             audience: audience,
             method: method,
             eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
             key: .secp256k1(key),
             now: now,
             lifetime: lifetime
@@ -251,6 +265,7 @@ public enum ServiceJWT {
         publicKey: ATProtoJWTVerificationKey,
         expectedAudience: String? = nil,
         expectedMethod: String? = nil,
+        expectedRequestBodyDigest: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -270,6 +285,11 @@ public enum ServiceJWT {
         if let expectedMethod {
             guard parsed.claims.lxm == expectedMethod else {
                 throw PetrelCryptoError.unauthorized("service authentication method mismatch")
+            }
+        }
+        if let expectedRequestBodyDigest {
+            guard parsed.claims.requestBodyDigest == expectedRequestBodyDigest else {
+                throw PetrelCryptoError.unauthorized("service authentication request body digest mismatch")
             }
         }
         guard try publicKey.verify(
@@ -315,6 +335,7 @@ public enum ServiceJWT {
         publicKey: PLCDIDVerificationKey,
         expectedAudience: String? = nil,
         expectedMethod: String? = nil,
+        expectedRequestBodyDigest: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -324,6 +345,7 @@ public enum ServiceJWT {
             publicKey: ATProtoJWTVerificationKey(publicKey),
             expectedAudience: expectedAudience,
             expectedMethod: expectedMethod,
+            expectedRequestBodyDigest: expectedRequestBodyDigest,
             now: now,
             clockSkew: clockSkew,
             maximumLifetime: maximumLifetime
@@ -335,6 +357,7 @@ public enum ServiceJWT {
         didKey: String,
         expectedAudience: String? = nil,
         expectedMethod: String? = nil,
+        expectedRequestBodyDigest: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -345,6 +368,7 @@ public enum ServiceJWT {
             publicKey: key,
             expectedAudience: expectedAudience,
             expectedMethod: expectedMethod,
+            expectedRequestBodyDigest: expectedRequestBodyDigest,
             now: now,
             clockSkew: clockSkew,
             maximumLifetime: maximumLifetime
@@ -391,9 +415,15 @@ public enum ServiceJWT {
               serviceIssuerDID(claims.iss) != nil,
               validServiceAudience(claims.aud),
               validServiceMethod(claims.lxm ?? ""),
-              validServiceEventID(claims.jti ?? "") else {
+              validServiceEventID(claims.jti ?? ""),
+              validServiceRequestBodyDigest(claims.requestBodyDigest) else {
             throw PetrelCryptoError.unauthorized("service authentication token is invalid")
         }
+    }
+
+    private static func validServiceRequestBodyDigest(_ value: String?) -> Bool {
+        guard let value else { return true }
+        return !value.isEmpty && value.utf8.count <= 4_096 && value.utf8.allSatisfy { $0 >= 0x21 && $0 <= 0x7e }
     }
 
     public static func isNSID(_ value: String) -> Bool { isValidNSID(value) }
@@ -584,6 +614,7 @@ public enum ProxyServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: P256.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = maximumLifetime
@@ -593,6 +624,7 @@ public enum ProxyServiceJWT {
             audience: audience,
             method: method,
             eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
             key: .p256(key),
             now: now,
             lifetime: lifetime
@@ -604,6 +636,7 @@ public enum ProxyServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: secp256k1.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = maximumLifetime
@@ -613,6 +646,7 @@ public enum ProxyServiceJWT {
             audience: audience,
             method: method,
             eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
             key: .secp256k1(key),
             now: now,
             lifetime: lifetime
@@ -636,6 +670,7 @@ public enum SpaceServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: P256.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = lifetime
@@ -645,6 +680,7 @@ public enum SpaceServiceJWT {
             audience: audience,
             method: method,
             eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
             key: .p256(key),
             now: now,
             lifetime: lifetime
@@ -656,6 +692,7 @@ public enum SpaceServiceJWT {
         audience: String,
         method: String,
         eventID: String,
+        requestBodyDigest: String? = nil,
         key: secp256k1.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = lifetime
@@ -665,6 +702,7 @@ public enum SpaceServiceJWT {
             audience: audience,
             method: method,
             eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
             key: .secp256k1(key),
             now: now,
             lifetime: lifetime
@@ -680,6 +718,7 @@ public enum SpaceServiceJWT {
         publicKey: ATProtoJWTVerificationKey,
         expectedAudience: String? = nil,
         expectedMethod: String? = nil,
+        expectedRequestBodyDigest: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -689,6 +728,7 @@ public enum SpaceServiceJWT {
             publicKey: publicKey,
             expectedAudience: expectedAudience,
             expectedMethod: expectedMethod,
+            expectedRequestBodyDigest: expectedRequestBodyDigest,
             now: now,
             clockSkew: clockSkew,
             maximumLifetime: maximumLifetime
@@ -700,6 +740,7 @@ public enum SpaceServiceJWT {
         publicKey: PLCDIDVerificationKey,
         expectedAudience: String? = nil,
         expectedMethod: String? = nil,
+        expectedRequestBodyDigest: String? = nil,
         now: Date = Date(),
         clockSkew: TimeInterval = 60,
         maximumLifetime: TimeInterval = 5 * 60
@@ -709,6 +750,7 @@ public enum SpaceServiceJWT {
             publicKey: publicKey,
             expectedAudience: expectedAudience,
             expectedMethod: expectedMethod,
+            expectedRequestBodyDigest: expectedRequestBodyDigest,
             now: now,
             clockSkew: clockSkew,
             maximumLifetime: maximumLifetime
