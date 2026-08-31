@@ -343,6 +343,9 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         }
     }
 
+    // swift-corelibs-foundation does not support server-trust authentication
+    // methods; transport rebinding is still enforced via task metrics on Linux.
+    #if canImport(Darwin)
     package nonisolated func urlSession(
         _ session: URLSession,
         task: URLSessionTask,
@@ -366,6 +369,7 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             completionHandler(.performDefaultHandling, nil)
         }
     }
+    #endif
 
     package nonisolated func urlSession(
         _ session: URLSession,

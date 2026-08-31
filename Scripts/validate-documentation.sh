@@ -88,7 +88,6 @@ typecheck_documentation_examples() {
                     -target "$target" \
                     -I "$example_bin_path/Modules" \
                     -Xcc -fmodule-map-file="$example_bin_path/CAsyncDNSResolver.build/module.modulemap" \
-                    -Xcc -fmodule-map-file="$scratch_path/checkouts/zlib/Sources/Zlib/module.modulemap" \
                     -Xcc -fmodule-map-file="$example_bin_path/secp256k1_bindings.build/module.modulemap" \
                     -Xcc -I \
                     -Xcc "$scratch_path/checkouts/swift-async-dns-resolver/Sources/CAsyncDNSResolver/include" \
