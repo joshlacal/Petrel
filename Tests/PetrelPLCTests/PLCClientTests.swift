@@ -708,9 +708,13 @@ final class PLCClientTests: XCTestCase {
 
     func testURLSessionPLCTransportPreCancelledTaskCompletesWithCancellationError() async throws {
         MockPLCHTTPURLProtocol.reset()
+        // Darwin's URLSession never starts a pre-cancelled task, so stopLoading
+        // must not fire; swift-corelibs-foundation starts it and stops it.
+        #if canImport(Darwin)
         let stopExpectation = expectation(description: "stopLoading must not be called on pre-cancelled task")
         stopExpectation.isInverted = true
         MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
+        #endif
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
@@ -749,7 +753,9 @@ final class PLCClientTests: XCTestCase {
             XCTFail("Expected CancellationError, got \(error)")
         }
 
+        #if canImport(Darwin)
         await fulfillment(of: [stopExpectation], timeout: 0.1)
+        #endif
         // Darwin's URLSession never starts (so never stops) a pre-cancelled task;
         // swift-corelibs-foundation starts it and then invokes stopLoading.
         #if canImport(Darwin)
