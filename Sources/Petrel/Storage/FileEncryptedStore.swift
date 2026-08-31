@@ -269,7 +269,7 @@
             let tempURL = storageDirectory.appendingPathComponent(".tmp.\(UUID().uuidString)")
 
             // Write temporary file with owner-only 0600 permissions
-            try combined.write(to: tempURL, options: .atomicWrite)
+            try combined.write(to: tempURL, options: .atomic)
             _ = chmod(tempURL.path, 0o600)
 
             if operations.rename(tempURL.path, targetURL.path) != 0 {

@@ -199,6 +199,14 @@ enum ContentDecoding {
     private static func decompressZlib(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
         nil
     }
+
+    private static func decompressDeflate(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+        nil
+    }
+
+    private static func decompressGzip(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+        nil
+    }
     #endif
 }
 
