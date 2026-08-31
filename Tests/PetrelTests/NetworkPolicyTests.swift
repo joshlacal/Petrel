@@ -536,6 +536,10 @@ struct NetworkPolicyTests {
         #expect(sanitizedDID.hasPrefix("/did:plc:12345/data"))
     }
 
+    // URLSessionTask(Transaction)Metrics.init() is unsupported on macOS (deprecated
+    // 10.15, fatalErrors at runtime), so the stub-based rebinding test only exists
+    // on platforms where the initializer works.
+    #if !os(macOS)
     @Test("DNS answer change causes request failure (SSRF / TOCTOU mitigation)")
     func dnsRebindingRejection() async throws {
         let delegate = HardenedURLSessionDelegate()
@@ -570,6 +574,7 @@ struct NetworkPolicyTests {
         #expect(isViolation, "Expected connection to 127.0.0.1 to be flagged as security violation")
         #expect(delegate.contextManager.hasAnySecurityViolation())
     }
+    #endif
     @Test("Transport DNS resolver rejects public-to-private rebinding")
     func transportResolverRejectsPrivateRebinding() {
         let approved: Set<String> = ["93.184.216.34"]
