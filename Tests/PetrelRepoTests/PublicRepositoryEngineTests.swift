@@ -15,7 +15,7 @@ final class PublicRepositoryEngineTests: XCTestCase {
         let path = try path("first")
         let record = post("hello")
         let expectedRecord = try PublicRepositoryRecordCodec.prepare(record, for: path)
-        let signer = CountingEngineSigner(key: fixture.key)
+        let signer = try CountingEngineSigner(rawKey: fixture.key.rawRepresentation)
         let batch = try PublicRepositoryWriteBatch(writes: [
             .create(path: path, record: record),
         ])
@@ -98,7 +98,7 @@ final class PublicRepositoryEngineTests: XCTestCase {
         let originalCID = first.recordResults[0].recordCID!
         let deletedCID = first.recordResults[1].recordCID!
         let createdPath = try path("created")
-        let signer = CountingEngineSigner(key: fixture.key)
+        let signer = try CountingEngineSigner(rawKey: fixture.key.rawRepresentation)
         let batch = try PublicRepositoryWriteBatch(
             writes: [
                 .update(path: originalPath, record: post("two"), expectedRecordCID: originalCID),
@@ -143,7 +143,7 @@ final class PublicRepositoryEngineTests: XCTestCase {
         let base = try fixture.blocks.adding(first.newBlocks.blocks)
         let currentCID = first.recordResults[0].recordCID!
 
-        let successfulSigner = CountingEngineSigner(key: fixture.key)
+        let successfulSigner = try CountingEngineSigner(rawKey: fixture.key.rawRepresentation)
         let success = try await PublicRepositoryEngine.apply(
             repositoryDID: did,
             currentState: first.state,
@@ -231,7 +231,7 @@ final class PublicRepositoryEngineTests: XCTestCase {
             ),
         ]
         for (expected, repositoryDID, batch, revision) in cases {
-            let signer = CountingEngineSigner(key: fixture.key)
+            let signer = try CountingEngineSigner(rawKey: fixture.key.rawRepresentation)
             do {
                 _ = try await PublicRepositoryEngine.apply(
                     repositoryDID: repositoryDID,
@@ -290,7 +290,7 @@ final class PublicRepositoryEngineTests: XCTestCase {
             writes: [.create(path: recordPath, record: post("one"))]
         )
         let base = try fixture.blocks.adding(first.newBlocks.blocks)
-        let signer = CountingEngineSigner(key: fixture.key)
+        let signer = try CountingEngineSigner(rawKey: fixture.key.rawRepresentation)
         let result = try await PublicRepositoryEngine.apply(
             repositoryDID: did,
             currentState: first.state,
@@ -312,7 +312,7 @@ final class PublicRepositoryEngineTests: XCTestCase {
 
     func testMissingBaseMSTMapsToTypedFailureBeforeSigning() async throws {
         let fixture = try makeEmptyFixture()
-        let signer = CountingEngineSigner(key: fixture.key)
+        let signer = try CountingEngineSigner(rawKey: fixture.key.rawRepresentation)
         let onlyCommit = try PublicRepositoryBlockMap(blocks: fixture.blocks.blocks.filter {
             $0.cid == fixture.state.commitCID
         })
@@ -341,7 +341,7 @@ final class PublicRepositoryEngineTests: XCTestCase {
         let secondPath = try path("large-b")
         let largeA = post(String(repeating: "a", count: 999_800))
         let largeB = post(String(repeating: "b", count: 999_800))
-        let signer = CountingEngineSigner(key: fixture.key)
+        let signer = try CountingEngineSigner(rawKey: fixture.key.rawRepresentation)
         let batch = try PublicRepositoryWriteBatch(writes: [
             .create(path: firstPath, record: largeA),
             .create(path: secondPath, record: largeB),
@@ -424,7 +424,7 @@ final class PublicRepositoryEngineTests: XCTestCase {
             blocks: fixture.blocks,
             revision: revision,
             batch: try PublicRepositoryWriteBatch(writes: writes),
-            signer: CountingEngineSigner(key: fixture.key)
+            signer: try CountingEngineSigner(rawKey: fixture.key.rawRepresentation)
         )
     }
 
@@ -442,7 +442,9 @@ final class PublicRepositoryEngineTests: XCTestCase {
         file: StaticString = #filePath,
         line: UInt = #line
     ) async {
-        let signer = CountingEngineSigner(key: fixture.key)
+        guard let signer = try? CountingEngineSigner(rawKey: fixture.key.rawRepresentation) else {
+            return XCTFail("failed to reconstruct signing key", file: file, line: line)
+        }
         do {
             _ = try await PublicRepositoryEngine.apply(
                 repositoryDID: did,
@@ -503,8 +505,8 @@ private actor CountingEngineSigner: PublicRepositoryCommitSigner {
     private let key: P256.Signing.PrivateKey
     private(set) var callCount = 0
 
-    init(key: P256.Signing.PrivateKey) {
-        self.key = key
+    init(rawKey: Data) throws {
+        key = try P256.Signing.PrivateKey(rawRepresentation: rawKey)
     }
 
     func sign(unsignedCommitBytes: Data) async throws -> Data {

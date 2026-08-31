@@ -40,7 +40,7 @@ final class PublicRepositoryCommitTests: XCTestCase {
     }
 
     func testPrepareSignsExactCanonicalBytesExactlyOnceAndKeepsMetadataOffWire() async throws {
-        let signer = RecordingSigner(key: try fixedKey())
+        let signer = try RecordingSigner(rawKey: fixedKey().rawRepresentation)
         let root = CID.fromDAGCBOR(PublicRepositoryGenesisCodec.canonicalEmptyMST)
         let prepared = try await PublicRepositoryCommitCodec.prepare(
             did: did,
@@ -421,8 +421,8 @@ private actor RecordingSigner: PublicRepositoryCommitSigner {
     private let key: P256.Signing.PrivateKey
     private(set) var calls: [Data] = []
 
-    init(key: P256.Signing.PrivateKey) {
-        self.key = key
+    init(rawKey: Data) throws {
+        key = try P256.Signing.PrivateKey(rawRepresentation: rawKey)
     }
 
     func sign(unsignedCommitBytes: Data) async throws -> Data {
