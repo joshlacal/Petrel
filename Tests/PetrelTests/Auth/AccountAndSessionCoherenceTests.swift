@@ -317,26 +317,29 @@ struct AccountAndSessionCoherenceTests {
                 }
             }
 
-            let storage2Result = Mutex<String?>(nil)
-            try await withThrowingTaskGroup(of: Void.self) { group in
+            var storage2Result: String??
+            try await withThrowingTaskGroup(of: String??.self) { group in
                 group.addTask {
                     let res1 = try await storage1.getGatewaySession(for: testDID)
                     #expect(res1 == "legacy-secret-session")
+                    return nil
                 }
                 group.addTask {
                     await storeStarted.wait()
                     // While storage1 is persisting the migrated session (active claim in flight),
                     // storage2 calls getGatewaySession. It must NOT start a concurrent migration attempt.
                     let res2 = try await storage2.getGatewaySession(for: testDID)
-                    storage2Result.withLock { $0 = res2 }
                     storeContinue.signal()
+                    return .some(res2)
                 }
-                try await group.waitForAll()
+                for try await result in group {
+                    if let observed = result { storage2Result = observed }
+                }
             }
             backend.beforeStore = nil
 
             // While migration was in flight, storage2 saw the in-flight claim and returned nil
-            #expect(storage2Result.withLock { $0 } == nil, "Concurrent read while migration is in-flight must respect active claim and return nil")
+            #expect(storage2Result == .some(nil), "Concurrent read while migration is in-flight must respect active claim and return nil")
 
             // After storage1 commits migration to per-DID storage, subsequent reads on storage2 return the migrated session
             let postMigrationRead = try await storage2.getGatewaySession(for: testDID)
