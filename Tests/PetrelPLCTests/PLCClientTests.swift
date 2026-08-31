@@ -750,8 +750,12 @@ final class PLCClientTests: XCTestCase {
         }
 
         await fulfillment(of: [stopExpectation], timeout: 0.1)
+        // Darwin's URLSession never starts (so never stops) a pre-cancelled task;
+        // swift-corelibs-foundation starts it and then invokes stopLoading.
+        #if canImport(Darwin)
         XCTAssertFalse(MockPLCHTTPURLProtocol.isStopLoadingCalled)
         XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 0)
+        #endif
         XCTAssertEqual(transport.lastAcceptedBytes, 0)
     }
 

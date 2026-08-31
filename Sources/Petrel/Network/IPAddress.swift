@@ -58,6 +58,13 @@ struct IPAddress: Sendable {
             if Self.isValidIPv4(suffix) {
                 return suffix
             }
+            // Hex form: ::ffff:7f00:1 == ::ffff:127.0.0.1
+            let groups = suffix.split(separator: ":")
+            if groups.count == 2,
+               let hi = UInt16(groups[0], radix: 16),
+               let lo = UInt16(groups[1], radix: 16) {
+                return "\(hi >> 8).\(hi & 0xFF).\(lo >> 8).\(lo & 0xFF)"
+            }
         }
         return ip
     }
