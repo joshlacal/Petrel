@@ -30,4 +30,3 @@ the internal services directly.
 ### Identifier and Record Utilities
 
 - ``TIDGenerator``
-- ``CID``

@@ -254,7 +254,8 @@ actor CABOAuthStrategy: AuthStrategy {
         guard let keyData = oauthState.ephemeralDPoPKey else { throw AuthError.dpopKeyError }
         let ephemeralKey = try P256.Signing.PrivateKey(rawRepresentation: keyData)
 
-        let jwk = try await core.createJWK(from: ephemeralKey)
+        let jwk = try await core.createJWK(
+                    from: P256.Signing.PrivateKey(rawRepresentation: ephemeralKey.rawRepresentation))
         let thumbprint = try await core.calculateJWKThumbprint(jwk: jwk)
         guard thumbprint == expectedJKT else {
             throw AuthError.dpopKeyError
@@ -539,7 +540,8 @@ actor CABOAuthStrategy: AuthStrategy {
         let stateToken = UUID().uuidString
         let ephemeralKey = P256.Signing.PrivateKey()
 
-        let jwk = try await core.createJWK(from: ephemeralKey)
+        let jwk = try await core.createJWK(
+                    from: P256.Signing.PrivateKey(rawRepresentation: ephemeralKey.rawRepresentation))
         let dpopJKT = try await core.calculateJWKThumbprint(jwk: jwk)
 
         let oauthConfig = core.oauthConfig
