@@ -4,6 +4,9 @@
   @preconcurrency import Crypto
 #endif
 import Foundation
+#if canImport(FoundationNetworking)
+  import FoundationNetworking
+#endif
 import Hummingbird
 import PetrelCrypto
 import Logging
