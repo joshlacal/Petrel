@@ -634,7 +634,7 @@ private final class TestBox<T>: @unchecked Sendable {
 }
 
 // MARK: - Mock URLProtocol for DID Tests
-private final class DIDTestURLProtocol: URLProtocol, @unchecked Sendable {
+private final class DIDTestURLProtocol: URLProtocol {
     typealias RouteHandler = @Sendable (URLRequest) -> (statusCode: Int, body: Data, headers: [String: String])
 
     private static let lock = NSLock()
@@ -689,3 +689,9 @@ private final class DIDTestURLProtocol: URLProtocol, @unchecked Sendable {
 
     override func stopLoading() {}
 }
+
+// Older toolchains require the explicit conformance for strict-concurrency;
+// newer SDKs mark URLProtocol's inherited Sendable unavailable and warn on it.
+#if compiler(<6.2)
+extension DIDTestURLProtocol: @unchecked Sendable {}
+#endif

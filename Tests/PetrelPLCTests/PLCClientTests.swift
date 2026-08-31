@@ -87,7 +87,7 @@ final class PLCClientTests: XCTestCase {
                 origin: URL(string: "http://127.0.0.1:2582")!
             ),
         ] {
-            let client = try PLCDirectoryClient(
+            let client = PLCDirectoryClient(
                 configuration: configuration,
                 transport: RecordingPLCTransport(responses: [response])
             )
@@ -131,7 +131,7 @@ final class PLCClientTests: XCTestCase {
                 maximumSubmitResponseBytes: 64
             )
             let transport = RecordingPLCTransport(responses: [response])
-            let client = try PLCDirectoryClient(
+            let client = PLCDirectoryClient(
                 configuration: configuration,
                 transport: transport
             )

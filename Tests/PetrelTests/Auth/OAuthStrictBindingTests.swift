@@ -5,7 +5,7 @@ import Testing
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
-private final class OAuthBindingTestURLProtocol: URLProtocol, @unchecked Sendable {
+private final class OAuthBindingTestURLProtocol: URLProtocol {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> (HTTPURLResponse, Data))?
     private nonisolated(unsafe) static var requests: [URLRequest] = []
@@ -1061,3 +1061,9 @@ struct OAuthStrictBindingTests {
         }
     }
 }
+
+// Older toolchains require the explicit conformance for strict-concurrency;
+// newer SDKs mark URLProtocol's inherited Sendable unavailable and warn on it.
+#if compiler(<6.2)
+extension OAuthBindingTestURLProtocol: @unchecked Sendable {}
+#endif

@@ -5,7 +5,7 @@ import Testing
     import FoundationNetworking
 #endif
 
-private final class GatewayLoginTestURLProtocol: URLProtocol, @unchecked Sendable {
+private final class GatewayLoginTestURLProtocol: URLProtocol {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var handler: (@Sendable (URLRequest) -> (HTTPURLResponse, Data))?
     private nonisolated(unsafe) static var requests: [URLRequest] = []
@@ -824,3 +824,9 @@ struct GatewayLoginSessionSwapTests {
         }
     }
 }
+
+// Older toolchains require the explicit conformance for strict-concurrency;
+// newer SDKs mark URLProtocol's inherited Sendable unavailable and warn on it.
+#if compiler(<6.2)
+extension GatewayLoginTestURLProtocol: @unchecked Sendable {}
+#endif

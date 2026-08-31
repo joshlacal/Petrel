@@ -51,7 +51,7 @@ final class ReferenceRepositorySurfaceTests: XCTestCase {
 
     func testMissingBlobListingIsPaginatedAndDoesNotMaterializeUnboundedInput() async throws {
         let cid = CID.fromDAGCBOR(Data([0xa0]))
-        let surface = try PublicRepositoryReferenceSurface(
+        _ = try PublicRepositoryReferenceSurface(
             did: "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
             revision: "3jzfc6r5bqg2a",
             blocks: [], records: [], maximumPageSize: 2
@@ -177,7 +177,7 @@ final class ReferenceRepositorySurfaceTests: XCTestCase {
     }
 
     private func makeBlocks(count: Int) throws -> [PublicRepositoryBlock] {
-        try (0..<count).map { index in
+        (0..<count).map { index in
             let data = Data([0xa1, 0x61, 0x69, UInt8(index)])
             let cid = CID.fromDAGCBOR(data)
             return PublicRepositoryBlock(cid: cid, bytes: data)

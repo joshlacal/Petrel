@@ -348,7 +348,7 @@ final class FirehoseFrameEncoderTests: XCTestCase {
       cid: nil,
       prev: nil
     )
-    for (index, op) in [createWithPrev, updateWithoutPrev, deleteWithCID, deleteWithoutPrev].enumerated() {
+    for op in [createWithPrev, updateWithoutPrev, deleteWithCID, deleteWithoutPrev] {
       let material = commitMaterial(since: nil, prevData: nil, ops: [op], commitCID: commitCID)
       XCTAssertThrowsError(
         try FirehoseFrameEncoder.commitFrame(seq: 1, material: material, diffCAR: Data())

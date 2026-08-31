@@ -622,7 +622,7 @@ private func makeGzipPayload(_ uncompressed: Data) -> Data {
     #endif
 }
 
-private final class PolicyTestURLProtocol: URLProtocol, @unchecked Sendable {
+private final class PolicyTestURLProtocol: URLProtocol {
     typealias Handler = @Sendable (URLRequest) async -> (HTTPURLResponse, Data)?
     private static let lock = NSLock()
     private nonisolated(unsafe) static var handlers: [String: Handler] = [:]
@@ -667,25 +667,40 @@ private final class PolicyTestURLProtocol: URLProtocol, @unchecked Sendable {
             return
         }
 
+        let box = UncheckedSendableBox(self)
         Task {
-            if let (response, data) = await handler(request) {
+            let proto = box.value
+            if let (response, data) = await handler(proto.request) {
                 if (300 ..< 400).contains(response.statusCode),
                    let location = response.allHeaderFields["Location"] as? String,
-                   let redirectURL = URL(string: location, relativeTo: request.url)
+                   let redirectURL = URL(string: location, relativeTo: proto.request.url)
                 {
-                    var redirectReq = request
+                    var redirectReq = proto.request
                     redirectReq.url = redirectURL
-                    client?.urlProtocol(self, wasRedirectedTo: redirectReq, redirectResponse: response)
+                    proto.client?.urlProtocol(proto, wasRedirectedTo: redirectReq, redirectResponse: response)
                     return
                 }
-                client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-                client?.urlProtocol(self, didLoad: data)
-                client?.urlProtocolDidFinishLoading(self)
+                proto.client?.urlProtocol(proto, didReceive: response, cacheStoragePolicy: .notAllowed)
+                proto.client?.urlProtocol(proto, didLoad: data)
+                proto.client?.urlProtocolDidFinishLoading(proto)
             } else {
-                client?.urlProtocol(self, didFailWithError: URLError(.badServerResponse))
+                proto.client?.urlProtocol(proto, didFailWithError: URLError(.badServerResponse))
             }
         }
     }
 
     override func stopLoading() {}
+}
+
+// Older toolchains require the explicit conformance for strict-concurrency;
+// newer SDKs mark URLProtocol's inherited Sendable unavailable and warn on it.
+#if compiler(<6.2)
+extension PolicyTestURLProtocol: @unchecked Sendable {}
+#endif
+
+/// Carries a non-Sendable value across a task boundary in tests where the
+/// URLProtocol machinery guarantees exclusive access.
+private final class UncheckedSendableBox<T>: @unchecked Sendable {
+    let value: T
+    init(_ value: T) { self.value = value }
 }
