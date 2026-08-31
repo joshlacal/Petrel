@@ -500,7 +500,7 @@ enum PetrelLoadCLI {
     ) throws -> String? {
         if let prompt {
             print(prompt, terminator: "")
-            fflush(stdout)
+            fflush(nil)
         }
 
         let isTTY = isattyFn(descriptor) != 0
@@ -524,7 +524,7 @@ enum PetrelLoadCLI {
             defer {
                 _ = tcsetattrFn(descriptor, TCSANOW, &originalTermios)
                 print("")
-                fflush(stdout)
+                fflush(nil)
             }
 
             return readLineFromDescriptor(descriptor)
