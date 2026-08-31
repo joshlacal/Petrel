@@ -11,7 +11,7 @@ sealed interface {{ union_name }} {
 
 object {{ union_name }}Serializer : kotlinx.serialization.KSerializer<{{ union_name }}> {
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-        kotlinx.serialization.descriptors.buildClassSerialDescriptor("{{ union_name }}")
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("{{ union_name | escapeStringLiteral }}")
 
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: {{ union_name }}) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
@@ -20,7 +20,7 @@ object {{ union_name }}Serializer : kotlinx.serialization.KSerializer<{{ union_n
             is {{ union_name }}.{{ variant.short_name }} -> {
                 val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.{{ variant.type }}.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("{{ variant.lexicon_ref }}")
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("{{ variant.lexicon_ref | escapeStringLiteral }}")
                 })
             }
             {% endfor %}
@@ -44,7 +44,7 @@ object {{ union_name }}Serializer : kotlinx.serialization.KSerializer<{{ union_n
 
         return when (type) {
             {% for variant in variants %}
-            "{{ variant.lexicon_ref }}" -> {{ union_name }}.{{ variant.short_name }}(
+            "{{ variant.lexicon_ref | escapeStringLiteral }}" -> {{ union_name }}.{{ variant.short_name }}(
                 jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.{{ variant.type }}.serializer(), element)
             )
             {% endfor %}

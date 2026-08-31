@@ -284,7 +284,7 @@ public enum RelayFrameDecoder {
   }
 }
 
-private indirect enum RelayCBORValue {
+indirect enum RelayCBORValue {
   case unsigned(UInt64)
   case signed(Int64)
   case text(String)
@@ -296,7 +296,7 @@ private indirect enum RelayCBORValue {
   case cidLink(CID)
 }
 
-private struct RelayCBORMap {
+struct RelayCBORMap {
   private let storage: [String: RelayCBORValue]
 
   init(_ entries: [(String, RelayCBORValue)]) {
@@ -327,7 +327,7 @@ private struct RelayCBORMap {
   }
 }
 
-private enum RelayCBORReaderError: Error {
+enum RelayCBORReaderError: Error, Equatable {
   case truncated
   case invalid
   case nonCanonical
@@ -343,9 +343,10 @@ private enum RelayCBORReaderError: Error {
   }
 }
 
-private struct CanonicalRelayCBORReader {
+struct CanonicalRelayCBORReader {
   private let bytes: [UInt8]
   private var offset = 0
+  private var nodeCount = 0
 
   init(_ data: Data) {
     bytes = Array(data)
@@ -354,7 +355,9 @@ private struct CanonicalRelayCBORReader {
   var isAtEnd: Bool { offset == bytes.count }
 
   mutating func read(depth: Int = 0) throws -> RelayCBORValue {
-    guard depth <= 64 else { throw RelayCBORReaderError.invalid }
+    guard depth <= FirehoseFrameLimits.maximumDepth else { throw RelayCBORReaderError.invalid }
+    nodeCount += 1
+    guard nodeCount <= FirehoseFrameLimits.maximumAggregateNodes else { throw RelayCBORReaderError.invalid }
     guard let initial = readByte() else { throw RelayCBORReaderError.truncated }
     let major = initial >> 5
     let argument = try readArgument(initial)
@@ -372,13 +375,22 @@ private struct CanonicalRelayCBORReader {
       }
       return .text(text)
     case 4:
-      guard argument <= 1_000_000 else { throw RelayCBORReaderError.invalid }
+      let remainingBytes = bytes.count - offset
+      guard argument <= UInt64(remainingBytes) else { throw RelayCBORReaderError.truncated }
+      guard UInt64(nodeCount) + argument <= UInt64(FirehoseFrameLimits.maximumAggregateNodes) else {
+        throw RelayCBORReaderError.invalid
+      }
       var values: [RelayCBORValue] = []
-      values.reserveCapacity(Int(argument))
+      values.reserveCapacity(min(Int(argument), 128))
       for _ in 0 ..< argument { values.append(try read(depth: depth + 1)) }
       return .array(values)
     case 5:
       guard argument <= 128 else { throw RelayCBORReaderError.invalid }
+      let remainingBytes = bytes.count - offset
+      guard argument * 2 <= UInt64(remainingBytes) else { throw RelayCBORReaderError.truncated }
+      guard UInt64(nodeCount) + argument * 2 <= UInt64(FirehoseFrameLimits.maximumAggregateNodes) else {
+        throw RelayCBORReaderError.invalid
+      }
       var entries: [(String, RelayCBORValue)] = []
       entries.reserveCapacity(Int(argument))
       var previous: Data?

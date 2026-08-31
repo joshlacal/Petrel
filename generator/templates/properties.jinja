@@ -89,18 +89,18 @@
             {% if prop.required_nullable -%}
             if let value = {{ prop.name|sanitizeKeyword }} {
                 let {{ prop.name }}Value = try value.toCBORValue()
-                map = map.adding(key: "{{ prop.name }}", value: {{ prop.name }}Value)
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ prop.name }}Value)
             } else {
-                map = map.adding(key: "{{ prop.name }}", value: NSNull())
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: NSNull())
             }
             {%- elif prop.optional -%}
             if let value = {{ prop.name|sanitizeKeyword }} {
                 let {{ prop.name }}Value = try value.toCBORValue()
-                map = map.adding(key: "{{ prop.name }}", value: {{ prop.name }}Value)
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ prop.name }}Value)
             }
             {%- else -%}
             let {{ prop.name }}Value = try {{ prop.name|sanitizeKeyword }}.toCBORValue()
-            map = map.adding(key: "{{ prop.name }}", value: {{ prop.name }}Value)
+            map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ prop.name }}Value)
             {%- endif %}
             {%- endfor %}
             return map

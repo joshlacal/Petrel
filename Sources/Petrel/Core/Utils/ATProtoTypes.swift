@@ -1162,8 +1162,18 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
         guard let regex = nsidRegex else {
             // Fallback validation without regex
             let components = nsid.split(separator: ".")
-            return components.count >= 3 && components.allSatisfy { component in
-                !component.isEmpty && component.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" }
+            guard components.count >= 3,
+                  let first = components.first, let firstChar = first.first, firstChar.isLetter,
+                  let last = components.last, let lastFirstChar = last.first, lastFirstChar.isLetter,
+                  !last.contains("-") else {
+                return false
+            }
+            return components.allSatisfy { component in
+                guard let cFirst = component.first, (cFirst.isLetter || cFirst.isNumber),
+                      let cLast = component.last, (cLast.isLetter || cLast.isNumber) else {
+                    return false
+                }
+                return component.count <= 63 && component.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" }
             }
         }
 

@@ -87,6 +87,37 @@ struct RateLimiterTests {
     // refused — the sweep must not have reset it to a fresh, full bucket.
     #expect(await limiter.allow(key: "k", now: start.addingTimeInterval(10)) == false)
   }
+
+  @Test("Rotating keys stay within hard maxKeys bound via O(1) LRU eviction")
+  func hardCapacityBound() async {
+    let limiter = RateLimiter(requestsPerMinute: 60, maxKeys: 50)
+    let start = Date(timeIntervalSince1970: 6_000_000)
+
+    // Rotate 200 keys within the same instant (inside stale horizon)
+    for i in 0 ..< 200 {
+      #expect(await limiter.allow(key: "jkt-\(i)", now: start) == true)
+    }
+
+    let count = await limiter.bucketCountForTesting
+    #expect(count == 50)
+  }
+
+  @Test("Concurrent rate limiter requests maintain safety and capacity bounds")
+  func concurrentRateLimiting() async {
+    let limiter = RateLimiter(requestsPerMinute: 100, maxKeys: 30)
+    let start = Date()
+
+    await withTaskGroup(of: Void.self) { group in
+      for i in 0 ..< 100 {
+        group.addTask {
+          _ = await limiter.allow(key: "concurrent-\(i % 50)", now: start)
+        }
+      }
+    }
+
+    let count = await limiter.bucketCountForTesting
+    #expect(count == 30)
+  }
 }
 
 @Suite("Rate-limited endpoint")

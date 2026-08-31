@@ -6,6 +6,7 @@ import kotlinx.serialization.json.Json
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class SpaceRefTest {
@@ -28,6 +29,7 @@ class SpaceRefTest {
             val ref = SpaceRef.parse(uri)
             assertEquals(uri, ref.value)
             assertEquals(uri, ref.toString())
+            assertEquals(uri, ref.uriString())
 
             val json = Json.encodeToString(ref)
             assertEquals("\"$uri\"", json)
@@ -125,6 +127,9 @@ class SpaceRefTest {
     fun `SpaceRef component factory routes through full validation`() {
         val valid = SpaceRef.create("did:m:v", "com.example.group", "default")
         assertEquals("at://did:m:v/space/com.example.group/default", valid.value)
+        assertEquals("did:m:v", valid.spaceDID)
+        assertEquals("com.example.group", valid.spaceType)
+        assertEquals("default", valid.skey)
 
         val did2049 = "did:plc:" + "a".repeat(2041)
         assertFailsWith<IllegalArgumentException> {
@@ -145,5 +150,23 @@ class SpaceRefTest {
         assertFailsWith<IllegalArgumentException> {
             SpaceRef.create("did:plc:asdf123", "com.example.group", "..")
         }
+    }
+
+    @Test
+    fun `RecordKey validation matches specification`() {
+        assertTrue(RecordKey.isValidRecordKey("self"))
+        assertTrue(RecordKey.isValidRecordKey("abc123"))
+        assertTrue(RecordKey.isValidRecordKey("test-key_123"))
+        assertTrue(RecordKey.isValidRecordKey("2024-01-01"))
+        assertTrue(RecordKey.isValidRecordKey("rkey:~._-"))
+        assertTrue(RecordKey.isValidRecordKey("a".repeat(512)))
+
+        assertFalse(RecordKey.isValidRecordKey(""))
+        assertFalse(RecordKey.isValidRecordKey("."))
+        assertFalse(RecordKey.isValidRecordKey(".."))
+        assertFalse(RecordKey.isValidRecordKey("has space"))
+        assertFalse(RecordKey.isValidRecordKey("has/slash"))
+        assertFalse(RecordKey.isValidRecordKey("has@invalid"))
+        assertFalse(RecordKey.isValidRecordKey("a".repeat(513)))
     }
 }

@@ -1,3 +1,4 @@
+import os
 import pathlib
 import subprocess
 import sys
@@ -13,6 +14,24 @@ from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
 from cycle_detector import CycleDetector
 
+
+def _gradle_env():
+    env = os.environ.copy()
+    if sys.platform == "darwin":
+        for version in ("21", "17"):
+            try:
+                res = subprocess.run(
+                    ["/usr/libexec/java_home", "-v", version],
+                    capture_output=True,
+                    text=True,
+                    check=False,
+                )
+                if res.returncode == 0 and res.stdout.strip():
+                    env["JAVA_HOME"] = res.stdout.strip()
+                    break
+            except Exception:
+                pass
+    return env
 
 class BoxedStrictRefCycleDetector:
     def should_box_property(self, type_name, property_name):
@@ -541,6 +560,7 @@ class StrictRefUnknownKeysTests(unittest.TestCase):
                     "blue.catbird.petrel.generated.StrictRefGeneratedFixtureTest",
                 ],
                 cwd=GENERATOR_DIR.parent / "kotlin",
+                env=_gradle_env(),
                 capture_output=True,
                 text=True,
             )

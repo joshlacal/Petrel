@@ -2,6 +2,11 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#endif
 import Petrel
 
 actor AuthEventJSONLWriter {
@@ -49,6 +54,33 @@ enum PetrelLoadCLI {
                 "Unexpected argument: \(argument)"
             case let .unknownOption(option):
                 "Unknown option: --\(option)"
+            }
+        }
+    }
+    enum CallbackReadError: Error, Equatable, CustomStringConvertible {
+        case emptyInput
+        case invalidUTF8
+        case whitespaceOnly
+
+        var description: String {
+            switch self {
+            case .emptyInput:
+                "Standard input was empty; expected OAuth callback URL"
+            case .invalidUTF8:
+                "Standard input contained invalid UTF-8 bytes"
+            case .whitespaceOnly:
+                "Standard input contained only whitespace; expected OAuth callback URL"
+            }
+        }
+    }
+
+    enum SecretReaderError: Error, Equatable, CustomStringConvertible {
+        case terminalAttributeError(String)
+
+        var description: String {
+            switch self {
+            case let .terminalAttributeError(message):
+                message
             }
         }
     }
@@ -159,7 +191,8 @@ enum PetrelLoadCLI {
       --redirect-uri <URL>       Callback URI declared by that metadata
       --oauth-start              Start an OAuth flow
       --identifier <handle>      Optional handle for --oauth-start
-      --oauth-complete <URL>     Complete OAuth with the callback URL
+      --oauth-complete -         Complete OAuth with callback URL from standard input
+      --oauth-complete-stdin     Complete OAuth by reading callback URL from standard input
 
     OAuth Stress Testing:
       --oauth-stress                   Run an authenticated load sequence
@@ -193,6 +226,7 @@ enum PetrelLoadCLI {
 
     private static let flagOptions: Set<String> = [
         "keep-running",
+        "oauth-complete-stdin",
         "oauth-start",
         "oauth-stress",
         "simulate-ambiguous-timeout",
@@ -268,6 +302,9 @@ enum PetrelLoadCLI {
         }
         if let mode = args["dpop-test"], !dpopTestModes.contains(mode) {
             throw ArgumentError.invalidValue(option: "dpop-test", value: mode)
+        }
+        if let callback = args["oauth-complete"], callback != "-" {
+            throw ArgumentError.invalidValue(option: "oauth-complete", value: callback)
         }
         if let baseURL = args["base-url"] {
             _ = try validatedBaseURL(baseURL)
@@ -426,11 +463,99 @@ enum PetrelLoadCLI {
         After authorizing in the browser:
         1. The authorization server redirects to '\(configuration.redirectUri)'.
         2. The application registered for that URI must capture the ENTIRE callback URL, including its query string.
-        3. Run the following command with that captured URL:
-           PetrelLoad --namespace \(namespace) --endpoint \(endpoint) --client-id "\(configuration.clientId)" --redirect-uri "\(configuration.redirectUri)" --oauth-complete "<PASTE_CALLBACK_URL>"
+        3. Run PetrelLoad with --oauth-complete-stdin and pass the captured URL via standard input:
+           PetrelLoad --namespace \(namespace) --endpoint \(endpoint) --client-id "\(configuration.clientId)" --redirect-uri "\(configuration.redirectUri)" --oauth-complete-stdin
 
         PetrelLoad exits after printing these instructions; it does not receive the callback itself.
         """
+    }
+
+    static func readCallback(from handle: FileHandle = .standardInput) throws -> String {
+        let data = handle.readDataToEndOfFile()
+        guard !data.isEmpty else {
+            throw CallbackReadError.emptyInput
+        }
+        guard let string = String(data: data, encoding: .utf8) else {
+            throw CallbackReadError.invalidUTF8
+        }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw CallbackReadError.whitespaceOnly
+        }
+        return trimmed
+    }
+
+    static func parseCallbackURL(_ raw: String) -> URL? {
+        let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return nil }
+        return URL(string: trimmed)
+    }
+
+    static func readSecret(
+        from descriptor: Int32 = STDIN_FILENO,
+        prompt: String? = nil,
+        isattyFn: (Int32) -> Int32 = { isatty($0) },
+        tcgetattrFn: (Int32, UnsafeMutablePointer<termios>) -> Int32 = { tcgetattr($0, $1) },
+        tcsetattrFn: (Int32, Int32, UnsafePointer<termios>) -> Int32 = { tcsetattr($0, $1, $2) }
+    ) throws -> String? {
+        if let prompt {
+            print(prompt, terminator: "")
+            fflush(stdout)
+        }
+
+        let isTTY = isattyFn(descriptor) != 0
+        if isTTY {
+            var originalTermios = termios()
+            guard tcgetattrFn(descriptor, &originalTermios) == 0 else {
+                throw SecretReaderError.terminalAttributeError("Failed to inspect terminal attributes for descriptor \(descriptor)")
+            }
+
+            var noEchoTermios = originalTermios
+            #if canImport(Darwin)
+            noEchoTermios.c_lflag &= ~UInt(ECHO)
+            #else
+            noEchoTermios.c_lflag &= ~tcflag_t(ECHO)
+            #endif
+
+            guard tcsetattrFn(descriptor, TCSANOW, &noEchoTermios) == 0 else {
+                throw SecretReaderError.terminalAttributeError("Failed to disable terminal echo for descriptor \(descriptor)")
+            }
+
+            defer {
+                _ = tcsetattrFn(descriptor, TCSANOW, &originalTermios)
+                print("")
+                fflush(stdout)
+            }
+
+            return readLineFromDescriptor(descriptor)
+        }
+        return readLineFromDescriptor(descriptor)
+    }
+
+    private static func readLineFromDescriptor(_ descriptor: Int32) -> String? {
+        var bytes = [UInt8]()
+        var byte: UInt8 = 0
+        while true {
+            let count = read(descriptor, &byte, 1)
+            if count <= 0 {
+                break
+            }
+            if byte == UInt8(ascii: "\n") {
+                break
+            }
+            if byte == UInt8(ascii: "\r") {
+                continue
+            }
+            bytes.append(byte)
+        }
+        if bytes.isEmpty {
+            return nil
+        }
+        guard let string = String(bytes: bytes, encoding: .utf8) else {
+            return nil
+        }
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? nil : trimmed
     }
 
     static func scenarioPlan(
@@ -598,9 +723,18 @@ enum PetrelLoadCLI {
             return
         }
 
-        if let callback = args["oauth-complete"], !callback.isEmpty {
-            guard let url = URL(string: callback) else {
-                throw ScenarioError.commandFailure("Invalid callback URL: \(callback)")
+        let isStdinOAuthComplete = (args["oauth-complete"] == "-") || ((args["oauth-complete-stdin"] ?? "false").lowercased() == "true")
+        if isStdinOAuthComplete {
+            let callback: String
+            do {
+                callback = try readCallback(from: .standardInput)
+            } catch let error as CallbackReadError {
+                throw ScenarioError.commandFailure("Failed to read OAuth callback from standard input: \(error)")
+            } catch {
+                throw ScenarioError.commandFailure("Failed to read OAuth callback: \(error)")
+            }
+            guard let url = parseCallbackURL(callback) else {
+                throw ScenarioError.commandFailure("Standard input did not contain a parsable callback URL (\(callback.count) bytes)")
             }
             do {
                 print("DEBUG - About to call handleOAuthCallback...")

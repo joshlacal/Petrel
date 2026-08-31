@@ -39,6 +39,8 @@ public enum RelayVerifierError: String, Error, Sendable, Equatable, Codable {
   case finalMSTMismatch
   case invalidCaptureManifest
   case missingFinalRepository
+  case revisionRollback
+  case storageFailure
 }
 
 public enum RelayRepoAction: String, Sendable, Equatable, Codable {

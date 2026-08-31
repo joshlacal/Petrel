@@ -8,6 +8,29 @@
 import Crypto
 import Foundation
 import Synchronization
+/// State representing an in-flight gateway login with browser nonce and state token.
+public struct PendingGatewayLoginState: Codable, Equatable, Sendable {
+    public let browserNonce: String
+    public let stateToken: String
+    public let redirectURI: String
+    public let expectedDID: String?
+    public let createdAt: Date
+
+    public init(
+        browserNonce: String,
+        stateToken: String,
+        redirectURI: String,
+        expectedDID: String? = nil,
+        createdAt: Date
+    ) {
+        self.browserNonce = browserNonce
+        self.stateToken = stateToken
+        self.redirectURI = redirectURI
+        self.expectedDID = expectedDID
+        self.createdAt = createdAt
+    }
+}
+
 enum AuthContinuityStorageMutationEvent {
     case willMutate(UUID)
     case didMutate(UUID)
@@ -330,7 +353,6 @@ public actor KeychainStorage {
     public init(namespace: String, accessGroup: String? = nil, accessibility: KeychainAccessibility = .afterFirstUnlockThisDeviceOnly) {
         self.namespace = namespace
         self.accessGroup = accessGroup
-        KeychainManager.configureDefaultAccessGroup(accessGroup)
         KeychainManager.configureAccessibility(accessibility)
     }
 
@@ -1061,21 +1083,6 @@ public actor KeychainStorage {
         return true
     }
 
-    /// Legacy single-session methods for backward compatibility during migration
-    @available(*, deprecated, message: "Use saveGatewaySession(_:for:) for multi-account support")
-    func saveGatewaySession(_ session: String) async throws {
-        try await saveLegacyGatewaySession(session)
-    }
-
-    @available(*, deprecated, message: "Use getGatewaySession(for:) for multi-account support")
-    func getGatewaySession() async throws -> String? {
-        try await getLegacyGatewaySession()
-    }
-
-    @available(*, deprecated, message: "Use deleteGatewaySession(for:) for multi-account support")
-    func deleteGatewaySession() async throws {
-        try await deleteLegacyGatewaySession()
-    }
 
     private func getLegacyGatewaySession() async throws -> String? {
         let key = makeKey("gatewaySession")
@@ -1852,6 +1859,97 @@ public actor KeychainStorage {
         try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
     }
 
+    /// Atomically consumes an OAuth state token: validates age, deletes state, and returns it.
+    /// Replayed or expired state throws without restoring it.
+    public func consumeOAuthState(
+        _ token: String,
+        now: Date = Date(),
+        maximumAge: TimeInterval = 600
+    ) async throws -> OAuthState {
+        let key = makeKey("oauthState", stateToken: token)
+        let data: Data
+        do {
+            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+        } catch {
+            if KeychainManager.isItemNotFound(error) {
+                throw KeychainError.itemRetrievalError(status: KeychainManager.itemNotFoundStatus)
+            }
+            throw error
+        }
+
+        // Synchronously delete state before decoding to eliminate actor-reentrancy windows
+        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+
+        let state = try decoder.decode(OAuthState.self, from: data)
+
+        // Validate age
+        let age = now.timeIntervalSince(state.createdAt)
+        if age < 0 || age > maximumAge {
+            throw KeychainError.expiredState
+        }
+
+        return state
+    }
+
+    // MARK: - Pending Gateway Login State Management
+
+    /// Saves a pending gateway login state to the keychain.
+    public func savePendingGatewayLogin(_ state: PendingGatewayLoginState, for stateKey: String? = nil) async throws {
+        let key = makeKey("pendingGatewayLogin", stateToken: stateKey ?? state.stateToken)
+        let data = try encoder.encode(state)
+        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+    }
+
+    /// Retrieves a pending gateway login state from the keychain.
+    public func getPendingGatewayLogin(for stateToken: String) async throws -> PendingGatewayLoginState? {
+        let key = makeKey("pendingGatewayLogin", stateToken: stateToken)
+        do {
+            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            return try decoder.decode(PendingGatewayLoginState.self, from: data)
+        } catch {
+            if KeychainManager.isItemNotFound(error) { return nil }
+            LogManager.logError("KeychainStorage - Failed to read pending gateway login state: \(error)")
+            throw error
+        }
+    }
+
+    /// Deletes a pending gateway login state from the keychain.
+    public func deletePendingGatewayLogin(for stateToken: String) async throws {
+        let key = makeKey("pendingGatewayLogin", stateToken: stateToken)
+        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+    }
+
+    /// Atomically consumes a pending gateway login state: validates age, deletes state, and returns it.
+    /// Replayed or expired state throws without restoring it.
+    public func consumePendingGatewayLogin(
+        _ token: String,
+        now: Date = Date(),
+        maximumAge: TimeInterval = 600
+    ) async throws -> PendingGatewayLoginState {
+        let key = makeKey("pendingGatewayLogin", stateToken: token)
+        let data: Data
+        do {
+            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+        } catch {
+            if KeychainManager.isItemNotFound(error) {
+                throw KeychainError.itemRetrievalError(status: KeychainManager.itemNotFoundStatus)
+            }
+            throw error
+        }
+
+        // Synchronously delete state before decoding to eliminate actor-reentrancy windows
+        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+
+        let state = try decoder.decode(PendingGatewayLoginState.self, from: data)
+
+        // Validate age
+        let age = now.timeIntervalSince(state.createdAt)
+        if age < 0 || age > maximumAge {
+            throw KeychainError.expiredState
+        }
+
+        return state
+    }
     // MARK: - Session Integrity Validation
 
     /// Validates the integrity of authentication state and fixes inconsistencies.

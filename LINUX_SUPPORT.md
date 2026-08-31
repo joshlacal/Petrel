@@ -42,14 +42,14 @@ When running in headless environments where `LibSecretStore` is unavailable, `Fi
 ### Environment variables
 
 - **`PETREL_MASTER_KEY`**: A base64-encoded 32-byte (256-bit) symmetric encryption key used for AES-GCM operations.
-  - If unset, `FileEncryptedStore` generates an ephemeral key and logs a warning. Secrets encrypted with an ephemeral key cannot be decrypted after the process exits.
+  - Mandatory when running without `LibSecretStore`. Construction fails closed with `missingMasterKey` if unset; ephemeral keys are never generated and key material is never logged.
   - Generate a secure key:
     ```bash
     export PETREL_MASTER_KEY=$(openssl rand -base64 32)
     ```
 - **`PETREL_SECRETS_DIR`**: Path to the directory where encrypted secret files are stored.
-  - If unset, Petrel defaults to `$HOME/.petrel-secrets` (or `/tmp/.petrel-secrets` if `$HOME` is not set).
-  - Ensure this directory has restricted permissions (e.g. `chmod 700`).
+  - If unset, Petrel defaults to `$HOME/.petrel-secrets`. `$HOME` must be set; temporary directory paths (`/tmp`, `/private/tmp`, `/var/tmp`) are unconditionally rejected.
+  - The directory must be owner-only (`0700`) and owned by the running `uid`. Stored secret files are written atomically with owner-only `0600` permissions.
 
 ### Deployment configurations
 
@@ -250,7 +250,7 @@ let client = try await ATProtoClient(
 
 ## Troubleshooting
 
-### "Generated ephemeral master key" log warning
+### "Missing protected master key for file-encrypted storage" (`missingMasterKey`)
 
 - **Cause**: The application is running with `FileEncryptedStore` on a headless system and `PETREL_MASTER_KEY` is not set.
 - **Solution**: Generate a 32-byte base64 key (`openssl rand -base64 32`) and export `PETREL_MASTER_KEY` in your environment or service definition.

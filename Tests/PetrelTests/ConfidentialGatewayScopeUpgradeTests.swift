@@ -174,9 +174,11 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         GatewayUpgradeTestURLProtocol.reset()
         URLProtocol.registerClass(GatewayUpgradeTestURLProtocol.self)
         NetworkService.setNetworkTestProtocolClasses([GatewayUpgradeTestURLProtocol.self])
+        NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
     }
 
     override func tearDown() {
+        NetworkService.dnsResolverOverride = nil
         URLProtocol.unregisterClass(GatewayUpgradeTestURLProtocol.self)
         NetworkService.setNetworkTestProtocolClasses(nil)
         GatewayUpgradeTestURLProtocol.reset()
@@ -2193,7 +2195,15 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             } catch {}
 
             // 3. Exact Nest DTO in handleOAuthCallback succeeds
+            let freshSessionUUID = UUID().uuidString.lowercased()
+            let (loginURL1, stateToken1) = try await client.startOAuthFlowWithState(identifier: alice)
+            _ = loginURL1
             GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/exchange" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = #"{"session_id":"\#(freshSessionUUID)"}"#.data(using: .utf8)!
+                    return (resp, body)
+                }
                 if request.url?.path == "/auth/session" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     let body = """
@@ -2209,14 +2219,20 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
             }
 
-            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(UUID().uuidString.lowercased())")!
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback?code=code_fresh_nest_dto&state=\(stateToken1)")!
             try await client.handleOAuthCallback(url: callbackURL)
             let current = await client.getCurrentAccount()
             XCTAssertEqual(current?.did, alice)
             XCTAssertEqual(current?.handle, "alice.test")
 
             // 4. Explicit active == false in handleOAuthCallback is rejected
+            let (_, stateToken2) = try await client.startOAuthFlowWithState(identifier: alice)
             GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/exchange" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = #"{"session_id":"\#(freshSessionUUID)"}"#.data(using: .utf8)!
+                    return (resp, body)
+                }
                 if request.url?.path == "/auth/session" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     let body = """
@@ -2232,8 +2248,9 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
             }
 
+            let callbackURL2 = URL(string: "https://catbird.blue/oauth/callback?code=code_fresh_nest_dto_2&state=\(stateToken2)")!
             do {
-                _ = try await client.handleOAuthCallback(url: callbackURL)
+                _ = try await client.handleOAuthCallback(url: callbackURL2)
                 XCTFail("Expected handleOAuthCallback to reject active == false")
             } catch {}
         }
@@ -2387,8 +2404,14 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             """.data(using: .utf8)!
             try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
 
+            let (_, stateToken) = try await client.startOAuthFlowWithState(identifier: alice)
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 let path = request.url?.path ?? ""
+                if path == "/auth/exchange" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = #"{"session_id":"\#(thirdSessionUUID)"}"#.data(using: .utf8)!
+                    return (resp, body)
+                }
                 if path == "/auth/session" {
                     XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(thirdSessionUUID)")
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
@@ -2418,7 +2441,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
             }
 
-            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(thirdSessionUUID)")!
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback?code=code_third_session&state=\(stateToken)")!
             do {
                 _ = try await client.handleOAuthCallback(url: callbackURL)
                 XCTFail("Ordinary callback must be rejected when candidate upgrade is pending")
@@ -2461,17 +2484,9 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
 
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 let path = request.url?.path ?? ""
-                if path == "/auth/session" {
-                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(thirdSessionUUID)")
+                if path == "/auth/exchange" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
-                    let body = """
-                    {
-                        "did": "\(alice)",
-                        "handle": "alice.third",
-                        "active": true,
-                        "granted_scopes": ["atproto"]
-                    }
-                    """.data(using: .utf8)!
+                    let body = #"{"session_id":"\#(thirdSessionUUID)"}"#.data(using: .utf8)!
                     return (resp, body)
                 }
                 if path == "/auth/upgrade/commit" {
@@ -2482,7 +2497,8 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
             }
 
-            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(thirdSessionUUID)")!
+            let (_, stateToken) = try await client.startOAuthFlowWithState(identifier: alice)
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback?code=code_third_session&state=\(stateToken)")!
             do {
                 _ = try await client.handleOAuthCallback(url: callbackURL)
                 XCTFail("Ordinary callback must be rejected when candidate upgrade is pending")
@@ -2522,23 +2538,16 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
 
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 let path = request.url?.path ?? ""
-                if path == "/auth/session" {
-                    XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(thirdSessionUUID)")
+                if path == "/auth/exchange" {
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
-                    let body = """
-                    {
-                        "did": "\(alice)",
-                        "handle": "alice.third",
-                        "active": true,
-                        "granted_scopes": ["atproto"]
-                    }
-                    """.data(using: .utf8)!
+                    let body = #"{"session_id":"\#(thirdSessionUUID)"}"#.data(using: .utf8)!
                     return (resp, body)
                 }
                 return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
             }
 
-            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(thirdSessionUUID)")!
+            let (_, stateToken) = try await client.startOAuthFlowWithState(identifier: alice)
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback?code=code_third_session&state=\(stateToken)")!
             do {
                 _ = try await client.handleOAuthCallback(url: callbackURL)
                 XCTFail("Ordinary callback must be rejected when pre-candidate upgrade is in progress")
@@ -3147,8 +3156,14 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertNil(currentAccount, "Current account must be cleared on logout")
 
             // 4. Fresh same-DID OAuth callback succeeds now that pending upgrade is gone
+            let (_, stateToken) = try await client.startOAuthFlowWithState(identifier: alice)
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 let path = request.url?.path ?? ""
+                if path == "/auth/exchange" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = #"{"session_id":"\#(freshSessionUUID)"}"#.data(using: .utf8)!
+                    return (resp, body)
+                }
                 if path == "/auth/session" {
                     XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer \(freshSessionUUID)")
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
@@ -3166,7 +3181,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
             }
 
-            let callbackURL = URL(string: "https://catbird.blue/oauth/callback#session_id=\(freshSessionUUID)")!
+            let callbackURL = URL(string: "https://catbird.blue/oauth/callback?code=code_fresh_session&state=\(stateToken)")!
             try await client.handleOAuthCallback(url: callbackURL)
 
             let restoredSession = try await storage.getGatewaySession(for: alice)

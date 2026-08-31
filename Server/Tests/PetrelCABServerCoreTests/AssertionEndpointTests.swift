@@ -268,4 +268,123 @@ struct AssertionEndpointTests {
       #expect(refused.status == .forbidden)
     }
   }
+
+  @Test("Zero-mutation: invalid form, disallowed aud, or oversized identifiers leave stores unchanged")
+  func zeroMutationOnRejectedRequests() async throws {
+    let (config, _) = try makeTestConfig {
+      $0.audAllowlist = ["https://allowed.example"]
+      $0.rateLimit = RateLimitConfig(requestsPerMinute: 10)
+    }
+    let server = try CABServer(config: config)
+    let app = Application(router: server.buildRouter())
+    try await app.test(.router) { client in
+      let deviceKey = P256.Signing.PrivateKey()
+
+      // Helper to assert zero state mutated across all three stores
+      func assertZeroStoreMutation() async {
+        #expect(await server.replayStore.seenCountForTesting == 0)
+        #expect(await server.rateLimiter?.bucketCountForTesting == 0)
+        let snapshot = await server.deviceStore.snapshot()
+        #expect(snapshot.isEmpty)
+      }
+
+      // Case 1: Missing / empty form body (missing aud)
+      let proofMissingAud = try makeDPoPProof(key: deviceKey, htu: endpointHTU, jti: "zero-mut-1")
+      let resMissing = try await postAssertion(client, proof: proofMissingAud, body: "")
+      #expect(resMissing.status == .badRequest)
+      await assertZeroStoreMutation()
+
+      // Case 2: Disallowed aud
+      let proofDisallowedAud = try makeDPoPProof(key: deviceKey, htu: endpointHTU, jti: "zero-mut-2")
+      let resDisallowed = try await postAssertion(
+        client, proof: proofDisallowedAud, body: "aud=https://disallowed.example"
+      )
+      #expect(resDisallowed.status == .badRequest)
+      await assertZeroStoreMutation()
+
+      // Case 3: Oversized aud (> 2048 chars)
+      let hugeAud = "https://allowed.example/" + String(repeating: "x", count: 2500)
+      let proofHugeAud = try makeDPoPProof(key: deviceKey, htu: endpointHTU, jti: "zero-mut-3")
+      let resHugeAud = try await postAssertion(
+        client, proof: proofHugeAud, body: "aud=\(hugeAud)"
+      )
+      #expect(resHugeAud.status == .badRequest)
+      await assertZeroStoreMutation()
+
+      // Case 4: Oversized JTI (> 512 chars)
+      let hugeJti = String(repeating: "j", count: 600)
+      let proofHugeJti = try makeDPoPProof(key: deviceKey, htu: endpointHTU, jti: hugeJti)
+      let resHugeJti = try await postAssertion(
+        client, proof: proofHugeJti, body: "aud=https://allowed.example"
+      )
+      #expect(resHugeJti.status == .badRequest)
+      await assertZeroStoreMutation()
+
+      // Case 5: Oversized proof (> 8192 chars)
+      let hugeProof = String(repeating: "p", count: 9000)
+      let resHugeProof = try await postAssertion(
+        client, proof: hugeProof, body: "aud=https://allowed.example"
+      )
+      #expect(resHugeProof.status == .badRequest)
+      await assertZeroStoreMutation()
+    }
+  }
+
+  @Test("Replay store saturation returns 503 temporarily_unavailable and preserves live replay records")
+  func replaySaturationReturns503() async throws {
+    let (config, _) = try makeTestConfig {
+      $0.replayCapacity = 2
+    }
+    let server = try CABServer(config: config)
+    let app = Application(router: server.buildRouter())
+    try await app.test(.router) { client in
+      let proof1 = try makeDPoPProof(htu: endpointHTU, jti: "jti-1")
+      let res1 = try await postAssertion(client, proof: proof1)
+      #expect(res1.status == .ok)
+
+      let proof2 = try makeDPoPProof(htu: endpointHTU, jti: "jti-2")
+      let res2 = try await postAssertion(client, proof: proof2)
+      #expect(res2.status == .ok)
+
+      // 3rd distinct jti saturates the 2-entry store
+      let proof3 = try makeDPoPProof(htu: endpointHTU, jti: "jti-3")
+      let res3 = try await postAssertion(client, proof: proof3)
+      #expect(res3.status == .serviceUnavailable)
+
+      // Original jti-1 must still be refused as a replay (400, not 503!)
+      let resReplay = try await postAssertion(client, proof: proof1)
+      #expect(resReplay.status == .badRequest)
+    }
+  }
+
+
+  @Test("Rate-limited requests (429) do not commit state to ReplayStore")
+  func rateLimitedRequestsDoNotCommitReplayState() async throws {
+    let (config, _) = try makeTestConfig {
+      $0.rateLimit = RateLimitConfig(requestsPerMinute: 2)
+      $0.replayCapacity = 50
+    }
+    let server = try CABServer(config: config)
+    let app = Application(router: server.buildRouter())
+    try await app.test(.router) { client in
+      let deviceKey = P256.Signing.PrivateKey()
+
+      let proof1 = try makeDPoPProof(key: deviceKey, htu: endpointHTU, jti: "rate-limit-jti-1")
+      let res1 = try await postAssertion(client, proof: proof1)
+      #expect(res1.status == .ok)
+
+      let proof2 = try makeDPoPProof(key: deviceKey, htu: endpointHTU, jti: "rate-limit-jti-2")
+      let res2 = try await postAssertion(client, proof: proof2)
+      #expect(res2.status == .ok)
+      #expect(await server.replayStore.seenCountForTesting == 2)
+
+      // 3rd request from same device exceeds the rate limit (2 req/min)
+      let proof3 = try makeDPoPProof(key: deviceKey, htu: endpointHTU, jti: "rate-limit-jti-3")
+      let res3 = try await postAssertion(client, proof: proof3)
+      #expect(res3.status == .tooManyRequests)
+
+      // ReplayStore must NOT have recorded jti-3 for the 429-rejected request
+      #expect(await server.replayStore.seenCountForTesting == 2)
+    }
+  }
 }

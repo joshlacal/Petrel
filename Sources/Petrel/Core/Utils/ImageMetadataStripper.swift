@@ -65,10 +65,10 @@ public class ImageMetadataStripper {
 
             return mutableData as Data
         #else
-            // On Linux, metadata stripping is not available
-            // Return the original data unchanged
-            LogManager.logDebug("ImageMetadataStripper - Metadata stripping not available on this platform, returning original data")
-            return imageData
+            // On non-Apple platforms (such as Linux), ImageIO metadata stripping is unavailable.
+            // Fail closed by returning nil to prevent leaking unsanitized metadata.
+            LogManager.logError("ImageMetadataStripper - Metadata stripping not available on this platform")
+            return nil
         #endif
     }
 

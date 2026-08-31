@@ -117,17 +117,22 @@ data class DID(
     }
 
     companion object {
+        private val DID_REGEX = Regex("^did:[a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-]$")
+
+        fun isValidDID(didString: String): Boolean {
+            if (didString.isEmpty() || didString.toByteArray(Charsets.UTF_8).size > 8192) {
+                return false
+            }
+            return DID_REGEX.matches(didString)
+        }
+
         fun parse(didString: String): DID {
-            require(didString.startsWith("did:")) { "Invalid DID format" }
-            require(didString.length > 4) { "Invalid DID: too short" }
-
+            require(isValidDID(didString)) { "Invalid DID format: $didString" }
             val parts = didString.substring(4).split(":")
-            require(parts.size >= 2) { "Invalid DID: missing method or authority" }
-
             return DID(
                 method = parts[0],
-                authority = parts[1],
-                segments = parts.drop(2)
+                authority = if (parts.size > 1) parts[1] else "",
+                segments = if (parts.size > 2) parts.drop(2) else emptyList()
             )
         }
     }
@@ -256,9 +261,19 @@ data class NSID(val authority: String, val name: String) {
     override fun toString(): String = "$authority.$name"
 
     companion object {
+        private val NSID_REGEX =
+            Regex("^([a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\\.[a-zA-Z][a-zA-Z0-9]{0,62}$")
+
+        fun isValidNSID(nsidString: String): Boolean {
+            if (nsidString.isEmpty() || nsidString.length > 584) {
+                return false
+            }
+            return NSID_REGEX.matches(nsidString)
+        }
+
         fun parse(nsidString: String): NSID {
+            require(isValidNSID(nsidString)) { "Invalid NSID format: $nsidString" }
             val parts = nsidString.split(".")
-            require(parts.size >= 2) { "Invalid NSID format" }
             return NSID(
                 authority = parts.dropLast(1).joinToString("."),
                 name = parts.last()
@@ -440,6 +455,52 @@ object ATProtocolURISerializer : KSerializer<ATProtocolURI> {
     }
 }
 
+// MARK: - Record Key
+
+@Serializable(with = RecordKeySerializer::class)
+class RecordKey private constructor(val value: String) {
+    override fun toString(): String = value
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is RecordKey) return false
+        return value == other.value
+    }
+
+    override fun hashCode(): Int = value.hashCode()
+
+    companion object {
+        private val RECORD_KEY_REGEX = Regex("^[a-zA-Z0-9_.~:-]+$")
+
+        fun isValidRecordKey(key: String): Boolean {
+            if (key.isEmpty() || key.toByteArray(Charsets.UTF_8).size > 512 || key == "." || key == "..") {
+                return false
+            }
+            return RECORD_KEY_REGEX.matches(key)
+        }
+
+        fun create(keyString: String): RecordKey {
+            require(isValidRecordKey(keyString)) { "Invalid record key: $keyString" }
+            return RecordKey(keyString)
+        }
+
+        fun parse(keyString: String): RecordKey = create(keyString)
+    }
+}
+
+object RecordKeySerializer : KSerializer<RecordKey> {
+    override val descriptor: SerialDescriptor =
+        PrimitiveSerialDescriptor("RecordKey", PrimitiveKind.STRING)
+
+    override fun serialize(encoder: Encoder, value: RecordKey) {
+        encoder.encodeString(value.value)
+    }
+
+    override fun deserialize(decoder: Decoder): RecordKey {
+        return RecordKey.create(decoder.decodeString())
+    }
+}
+
 // MARK: - Space Reference
 
 /**
@@ -458,6 +519,8 @@ class SpaceRef private constructor(
     val spaceType: String,
     val skey: String
 ) {
+    fun uriString(): String = value
+
     override fun toString(): String = value
 
     override fun equals(other: Any?): Boolean {
@@ -529,7 +592,7 @@ object SpaceRefSerializer : KSerializer<SpaceRef> {
         PrimitiveSerialDescriptor("SpaceRef", PrimitiveKind.STRING)
 
     override fun serialize(encoder: Encoder, value: SpaceRef) {
-        encoder.encodeString(value.value)
+        encoder.encodeString(value.toString())
     }
 
     override fun deserialize(decoder: Decoder): SpaceRef {

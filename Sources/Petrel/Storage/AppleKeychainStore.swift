@@ -24,21 +24,114 @@
     /// Secure storage implementation using Apple's Keychain Services
     final class AppleKeychainStore: SecureStorage {
         internal struct Operations: @unchecked Sendable {
+            let copyMatching: (CFDictionary, UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus
             let update: (CFDictionary, CFDictionary) -> OSStatus
             let add: (CFDictionary, UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus
             let delete: (CFDictionary) -> OSStatus
+            let isLive: Bool
+
+            init(
+                copyMatching: @escaping (CFDictionary, UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus,
+                update: @escaping (CFDictionary, CFDictionary) -> OSStatus,
+                add: @escaping (CFDictionary, UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus,
+                delete: @escaping (CFDictionary) -> OSStatus,
+                isLive: Bool = false
+            ) {
+                self.copyMatching = copyMatching
+                self.update = update
+                self.add = add
+                self.delete = delete
+                self.isLive = isLive
+            }
 
             static let live = Operations(
+                copyMatching: { SecItemCopyMatching($0, $1) },
                 update: { SecItemUpdate($0, $1) },
                 add: { SecItemAdd($0, $1) },
-                delete: { SecItemDelete($0) }
+                delete: { SecItemDelete($0) },
+                isLive: true
             )
         }
 
         private let operations: Operations
+        private let defaultAccessGroup: String?
+        private let resolvedDefaultAccessGroupCache = Mutex<String?>(nil)
 
-        init(operations: Operations = .live) {
+        init(operations: Operations = .live, defaultAccessGroup: String? = nil) {
             self.operations = operations
+            self.defaultAccessGroup = defaultAccessGroup
+        }
+
+        /// Resolves the default team-prefixed access group for the current process via entitlement or probe
+        private func resolveDefaultAccessGroup() -> String? {
+            if let cached = resolvedDefaultAccessGroupCache.withLock({ $0 }), !cached.isEmpty {
+                return cached
+            }
+
+            #if os(macOS) || targetEnvironment(macCatalyst)
+                if operations.isLive,
+                   let task = SecTaskCreateFromSelf(nil),
+                   let value = SecTaskCopyValueForEntitlement(task, "keychain-access-groups" as CFString, nil),
+                   let groups = value as? [String],
+                   let first = groups.first, !first.isEmpty {
+                    resolvedDefaultAccessGroupCache.withLock { $0 = first }
+                    return first
+                }
+            #endif
+
+            // Live-keychain default access group probe:
+            // This probe emits queries without `kSecAttrAccessGroup` intentionally so Keychain Services
+            // assigns the system-determined default access group for the calling application.
+            // The probe item uses a unique UUID-based account name, requests attribute-only return
+            // (kSecReturnAttributes: true, no secret payload), and is immediately deleted.
+            let probeAccount = "petrel.defaultGroupProbe.\(UUID().uuidString)"
+            let probeData = Data([0])
+            var addQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrAccount as String: probeAccount,
+                kSecValueData as String: probeData,
+                kSecAttrAccessible as String: KeychainAccessibility.afterFirstUnlockThisDeviceOnly.cfValue,
+            ]
+            #if os(macOS)
+                addQuery[kSecUseDataProtectionKeychain as String] = true
+            #endif
+            let status = operations.add(addQuery as CFDictionary, nil)
+            guard status == errSecSuccess || status == errSecDuplicateItem else {
+                return nil
+            }
+
+            var matchQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrAccount as String: probeAccount,
+                kSecReturnAttributes as String: true,
+                kSecMatchLimit as String: kSecMatchLimitOne,
+            ]
+            #if os(macOS)
+                matchQuery[kSecUseDataProtectionKeychain as String] = true
+            #endif
+            var item: CFTypeRef?
+            let matchStatus = operations.copyMatching(matchQuery as CFDictionary, &item)
+
+            var deleteQuery: [String: Any] = [
+                kSecClass as String: kSecClassGenericPassword,
+                kSecAttrAccount as String: probeAccount,
+            ]
+            #if os(macOS)
+                deleteQuery[kSecUseDataProtectionKeychain as String] = true
+            #endif
+            let deleteStatus = operations.delete(deleteQuery as CFDictionary)
+            if deleteStatus != errSecSuccess && deleteStatus != errSecItemNotFound {
+                LogManager.logWarning("AppleKeychainStore - Failed to delete probe item \(probeAccount): \(deleteStatus)")
+            }
+
+            if matchStatus == errSecSuccess,
+               let attrs = item as? [String: Any],
+               let group = attrs[kSecAttrAccessGroup as String] as? String,
+               !group.isEmpty {
+                resolvedDefaultAccessGroupCache.withLock { $0 = group }
+                return group
+            }
+            return nil
         }
 
         // MARK: - Platform-specific Configuration
@@ -69,10 +162,19 @@
             return attributes
         }
 
-        /// Returns access group attributes when provided
-        private static func accessGroupAttributes(_ accessGroup: String?) -> [String: Any] {
-            guard let accessGroup, !accessGroup.isEmpty else { return [:] }
-            return [kSecAttrAccessGroup as String: accessGroup]
+        /// Returns access group attributes (explicit group or resolved default group).
+        /// Fails closed with KeychainError.storageUnavailable if no access group can be resolved.
+        private func accessGroupAttributes(_ accessGroup: String?) throws -> [String: Any] {
+            if let accessGroup, !accessGroup.isEmpty {
+                return [kSecAttrAccessGroup as String: accessGroup]
+            }
+            if let defaultGroup = defaultAccessGroup, !defaultGroup.isEmpty {
+                return [kSecAttrAccessGroup as String: defaultGroup]
+            }
+            if let resolved = resolveDefaultAccessGroup(), !resolved.isEmpty {
+                return [kSecAttrAccessGroup as String: resolved]
+            }
+            throw KeychainError.storageUnavailable("Could not resolve default keychain access group")
         }
 
         // MARK: - SecureStorage Implementation
@@ -88,7 +190,7 @@
                 kSecAttrAccount as String: namespacedKey,
             ]
             .merging(Self.platformSpecificAttributes()) { _, new in new }
-            .merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+            .merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
             let updateAttributes: [String: Any] = [
                 kSecValueData as String: value,
@@ -146,10 +248,10 @@
                 kSecAttrAccount as String: namespacedKey,
                 kSecReturnData as String: kCFBooleanTrue!,
                 kSecMatchLimit as String: kSecMatchLimitOne,
-            ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+            ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
             var item: CFTypeRef?
-            let status = SecItemCopyMatching(query as CFDictionary, &item)
+            let status = operations.copyMatching(query as CFDictionary, &item)
 
             if status == errSecItemNotFound {
                 // Item not found is expected in many cases (e.g., gateway mode doesn't use regular sessions)
@@ -182,7 +284,7 @@
             let query: [String: Any] = [
                 kSecClass as String: kSecClassGenericPassword,
                 kSecAttrAccount as String: namespacedKey,
-            ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+            ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
             let status = operations.delete(query as CFDictionary)
             LogManager.logDebug("AppleKeychainStore: Delete status for key \(namespacedKey): \(status)")
@@ -226,10 +328,10 @@
                 kSecClass as String: kSecClassGenericPassword,
                 kSecMatchLimit as String: kSecMatchLimitAll,
                 kSecReturnAttributes as String: true,
-            ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+            ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
             var result: AnyObject?
-            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            let status = operations.copyMatching(query as CFDictionary, &result)
 
             if status == errSecSuccess, let items = result as? [[String: Any]] {
                 var allSucceeded = true
@@ -246,9 +348,9 @@
                         let deleteQuery: [String: Any] = [
                             kSecClass as String: kSecClassGenericPassword,
                             kSecAttrAccount as String: account,
-                        ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                        ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
-                        let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
+                        let deleteStatus = operations.delete(deleteQuery as CFDictionary)
                         if deleteStatus != errSecSuccess {
                             LogManager.logError(
                                 "AppleKeychainStore - Failed to delete item \(account): \(deleteStatus)"
@@ -284,10 +386,10 @@
                 kSecClass as String: kSecClassKey,
                 kSecMatchLimit as String: kSecMatchLimitAll,
                 kSecReturnAttributes as String: true,
-            ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+            ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
             var result: AnyObject?
-            let status = SecItemCopyMatching(query as CFDictionary, &result)
+            let status = operations.copyMatching(query as CFDictionary, &result)
 
             if status == errSecSuccess, let items = result as? [[String: Any]] {
                 var allSucceeded = true
@@ -306,9 +408,9 @@
                         let deleteQuery: [String: Any] = [
                             kSecClass as String: kSecClassKey,
                             kSecAttrApplicationTag as String: tagData,
-                        ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                        ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
-                        let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
+                        let deleteStatus = operations.delete(deleteQuery as CFDictionary)
                         if deleteStatus != errSecSuccess {
                             LogManager.logError(
                                 "AppleKeychainStore - Failed to delete key \(tagString): \(deleteStatus)"
@@ -391,25 +493,25 @@
                     kSecValueData as String: representation,
                     kSecAttrAccessible as String: Self.defaultAccessibility,
                 ]
-                query.merge(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                query.merge(try accessGroupAttributes(accessGroup)) { _, new in new }
 
                 // Delete any existing key first
                 let deleteQuery: [String: Any] = [
                     kSecClass as String: kSecClassKey,
                     kSecAttrApplicationTag as String: tagData,
-                ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
-                let deleteStatus = SecItemDelete(deleteQuery as CFDictionary)
+                let deleteStatus = operations.delete(deleteQuery as CFDictionary)
                 LogManager.logDebug("AppleKeychainStore - iOS delete status: \(deleteStatus)")
 
                 // Add the new key
-                let status = SecItemAdd(query as CFDictionary, nil)
+                let status = operations.add(query as CFDictionary, nil)
                 if status == errSecDuplicateItem {
                     // Try update
                     let updateAttributes: [String: Any] = [
                         kSecValueData as String: representation,
                     ]
-                    let updateStatus = SecItemUpdate(
+                    let updateStatus = operations.update(
                         deleteQuery as CFDictionary, updateAttributes as CFDictionary
                     )
                     guard updateStatus == errSecSuccess else {
@@ -439,10 +541,10 @@
                     kSecAttrKeyType as String: kSecAttrKeyTypeECSECPrimeRandom,
                     kSecReturnData as String: kCFBooleanTrue!,
                     kSecMatchLimit as String: kSecMatchLimitOne,
-                ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
                 var item: CFTypeRef?
-                let status = SecItemCopyMatching(query as CFDictionary, &item)
+                let status = operations.copyMatching(query as CFDictionary, &item)
 
                 guard status == errSecSuccess, let data = item as? Data else {
                     LogManager.logError(
@@ -468,9 +570,9 @@
                 let query: [String: Any] = [
                     kSecClass as String: kSecClassKey,
                     kSecAttrApplicationTag as String: tagData,
-                ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
-                let status = SecItemDelete(query as CFDictionary)
+                let status = operations.delete(query as CFDictionary)
                 if status != errSecSuccess, status != errSecItemNotFound {
                     LogManager.logError(
                         "AppleKeychainStore - iOS failed to delete DPoP key for tag \(keyTag). Status: \(status)"
@@ -539,19 +641,19 @@
                     kSecValueRef as String: secKey,
                     kSecAttrAccessible as String: Self.defaultAccessibility,
                     kSecAttrSynchronizable as String: false,
-                ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
-                let status = SecItemAdd(query as CFDictionary, nil)
+                let status = operations.add(query as CFDictionary, nil)
                 if status == errSecDuplicateItem {
                     // Try update
                     let updateQuery: [String: Any] = [
                         kSecClass as String: kSecClassKey,
                         kSecAttrApplicationTag as String: tagData,
-                    ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                    ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
                     let updateAttributes: [String: Any] = [
                         kSecValueRef as String: secKey,
                     ]
-                    let updateStatus = SecItemUpdate(
+                    let updateStatus = operations.update(
                         updateQuery as CFDictionary, updateAttributes as CFDictionary
                     )
                     guard updateStatus == errSecSuccess else {
@@ -634,10 +736,10 @@
                     kSecAttrApplicationTag as String: tagData,
                     kSecReturnRef as String: kCFBooleanTrue!,
                     kSecMatchLimit as String: kSecMatchLimitOne,
-                ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
+                ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
 
                 var item: CFTypeRef?
-                let status = SecItemCopyMatching(query as CFDictionary, &item)
+                let status = operations.copyMatching(query as CFDictionary, &item)
 
                 guard status == errSecSuccess, let secKey = item else {
                     LogManager.logDebug(
@@ -702,8 +804,8 @@
                 let keyQuery: [String: Any] = [
                     kSecClass as String: kSecClassKey,
                     kSecAttrApplicationTag as String: tagData,
-                ].merging(Self.accessGroupAttributes(accessGroup)) { _, new in new }
-                let keyStatus = SecItemDelete(keyQuery as CFDictionary)
+                ].merging(try accessGroupAttributes(accessGroup)) { _, new in new }
+                let keyStatus = operations.delete(keyQuery as CFDictionary)
                 LogManager.logDebug("AppleKeychainStore - macOS SecKey delete status: \(keyStatus)")
                 if keyStatus != errSecSuccess, keyStatus != errSecItemNotFound {
                     LogManager.logError(

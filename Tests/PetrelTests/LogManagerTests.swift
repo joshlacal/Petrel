@@ -284,6 +284,28 @@ struct LogManagerTests {
         LogManager.logResponse(response, data: largeData)
     }
 
+    @Test("LogManager redacts response body for gateway credential endpoints")
+    func gatewayCredentialEndpointLogging() throws {
+        for path in ["/auth/exchange", "/auth/session", "/auth/upgrade/exchange", "/auth/upgrade/commit"] {
+            let url = try #require(URL(string: "https://gateway.catbird.blue\(path)"))
+            let response = try #require(HTTPURLResponse(
+                url: url,
+                statusCode: 200,
+                httpVersion: "1.1",
+                headerFields: ["Content-Type": "application/json"]
+            ))
+            let responseData = """
+            {
+                "session_id": "secret-session-uuid-12345",
+                "did": "did:plc:test12345"
+            }
+            """.data(using: .utf8)!
+
+            // Must not crash and must treat as token endpoint
+            LogManager.logResponse(response, data: responseData)
+        }
+    }
+
     @Test("LogManager should handle request with sensitive body")
     func sensitiveRequestBody() throws {
         let url = try #require(URL(string: "https://example.com/api/test"))
@@ -321,6 +343,38 @@ struct LogManagerTests {
 
         // This should log the body since it doesn't contain sensitive data
         LogManager.logRequest(request)
+    }
+
+    @Test("Step 8 & N1-N5: sanitizeURLForLogging emits normalized path and allowlisted parameter names only")
+    func sanitizeURLForLoggingComprehensive() {
+        let url = URL(string: "https://user:pass123@alice.bsky.social/oauth/authorize?response_type=code&client_id=myclient&code=secret123&state=xyz789&email=alice@example.com#token123")!
+        let sanitized = LogManager.sanitizeURLForLogging(url)
+
+        #expect(!sanitized.contains("user"))
+        #expect(!sanitized.contains("pass123"))
+        #expect(!sanitized.contains("secret123"))
+        #expect(!sanitized.contains("xyz789"))
+        #expect(!sanitized.contains("alice@example.com"))
+        #expect(!sanitized.contains("token123"))
+        #expect(!sanitized.contains("#"))
+        #expect(!sanitized.contains("alice.bsky.social"))
+        #expect(!sanitized.contains("code"))
+        #expect(!sanitized.contains("state"))
+        #expect(!sanitized.contains("email"))
+        #expect(sanitized.contains("response_type"))
+        #expect(sanitized.contains("client_id"))
+        #expect(sanitized.hasPrefix("/oauth/authorize"))
+
+        let didURL = URL(string: "https://plc.directory/did:plc:12345/data?limit=50&cursor=abc&secret_key=topsecret")!
+        let sanitizedDID = LogManager.sanitizeURLForLogging(didURL)
+        #expect(!sanitizedDID.contains("plc.directory"))
+        #expect(!sanitizedDID.contains("50"))
+        #expect(!sanitizedDID.contains("abc"))
+        #expect(!sanitizedDID.contains("secret_key"))
+        #expect(!sanitizedDID.contains("topsecret"))
+        #expect(sanitizedDID.contains("limit"))
+        #expect(sanitizedDID.contains("cursor"))
+        #expect(sanitizedDID.hasPrefix("/did:plc:12345/data"))
     }
 }
 

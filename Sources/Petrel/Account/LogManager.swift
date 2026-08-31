@@ -57,6 +57,8 @@ public class LogManager {
         "/xrpc/com.atproto.server.createSession",
         "/xrpc/com.atproto.server.refreshSession",
         "/oauth/token", "/token",
+        "/auth/exchange", "/auth/session",
+        "/auth/upgrade/exchange", "/auth/upgrade/commit",
     ]
 
     // MARK: - Observer support (Swift Concurrency safe)
@@ -159,10 +161,9 @@ public class LogManager {
 
     public static func logRequest(_ request: URLRequest) {
         #if DEBUG
-            let url = request.url?.absoluteString ?? "N/A"
+            let url = request.url.map { sanitizeURLForLogging($0) } ?? "N/A"
             var debugMessage = "Request URL: \(url)\n"
             debugMessage += "Method: \(request.httpMethod ?? "N/A")\n"
-
             // Filter sensitive headers
             var filteredHeaders: [String: String] = [:]
             request.allHTTPHeaderFields?.forEach { key, value in
@@ -171,32 +172,38 @@ public class LogManager {
             debugMessage += "Headers: \(filteredHeaders)"
 
             // Don't log body for token endpoints or if it contains sensitive data
-            if let url = request.url,
-               !tokenEndpointPaths.contains(where: { url.path.contains($0) }),
-               let bodyData = request.httpBody,
-               let bodyString = String(data: bodyData, encoding: .utf8)
-            {
-                // Check if body might contain sensitive data
-                let lowerBody = bodyString.lowercased()
-                if lowerBody.contains("password") || lowerBody.contains("token") ||
-                    lowerBody.contains("client_secret") || lowerBody.contains("code")
+            if let url = request.url {
+                let normalizedPath = url.path.lowercased()
+                let isTokenEndpoint = tokenEndpointPaths.contains { endpoint in
+                    normalizedPath == endpoint || normalizedPath.hasSuffix(endpoint)
+                }
+                if !isTokenEndpoint,
+                   let bodyData = request.httpBody,
+                   let bodyString = String(data: bodyData, encoding: .utf8)
                 {
-                    debugMessage += "\nBody: [CONTAINS_SENSITIVE_DATA]"
-                } else {
-                    debugMessage += "\nBody: \(bodyString)"
+                    // Check if body might contain sensitive data
+                    let lowerBody = bodyString.lowercased()
+                    if lowerBody.contains("password") || lowerBody.contains("token") ||
+                        lowerBody.contains("client_secret") || lowerBody.contains("code") ||
+                        lowerBody.contains("session_id")
+                    {
+                        debugMessage += "\nBody: [CONTAINS_SENSITIVE_DATA]"
+                    } else {
+                        let maxLen = 1000
+                        let truncatedBody = bodyString.count > maxLen ? String(bodyString.prefix(maxLen)) + "… [truncated]" : bodyString
+                        debugMessage += "\nBody: \(truncatedBody)"
+                    }
                 }
             }
-
             logDebug(debugMessage, category: .network)
         #endif
     }
 
     public static func logResponse(_ response: HTTPURLResponse, data: Data) {
         #if DEBUG
-            let url = response.url?.absoluteString ?? "N/A"
+            let url = response.url.map { sanitizeURLForLogging($0) } ?? "N/A"
             var debugMessage = "Response URL: \(url)\n"
             debugMessage += "Status Code: \(response.statusCode)\n"
-
             // Filter sensitive headers
             var filteredHeaders: [String: Any] = [:]
             for (key, value) in response.allHeaderFields {
@@ -211,17 +218,21 @@ public class LogManager {
             debugMessage += "Headers: \(filteredHeaders)"
 
             // Don't log response body for token endpoints
-            if let url = response.url,
-               !tokenEndpointPaths.contains(where: { url.path.contains($0) })
-            {
-                if let responseString = String(data: data, encoding: .utf8) {
-                    // TEMPORARY: Truncation disabled for debugging
-                    debugMessage += "\nBody: \(responseString)"
+            if let url = response.url {
+                let normalizedPath = url.path.lowercased()
+                let isTokenEndpoint = tokenEndpointPaths.contains { endpoint in
+                    normalizedPath == endpoint || normalizedPath.hasSuffix(endpoint)
                 }
-            } else {
-                debugMessage += "\nBody: [TOKEN_ENDPOINT_RESPONSE]"
+                if !isTokenEndpoint {
+                    if let responseString = String(data: data, encoding: .utf8) {
+                        let maxLen = 1000
+                        let truncated = responseString.count > maxLen ? String(responseString.prefix(maxLen)) + "… [truncated]" : responseString
+                        debugMessage += "\nBody: \(truncated)"
+                    }
+                } else {
+                    debugMessage += "\nBody: [TOKEN_ENDPOINT_RESPONSE]"
+                }
             }
-
             logDebug(debugMessage, category: .network)
         #endif
     }
@@ -257,6 +268,36 @@ public class LogManager {
         }
     }
 
+    public static let allowedQueryParamNames: Set<String> = [
+        "cursor", "limit", "resolve", "purpose", "type", "scope", "format", "version",
+        "response_type", "client_id", "redirect_uri", "grant_type"
+    ]
+
+    /// Allowlist of safe parameter names where parameter values are safe to log, or query parameter keys.
+    /// Emits normalized path plus allowlisted parameter names only.
+    /// All values are stripped from query parameters to prevent leaks of codes, email, state, tokens, handles, IDs.
+    /// Userinfo, host, password, fragments, and non-allowlisted query parameters are completely omitted.
+    public static func sanitizeURLForLogging(_ url: URL) -> String {
+        let path = url.path.isEmpty ? "/" : url.path
+        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
+            return path
+        }
+        if let queryItems = components.queryItems, !queryItems.isEmpty {
+            // Keep only allowlisted parameter names; do NOT emit query values
+            let filtered = queryItems.compactMap { item -> String? in
+                let lower = item.name.lowercased()
+                if allowedQueryParamNames.contains(lower) {
+                    return item.name
+                }
+                return nil
+            }
+            if !filtered.isEmpty {
+                return "\(path)?\(filtered.joined(separator: "&"))"
+            }
+        }
+        return path
+    }
+
     /// Logs a structured request with shape information for BFF debugging
     /// - Parameters:
     ///   - requestId: UUID for correlating with BFF logs
@@ -273,18 +314,15 @@ public class LogManager {
         bodyShape: String?,
         gatewayMode: Bool
     ) {
-        let host = url.host ?? "unknown"
-        let path = url.path
-        let query = url.query.map { "?\($0)" } ?? ""
+        let path = sanitizeURLForLogging(url)
         let mode = gatewayMode ? "gateway" : "direct"
         let shape = bodyShape ?? "nil"
 
         logInfo(
-            "[XRPC-REQ] id=\(requestId) mode=\(mode) method=\(method) host=\(host) path=\(path)\(query) bodyBytes=\(bodySize) shape=\(shape)",
+            "[XRPC-REQ] id=\(requestId) mode=\(mode) method=\(method) url=\(path) bodyBytes=\(bodySize) shape=\(shape)",
             category: .network
         )
     }
-
     /// Logs a structured response with shape information for BFF debugging
     /// - Parameters:
     ///   - requestId: UUID for correlating with request

@@ -52,7 +52,15 @@ private enum TestCBOR {
     }
 
     static func map(_ pairs: [(String, Data)]) -> Data {
-        pairs.reduce(header(major: 5, argument: UInt64(pairs.count))) { $0 + text($1.0) + $1.1 }
+        let sorted = pairs.sorted { a, b in
+            let aBytes = a.0.utf8
+            let bBytes = b.0.utf8
+            if aBytes.count != bBytes.count {
+                return aBytes.count < bBytes.count
+            }
+            return aBytes.lexicographicallyPrecedes(bBytes)
+        }
+        return sorted.reduce(header(major: 5, argument: UInt64(sorted.count))) { $0 + text($1.0) + $1.1 }
     }
 
     static func link(_ cid: CID) -> Data {
@@ -310,6 +318,25 @@ struct CARStrictnessTests {
         #expect(throws: CARReaderError.self) { try parse(archive) }
     }
 
+    @Test("A non-canonical padded varint block length throws")
+    func nonCanonicalPaddedVarintThrows() throws {
+        // 0x81 0x00 is non-canonical encoding of 1 (padded with zero)
+        let block = Data([0x01, 0x71, 0x12, 0x20] + [UInt8](repeating: 0xAA, count: 32))
+        let paddedVarint = Data([0x80 | UInt8(block.count), 0x00])
+        let archive = archive() + paddedVarint + block
+
+        #expect(throws: CARReaderError.self) { try parse(archive) }
+    }
+
+    @Test("A maximal 9-byte varint header length that overflows Int throws CARReaderError instead of trapping")
+    func maximalVarintHeaderLengthThrows() throws {
+        // 9-byte varint representing Int.max (0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0xFF 0x7F)
+        let maxVarint = Data([0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x7F])
+        #expect(throws: CARReaderError.self) {
+            _ = try CARReader(data: maxVarint)
+        }
+    }
+
     @Test("A block length that overruns the archive throws")
     func overlongBlockLengthThrows() throws {
         var archive = archive()
@@ -346,19 +373,47 @@ struct CARStrictnessTests {
             ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
         ]))
 
-        let cyclicCID = try CID(bytes: Data([0x01, 0x71, 0x12, 0x20] + [UInt8](repeating: 0xCC, count: 32)))
-        let cyclicNode = TestCBOR.map([
-            ("l", TestCBOR.link(cyclicCID)),
+        // Revisit a node: Root -> NodeA (key: a), entry key: m, right subtree -> NodeB.
+        // NodeB has entry key: z, and left subtree -> NodeA (revisiting NodeA in a different branch of the DAG).
+        let nodeAPayload = TestCBOR.map([
             ("e", TestCBOR.array([
                 TestCBOR.map([
                     ("p", TestCBOR.uint(0)),
-                    ("k", TestCBOR.bytes(Data(Self.recordKey.utf8))),
+                    ("k", TestCBOR.bytes(Data("app.bsky.feed.post/a".utf8))),
                     ("v", TestCBOR.link(recordCID)),
                 ]),
             ])),
         ])
-        builder.add(cid: cyclicCID, payload: cyclicNode)
+        let nodeACID = CID.fromDAGCBOR(nodeAPayload)
+        builder.add(cid: nodeACID, payload: nodeAPayload)
 
+        let nodeBPayload = TestCBOR.map([
+            ("l", TestCBOR.link(nodeACID)),
+            ("e", TestCBOR.array([
+                TestCBOR.map([
+                    ("p", TestCBOR.uint(0)),
+                    ("k", TestCBOR.bytes(Data("app.bsky.feed.post/z".utf8))),
+                    ("v", TestCBOR.link(recordCID)),
+                ]),
+            ])),
+        ])
+        let nodeBCID = CID.fromDAGCBOR(nodeBPayload)
+        builder.add(cid: nodeBCID, payload: nodeBPayload)
+
+        let rootNodePayload = TestCBOR.map([
+            ("l", TestCBOR.link(nodeACID)),
+            ("e", TestCBOR.array([
+                TestCBOR.map([
+                    ("p", TestCBOR.uint(0)),
+                    ("k", TestCBOR.bytes(Data("app.bsky.feed.post/m".utf8))),
+                    ("v", TestCBOR.link(recordCID)),
+                    ("t", TestCBOR.link(nodeBCID)),
+                ]),
+            ])),
+        ])
+        let rootNodeCID = CID.fromDAGCBOR(rootNodePayload)
+        builder.add(cid: rootNodeCID, payload: rootNodePayload)
+        let cyclicCID = rootNodeCID
         let commitCID = builder.add(TestCBOR.map([
             ("did", TestCBOR.text("did:plc:testtesttesttesttesttest")),
             ("version", TestCBOR.uint(3)),
@@ -489,5 +544,191 @@ struct CARStrictnessTests {
         #expect(records[1].rkey == "🎉middle")
         #expect(records[2].collection == "app.bsky.feed.post")
         #expect(records[2].rkey == "🎉zebra")
+    }
+
+    // MARK: - CID Integrity and Legacy Verification (F5, F10)
+
+    @Test("A block whose body multihash does not match its claimed CID throws")
+    func blockBodyMultihashMismatchThrows() throws {
+        var builder = TestCARBuilder()
+        let realPayload = TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
+        ])
+        _ = CID.fromDAGCBOR(realPayload)
+        // Corrupt claimed CID with different digest
+        let fakeCID = try CID(bytes: Data([0x01, 0x71, 0x12, 0x20] + [UInt8](repeating: 0xEE, count: 32)))
+        builder.add(cid: fakeCID, payload: realPayload)
+
+        let entry = TestCBOR.map([
+            ("p", TestCBOR.uint(0)),
+            ("k", TestCBOR.bytes(Data(Self.recordKey.utf8))),
+            ("v", TestCBOR.link(fakeCID)),
+        ])
+        let rootNodeCID = builder.add(TestCBOR.map([("e", TestCBOR.array([entry]))]))
+        let commitCID = builder.add(TestCBOR.map([
+            ("did", TestCBOR.text("did:plc:testtesttesttesttesttest")),
+            ("version", TestCBOR.uint(3)),
+            ("data", TestCBOR.link(rootNodeCID)),
+        ]))
+
+        let archive = builder.archive(root: commitCID)
+        #expect(throws: CARReaderError.self) { try parse(archive) }
+    }
+
+    @Test("A block claiming a non-sha2-256 multihash code throws invalidCID")
+    func nonSha256MultihashThrows() throws {
+        var builder = TestCARBuilder()
+        let payload = TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
+        ])
+        // Multihash algorithm 0x11 (SHA-1) with 20 bytes digest
+        let sha1CID = try CID(bytes: Data([0x01, 0x71, 0x11, 0x14] + [UInt8](repeating: 0xAA, count: 20)))
+        builder.add(cid: sha1CID, payload: payload)
+
+        let entry = TestCBOR.map([
+            ("p", TestCBOR.uint(0)),
+            ("k", TestCBOR.bytes(Data(Self.recordKey.utf8))),
+            ("v", TestCBOR.link(sha1CID)),
+        ])
+        let rootNodeCID = builder.add(TestCBOR.map([("e", TestCBOR.array([entry]))]))
+        let commitCID = builder.add(TestCBOR.map([
+            ("did", TestCBOR.text("did:plc:testtesttesttesttesttest")),
+            ("version", TestCBOR.uint(3)),
+            ("data", TestCBOR.link(rootNodeCID)),
+        ]))
+
+        let archive = builder.archive(root: commitCID)
+        #expect(throws: CARReaderError.self) { try parse(archive) }
+    }
+
+    @Test("A CAR archive containing conflicting duplicate CIDs throws")
+    func conflictingDuplicateCIDsThrow() throws {
+        var builder = TestCARBuilder()
+        let payload1 = TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("text", TestCBOR.text("hello 1")),
+            ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
+        ])
+        let payload2 = TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("text", TestCBOR.text("hello 2")),
+            ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
+        ])
+        let cid1 = CID.fromDAGCBOR(payload1)
+        // Add block 1 with cid1 and payload1
+        builder.add(cid: cid1, payload: payload1)
+        // Add conflicting block 2 with cid1 and different payload2
+        builder.add(cid: cid1, payload: payload2)
+
+        let entry = TestCBOR.map([
+            ("p", TestCBOR.uint(0)),
+            ("k", TestCBOR.bytes(Data(Self.recordKey.utf8))),
+            ("v", TestCBOR.link(cid1)),
+        ])
+        let rootNodeCID = builder.add(TestCBOR.map([("e", TestCBOR.array([entry]))]))
+        let commitCID = builder.add(TestCBOR.map([
+            ("did", TestCBOR.text("did:plc:testtesttesttesttesttest")),
+            ("version", TestCBOR.uint(3)),
+            ("data", TestCBOR.link(rootNodeCID)),
+        ]))
+
+        let archive = builder.archive(root: commitCID)
+        #expect(throws: CARReaderError.self) { try parse(archive) }
+    }
+
+    @Test("An MST node with unsorted keys throws")
+    func unsortedKeysThrow() throws {
+        var builder = TestCARBuilder()
+        let record1CID = builder.add(TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("text", TestCBOR.text("post 1")),
+            ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
+        ]))
+        let record2CID = builder.add(TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("text", TestCBOR.text("post 2")),
+            ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
+        ]))
+
+        // Key 1: "app.bsky.feed.post/z", Key 2: "app.bsky.feed.post/a" (out of order!)
+        let rootNodeCID = builder.add(TestCBOR.map([
+            ("e", TestCBOR.array([
+                TestCBOR.map([
+                    ("p", TestCBOR.uint(0)),
+                    ("k", TestCBOR.bytes(Data("app.bsky.feed.post/z".utf8))),
+                    ("v", TestCBOR.link(record1CID)),
+                ]),
+                TestCBOR.map([
+                    ("p", TestCBOR.uint(0)),
+                    ("k", TestCBOR.bytes(Data("app.bsky.feed.post/a".utf8))),
+                    ("v", TestCBOR.link(record2CID)),
+                ]),
+            ])),
+        ]))
+
+        let commitCID = builder.add(TestCBOR.map([
+            ("did", TestCBOR.text("did:plc:testtesttesttesttesttest")),
+            ("version", TestCBOR.uint(3)),
+            ("data", TestCBOR.link(rootNodeCID)),
+        ]))
+
+        let archive = builder.archive(root: commitCID)
+        #expect(throws: CARReaderError.self) { try parse(archive) }
+    }
+
+    @Test("An MST node with an invalid path collection/rkey structure throws")
+    func invalidPathStructureThrows() throws {
+        var builder = TestCARBuilder()
+        let recordCID = builder.add(TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("text", TestCBOR.text("post")),
+            ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
+        ]))
+
+        // Key with no slash: invalid path
+        let rootNodeCID = builder.add(TestCBOR.map([
+            ("e", TestCBOR.array([
+                TestCBOR.map([
+                    ("p", TestCBOR.uint(0)),
+                    ("k", TestCBOR.bytes(Data("invalidPathNoSlash".utf8))),
+                    ("v", TestCBOR.link(recordCID)),
+                ]),
+            ])),
+        ]))
+
+        let commitCID = builder.add(TestCBOR.map([
+            ("did", TestCBOR.text("did:plc:testtesttesttesttesttest")),
+            ("version", TestCBOR.uint(3)),
+            ("data", TestCBOR.link(rootNodeCID)),
+        ]))
+
+        let archive = builder.archive(root: commitCID)
+        #expect(throws: CARReaderError.self) { try parse(archive) }
+
+        // Key with extra slash (e.g. app.bsky.feed.post/a/b): invalid path
+        var builder2 = TestCARBuilder()
+        let recordCID2 = builder2.add(TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("text", TestCBOR.text("post")),
+            ("createdAt", TestCBOR.text("2026-01-01T00:00:00.000Z")),
+        ]))
+        let rootNodeCID2 = builder2.add(TestCBOR.map([
+            ("e", TestCBOR.array([
+                TestCBOR.map([
+                    ("p", TestCBOR.uint(0)),
+                    ("k", TestCBOR.bytes(Data("app.bsky.feed.post/a/b".utf8))),
+                    ("v", TestCBOR.link(recordCID2)),
+                ]),
+            ])),
+        ]))
+        let commitCID2 = builder2.add(TestCBOR.map([
+            ("did", TestCBOR.text("did:plc:testtesttesttesttesttest")),
+            ("version", TestCBOR.uint(3)),
+            ("data", TestCBOR.link(rootNodeCID2)),
+        ]))
+        let archive2 = builder2.archive(root: commitCID2)
+        #expect(throws: CARReaderError.self) { try parse(archive2) }
     }
 }

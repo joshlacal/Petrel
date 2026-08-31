@@ -37,7 +37,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         {% for chunk in type_cases | batch(25) %}
         private static func registerChunk{{ loop.index0 }}(into decoders: inout [String: DecoderFunction]) {
             {% for type_key, swift_type in chunk %}
-            decoders["{{ type_key }}"] = { decoder in
+            decoders["{{ type_key | escapeStringLiteral }}"] = { decoder in
                 do {
                     let decodedObject = try {{ swift_type }}(from: decoder)
                     return .knownType(decodedObject)

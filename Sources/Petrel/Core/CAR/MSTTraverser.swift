@@ -43,10 +43,10 @@ public class MSTTraverser {
         }
 
         var visited = Set<CID>()
+        var lastKeyBytes: [UInt8]? = nil
         var stack: [MSTFrame] = [
             try makeFrame(cid: dataCID, depth: 0, visited: &visited),
         ]
-
         while let frameIndex = stack.indices.last {
             // 1. Process left subtree if not yet processed
             if !stack[frameIndex].processedLeft {
@@ -92,6 +92,25 @@ public class MSTTraverser {
                     )
                 }
 
+                // Validate path structure: must be exactly collection/rkey (no additional slashes)
+                let parts = fullKey.split(separator: "/", omittingEmptySubsequences: false)
+                guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else {
+                    throw CARReaderError.decodingFailed(
+                        "MST node \(CARReader.cidHex(from: stack[frameIndex].cid)) entry \(entryIndex) has invalid path structure: '\(fullKey)'"
+                    )
+                }
+
+                // Validate strictly increasing order across traversal
+                if let prevKeyBytes = lastKeyBytes {
+                    let currentBytes = stack[frameIndex].keyBytes
+                    guard currentBytes.lexicographicallyPrecedes(prevKeyBytes) == false && currentBytes != prevKeyBytes else {
+                        throw CARReaderError.decodingFailed(
+                            "MST keys out of order or duplicate: '\(fullKey)'"
+                        )
+                    }
+                }
+                lastKeyBytes = stack[frameIndex].keyBytes
+
                 // "v" — value CID (the record)
                 guard let valueCID = entry["v"] as? CID else {
                     throw CARReaderError.decodingFailed(
@@ -100,7 +119,6 @@ public class MSTTraverser {
                 }
 
                 try onRecord(fullKey, valueCID)
-
                 // If this entry has a right subtree 't', push it to the stack
                 if let treeCID = entry["t"] as? CID {
                     let nextDepth = stack[frameIndex].depth + 1

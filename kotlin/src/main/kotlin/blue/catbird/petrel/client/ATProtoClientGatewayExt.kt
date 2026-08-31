@@ -15,14 +15,7 @@ import java.util.WeakHashMap
  * strategy-per-client mapping lives in a synchronized [WeakHashMap]. Entries
  * are removed automatically when their owning [ATProtoClient] is garbage
  * collected.
- *
- * The old inline `createGatewayLoginUrl` / `handleGatewayCallback` /
- * `restoreGatewaySession` / `clearGatewaySession` / `currentGatewaySessionId` /
- * `gatewayLogout` methods on [ATProtoClient] (emitted by
- * `Generator/templates/kotlin/KotlinClientMain.jinja`) remain for source
- * compatibility, but Android callers should migrate to the strategy-based
- * API exposed here. See the report in `wip/kotlin-gateway-strategy` for
- * follow-up template cleanup.
+ * Android callers should use the strategy-based API exposed here.
  */
 private val strategies: MutableMap<ATProtoClient, ConfidentialGatewayStrategy> =
     Collections.synchronizedMap(WeakHashMap())

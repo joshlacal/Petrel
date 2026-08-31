@@ -160,13 +160,21 @@ private func nonceInProof(_ compactJWS: String) throws -> String? {
 private func withOAuthFlowTransport<T>(
     _ backend: InMemorySecureStorage,
     handler: @escaping @Sendable (URLRequest) -> (HTTPURLResponse, Data),
-    _ body: () async throws -> T
+    _ body: @escaping () async throws -> T
 ) async throws -> T {
     try await withSerializedStorageOverrideTest {
         KeychainManager._setStorageOverride(backend)
         OAuthFlowURLProtocol.setHandler(handler)
         NetworkService.setNetworkTestProtocolClasses([OAuthFlowURLProtocol.self])
+        let testDNS: @Sendable (String) -> [String]? = { host in
+            if host == "localhost" || host == "127.0.0.1" || host == "::1" {
+                return ["127.0.0.1"]
+            }
+            return ["93.184.216.34"]
+        }
+        NetworkService.dnsResolverOverride = testDNS
         defer {
+            NetworkService.dnsResolverOverride = nil
             NetworkService.setNetworkTestProtocolClasses(nil)
             OAuthFlowURLProtocol.setHandler(nil)
             KeychainManager._setStorageOverride(nil)
@@ -182,6 +190,18 @@ private func withOAuthFlowTransport<T>(
 /// `use_dpop_nonce` retry on the server's nonce whether or not it started out with a
 /// PAR nonce — gating the retry on "no initial nonce" made a rotated PAR nonce fail
 /// the login outright.
+private final class NonceTestDIDResolver: DIDResolving, @unchecked Sendable {
+    func resolveHandleToDID(handle: String) async throws -> String {
+        "did:plc:parnoncerotation"
+    }
+    func resolveDIDToPDSURL(did: String) async throws -> URL {
+        URL(string: pdsHost)!
+    }
+    func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
+        ("exchange.example", URL(string: pdsHost)!)
+    }
+}
+
 @Suite("OAuth token exchange nonce handling", .serialized)
 struct OAuthTokenExchangeNonceTests {
     private func makeStrategy(namespace: String) -> PublicOAuthStrategy {
@@ -200,7 +220,7 @@ struct OAuthTokenExchangeNonceTests {
                 redirectUri: "https://client.example/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver()
+            didResolver: NonceTestDIDResolver()
         )
     }
 
@@ -249,6 +269,8 @@ struct OAuthTokenExchangeNonceTests {
             let storage = KeychainStorage(namespace: namespace)
             let stateToken = UUID().uuidString
             let ephemeralKey = P256.Signing.PrivateKey()
+            let jwk = try await strategy.core.createJWK(from: ephemeralKey)
+            let dpopJKT = try await strategy.core.calculateJWKThumbprint(jwk: jwk)
             try await storage.saveOAuthState(
                 OAuthState(
                     stateToken: stateToken,
@@ -259,12 +281,19 @@ struct OAuthTokenExchangeNonceTests {
                     ephemeralDPoPKey: ephemeralKey.rawRepresentation,
                     parResponseNonce: initialPARNonce,
                     bskyAppViewDID: nil,
-                    bskyChatDID: nil
+                    bskyChatDID: nil,
+                    expectedIssuer: authHost,
+                    expectedPDSOrigin: pdsHost,
+                    expectedDID: "did:plc:parnoncerotation",
+                    redirectURI: "https://client.example/callback",
+                    dpopJKT: dpopJKT,
+                    tokenEndpoint: "\(authHost)/oauth/token",
+                    authorizationEndpoint: "\(authHost)/oauth/authorize"
                 )
             )
 
             let callbackURL = URL(
-                string: "https://client.example/callback?code=auth-code&state=\(stateToken)"
+                string: "https://client.example/callback?code=auth-code&state=\(stateToken)&iss=\(authHost)"
             )!
             let result = try await strategy.handleOAuthCallback(url: callbackURL)
 

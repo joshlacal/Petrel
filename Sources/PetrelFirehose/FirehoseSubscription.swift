@@ -62,21 +62,44 @@ public protocol FirehoseWebSocketSessionFactory: Sendable {
 
 public final class URLSessionFirehoseWebSocketSession: FirehoseWebSocketSession, @unchecked Sendable {
   private let task: URLSessionWebSocketTask
+  private let delegate: HardenedURLSessionDelegate?
 
   public init(task: URLSessionWebSocketTask) {
     self.task = task
+    self.delegate = nil
+    self.task.resume()
+  }
+
+  package init(task: URLSessionWebSocketTask, delegate: HardenedURLSessionDelegate?) {
+    self.task = task
+    self.delegate = delegate
     self.task.resume()
   }
 
   public func receiveMessage() async throws -> Data {
-    let message = try await task.receive()
-    switch message {
-    case let .data(data):
-      return data
-    case let .string(text):
-      return Data(text.utf8)
-    @unknown default:
-      throw FirehoseSubscriptionError.unsupportedMessageFormat
+    do {
+      let message = try await task.receive()
+      switch message {
+      case let .data(data):
+        return data
+      case .string:
+        throw FirehoseSubscriptionError.unsupportedMessageFormat
+      @unknown default:
+        throw FirehoseSubscriptionError.unsupportedMessageFormat
+      }
+    } catch {
+      if let delegate {
+        if delegate.contextManager.isSecurityViolation(for: task) {
+          delegate.contextManager.pruneCompletedTask(task)
+          throw NetworkError.securityViolation
+        }
+        if delegate.contextManager.isLimitExceeded(for: task) {
+          delegate.contextManager.pruneCompletedTask(task)
+          throw NetworkError.responseLimitExceeded("Response limit exceeded")
+        }
+        delegate.contextManager.pruneCompletedTask(task)
+      }
+      throw error
     }
   }
 
@@ -88,20 +111,50 @@ public final class URLSessionFirehoseWebSocketSession: FirehoseWebSocketSession,
 /// URLSession is internally thread-safe/reference-safe, but Swift FoundationNetworking 6.1 lacks Sendable annotation on Linux.
 public struct URLSessionFirehoseWebSocketFactory: FirehoseWebSocketSessionFactory, @unchecked Sendable {
   private let session: URLSession
+  private let delegate: HardenedURLSessionDelegate?
 
-  public init(session: URLSession = .shared) {
+  public init() {
+    let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+    let config = URLSessionConfiguration.ephemeral
+    self.delegate = delegate
+    self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+  }
+
+  public init(session: URLSession) {
     self.session = session
+    self.delegate = session.delegate as? HardenedURLSessionDelegate
+  }
+
+  public init(limits: NetworkResponseLimits) {
+    let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
+    let config = URLSessionConfiguration.ephemeral
+    self.delegate = delegate
+    self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
   }
 
   public func makeSession(url: URL) async throws -> any FirehoseWebSocketSession {
+    if !(try await NetworkService.validateURL(url)) {
+      throw NetworkError.securityViolation
+    }
     let task = session.webSocketTask(with: url)
-    return URLSessionFirehoseWebSocketSession(task: task)
+    let host = url.host?.lowercased() ?? ""
+    let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
+    if let delegate {
+      let addresses = try await NetworkService.resolveApprovedAddresses(host: host, isLocal: isLocal)
+      delegate.contextManager.setApprovedAddresses(addresses, for: task)
+    }
+    return URLSessionFirehoseWebSocketSession(task: task, delegate: delegate)
   }
 }
 
 public enum FirehoseSubscriptionError: Error, Sendable, Equatable {
   case unsupportedMessageFormat
   case connectionClosed
+  case duplicateSequence(Int64)
+  case cursorRegression(expected: Int64, received: Int64)
+  case resynchronizationRequired
+  case storageFailure
+  case unacknowledgedSequenceGap
 }
 
 public struct FirehoseSubscriptionConfiguration: Sendable {
@@ -109,44 +162,107 @@ public struct FirehoseSubscriptionConfiguration: Sendable {
   public var cursorStorage: any FirehoseCursorStorage
   public var backoff: FirehoseBackoffConfiguration
   public var sessionFactory: any FirehoseWebSocketSessionFactory
+  public var bufferLimit: Int
+  public var autoAcknowledge: Bool
 
   public init(
     url: URL,
     cursorStorage: any FirehoseCursorStorage = InMemoryFirehoseCursorStorage(),
     backoff: FirehoseBackoffConfiguration = .init(),
-    sessionFactory: any FirehoseWebSocketSessionFactory = URLSessionFirehoseWebSocketFactory()
+    sessionFactory: any FirehoseWebSocketSessionFactory = URLSessionFirehoseWebSocketFactory(),
+    bufferLimit: Int = 1000,
+    autoAcknowledge: Bool = false
   ) {
     self.url = url
     self.cursorStorage = cursorStorage
     self.backoff = backoff
     self.sessionFactory = sessionFactory
+    self.bufferLimit = bufferLimit
+    self.autoAcknowledge = autoAcknowledge
+  }
+}
+
+private actor FirehoseSubscriptionCoordinator {
+  private let storage: any FirehoseCursorStorage
+  private var lastPersistedCursor: Int64?
+
+  init(storage: any FirehoseCursorStorage) {
+    self.storage = storage
+  }
+
+  func initializeCursor(_ cursor: Int64?) {
+    if lastPersistedCursor == nil {
+      lastPersistedCursor = cursor
+    }
+  }
+
+  func acknowledge(sequence: Int64) async throws {
+    if let last = lastPersistedCursor {
+      guard sequence > last else {
+        throw FirehoseSubscriptionError.cursorRegression(expected: last + 1, received: sequence)
+      }
+      guard sequence == last + 1 else {
+        throw FirehoseSubscriptionError.unacknowledgedSequenceGap
+      }
+    }
+    do {
+      try await storage.saveCursor(sequence)
+      lastPersistedCursor = sequence
+    } catch {
+      throw FirehoseSubscriptionError.storageFailure
+    }
+  }
+
+  func currentCursor() -> Int64? {
+    lastPersistedCursor
   }
 }
 
 public final class FirehoseSubscription: Sendable {
   public let configuration: FirehoseSubscriptionConfiguration
+  private let coordinator: FirehoseSubscriptionCoordinator
 
   public init(configuration: FirehoseSubscriptionConfiguration) {
     self.configuration = configuration
+    self.coordinator = FirehoseSubscriptionCoordinator(storage: configuration.cursorStorage)
   }
 
-  public init(
+  public convenience init(
     url: URL,
     cursorStorage: any FirehoseCursorStorage = InMemoryFirehoseCursorStorage(),
     backoff: FirehoseBackoffConfiguration = .init(),
-    sessionFactory: any FirehoseWebSocketSessionFactory = URLSessionFirehoseWebSocketFactory()
+    sessionFactory: any FirehoseWebSocketSessionFactory = URLSessionFirehoseWebSocketFactory(),
+    bufferLimit: Int = 1000,
+    autoAcknowledge: Bool = false
   ) {
-    self.configuration = FirehoseSubscriptionConfiguration(
-      url: url,
-      cursorStorage: cursorStorage,
-      backoff: backoff,
-      sessionFactory: sessionFactory
+    self.init(
+      configuration: FirehoseSubscriptionConfiguration(
+        url: url,
+        cursorStorage: cursorStorage,
+        backoff: backoff,
+        sessionFactory: sessionFactory,
+        bufferLimit: bufferLimit,
+        autoAcknowledge: autoAcknowledge
+      )
     )
   }
 
-  public func events() -> AsyncStream<FirehoseSubscriptionEvent> {
-    AsyncStream { continuation in
-      let runner = FirehoseSubscriptionRunner(configuration: configuration)
+  public func acknowledge(sequence: Int64) async throws {
+    try await coordinator.acknowledge(sequence: sequence)
+  }
+
+  public func acknowledge(_ event: RelayEvent) async throws {
+    guard let seq = event.sequence else { return }
+    try await acknowledge(sequence: seq)
+  }
+
+  public func currentCursor() async -> Int64? {
+    await coordinator.currentCursor()
+  }
+
+  public func events() -> AsyncThrowingStream<FirehoseSubscriptionEvent, any Error> {
+    AsyncThrowingStream(bufferingPolicy: .bufferingOldest(configuration.bufferLimit)) { continuation in
+      let runner = FirehoseSubscriptionRunner(configuration: configuration, coordinator: coordinator)
       let task = Task {
         await runner.run(continuation: continuation)
       }
@@ -162,10 +278,15 @@ public final class FirehoseSubscription: Sendable {
 
 private actor FirehoseSubscriptionRunner {
   private let configuration: FirehoseSubscriptionConfiguration
+  private let coordinator: FirehoseSubscriptionCoordinator
   private var activeSession: (any FirehoseWebSocketSession)?
 
-  init(configuration: FirehoseSubscriptionConfiguration) {
+  init(
+    configuration: FirehoseSubscriptionConfiguration,
+    coordinator: FirehoseSubscriptionCoordinator
+  ) {
     self.configuration = configuration
+    self.coordinator = coordinator
   }
 
   func stop() async {
@@ -177,15 +298,21 @@ private actor FirehoseSubscriptionRunner {
     self.activeSession = session
   }
 
-  func run(continuation: AsyncStream<FirehoseSubscriptionEvent>.Continuation) async {
+  func run(continuation: AsyncThrowingStream<FirehoseSubscriptionEvent, any Error>.Continuation) async {
     var currentDelay: TimeInterval?
-    var lastSequence: Int64?
+    var lastDeliveredSequence: Int64?
 
     while !Task.isCancelled {
-      let cursor = try? await configuration.cursorStorage.loadCursor()
-      if lastSequence == nil, let cursor {
-        lastSequence = cursor
+      let cursor: Int64?
+      do {
+        cursor = try await configuration.cursorStorage.loadCursor()
+      } catch {
+        continuation.finish(throwing: FirehoseSubscriptionError.storageFailure)
+        return
       }
+
+      await coordinator.initializeCursor(cursor)
+      lastDeliveredSequence = cursor
       let connectURL = Self.urlWithCursor(configuration.url, cursor: cursor)
 
       do {
@@ -198,17 +325,67 @@ private actor FirehoseSubscriptionRunner {
 
           let event = try RelayFrameDecoder.decode(data)
           if let seq = event.sequence {
-            if let last = lastSequence, seq > last + 1 {
-              continuation.yield(.sequenceGap(expected: last + 1, received: seq))
+            try FirehoseFrameLimits.validateSequence(seq)
+            if let last = lastDeliveredSequence {
+              if seq == last {
+                await stop()
+                continuation.finish(throwing: FirehoseSubscriptionError.duplicateSequence(seq))
+                return
+              }
+              if seq < last {
+                await stop()
+                continuation.finish(throwing: FirehoseSubscriptionError.cursorRegression(expected: last + 1, received: seq))
+                return
+              }
+              if seq > last + 1 {
+                let gapResult = continuation.yield(.sequenceGap(expected: last + 1, received: seq))
+                await stop()
+                if case .terminated = gapResult {
+                  return
+                }
+                continuation.finish(throwing: FirehoseSubscriptionError.resynchronizationRequired)
+                return
+              }
             }
-            lastSequence = seq
-            try? await configuration.cursorStorage.saveCursor(seq)
+            lastDeliveredSequence = seq
+            if configuration.autoAcknowledge {
+              try await coordinator.acknowledge(sequence: seq)
+            }
           }
-          continuation.yield(.event(event))
+
+          let eventResult = continuation.yield(.event(event))
+          switch eventResult {
+          case .enqueued:
+            break
+          case .dropped:
+            await stop()
+            continuation.finish(throwing: FirehoseSubscriptionError.resynchronizationRequired)
+            return
+          case .terminated:
+            await stop()
+            return
+          @unknown default:
+            break
+          }
         }
       } catch {
         await stop()
         if Task.isCancelled { break }
+        switch error {
+        case FirehoseSubscriptionError.connectionClosed:
+          break
+        case is URLError,
+             NetworkError.requestFailed:
+          break
+        case is FirehoseSubscriptionError,
+             is RelayVerifierError,
+             is NetworkError,
+             is DecodingError:
+          continuation.finish(throwing: error)
+          return
+        default:
+          break
+        }
         let delay = configuration.backoff.nextDelay(after: currentDelay)
         currentDelay = delay
         try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))

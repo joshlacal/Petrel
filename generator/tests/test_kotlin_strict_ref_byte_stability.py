@@ -164,8 +164,9 @@ class KotlinStrictRefByteStabilityTests(unittest.TestCase):
             "blue.catbird.test.ordinaryObject": (
                 "3e6c64d3f955f3f2e7c76ff67b7f064464775c6681874090bfb5cd668c5ef99b"
             ),
+            # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
             "blue.catbird.test.ordinaryProcedure": (
-                "6c7362fd8911567080c9103766f20195d3b44ad6604b144126baab46e2a8a585"
+                "d29ff2cef9cadbfa554448c42a6ab432d676ade992671bc19e3e72ca25604137"
             ),
             "blue.catbird.test.ordinaryRecord": (
                 "64d9efecd9bfc95390371a71cae9960a42195e0c6fe697aaca511186bcfce9c4"

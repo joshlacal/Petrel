@@ -31,8 +31,11 @@ final class FirehoseSubscriptionTests: XCTestCase {
     var received: [FirehoseSubscriptionEvent] = []
     let stream = subscription.events()
 
-    for await event in stream {
+    for try await event in stream {
       received.append(event)
+      if case let .event(relayEvent) = event {
+        try await subscription.acknowledge(relayEvent)
+      }
       if received.count == 2 {
         break
       }
@@ -79,29 +82,29 @@ final class FirehoseSubscriptionTests: XCTestCase {
     var received: [FirehoseSubscriptionEvent] = []
     let stream = subscription.events()
 
-    for await event in stream {
-      received.append(event)
-      if received.count == 3 {
-        break
+    var streamError: Error?
+    do {
+      for try await event in stream {
+        received.append(event)
       }
+    } catch {
+      streamError = error
     }
 
-    XCTAssertEqual(received.count, 3)
-    guard case let .event(.identity(first)) = received[0] else {
+    XCTAssertEqual(received.count, 2)
+    guard case let .event(.identity(first)) = received.first else {
       return XCTFail("expected first identity event")
     }
     XCTAssertEqual(first.seq, 10)
 
-    guard case let .sequenceGap(expected, receivedSeq) = received[1] else {
+    guard case let .sequenceGap(expected, receivedSeq) = received.last else {
       return XCTFail("expected sequenceGap event")
     }
     XCTAssertEqual(expected, 11)
     XCTAssertEqual(receivedSeq, 15)
 
-    guard case let .event(.identity(second)) = received[2] else {
-      return XCTFail("expected second identity event")
-    }
-    XCTAssertEqual(second.seq, 15)
+    XCTAssertEqual(streamError as? FirehoseSubscriptionError, .resynchronizationRequired)
+    await session.waitForClose()
   }
 
   func testSequenceGapDetectionWithInitialCursor() async throws {
@@ -124,24 +127,37 @@ final class FirehoseSubscriptionTests: XCTestCase {
     var received: [FirehoseSubscriptionEvent] = []
     let stream = subscription.events()
 
-    for await event in stream {
-      received.append(event)
-      if received.count == 2 {
-        break
+    var streamError: Error?
+    do {
+      for try await event in stream {
+        received.append(event)
       }
+    } catch {
+      streamError = error
     }
 
-    XCTAssertEqual(received.count, 2)
-    guard case let .sequenceGap(expected, receivedSeq) = received[0] else {
+    XCTAssertEqual(received.count, 1)
+    guard case let .sequenceGap(expected, receivedSeq) = received.first else {
       return XCTFail("expected sequenceGap event")
     }
     XCTAssertEqual(expected, 41)
     XCTAssertEqual(receivedSeq, 50)
 
-    guard case let .event(.identity(idEvent)) = received[1] else {
-      return XCTFail("expected identity event")
-    }
-    XCTAssertEqual(idEvent.seq, 50)
+    XCTAssertEqual(streamError as? FirehoseSubscriptionError, .resynchronizationRequired)
+    await session.waitForClose()
+  }
+
+  func testSubscriptionExposesCurrentCursor() async throws {
+    let storage = InMemoryFirehoseCursorStorage()
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage
+    )
+    let initial = await subscription.currentCursor()
+    XCTAssertNil(initial)
+    try await subscription.acknowledge(sequence: 43)
+    let acked = await subscription.currentCursor()
+    XCTAssertEqual(acked, 43)
   }
 
   func testCursorIsAppendedToURLOnConnect() async throws {
@@ -162,7 +178,7 @@ final class FirehoseSubscriptionTests: XCTestCase {
     )
 
     let stream = subscription.events()
-    for await _ in stream {
+    for try await _ in stream {
       break
     }
 
@@ -181,9 +197,7 @@ final class FirehoseSubscriptionTests: XCTestCase {
       material: .init(did: did, handle: nil, time: time)
     )
 
-    // Session 1 delivers frame1, then throws error
     let session1 = FakeWebSocketSession(messages: [frame1], errorAfterMessages: FirehoseSubscriptionError.connectionClosed)
-    // Session 2 delivers frame2
     let session2 = FakeWebSocketSession(messages: [frame2])
 
     let factory = FakeWebSocketFactory(sessions: [session1, session2])
@@ -199,8 +213,11 @@ final class FirehoseSubscriptionTests: XCTestCase {
     var received: [FirehoseSubscriptionEvent] = []
     let stream = subscription.events()
 
-    for await event in stream {
+    for try await event in stream {
       received.append(event)
+      if case let .event(relayEvent) = event {
+        try await subscription.acknowledge(relayEvent)
+      }
       if received.count == 2 {
         break
       }
@@ -222,7 +239,266 @@ final class FirehoseSubscriptionTests: XCTestCase {
     XCTAssertNil(urls[0].query)
     XCTAssertEqual(urls[1].query, "cursor=10")
   }
+  func testReconnectionRebasesWatermarkOnPersistedCursorAfterUnacknowledgedDelivery() async throws {
+    let frame10 = try FirehoseFrameEncoder.identityFrame(
+      seq: 10,
+      material: .init(did: did, handle: nil, time: time)
+    )
+    let frame11 = try FirehoseFrameEncoder.identityFrame(
+      seq: 11,
+      material: .init(did: did, handle: nil, time: time)
+    )
+    let frame11Replay = try FirehoseFrameEncoder.identityFrame(
+      seq: 11,
+      material: .init(did: did, handle: nil, time: time)
+    )
+    let frame12 = try FirehoseFrameEncoder.identityFrame(
+      seq: 12,
+      material: .init(did: did, handle: nil, time: time)
+    )
 
+    let session1 = FakeWebSocketSession(messages: [frame10, frame11], errorAfterMessages: FirehoseSubscriptionError.connectionClosed)
+    let session2 = FakeWebSocketSession(messages: [frame11Replay, frame12])
+
+    let factory = FakeWebSocketFactory(sessions: [session1, session2])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.005, maxDelay: 0.01, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    var receivedSeqs: [Int64] = []
+    let stream = subscription.events()
+
+    for try await event in stream {
+      if case let .event(.identity(ident)) = event {
+        receivedSeqs.append(ident.seq)
+        if ident.seq == 10 {
+          try await subscription.acknowledge(sequence: 10)
+        } else if receivedSeqs.count >= 3 {
+          try await subscription.acknowledge(sequence: ident.seq)
+        }
+      }
+      if receivedSeqs.count == 3 {
+        break
+      }
+    }
+
+    XCTAssertEqual(receivedSeqs, [10, 11, 11])
+    let urls = await factory.connectedURLs
+    XCTAssertEqual(urls.count, 2)
+    XCTAssertNil(urls[0].query)
+    XCTAssertEqual(urls[1].query, "cursor=10")
+  }
+
+  func testDuplicateSequenceTerminatesWithError() async throws {
+    let frame1 = try FirehoseFrameEncoder.identityFrame(
+      seq: 10,
+      material: .init(did: did, handle: nil, time: time)
+    )
+    let frame2 = try FirehoseFrameEncoder.identityFrame(
+      seq: 10,
+      material: .init(did: did, handle: nil, time: time)
+    )
+
+    let session = FakeWebSocketSession(messages: [frame1, frame2])
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    let stream = subscription.events()
+    var caughtError: Error?
+    do {
+      for try await _ in stream {}
+    } catch {
+      caughtError = error
+    }
+    XCTAssertEqual(caughtError as? FirehoseSubscriptionError, .duplicateSequence(10))
+  }
+
+  func testSequenceRegressionTerminatesWithError() async throws {
+    let frame1 = try FirehoseFrameEncoder.identityFrame(
+      seq: 10,
+      material: .init(did: did, handle: nil, time: time)
+    )
+    let frame2 = try FirehoseFrameEncoder.identityFrame(
+      seq: 9,
+      material: .init(did: did, handle: nil, time: time)
+    )
+
+    let session = FakeWebSocketSession(messages: [frame1, frame2])
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    let stream = subscription.events()
+    var caughtError: Error?
+    do {
+      for try await _ in stream {}
+    } catch {
+      caughtError = error
+    }
+    XCTAssertEqual(caughtError as? FirehoseSubscriptionError, .cursorRegression(expected: 11, received: 9))
+  }
+
+  func testFailedDurableApplicationDoesNotAdvanceCursor() async throws {
+    let frame1 = try FirehoseFrameEncoder.identityFrame(
+      seq: 1,
+      material: .init(did: did, handle: "alice.test", time: time)
+    )
+    let frame2 = try FirehoseFrameEncoder.accountFrame(
+      seq: 2,
+      material: .init(did: did, active: true, status: nil, time: time)
+    )
+
+    let session = FakeWebSocketSession(messages: [frame1, frame2])
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    let stream = subscription.events()
+    var count = 0
+    for try await event in stream {
+      count += 1
+      if count == 1 {
+        // Consumer succeeds on event 1 and acknowledges it
+        if case let .event(relayEvent) = event {
+          try await subscription.acknowledge(relayEvent)
+        }
+      } else {
+        // Consumer simulates application failure on event 2 and does NOT acknowledge
+        break
+      }
+    }
+
+    let savedCursor = await storage.loadCursor()
+    // Stored cursor must remain at 1, because event 2 was never acknowledged
+    XCTAssertEqual(savedCursor, 1)
+  }
+
+  func testFailedCursorSaveFailsClosed() async throws {
+    actor FailingCursorStorage: FirehoseCursorStorage {
+      struct Boom: Error, Equatable {}
+      func loadCursor() async throws -> Int64? { nil }
+      func saveCursor(_ cursor: Int64) async throws { throw Boom() }
+    }
+
+    let storage = FailingCursorStorage()
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      sessionFactory: FakeWebSocketFactory(sessions: [])
+    )
+
+    do {
+      try await subscription.acknowledge(sequence: 1)
+      XCTFail("expected storageFailure")
+    } catch {
+      XCTAssertEqual(error as? FirehoseSubscriptionError, .storageFailure)
+    }
+  }
+
+  func testUnacknowledgedSequenceGapThrowsError() async throws {
+    let storage = InMemoryFirehoseCursorStorage()
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      sessionFactory: FakeWebSocketFactory(sessions: [])
+    )
+
+    try await subscription.acknowledge(sequence: 1)
+    // Acknowledging sequence 3 when sequence 2 was skipped
+    do {
+      try await subscription.acknowledge(sequence: 3)
+      XCTFail("expected unacknowledgedSequenceGap")
+    } catch {
+      XCTAssertEqual(error as? FirehoseSubscriptionError, .unacknowledgedSequenceGap)
+    }
+  }
+
+  func testConsumerCancellationClosesSocketSession() async throws {
+    let frame1 = try FirehoseFrameEncoder.identityFrame(
+      seq: 1,
+      material: .init(did: did, handle: nil, time: time)
+    )
+
+    let session = FakeWebSocketSession(messages: [frame1])
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      sessionFactory: factory
+    )
+
+    let consumerTask = Task {
+      for try await _ in subscription.events() {
+        break
+      }
+    }
+    _ = await consumerTask.result
+
+    // Wait for the session's close to be signaled rather than relying on a fixed delay
+    await session.waitForClose()
+    let isClosed = await session.isClosed
+    XCTAssertTrue(isClosed)
+  }
+
+  func testBoundedStreamOverflowTerminatesWithResynchronizationRequired() async throws {
+    var frames: [Data] = []
+    for i in 1 ... 50 {
+      frames.append(try FirehoseFrameEncoder.identityFrame(
+        seq: Int64(i),
+        material: .init(did: did, handle: nil, time: time)
+      ))
+    }
+
+    let session = FakeWebSocketSession(messages: frames)
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    // Buffer limit of 2: producing messages faster than slow consumer will overflow
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      sessionFactory: factory,
+      bufferLimit: 2
+    )
+
+    let stream = subscription.events()
+    var caughtError: Error?
+    do {
+      for try await _ in stream {
+        // Slow consumer to let the 2-slot producer buffer saturate and drop
+        try await Task.sleep(nanoseconds: 20_000_000)
+      }
+    } catch {
+      caughtError = error
+    }
+    XCTAssertEqual(caughtError as? FirehoseSubscriptionError, .resynchronizationRequired)
+  }
   func testBackoffCalculation() {
     let backoff = FirehoseBackoffConfiguration(initialDelay: 1.0, maxDelay: 8.0, multiplier: 2.0)
     XCTAssertEqual(backoff.nextDelay(after: nil), 1.0)
@@ -232,6 +508,153 @@ final class FirehoseSubscriptionTests: XCTestCase {
     XCTAssertEqual(backoff.nextDelay(after: 8.0), 8.0)
     XCTAssertEqual(backoff.nextDelay(after: 16.0), 8.0)
   }
+
+  func testRelayVerifierRevisionRollbackTerminatesStreamImmediatelyWithoutReconnecting() async throws {
+    let session = FakeWebSocketSession(messages: [], errorAfterMessages: RelayVerifierError.revisionRollback)
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    let stream = subscription.events()
+    var caughtError: Error?
+    do {
+      for try await _ in stream {}
+    } catch {
+      caughtError = error
+    }
+
+    XCTAssertEqual(caughtError as? RelayVerifierError, .revisionRollback)
+  }
+
+  func testURLSessionFirehoseWebSocketFactoryRejectsSSRFAndCleartextRemote() async throws {
+    let factory = URLSessionFirehoseWebSocketFactory()
+    do {
+      _ = try await factory.makeSession(url: URL(string: "http://relay.remote.com/xrpc/com.atproto.sync.subscribeRepos")!)
+      XCTFail("Expected cleartext remote URL to be rejected")
+    } catch let error as NetworkError {
+      guard case .securityViolation = error else {
+        XCTFail("Expected .securityViolation, got \(error)")
+        return
+      }
+    } catch {
+      XCTFail("Expected NetworkError.securityViolation, got \(error)")
+    }
+  }
+
+  func testURLSessionFirehoseWebSocketSessionPropagatesSecurityViolation() async throws {
+    let delegate = HardenedURLSessionDelegate()
+    let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+    defer { session.invalidateAndCancel() }
+    let task = session.webSocketTask(with: URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
+    delegate.contextManager.recordSecurityViolation(for: task)
+    task.cancel()
+    let wsSession = URLSessionFirehoseWebSocketSession(task: task, delegate: delegate)
+    do {
+      _ = try await wsSession.receiveMessage()
+      XCTFail("Expected security violation error")
+    } catch let error as NetworkError {
+      guard case .securityViolation = error else {
+        XCTFail("Expected .securityViolation, got \(error)")
+        return
+      }
+    } catch {
+      XCTFail("Expected NetworkError.securityViolation, got \(error)")
+    }
+  }
+
+  func testRelayVerifierFrameDecodeFailureTerminatesStreamImmediatelyWithoutReconnecting() async throws {
+    let session = FakeWebSocketSession(messages: [], errorAfterMessages: RelayVerifierError.invalidCBOR)
+    let factory = FakeWebSocketFactory(sessions: [session])
+    let storage = InMemoryFirehoseCursorStorage()
+
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    let stream = subscription.events()
+    var caughtError: Error?
+    do {
+      for try await _ in stream {}
+    } catch {
+      caughtError = error
+    }
+
+    XCTAssertEqual(caughtError as? RelayVerifierError, .invalidCBOR)
+  }
+  func testStreamRetriesOnTransientDNSOrConnectivityFailure() async throws {
+    let frame = try FirehoseFrameEncoder.identityFrame(
+      seq: 1,
+      material: .init(did: did, handle: "alice.test", time: time)
+    )
+    let successSession = FakeWebSocketSession(messages: [frame])
+
+    // Custom factory that fails first attempt with URLError(.cannotFindHost) then succeeds
+    actor FlakyFactory: FirehoseWebSocketSessionFactory {
+      var attempts = 0
+      let successSession: any FirehoseWebSocketSession
+      init(successSession: any FirehoseWebSocketSession) {
+        self.successSession = successSession
+      }
+      func makeSession(url: URL) async throws -> any FirehoseWebSocketSession {
+        attempts += 1
+        if attempts == 1 {
+          throw URLError(.cannotFindHost)
+        }
+        return successSession
+      }
+    }
+
+    let factory = FlakyFactory(successSession: successSession)
+    let storage = InMemoryFirehoseCursorStorage()
+    let subscription = FirehoseSubscription(
+      url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
+      cursorStorage: storage,
+      backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
+      sessionFactory: factory
+    )
+
+    var received: [FirehoseSubscriptionEvent] = []
+    let stream = subscription.events()
+    for try await event in stream {
+      received.append(event)
+      if received.count == 1 { break }
+    }
+
+    XCTAssertEqual(received.count, 1)
+    guard case let .event(.identity(identity)) = received.first else {
+      return XCTFail("expected identity event")
+    }
+    XCTAssertEqual(identity.seq, 1)
+    let attempts = await factory.attempts
+    XCTAssertEqual(attempts, 2, "Expected subscription to retry after transient DNS failure and succeed on second attempt")
+  }
+  func testURLSessionFirehoseWebSocketFactoryDoesNotMapDNSFailureToSecurityViolation() async throws {
+    let factory = URLSessionFirehoseWebSocketFactory()
+    NetworkService.dnsResolverOverride = { _ in [] } // simulates getaddrinfo returning no addresses (offline / DNS down)
+    defer {
+      NetworkService.dnsResolverOverride = nil
+    }
+
+    do {
+      _ = try await factory.makeSession(url: URL(string: "wss://relay.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
+      XCTFail("Expected makeSession to fail when host cannot be resolved")
+    } catch let error as NetworkError {
+      if case .securityViolation = error {
+        XCTFail("DNS resolution failure / offline state should NOT throw NetworkError.securityViolation; should throw requestFailed or URLError")
+      }
+    } catch {
+      // Non-security error (e.g. URLError, NetworkError.requestFailed) is expected
+    }
+  }
 }
 
 // MARK: - Test Doubles
@@ -240,6 +663,9 @@ private actor FakeWebSocketSession: FirehoseWebSocketSession {
   private var messages: [Data]
   private let errorAfterMessages: Error?
   private(set) var isClosed = false
+  private var closeContinuations: [CheckedContinuation<Void, Never>] = []
+  private var deliveredCount = 0
+  private var deliveryContinuations: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
   init(messages: [Data], errorAfterMessages: Error? = nil) {
     self.messages = messages
@@ -251,7 +677,10 @@ private actor FakeWebSocketSession: FirehoseWebSocketSession {
       throw FirehoseSubscriptionError.connectionClosed
     }
     if !messages.isEmpty {
-      return messages.removeFirst()
+      let msg = messages.removeFirst()
+      deliveredCount += 1
+      notifyDeliveryWaiters()
+      return msg
     }
     if let error = errorAfterMessages {
       throw error
@@ -262,9 +691,47 @@ private actor FakeWebSocketSession: FirehoseWebSocketSession {
     }
     throw FirehoseSubscriptionError.connectionClosed
   }
-
   func close() {
     isClosed = true
+    let waiters = closeContinuations
+    closeContinuations.removeAll()
+    for continuation in waiters {
+      continuation.resume()
+    }
+  }
+
+  func waitForClose() async {
+    if isClosed { return }
+    await withCheckedContinuation { continuation in
+      if isClosed {
+        continuation.resume()
+      } else {
+        closeContinuations.append(continuation)
+      }
+    }
+  }
+
+  func waitForDeliveryCount(atLeast count: Int) async {
+    if deliveredCount >= count { return }
+    await withCheckedContinuation { continuation in
+      if deliveredCount >= count {
+        continuation.resume()
+      } else {
+        deliveryContinuations.append((count: count, continuation: continuation))
+      }
+    }
+  }
+
+  private func notifyDeliveryWaiters() {
+    var pending: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
+    for waiter in deliveryContinuations {
+      if deliveredCount >= waiter.count {
+        waiter.continuation.resume()
+      } else {
+        pending.append(waiter)
+      }
+    }
+    deliveryContinuations = pending
   }
 }
 

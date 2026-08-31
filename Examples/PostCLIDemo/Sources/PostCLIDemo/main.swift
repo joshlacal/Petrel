@@ -9,6 +9,11 @@
 //
 
 import Foundation
+#if canImport(Darwin)
+    import Darwin
+#elseif canImport(Glibc)
+    import Glibc
+#endif
 import Petrel
 
 @main
@@ -19,11 +24,12 @@ struct PostCLIDemo {
 
         do {
             // Initialize the client
-            let client = await ATProtoClient(
+            let client = try await ATProtoClient(
                 baseURL: URL(string: "https://bsky.social")!,
                 oauthConfig: OAuthConfig(
-                    clientId: "http://localhost",
-                    redirectUri: "http://localhost/callback"
+                    clientId: "https://client.example.com/client-metadata.json",
+                    redirectUri: "https://client.example.com/callback",
+                    scope: "atproto transition:generic"
                 ),
                 namespace: "com.example.postcli"
             )
@@ -39,7 +45,7 @@ struct PostCLIDemo {
 
             print("\nEnter your app password:")
             print("(Generate one at https://bsky.app/settings/app-passwords)")
-            guard let password = readLine()?.trimmingCharacters(in: .whitespaces),
+            guard let password = readSecret()?.trimmingCharacters(in: .whitespaces),
                   !password.isEmpty
             else {
                 print("❌ Password is required")
@@ -99,6 +105,44 @@ struct PostCLIDemo {
         }
     }
 
+    private static func readSecret(prompt: String? = nil) -> String? {
+        if let prompt {
+            print(prompt, terminator: "")
+            fflush(stdout)
+        }
+
+        let descriptor = STDIN_FILENO
+        guard isatty(descriptor) != 0 else {
+            return readLine(strippingNewline: true)?.trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        var originalTermios = termios()
+        guard tcgetattr(descriptor, &originalTermios) == 0 else {
+            print("\n❌ Error: Failed to inspect terminal attributes for secure password input")
+            exit(1)
+        }
+
+        var noEchoTermios = originalTermios
+        #if canImport(Darwin)
+        noEchoTermios.c_lflag &= ~UInt(ECHO)
+        #else
+        noEchoTermios.c_lflag &= ~tcflag_t(ECHO)
+        #endif
+
+        guard tcsetattr(descriptor, TCSANOW, &noEchoTermios) == 0 else {
+            print("\n❌ Error: Failed to disable terminal echo for secure password input")
+            exit(1)
+        }
+
+        defer {
+            tcsetattr(descriptor, TCSANOW, &originalTermios)
+            print("")
+            fflush(stdout)
+        }
+
+        return readLine(strippingNewline: true)?.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     static func postMessage(client: ATProtoClient, handle: String) async throws {
         print("\n📝 Compose your post:")
         print("(Press Enter twice to finish, or type 'cancel' to abort)\n")
@@ -156,19 +200,19 @@ struct PostCLIDemo {
             facets: nil,
             reply: nil,
             embed: nil,
-            langs: [LanguageCodeContainer(code: "en")],
+            langs: [LanguageCodeContainer(languageCode: "en")],
             labels: nil,
             tags: nil,
             createdAt: ATProtocolDate(date: Date())
         )
 
         // Wrap in ATProtocolValueContainer
-        let recordContainer = ATProtocolValueContainer(post)
+        let recordContainer = ATProtocolValueContainer.knownType(post)
 
         // Create the record
-        let input = try ComAtprotoRepoCreateRecord.Input(
-            repo: ATIdentifier(handle),
-            collection: NSID("app.bsky.feed.post"),
+        let input = ComAtprotoRepoCreateRecord.Input(
+            repo: try ATIdentifier(string: handle),
+            collection: try NSID(nsidString: "app.bsky.feed.post"),
             rkey: nil,
             validate: true,
             record: recordContainer,
@@ -194,7 +238,8 @@ struct PostCLIDemo {
     static func viewProfile(client: ATProtoClient, handle: String) async throws {
         print("\n👤 Fetching profile...")
 
-        let params = AppBskyActorGetProfile.Parameters(actor: handle)
+        let actor = try ATIdentifier(string: handle)
+        let params = AppBskyActorGetProfile.Parameters(actor: actor)
         let (responseCode, profile) = try await client.app.bsky.actor.getProfile(input: params)
 
         guard responseCode == 200, let profile = profile else {
@@ -227,5 +272,3 @@ struct PostCLIDemo {
     }
 }
 
-// Run the demo
-await PostCLIDemo.main()

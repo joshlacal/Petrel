@@ -5,6 +5,8 @@ import io.ktor.client.HttpClient
 import io.ktor.client.engine.mock.MockEngine
 import io.ktor.client.engine.mock.respond
 import io.ktor.http.HttpStatusCode
+import io.ktor.http.HttpHeaders
+import io.ktor.http.headersOf
 import java.io.IOException
 import java.util.logging.Handler
 import java.util.logging.LogRecord
@@ -160,6 +162,39 @@ class ConfidentialGatewayLifecycleTest {
         assertNull(network.authorizationHeader)
         assertFalse(logs.contains(marker), logs)
         assertFalse(logs.contains(sessionId), logs)
+    }
+
+    @Test
+    fun `restoreSession binds network service to normalized HTTPS gateway origin and refuses cross origin`() = runTest {
+        val capturedAuth = mutableListOf<String?>()
+        val mockEngine = MockEngine { request ->
+            capturedAuth.add(request.headers[HttpHeaders.Authorization])
+            respond("""{"message":"ok"}""", HttpStatusCode.OK, headersOf(HttpHeaders.ContentType, "application/json"))
+        }
+        val network = NetworkService("https://api.catbird.blue", client = HttpClient(mockEngine))
+        val storage = InMemoryGatewaySessionStorage()
+        val strategy = ConfidentialGatewayStrategy(
+            gatewayBaseUrl = "https://api.catbird.blue",
+            callbackUrl = "https://catbird.blue/oauth/callback",
+            storage = storage,
+            currentAccount = storage,
+            networkService = network,
+            httpClient = HttpClient(mockEngine),
+        )
+        storage.saveSession(did, sessionId)
+        strategy.restoreSession(did)
+
+        assertEquals("https", network.authorizedOrigin?.scheme)
+        assertEquals("api.catbird.blue", network.authorizedOrigin?.host)
+        assertEquals(443, network.authorizedOrigin?.port)
+
+        // Request to authorized gateway origin carries credential
+        network.performRequest<Map<String, String>>("GET", "app.bsky.actor.getProfile")
+        assertEquals("Bearer $sessionId", capturedAuth[0])
+
+        // Request to cross origin does not carry credential
+        network.performRequest<Map<String, String>>("GET", "https://other.service/xrpc/app.bsky.actor.getProfile")
+        assertNull(capturedAuth[1], "Cross origin request must not carry gateway bearer token")
     }
 
     private suspend fun authenticatedFixture(client: HttpClient): Fixture {

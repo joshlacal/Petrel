@@ -288,9 +288,10 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         ).convert()
 
         self.assertEqual(ordinary, explicit_false)
+        # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "7510eb47c53b9983007bba2ea7566dd31e9b40660943617f2774f92d3c26d6a9",
+            "7139da5752c79fc9e21913eef3782b608129ca2596568f3eb041a7219dc09290",
         )
 
     def test_server_contract_flag_false_preserves_direct_input_bytes(self):
@@ -301,9 +302,10 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         ).convert()
 
         self.assertEqual(ordinary, explicit_false)
+        # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "6277561470447678e1457a1e31e5d5c9d29ab75e95afe5bf74b08d83344440cb",
+            "66e6f0b0c4294726a9fee4543bc7197826749c61827838d2fc859c7478cb3720",
         )
 
     def test_server_contract_presence_aware_decoders_compile_and_reject_malformed_values(self):

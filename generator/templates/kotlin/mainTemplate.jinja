@@ -1,5 +1,5 @@
 // Lexicon: {{ lexicon_version }}, ID: {{ lexicon_id }}
-{% if description %}// {{ description }}{% endif %}
+{% if description %}// {{ description | escapeLineComment }}{% endif %}
 
 package blue.catbird.petrel.generated
 
@@ -13,7 +13,7 @@ import blue.catbird.petrel.runtime.subscription.openSubscription
 import kotlinx.coroutines.flow.*
 
 object {{ object_name }} {
-    const val TYPE_IDENTIFIER = "{{ lexicon_id }}"
+    const val TYPE_IDENTIFIER = "{{ lexicon_id | escapeStringLiteral }}"
 }
 
 {% if sealed_interfaces %}

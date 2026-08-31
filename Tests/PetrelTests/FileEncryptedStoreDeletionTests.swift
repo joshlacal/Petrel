@@ -10,11 +10,17 @@
 
     @Suite("File-encrypted secure storage deletion")
     struct FileEncryptedStoreDeletionTests {
+        private static func createSafeTestDirectory(prefix: String) -> URL {
+            let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
+                ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".petrel-test-storage")
+            let dir = base.appendingPathComponent("\(prefix)-\(UUID().uuidString)")
+            return dir
+        }
+
         private func withStore<T>(
             _ body: (FileEncryptedStore, URL, String) throws -> T
         ) throws -> T {
-            let directory = FileManager.default.temporaryDirectory
-                .appendingPathComponent("petrel-file-store-delete-tests-\(UUID().uuidString)")
+            let directory = Self.createSafeTestDirectory(prefix: "petrel-file-store-delete-tests")
             let namespace = "petrel-file-store-delete-test-\(UUID().uuidString)"
             let store = try FileEncryptedStore(
                 storageDirectory: directory,

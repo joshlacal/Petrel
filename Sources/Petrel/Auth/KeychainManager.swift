@@ -19,6 +19,7 @@ enum KeychainError: Error, LocalizedError {
     case unableToCreateKey
     case deletionError(status: Int)
     case storageUnavailable(String)
+    case expiredState
 
     var errorDescription: String? {
         switch self {
@@ -34,6 +35,8 @@ enum KeychainError: Error, LocalizedError {
             return "Failed to delete item from keychain (Status: \(status))."
         case let .storageUnavailable(reason):
             return "No secure storage backend could be initialized: \(reason)"
+        case .expiredState:
+            return "The authentication flow state has expired."
         }
     }
 
@@ -54,6 +57,8 @@ enum KeychainError: Error, LocalizedError {
                 return "The cryptographic key data from keychain is invalid or corrupted."
             case let .deletionError(status) where status == Int(errSecAuthFailed):
                 return "Authentication failed while accessing keychain."
+            case .expiredState:
+                return "The authentication flow state has expired and is no longer valid."
             default:
                 return "Keychain operation failed due to system restrictions or device state."
             }
@@ -65,6 +70,8 @@ enum KeychainError: Error, LocalizedError {
                 return "The stored data cannot be decoded or is missing required fields."
             case .unableToCreateKey:
                 return "The cryptographic key data is invalid or corrupted."
+            case .expiredState:
+                return "The authentication flow state has expired and is no longer valid."
             default:
                 return "Storage operation failed."
             }
@@ -82,13 +89,20 @@ enum KeychainError: Error, LocalizedError {
                 return "You may need to log in again to restore your credentials."
             case .dataFormatError, .unableToCreateKey:
                 return "Please log out and log back in to reset your stored credentials."
+            case .expiredState:
+                return "Please restart the authentication flow."
             case let .itemStoreError(status) where status == Int(errSecDuplicateItem):
                 return "Please restart the app or log out and log back in."
             default:
                 return "Try restarting the app. If the problem persists, you may need to log out and log back in."
             }
         #else
-            return "Try restarting the app. If the problem persists, you may need to log out and log back in."
+            switch self {
+            case .expiredState:
+                return "Please restart the authentication flow."
+            default:
+                return "Try restarting the app. If the problem persists, you may need to log out and log back in."
+            }
         #endif
     }
 }
@@ -200,10 +214,9 @@ enum KeychainManager {
         key.hasPrefix("dpopNonces.") || key.hasPrefix("dpopNoncesByJKT.")
     }
 
-    private static func negativeCacheKey(key: String, namespace: String, accessGroup: String?) -> String {
+    private static func cacheKey(key: String, namespace: String, accessGroup: String?) -> String {
         "\(namespace)|\(accessGroup ?? "")|\(key)"
     }
-    private static let defaultAccessGroupState = Mutex<String?>(nil)
 
     /// Configures the keychain accessibility level applied to new writes on Apple
     /// platforms (no-op elsewhere). Existing items keep their previous attribute
@@ -214,46 +227,13 @@ enum KeychainManager {
         #endif
     }
 
-    static func configureDefaultAccessGroup(_ accessGroup: String?) {
-        let didChange = defaultAccessGroupState.withLock { currentAccessGroup in
-            guard currentAccessGroup != accessGroup else { return false }
-            // Clear caches before exposing the updated access group.
-            clearCacheStorage()
-            currentAccessGroup = accessGroup
-            return true
-        }
-        if didChange {
-            LogManager.logDebug("KeychainManager - Cache cleared.")
-        }
-        LogManager.logDebug(
-            "KeychainManager - Default access group set to \(accessGroup ?? "nil")"
-        )
-    }
-
-    private static let itemNotFoundStatus: Int = {
+    static let itemNotFoundStatus: Int = {
         #if os(iOS) || os(macOS)
             return Int(errSecItemNotFound)
         #else
             return -25300
         #endif
     }()
-
-    private static func resolvedAccessGroup(_ accessGroup: String?) -> String? {
-        let defaultAccessGroup = defaultAccessGroupState.withLock { currentAccessGroup in
-            currentAccessGroup
-        }
-        let group = accessGroup ?? defaultAccessGroup
-        return (group?.isEmpty == true) ? nil : group
-    }
-
-    private static func accessGroupAttributes(_ accessGroup: String?) -> [String: Any] {
-        guard let accessGroup, !accessGroup.isEmpty else { return [:] }
-        #if canImport(Security)
-            return [kSecAttrAccessGroup as String: accessGroup]
-        #else
-            return [:]
-        #endif
-    }
 
     /// True when `error` reports that the item simply does not exist, as opposed to
     /// a storage failure. Callers use this to tell absence from "could not read",
@@ -288,8 +268,8 @@ enum KeychainManager {
 
     /// Clears cached items for a specific namespace
     static func clearCache(forNamespace namespace: String) {
+        let prefix = "\(namespace)|"
         let keysToRemove = cachedKeysState.withLock { cachedKeys -> [String] in
-            let prefix = "\(namespace)."
             let matching = cachedKeys.filter { $0.hasPrefix(prefix) }
             for key in matching {
                 cachedKeys.remove(key)
@@ -300,7 +280,6 @@ enum KeychainManager {
             dataCache.removeObject(forKey: key as NSString)
         }
         nonceNegativeCacheState.withLock { negKeys in
-            let prefix = "\(namespace)|"
             let matching = negKeys.filter { $0.hasPrefix(prefix) }
             for key in matching {
                 negKeys.remove(key)
@@ -308,28 +287,22 @@ enum KeychainManager {
         }
         LogManager.logDebug("KeychainManager - Cache cleared for namespace: \(namespace).")
     }
-
     // MARK: - Generic Data Methods
 
     static func deleteExplicitKey(_ exactKey: String, accessGroup: String? = nil) throws {
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-        // This is used for direct key deletion - use the namespace approach
         let parts = exactKey.split(separator: ".", maxSplits: 1)
-        if parts.count == 2 {
-            try storage.delete(
-                key: String(parts[1]),
-                namespace: String(parts[0]),
-                accessGroup: resolvedAccessGroup
-            )
-        } else {
-            try storage.delete(key: exactKey, namespace: "", accessGroup: resolvedAccessGroup)
-        }
+        let (namespace, key) = parts.count == 2 ? (String(parts[0]), String(parts[1])) : ("", exactKey)
+        try storage.delete(
+            key: key,
+            namespace: namespace,
+            accessGroup: accessGroup
+        )
 
         // Remove from cache
-        dataCache.removeObject(forKey: exactKey as NSString)
-        cachedKeysState.withLock { _ = $0.remove(exactKey) }
+        let cKey = cacheKey(key: key, namespace: namespace, accessGroup: accessGroup)
+        dataCache.removeObject(forKey: cKey as NSString)
+        cachedKeysState.withLock { _ = $0.remove(cKey) }
     }
-
     /// Stores data in the keychain with a specified key and namespace.
     static func store(
         key: String,
@@ -337,21 +310,19 @@ enum KeychainManager {
         namespace: String,
         accessGroup: String? = nil
     ) throws {
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
         try storage.store(
             key: key,
             value: value,
             namespace: namespace,
-            accessGroup: resolvedAccessGroup
+            accessGroup: accessGroup
         )
 
         // Update cache
-        let namespacedKey = "\(namespace).\(key)"
-        dataCache.setObject(value as NSData, forKey: namespacedKey as NSString)
-        cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
+        let cKey = cacheKey(key: key, namespace: namespace, accessGroup: accessGroup)
+        dataCache.setObject(value as NSData, forKey: cKey as NSString)
+        cachedKeysState.withLock { _ = $0.insert(cKey) }
         if isHotNonceKey(key) {
-            let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
-            nonceNegativeCacheState.withLock { _ = $0.remove(negKey) }
+            nonceNegativeCacheState.withLock { _ = $0.remove(cKey) }
         }
         LogManager.logDebug("KeychainManager - Successfully stored item for key \(namespace).\(key).")
     }
@@ -367,115 +338,46 @@ enum KeychainManager {
         accessGroup: String? = nil,
         bypassCache: Bool = false
     ) throws -> Data {
-        let namespacedKey = "\(namespace).\(key)"
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
+        let cKey = cacheKey(key: key, namespace: namespace, accessGroup: accessGroup)
 
         // Check cache first
         if !bypassCache {
-            if let cachedData = dataCache.object(forKey: namespacedKey as NSString) {
-                LogManager.logDebug("KeychainManager - Retrieved item from cache for key \(namespacedKey).")
+            if let cachedData = dataCache.object(forKey: cKey as NSString) {
+                LogManager.logDebug("KeychainManager - Retrieved item from cache for key \(cKey).")
                 return cachedData as Data
             }
             if isHotNonceKey(key) {
-                let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
-                let isNegative = nonceNegativeCacheState.withLock { $0.contains(negKey) }
+                let isNegative = nonceNegativeCacheState.withLock { $0.contains(cKey) }
                 if isNegative {
-                    LogManager.logDebug("KeychainManager - Negative cache hit for hot nonce key \(namespacedKey).")
+                    LogManager.logDebug("KeychainManager - Negative cache hit for hot nonce key \(cKey).")
                     throw KeychainError.itemRetrievalError(status: itemNotFoundStatus)
                 }
             }
         }
 
-        if let resolvedAccessGroup {
-            do {
-                let data = try storage.retrieve(
-                    key: key,
-                    namespace: namespace,
-                    accessGroup: resolvedAccessGroup
-                )
-                dataCache.setObject(data as NSData, forKey: namespacedKey as NSString)
-                cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
-                if isHotNonceKey(key) {
-                    let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
-                    nonceNegativeCacheState.withLock { _ = $0.remove(negKey) }
-                }
-                return data
-            } catch {
-                if !isItemNotFound(error) {
-                    throw error
-                }
-            }
-
-            let legacyData: Data
-            do {
-                legacyData = try storage.retrieve(
-                    key: key,
-                    namespace: namespace,
-                    accessGroup: nil
-                )
-            } catch {
-                if isItemNotFound(error) && isHotNonceKey(key) {
-                    let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
-                    nonceNegativeCacheState.withLock { set in
-                        if set.count >= maxNegativeCacheSize { set.removeAll() }
-                        _ = set.insert(negKey)
-                    }
-                }
-                throw error
-            }
-            dataCache.setObject(legacyData as NSData, forKey: namespacedKey as NSString)
-            cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
-            if isHotNonceKey(key) {
-                let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
-                nonceNegativeCacheState.withLock { _ = $0.remove(negKey) }
-            }
-            do {
-                try storage.store(
-                    key: key,
-                    value: legacyData,
-                    namespace: namespace,
-                    accessGroup: resolvedAccessGroup
-                )
-                try? storage.delete(
-                    key: key,
-                    namespace: namespace,
-                    accessGroup: nil
-                )
-                LogManager.logInfo(
-                    "KeychainManager - Migrated item to access group \(resolvedAccessGroup) for key \(namespacedKey)."
-                )
-            } catch {
-                LogManager.logWarning(
-                    "KeychainManager - Failed to migrate item to access group \(resolvedAccessGroup) for key \(namespacedKey): \(error)"
-                )
-            }
-
-            LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
-            return legacyData
-        }
-
         let data: Data
         do {
-            data = try storage.retrieve(key: key, namespace: namespace, accessGroup: nil)
+            data = try storage.retrieve(
+                key: key,
+                namespace: namespace,
+                accessGroup: accessGroup
+            )
         } catch {
             if isItemNotFound(error) && isHotNonceKey(key) {
-                let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: nil)
                 nonceNegativeCacheState.withLock { set in
                     if set.count >= maxNegativeCacheSize { set.removeAll() }
-                    _ = set.insert(negKey)
+                    _ = set.insert(cKey)
                 }
             }
             throw error
         }
 
-        // Store in cache
-        dataCache.setObject(data as NSData, forKey: namespacedKey as NSString)
-        cachedKeysState.withLock { _ = $0.insert(namespacedKey) }
+        dataCache.setObject(data as NSData, forKey: cKey as NSString)
+        cachedKeysState.withLock { _ = $0.insert(cKey) }
         if isHotNonceKey(key) {
-            let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: nil)
-            nonceNegativeCacheState.withLock { _ = $0.remove(negKey) }
+            nonceNegativeCacheState.withLock { _ = $0.remove(cKey) }
         }
-        LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(namespacedKey).")
+        LogManager.logDebug("KeychainManager - Successfully retrieved item for key \(cKey).")
         return data
     }
 
@@ -504,47 +406,27 @@ enum KeychainManager {
         namespace: String,
         accessGroup: String? = nil
     ) throws {
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-        let namespacedKey = "\(namespace).\(key)"
+        let cKey = cacheKey(key: key, namespace: namespace, accessGroup: accessGroup)
 
-        // Remove from cache before either delete so a failure below cannot leave a
-        // deleted item readable from memory.
-        dataCache.removeObject(forKey: namespacedKey as NSString)
-        cachedKeysState.withLock { _ = $0.remove(namespacedKey) }
+        dataCache.removeObject(forKey: cKey as NSString)
+        cachedKeysState.withLock { _ = $0.remove(cKey) }
         do {
-            try storage.delete(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
+            try storage.delete(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
-            LogManager.logError("KeychainManager - Failed to delete item for key \(namespacedKey): \(error)")
+            LogManager.logError("KeychainManager - Failed to delete item for key \(cKey): \(error)")
             throw error
         }
 
-        // Evict any entry that a concurrent retrieve may have installed while delete was in flight
-        dataCache.removeObject(forKey: namespacedKey as NSString)
-        cachedKeysState.withLock { _ = $0.remove(namespacedKey) }
+        dataCache.removeObject(forKey: cKey as NSString)
+        cachedKeysState.withLock { _ = $0.remove(cKey) }
         if isHotNonceKey(key) {
-            let negKey = negativeCacheKey(key: key, namespace: namespace, accessGroup: resolvedAccessGroup)
             nonceNegativeCacheState.withLock { set in
                 if set.count >= maxNegativeCacheSize { set.removeAll() }
-                _ = set.insert(negKey)
+                _ = set.insert(cKey)
             }
         }
 
-        if resolvedAccessGroup != nil {
-            // `retrieve` re-migrates the legacy no-access-group copy on the next read,
-            // so a silently skipped deletion resurrects the credential we just removed.
-            do {
-                try storage.delete(key: key, namespace: namespace, accessGroup: nil)
-            } catch {
-                guard isItemNotFound(error) else {
-                    LogManager.logError(
-                        "KeychainManager - Deleted item for key \(namespacedKey) from the access group but failed to delete the legacy copy: \(error). The legacy copy would be re-migrated on the next read."
-                    )
-                    throw error
-                }
-            }
-        }
-
-        LogManager.logDebug("KeychainManager: Successfully deleted item for key \(namespacedKey).")
+        LogManager.logDebug("KeychainManager: Successfully deleted item for key \(cKey).")
     }
 
     static func nukeAllKeychainItems(
@@ -552,15 +434,8 @@ enum KeychainManager {
         accessGroup: String? = nil
     ) -> Bool {
         do {
-            let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-            try storage.deleteAll(namespace: namespace, accessGroup: resolvedAccessGroup)
-            if resolvedAccessGroup != nil {
-                try? storage.deleteAll(namespace: namespace, accessGroup: nil)
-            }
-
-            // Clear cache for this namespace
+            try storage.deleteAll(namespace: namespace, accessGroup: accessGroup)
             clearCache(forNamespace: namespace)
-
             LogManager.logInfo("KeychainManager - Successfully nuked all items for namespace: \(namespace)")
             return true
         } catch {
@@ -577,11 +452,10 @@ enum KeychainManager {
         keyTag: String,
         accessGroup: String? = nil
     ) throws {
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
         try storage.storeDPoPKeyRepresentation(
             representation,
             keyTag: keyTag,
-            accessGroup: resolvedAccessGroup
+            accessGroup: accessGroup
         )
     }
 
@@ -590,47 +464,9 @@ enum KeychainManager {
         keyTag: String,
         accessGroup: String? = nil
     ) throws -> Data {
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-
-        if let resolvedAccessGroup {
-            do {
-                return try storage.retrieveDPoPKeyRepresentation(
-                    keyTag: keyTag,
-                    accessGroup: resolvedAccessGroup
-                )
-            } catch {
-                if !isItemNotFound(error) {
-                    throw error
-                }
-            }
-
-            let legacyRepresentation = try storage.retrieveDPoPKeyRepresentation(
-                keyTag: keyTag,
-                accessGroup: nil
-            )
-
-            do {
-                try storage.storeDPoPKeyRepresentation(
-                    legacyRepresentation,
-                    keyTag: keyTag,
-                    accessGroup: resolvedAccessGroup
-                )
-                try? storage.deleteDPoPKey(keyTag: keyTag, accessGroup: nil)
-                LogManager.logInfo(
-                    "KeychainManager - Migrated DPoP key to access group \(resolvedAccessGroup) for tag \(keyTag)."
-                )
-            } catch {
-                LogManager.logWarning(
-                    "KeychainManager - Failed to migrate DPoP key to access group \(resolvedAccessGroup) for tag \(keyTag): \(error)"
-                )
-            }
-
-            return legacyRepresentation
-        }
-
-        return try storage.retrieveDPoPKeyRepresentation(
+        try storage.retrieveDPoPKeyRepresentation(
             keyTag: keyTag,
-            accessGroup: nil
+            accessGroup: accessGroup
         )
     }
 
@@ -664,22 +500,7 @@ enum KeychainManager {
 
     /// Deletes a DPoP private key from the keychain with a specified key tag.
     static func deleteDPoPKey(keyTag: String, accessGroup: String? = nil) throws {
-        let resolvedAccessGroup = resolvedAccessGroup(accessGroup)
-        try storage.deleteDPoPKey(keyTag: keyTag, accessGroup: resolvedAccessGroup)
-        if resolvedAccessGroup != nil {
-            // `retrieveDPoPKeyRepresentation` re-migrates the legacy no-access-group
-            // key on the next read, so a skipped deletion resurrects a revoked key.
-            do {
-                try storage.deleteDPoPKey(keyTag: keyTag, accessGroup: nil)
-            } catch {
-                guard isItemNotFound(error) else {
-                    LogManager.logError(
-                        "KeychainManager - Deleted DPoP key for tag \(keyTag) from the access group but failed to delete the legacy copy: \(error). The legacy key would be re-migrated on the next read."
-                    )
-                    throw error
-                }
-            }
-        }
+        try storage.deleteDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
     }
 
     /// Stores a DPoP private key in the keychain within a specified namespace.
@@ -868,32 +689,5 @@ enum KeychainManager {
             }
         }
     }
-
-    // MARK: - Gateway Session Management
-
-    /// Saves the gateway session ID
-    static func saveGatewaySession(_ session: String) throws {
-        guard let data = session.data(using: .utf8) else {
-            throw KeychainError.dataFormatError
-        }
-        try store(key: "gatewaySession", value: data, namespace: "catbird.gateway")
-    }
-
-    /// Retrieves the gateway session ID
-    static func getGatewaySession() throws -> String? {
-        do {
-            let data = try retrieve(key: "gatewaySession", namespace: "catbird.gateway")
-            return String(data: data, encoding: .utf8)
-        } catch {
-            if isItemNotFound(error) {
-                return nil
-            }
-            throw error
-        }
-    }
-
-    /// Deletes the gateway session ID
-    static func deleteGatewaySession() throws {
-        try delete(key: "gatewaySession", namespace: "catbird.gateway")
-    }
 }
+

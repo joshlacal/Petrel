@@ -3,8 +3,8 @@ public struct {{ enum_name }}: Codable, ATProtocolCodable, ATProtocolValue {
             
             // Predefined constants
             {%- for value, description in values %}
-            // {{ description }}
-            public static let {{ value | convertRefToSwift | lowerCamelCase | enum_case }} = {{ enum_name }}(rawValue: "{{ value }}")
+            // {{ description | escapeComment }}
+            public static let {{ value | convertRefToSwift | lowerCamelCase | enum_case }} = {{ enum_name }}(rawValue: "{{ value | escapeStringLiteral }}")
             {%- endfor %}
             
             public init(rawValue: String) {

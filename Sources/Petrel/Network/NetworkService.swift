@@ -16,11 +16,43 @@ import Foundation
     import Compression
 #endif
 
-// MARK: - Content-Encoding Decompression
+public enum RequestSecurityPolicy: Sendable, Equatable {
+    case unauthenticated
+    case authenticated(recipient: ExactAuthRequestOrigin)
+}
 
-/// Fallback decompression for cases where URLSession doesn't auto-decompress.
-/// With the fixed HardenedURLSessionDelegate (not implementing didReceive:),
-/// URLSession should handle decompression automatically. This is kept as a safety net.
+public struct NetworkResponseLimits: Sendable, Equatable {
+    public let maximumWireBytes: Int
+    public let maximumDecodedBytes: Int
+    public let maximumExpansionRatio: Int
+    public let maximumDiagnosticBytes: Int
+
+    public init(
+        maximumWireBytes: Int = 10 * 1024 * 1024,
+        maximumDecodedBytes: Int = 10 * 1024 * 1024,
+        maximumExpansionRatio: Int = 20,
+        maximumDiagnosticBytes: Int = 8 * 1024
+    ) {
+        self.maximumWireBytes = maximumWireBytes
+        self.maximumDecodedBytes = maximumDecodedBytes
+        self.maximumExpansionRatio = maximumExpansionRatio
+        self.maximumDiagnosticBytes = maximumDiagnosticBytes
+    }
+
+    public static let `default` = NetworkResponseLimits()
+}
+
+public protocol WebSocketTaskProtocol: Sendable {
+    func resume()
+    func receive() async throws -> URLSessionWebSocketTask.Message
+    func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?)
+}
+
+extension URLSessionWebSocketTask: WebSocketTaskProtocol {}
+
+/// Response body decoding and decompression.
+/// HardenedURLSessionDelegate receives raw wire data chunks for wire-byte accounting,
+/// and response decoding is handled centrally in executeDataTask via ContentDecoding.normalizeResponse.
 enum ContentDecoding {
     static func headerValue(named name: String, in headerFields: [AnyHashable: Any]) -> String? {
         for (key, value) in headerFields {
@@ -34,103 +66,140 @@ enum ContentDecoding {
         return nil
     }
 
-    /// Attempts to decompress data if it appears to still be compressed.
-    /// Returns original data if already decompressed or decompression fails.
-    static func decompressIfNeeded(_ data: Data, contentEncoding: String?) -> Data {
-        // Quick check: if data is valid UTF-8 starting with JSON structure, no decompression needed
-        if looksLikeValidJSON(data) {
+    /// Normalize response bytes exactly once. URLSession may already decode a body while retaining
+    /// its header, so only attempt a codec when the payload is framed (or is not recognizable text).
+    static func decompressIfNeeded(_ data: Data, contentEncoding: String?, limits: NetworkResponseLimits = .default) throws -> Data {
+        guard data.count <= limits.maximumWireBytes else {
+            throw NetworkError.responseLimitExceeded("Wire bytes exceeded limit")
+        }
+        let encoding = contentEncoding?.lowercased().trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !encoding.isEmpty && encoding != "identity" else {
+            guard data.count <= limits.maximumDecodedBytes else {
+                throw NetworkError.responseLimitExceeded("Decoded bytes exceeded limit")
+            }
             return data
         }
 
-        // Check Content-Encoding header
-        guard let encoding = contentEncoding?.lowercased().trimmingCharacters(in: .whitespaces),
-              !encoding.isEmpty,
-              encoding != "identity"
+        let looksUnencoded = data.first == 0x7B || data.first == 0x5B || data.first == 0x22
+            || data.first == 0x20 || data.first == 0x09 || data.first == 0x0A || data.first == 0x0D
+        let framed = encoding == "gzip" ? data.starts(with: [0x1F, 0x8B]) : !looksUnencoded
+        guard framed else {
+            guard data.count <= limits.maximumDecodedBytes else {
+                throw NetworkError.responseLimitExceeded("Decoded bytes exceeded limit")
+            }
+            return data
+        }
+
+        let decoded: Data?
+        switch encoding {
+        case "gzip": decoded = try decompressGzip(data, limits: limits)
+        case "deflate": decoded = try decompressDeflate(data, limits: limits)
+        case "br": decoded = try decompressBrotli(data, limits: limits)
+        default:
+            throw NetworkError.invalidResponse(description: "Unsupported Content-Encoding: \(encoding)")
+        }
+        guard let decoded else {
+            throw NetworkError.invalidResponse(description: "Invalid \(encoding) response")
+        }
+        guard decoded.count <= limits.maximumDecodedBytes,
+              data.isEmpty || Double(decoded.count) / Double(data.count) <= Double(limits.maximumExpansionRatio)
         else {
-            // No encoding specified but data isn't JSON - try Brotli as last resort
-            if let decompressed = decompressBrotli(data), looksLikeValidJSON(decompressed) {
-                LogManager.logInfo("ContentDecoding: Brotli decompression succeeded without header (\(data.count) → \(decompressed.count) bytes)")
-                return decompressed
-            }
-            return data
+            throw NetworkError.responseLimitExceeded("Decoded response exceeds limits")
         }
-
-        // If encoding says compressed, try to decompress
-        // Server may mislabel Brotli as gzip, so try Brotli for any compression header
-        if encoding == "br" || encoding == "gzip" || encoding == "deflate" {
-            if let decompressed = decompressBrotli(data), looksLikeValidJSON(decompressed) {
-                LogManager.logInfo("ContentDecoding: Fallback Brotli decompression succeeded (\(data.count) → \(decompressed.count) bytes)")
-                return decompressed
-            }
-        }
-
-        return data
+        return decoded
     }
 
-    /// Check if data looks like valid JSON (UTF-8 encoded, starts with { or [)
-    private static func looksLikeValidJSON(_ data: Data) -> Bool {
-        guard data.count >= 2 else { return false }
-
-        // Must start with { or [
-        let firstByte = data[0]
-        guard firstByte == 0x7B || firstByte == 0x5B else { return false }
-
-        // Check that at least the first few bytes are valid UTF-8/ASCII
-        // Valid JSON after { or [ should have ASCII characters (quotes, letters, numbers, whitespace)
-        let prefix = data.prefix(min(20, data.count))
-        for byte in prefix {
-            // Valid JSON characters are typically 0x09-0x0D (whitespace), 0x20-0x7E (printable ASCII)
-            if byte > 0x7E && byte < 0xC0 {
-                // This byte is in the Latin-1 extended range, not valid JSON/UTF-8 start
-                return false
-            }
+    static func normalizeResponse(_ data: Data, response: URLResponse, limits: NetworkResponseLimits) throws -> Data {
+        let encoding = (response as? HTTPURLResponse).flatMap {
+            headerValue(named: "Content-Encoding", in: $0.allHeaderFields)
         }
-
-        return true
+        return try decompressIfNeeded(data, contentEncoding: encoding, limits: limits)
     }
 
-    /// Decompress Brotli-encoded data using Apple's Compression framework
-    private static func decompressBrotli(_ data: Data) -> Data? {
+
+    #if canImport(Compression)
+    private static func decompressAlgorithm(_ data: Data, algorithm: compression_algorithm, limits: NetworkResponseLimits) throws -> Data? {
         guard !data.isEmpty else { return data }
+        let maxAllowedDecoded = min(limits.maximumDecodedBytes, data.count * limits.maximumExpansionRatio)
+        var outputSize = min(max(data.count * 4, 65536), maxAllowedDecoded)
+        var outputData = Data(count: outputSize)
 
-        #if canImport(Compression)
-            var outputSize = max(data.count * 10, 65536)
-            var outputData = Data(count: outputSize)
-
-            for _ in 0 ..< 5 {
-                let result = data.withUnsafeBytes { sourceBuffer -> Int in
-                    guard let sourcePtr = sourceBuffer.baseAddress else { return 0 }
-                    return outputData.withUnsafeMutableBytes { destBuffer -> Int in
-                        guard let destPtr = destBuffer.baseAddress else { return 0 }
-                        return compression_decode_buffer(
-                            destPtr.assumingMemoryBound(to: UInt8.self),
-                            outputSize,
-                            sourcePtr.assumingMemoryBound(to: UInt8.self),
-                            data.count,
-                            nil,
-                            COMPRESSION_BROTLI
-                        )
-                    }
-                }
-
-                if result > 0, result < outputSize {
-                    outputData.count = result
-                    return outputData
-                } else if result == outputSize {
-                    outputSize *= 2
-                    outputData = Data(count: outputSize)
-                } else {
-                    break
+        for _ in 0 ..< 6 {
+            let result = data.withUnsafeBytes { sourceBuffer -> Int in
+                guard let sourcePtr = sourceBuffer.baseAddress else { return 0 }
+                return outputData.withUnsafeMutableBytes { destBuffer -> Int in
+                    guard let destPtr = destBuffer.baseAddress else { return 0 }
+                    return compression_decode_buffer(
+                        destPtr.assumingMemoryBound(to: UInt8.self),
+                        outputSize,
+                        sourcePtr.assumingMemoryBound(to: UInt8.self),
+                        data.count,
+                        nil,
+                        algorithm
+                    )
                 }
             }
 
-            return nil
-        #else
-            // FoundationNetworking is responsible for content decoding on
-            // platforms where Apple's optional Compression framework is absent.
-            return nil
-        #endif
+            if result > 0, result < outputSize {
+                outputData.count = result
+                if outputData.count > limits.maximumDecodedBytes {
+                    throw NetworkError.responseLimitExceeded("Decoded bytes (\(outputData.count)) exceeded limit (\(limits.maximumDecodedBytes))")
+                }
+                if data.count > 0 && (Double(outputData.count) / Double(data.count) > Double(limits.maximumExpansionRatio)) {
+                    throw NetworkError.responseLimitExceeded("Decompression expansion ratio (\(outputData.count)/\(data.count)) exceeded limit (\(limits.maximumExpansionRatio)x)")
+                }
+                return outputData
+            } else if result == outputSize {
+                let nextSize = outputSize * 2
+                if nextSize > maxAllowedDecoded {
+                    throw NetworkError.responseLimitExceeded("Decoded bytes exceeded limit during decompression")
+                }
+                outputSize = nextSize
+                outputData = Data(count: outputSize)
+            } else {
+                break
+            }
+        }
+        return nil
     }
+
+    private static func decompressBrotli(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+        try decompressAlgorithm(data, algorithm: COMPRESSION_BROTLI, limits: limits)
+    }
+
+    private static func decompressZlib(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+        try decompressAlgorithm(data, algorithm: COMPRESSION_ZLIB, limits: limits)
+    }
+    private static func decompressDeflate(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+        if let raw = try decompressAlgorithm(data, algorithm: COMPRESSION_ZLIB, limits: limits) { return raw }
+        guard data.count > 6 else { return nil }
+        return try decompressAlgorithm(Data(data.dropFirst(2).dropLast(4)), algorithm: COMPRESSION_ZLIB, limits: limits)
+    }
+
+    private static func decompressGzip(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+        guard data.count >= 18, data[0] == 0x1f, data[1] == 0x8b, data[2] == 8 else { return nil }
+        var index = 10
+        let flags = data[3]
+        if flags & 4 != 0 {
+            guard index + 2 <= data.count else { return nil }
+            let length = Int(data[index]) | Int(data[index + 1]) << 8
+            index += 2 + length
+        }
+        if flags & 8 != 0 { while index < data.count && data[index] != 0 { index += 1 }; index += 1 }
+        if flags & 16 != 0 { while index < data.count && data[index] != 0 { index += 1 }; index += 1 }
+        if flags & 2 != 0 { index += 2 }
+        guard index < data.count - 8 else { return nil }
+        return try decompressAlgorithm(Data(data[index ..< data.count - 8]), algorithm: COMPRESSION_ZLIB, limits: limits)
+    }
+    #else
+    private static func decompressBrotli(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+        nil
+    }
+
+    private static func decompressZlib(_ data: Data, limits: NetworkResponseLimits) throws -> Data? {
+        nil
+    }
+    #endif
 }
 
 /// Allows client apps to control connection routing (e.g., bypassing proxy for WebSockets)
@@ -379,9 +448,12 @@ public actor NetworkService: NetworkServiceProtocol {
     // MARK: - Properties
 
     public private(set) var baseURL: URL
+    public let limits: NetworkResponseLimits
     private var authProvider: AuthenticationProvider?
     private var headers: [String: String] = [:]
-    private let session: URLSession
+    nonisolated package let sessionDelegate: HardenedURLSessionDelegate
+    nonisolated package let exactAuthSessionDelegate: HardenedURLSessionDelegate
+    nonisolated package let session: URLSession
     private let exactAuthSession: URLSession
     private let jsonEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
@@ -408,8 +480,9 @@ public actor NetworkService: NetworkServiceProtocol {
         return queue
     }()
     #if DEBUG
-        nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
-        nonisolated(unsafe) static var dnsResolverOverride: (@Sendable (String) -> [String]?)?
+        package nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
+        package nonisolated(unsafe) static var dnsResolverOverride: (@Sendable (String) -> [String]?)?
+        package nonisolated(unsafe) static var webSocketTaskOverride: (@Sendable (URLRequest) -> any WebSocketTaskProtocol)?
     #endif
     private var authContinuityRevision: UInt64 = 0
     private var authContinuityRevisionExhausted = false
@@ -451,6 +524,12 @@ public actor NetworkService: NetworkServiceProtocol {
         static func setNetworkTestProtocolClasses(_ classes: [AnyClass]?) {
             networkTestProtocolClassesLock.withLock {
                 networkTestProtocolClasses = classes
+            }
+        }
+
+        static func getNetworkTestProtocolClasses() -> [AnyClass]? {
+            networkTestProtocolClassesLock.withLock {
+                networkTestProtocolClasses
             }
         }
     #endif
@@ -718,9 +797,11 @@ public actor NetworkService: NetworkServiceProtocol {
     /// - Parameters:
     ///   - baseURL: The base URL for API requests.
     ///   - authService: The authentication service to use for authenticated requests.
-    public init(baseURL: URL, authService: AuthenticationProvider? = nil) {
+    ///   - limits: Network response limits for wire/decoded bytes and expansion ratios.
+    public init(baseURL: URL, authService: AuthenticationProvider? = nil, limits: NetworkResponseLimits = .default) {
         self.baseURL = baseURL
-        authProvider = authService
+        self.authProvider = authService
+        self.limits = limits
 
         // Configure URL session
         let config = URLSessionConfiguration.default
@@ -744,7 +825,8 @@ public actor NetworkService: NetworkServiceProtocol {
         #endif
 
         // Create a session with a delegate for enhanced security
-        let sessionDelegate = HardenedURLSessionDelegate()
+        let sessionDelegate = HardenedURLSessionDelegate(allowsRedirects: true, limits: limits)
+        self.sessionDelegate = sessionDelegate
         session = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
         let exactConfig = URLSessionConfiguration.ephemeral
         exactConfig.timeoutIntervalForRequest = config.timeoutIntervalForRequest
@@ -760,12 +842,13 @@ public actor NetworkService: NetworkServiceProtocol {
                 Self.networkTestProtocolClasses
             }
         #endif
+        let exactAuthDelegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
+        self.exactAuthSessionDelegate = exactAuthDelegate
         exactAuthSession = URLSession(
             configuration: exactConfig,
-            delegate: HardenedURLSessionDelegate(allowsRedirects: false),
+            delegate: exactAuthDelegate,
             delegateQueue: nil
         )
-
         LogManager.logDebug("Network Service initialized")
     }
 
@@ -786,11 +869,8 @@ public actor NetworkService: NetworkServiceProtocol {
     public func setBaseURL(_ url: URL) async {
         exactAuthDestinationGeneration = UUID()
         baseURL = url
-        LogManager.logInfo("Network Service - Base URL updated to: \(url)")
+        LogManager.logInfo("Network Service - Base URL updated to: \(LogManager.sanitizeURLForLogging(url))")
     }
-
-    /// Enables gateway mode where all xrpc requests require auth
-    /// and the gateway handles OAuth/DPoP complexity
     public func setGatewayMode(_ enabled: Bool) async {
         gatewayMode = enabled
         LogManager.logInfo("🔍 [GATEWAY DEBUG] setGatewayMode called with: \(enabled)")
@@ -945,120 +1025,92 @@ public actor NetworkService: NetworkServiceProtocol {
         case other
     }
 
-    func determineEndpointTypeAndAuthRequirement(for url: URL) -> (EndpointType, Bool) {
-        // DEBUG: Log every request with gateway mode status
-        LogManager.logInfo("🔍 [GATEWAY DEBUG] determineEndpointTypeAndAuthRequirement - gatewayMode: \(gatewayMode), url: \(url.absoluteString)")
-
-        // In gateway mode, all xrpc requests need auth - gateway handles OAuth/DPoP
-        if gatewayMode {
-            if url.absoluteString.contains("/xrpc/") {
-                LogManager.logInfo("🔍 [GATEWAY DEBUG] Gateway mode xrpc request - requiring auth")
-                return (.protectedResource, true)
-            }
-            // Non-xrpc requests (like /auth/session) don't need client-side auth
-            LogManager.logInfo("🔍 [GATEWAY DEBUG] Gateway mode non-xrpc request - no auth needed")
-            return (.other, false)
+    func determineSecurityPolicy(for url: URL) -> RequestSecurityPolicy {
+        guard let origin = ExactAuthRequestOrigin(url) else {
+            // Non-HTTPS or invalid URL -> unauthenticated
+            return .unauthenticated
         }
 
-        // Standard OAuth mode - use metadata to determine auth requirements
+        // Public discovery and unauthenticated endpoints
+        let path = url.path
+        if path.hasPrefix("/.well-known/") || path.hasPrefix("/oauth/") || url.host?.lowercased() == "plc.directory" {
+            return .unauthenticated
+        }
+
+        let segments = path.split(separator: "/", omittingEmptySubsequences: true).map(String.init)
+        let isXRPC = segments.contains("xrpc")
+
+        // In gateway mode, xrpc requests targeting the authorized gateway origin require auth
+        if gatewayMode {
+            if isXRPC {
+                if let baseOrigin = ExactAuthRequestOrigin(baseURL), origin == baseOrigin {
+                    return .authenticated(recipient: origin)
+                }
+            }
+            return .unauthenticated
+        }
+
+        if segments.contains("com.atproto.server.createSession") {
+            return .unauthenticated
+        }
+        // Standard OAuth mode - check metadata match
         if let authServerMetadata = authorizationServerMetadata,
-           url.absoluteString.hasPrefix(authServerMetadata.issuer)
+           let authServerURL = URL(string: authServerMetadata.issuer),
+           let authOrigin = ExactAuthRequestOrigin(authServerURL),
+           origin == authOrigin
         {
-            // Check if it's a token endpoint or other auth-related endpoint
             if url.absoluteString == authServerMetadata.tokenEndpoint
                 || url.absoluteString == authServerMetadata.authorizationEndpoint
                 || url.absoluteString == authServerMetadata.pushedAuthorizationRequestEndpoint
             {
-                return (.authorizationServer, false) // Auth server endpoints typically don't need authentication
+                return .unauthenticated
             } else {
-                return (.authorizationServer, true) // Other auth server endpoints might need authentication
+                return .authenticated(recipient: origin)
             }
         } else if let protectedResourceMetadata = protectedResourceMetadata,
-                  url.absoluteString.hasPrefix(protectedResourceMetadata.resource.absoluteString)
+                  let resOrigin = ExactAuthRequestOrigin(protectedResourceMetadata.resource),
+                  origin == resOrigin
         {
-            return (.protectedResource, true) // Protected resources always need authentication
-        } else if url.host == baseURL.host, url.absoluteString.contains("/xrpc/") {
-            // Requests to our configured baseURL need auth for xrpc endpoints
-            LogManager.logDebug("Network Service - Requiring auth for baseURL xrpc request: \(url.absoluteString)")
-            return (.protectedResource, true)
+            return .authenticated(recipient: origin)
+        } else if let baseOrigin = ExactAuthRequestOrigin(baseURL), origin == baseOrigin, isXRPC {
+            return .authenticated(recipient: origin)
         } else {
-            return (.other, false) // Default to not requiring authentication for other endpoints
+            return .unauthenticated
         }
     }
 
-    /// Performs a network request, determining authentication requirement based on endpoint type.
-    /// - Parameter request: The URLRequest to perform.
-    /// - Returns: A tuple containing the response data and URLResponse.
-    /// - Note: This is a simplified version. For retries and advanced handling, use `request(_:skipTokenRefresh:)`.
+    func determineEndpointTypeAndAuthRequirement(for url: URL) -> (EndpointType, Bool) {
+        let policy = determineSecurityPolicy(for: url)
+        switch policy {
+        case .unauthenticated:
+            return (.other, false)
+        case .authenticated:
+            return (.protectedResource, true)
+        }
+    }
+
     func request(_ request: URLRequest) async throws -> (Data, URLResponse) {
         guard let url = request.url else {
             throw NetworkError.invalidURL
         }
-
-        let (_, requiresAuth) = determineEndpointTypeAndAuthRequirement(for: url)
-        var requestToSend = request
+        if !(try await validateURL(url)) {
+            LogManager.logError("Security validation failed for URL: \(LogManager.sanitizeURLForLogging(url))")
+            throw NetworkError.securityViolation
+        }
+        let policy = determineSecurityPolicy(for: url)
         var authCtx_simple: AuthContext? = nil
         defer {
             authCtx_simple?.releaseAuthenticationLease()
         }
-
-        if requiresAuth {
-            guard let authProvider = authProvider else {
-                LogManager.logDebug(
-                    "Authentication required for \(url.absoluteString) but no auth provider is set."
-                )
-                // Broadcast auto-logout event so UI can redirect to reauth
-                Task {
-                    await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: "", reason: "401_no_auth_provider"))
-                }
-                throw NetworkError.authenticationRequired
-            }
-            do {
-                // Ensure token is fresh before preparing the request
-                _ = try await authProvider.refreshTokenIfNeeded()
-                let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(request)
-                requestToSend = authed
-                authCtx_simple = ctx
-                LogManager.logDebug("Prepared authenticated request for: \(url.absoluteString)")
-            } catch {
-                LogManager.logError(
-                    "Failed to prepare authenticated request for \(url.absoluteString): \(error)"
-                )
-                // Propagate the specific authentication error or a generic one
-                if error is AuthError {
-                    throw error
-                } else {
-                    throw NetworkError.authenticationFailed
-                }
-            }
-        } else {
-            LogManager.logDebug("No authentication required for: \(url.absoluteString)")
-        }
-
+        let (requestToSend, authedCtx) = try await attachCredentialsIfAuthorized(request, policy: policy)
+        authCtx_simple = authedCtx
         // Perform the request using the internal session
         do {
             LogManager.logRequest(requestToSend)
-            let (rawData, response) = try await session.data(for: requestToSend)
+            let (data, response) = try await Self.executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
             authCtx_simple?.releaseAuthenticationLease()
 
-            // Decompress if needed - use case-insensitive header lookup
-            var data = rawData
             if let httpResponse = response as? HTTPURLResponse {
-                // With the fixed HardenedURLSessionDelegate, URLSession should auto-decompress.
-                // Use fallback decompression only if data still appears compressed.
-                let contentEncoding: String? = {
-                    for (key, value) in httpResponse.allHeaderFields {
-                        if let keyString = key as? String,
-                           keyString.caseInsensitiveCompare("Content-Encoding") == .orderedSame,
-                           let valueString = value as? String
-                        {
-                            return valueString
-                        }
-                    }
-                    return nil
-                }()
-                data = ContentDecoding.decompressIfNeeded(rawData, contentEncoding: contentEncoding)
-
                 LogManager.logResponse(httpResponse, data: data)
 
                 // Immediately capture and store DPoP-Nonce (case-insensitive) before any status handling
@@ -1093,15 +1145,16 @@ public actor NetworkService: NetworkServiceProtocol {
                !(200 ..< 300).contains(httpResponse.statusCode)
             {
                 LogManager.logDebug(
-                    "Request to \(url.absoluteString) failed with status code: \(httpResponse.statusCode)"
+                    "Request to \(LogManager.sanitizeURLForLogging(url)) failed with status code: \(httpResponse.statusCode)"
                 )
-                // Consider throwing a more specific error based on status code if needed here
-                // For simplicity, just returning the response for now, letting caller handle.
             }
             return (data, response)
         } catch {
-            LogManager.logError("Network request failed for \(url.absoluteString): \(error)")
-            throw NetworkError.requestFailed // Or map to a more specific error
+            if let netError = error as? NetworkError {
+                throw netError
+            }
+            LogManager.logError("Network request failed for \(LogManager.sanitizeURLForLogging(url)): \(error)")
+            throw NetworkError.requestFailed
         }
     }
 
@@ -1113,6 +1166,15 @@ public actor NetworkService: NetworkServiceProtocol {
     func request(_ request: URLRequest, skipTokenRefresh: Bool = false, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, URLResponse
     ) {
+        guard let requestURL = request.url else {
+            throw NetworkError.invalidURL
+        }
+        // One final policy gate: validate URL before any send (including exact auth continuity)
+        if !(try await validateURL(requestURL)) {
+            LogManager.logError("Security validation failed for URL: \(LogManager.sanitizeURLForLogging(requestURL))")
+            throw NetworkError.securityViolation
+        }
+
         if let scope = ExactAuthGeneratedRequestScopeContext.current {
             return try await requestWithExactAuthContinuity(
                 request,
@@ -1132,54 +1194,25 @@ public actor NetworkService: NetworkServiceProtocol {
                 networkService: self,
                 request: currentRequest
             )
+
+        let policy = determineSecurityPolicy(for: requestURL)
+
         var retryCount = 0
 
         while retryCount < maxRetries {
             var requestToSend = currentRequest
-            var requiresAuth = false // Determine based on URL or context
             var authCtx: AuthContext? = nil
             defer {
                 authCtx?.releaseAuthenticationLease()
             }
 
-            // Determine if authentication is needed (simplified example)
-            if let url = requestToSend.url,
-               !url.absoluteString.contains("/.well-known/")
-               && !url.absoluteString.contains("plc.directory")
-               && !url.absoluteString.contains("/oauth/")
-            {
-                requiresAuth = true
-            }
-
-            // Add Authentication if required and provider exists
-            if requiresAuth, let authProvider = authProvider {
-                do {
-                    // Attempt to refresh token first if not skipped
-                    if !skipTokenRefresh {
-                        _ = try await authProvider.refreshTokenIfNeeded()
-                    }
-                    let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(requestToSend)
-                    requestToSend = authed
-                    authCtx = ctx
-                    LogManager.logDebug(
-                        "Prepared authenticated request for: \(requestToSend.url?.absoluteString ?? "Unknown URL")"
-                    )
-                } catch AuthError.noActiveAccount {
-                    LogManager.logError(
-                        "No active account for authenticated request: \(requestToSend.url?.absoluteString ?? "Unknown URL"). Proceeding without authentication."
-                    )
-                    // Allow request to proceed without auth headers if no account exists
-                } catch {
-                    LogManager.logError("Network Service - Failed to prepare authenticated request: \(error)")
-                    throw NetworkError.authenticationFailed
-                }
-            } else if requiresAuth {
-                LogManager.logError(
-                    "Authentication required but no provider set for: \(requestToSend.url?.absoluteString ?? "Unknown URL")"
-                )
-                // Decide whether to throw an error or allow the request without auth
-                // throw NetworkError.authenticationProviderMissing
-            }
+            let (authedRequest, authedCtx) = try await attachCredentialsIfAuthorized(
+                requestToSend,
+                policy: policy,
+                skipTokenRefresh: skipTokenRefresh
+            )
+            requestToSend = authedRequest
+            authCtx = authedCtx
 
             // Add custom headers
             for (name, value) in headers {
@@ -1242,40 +1275,24 @@ public actor NetworkService: NetworkServiceProtocol {
                 // Use deduplicator for non-refresh requests to prevent concurrent identical calls
                 let authIdentity = authCtx?.did ?? request.value(forHTTPHeaderField: "Authorization")
                 let (data, response) = if !skipTokenRefresh {
-                    try await requestDeduplicator.deduplicate(request: request, authIdentity: authIdentity) { @Sendable in
-                        return try await self.session.data(for: request)
+                    try await requestDeduplicator.deduplicate(request: request, authIdentity: authIdentity) { @Sendable [session, sessionDelegate] in
+                        return try await Self.executeDataTask(request, using: session, delegate: sessionDelegate)
                     }
                 } else {
                     // Skip deduplication for refresh requests to avoid circular dependencies
-                    try await session.data(for: requestToSend)
+                    try await Self.executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
                 }
                 authCtx?.releaseAuthenticationLease()
 
                 // Get data and ensure we have a valid HTTP response
                 guard let httpResponse = response as? HTTPURLResponse else {
-                    // Handle non-HTTP responses
                     LogManager.logError(
-                        "Network Service - Received non-HTTP response for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
+                        "Network Service - Received non-HTTP response for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
                     )
                     throw NetworkError.invalidResponse(description: "Received non-HTTP response")
                 }
-
-                // Decompress response if needed (Brotli, gzip, deflate)
-                // With the fixed HardenedURLSessionDelegate, URLSession should auto-decompress.
-                // Use fallback decompression only if data still appears compressed.
-                let contentEncoding: String? = {
-                    for (key, value) in httpResponse.allHeaderFields {
-                        if let keyString = key as? String,
-                           keyString.caseInsensitiveCompare("Content-Encoding") == .orderedSame,
-                           let valueString = value as? String
-                        {
-                            return valueString
-                        }
-                    }
-                    return nil
-                }()
-                let decompressedData = ContentDecoding.decompressIfNeeded(data, contentEncoding: contentEncoding)
-
+                // executeDataTask has already applied the shared response pipeline.
+                let decompressedData = data
                 // Log structured response shape for BFF debugging
                 let elapsedMs = Int(Date().timeIntervalSince(requestStartTime) * 1000)
                 #if DEBUG
@@ -1349,7 +1366,7 @@ public actor NetworkService: NetworkServiceProtocol {
                     // Handle unauthorized (401)
                     guard let authProvider = authProvider, let url = requestToSend.url else {
                         LogManager.logError(
-                            "Network Service - Received 401 but no auth provider or URL for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
+                            "Network Service - Received 401 but no auth provider or URL for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
                         )
                         let autoLogoutDID = authCtx?.did ?? ""
                         // Broadcast auto-logout event so UI can redirect to reauth
@@ -1359,9 +1376,7 @@ public actor NetworkService: NetworkServiceProtocol {
                         throw NetworkError.authenticationRequired // Cannot handle 401 without provider/URL
                     }
 
-                    LogManager.logInfo(
-                        "Network Service - Received 401 for \(url.absoluteString). Analyzing response."
-                    )
+                    LogManager.logInfo("Network Service - Received 401 for \(LogManager.sanitizeURLForLogging(url)). Analyzing response.")
 
                     // In gateway mode, don't try to handle DPoP nonce errors - gateway should handle them
                     // Just delegate to the auth provider's handleUnauthorizedResponse
@@ -1482,14 +1497,14 @@ public actor NetworkService: NetworkServiceProtocol {
                         }
                         retryCount = 1
                         LogManager.logInfo(
-                            "Network Service - Retrying request (\(retryCount)/\(maxRetries)) after storing DPoP nonce for \(url.absoluteString)."
+                            "Network Service - Retrying request (\(retryCount)/\(maxRetries)) after storing DPoP nonce for \(LogManager.sanitizeURLForLogging(url))."
                         )
 
                         continue // Continue to the next iteration of the while loop
                     } else if !skipTokenRefresh {
                         // If it's NOT a nonce error, and we're allowed to refresh, attempt standard token refresh via handleUnauthorizedResponse
                         LogManager.logInfo(
-                            "Network Service - Attempting standard token refresh/handling for 401 on \(url.absoluteString)."
+                            "Network Service - Attempting standard token refresh/handling for 401 on \(LogManager.sanitizeURLForLogging(url))."
                         )
                         do {
                             // Use the authProvider's handler (which should attempt refresh)
@@ -1513,9 +1528,7 @@ public actor NetworkService: NetworkServiceProtocol {
                         }
                     } else {
                         // Is NOT a nonce error, but we are skipping token refresh (e.g., during refresh itself)
-                        LogManager.logError(
-                            "Network Service - Received non-nonce 401 but skipping refresh for \(url.absoluteString). Cannot proceed."
-                        )
+                        LogManager.logError("Network Service - Received non-nonce 401 but skipping refresh for \(LogManager.sanitizeURLForLogging(url)). Cannot proceed.")
                         let autoLogoutDID = authCtx?.did ?? ""
                         // Broadcast auto-logout event so UI can redirect to reauth
                         Task {
@@ -1525,10 +1538,13 @@ public actor NetworkService: NetworkServiceProtocol {
                     }
                 // Handle 400 responses - check for ExpiredToken error which needs token refresh
                 case 400:
-                    let responseBody = String(data: decompressedData, encoding: .utf8) ?? "<binary data>"
-                    let redactedBody = responseBody.count > 500 ? String(responseBody.prefix(500)) + "..." : responseBody
+                    let maxDiag = NetworkResponseLimits.default.maximumDiagnosticBytes
+                    let diagData = decompressedData.prefix(maxDiag)
+                    let responseBody = String(data: diagData, encoding: .utf8) ?? "<binary data>"
+                    let truncatedSuffix = decompressedData.count > maxDiag ? "... [truncated to \(maxDiag) bytes]" : ""
+                    let redactedBody = (responseBody.count > 500 ? String(responseBody.prefix(500)) + "..." : responseBody) + truncatedSuffix
                     LogManager.logError(
-                        "Network Service - 400 Bad Request for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
+                        "Network Service - 400 Bad Request for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
                     )
                     LogManager.logError(
                         "Network Service - 400 Response body: \(redactedBody)"
@@ -1537,7 +1553,7 @@ public actor NetworkService: NetworkServiceProtocol {
                     // Check if this is an ExpiredToken error that needs refresh
                     if responseBody.contains("ExpiredToken"), let authProvider = authProvider, !skipTokenRefresh {
                         LogManager.logError(
-                            "Network Service - 400 ExpiredToken detected, attempting token refresh for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
+                            "Network Service - 400 ExpiredToken detected, attempting token refresh for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
                         )
 
                         // Attempt token refresh
@@ -1578,7 +1594,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
                 case 402 ..< 500: // Other client errors
                     LogManager.logError(
-                        "Network Service - Client error \(httpResponse.statusCode) for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
+                        "Network Service - Client error \(httpResponse.statusCode) for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
                     )
                     if returnsTerminalHTTPErrorResponses {
                         return (decompressedData, httpResponse)
@@ -1588,7 +1604,7 @@ public actor NetworkService: NetworkServiceProtocol {
                 case 500 ..< 600:
                     // Server errors - may be worth retrying
                     LogManager.logError(
-                        "Network Service - Server error \(httpResponse.statusCode) for \(requestToSend.url?.absoluteString ?? "Unknown URL"). Retry \(retryCount + 1)/\(maxRetries)."
+                        "Network Service - Server error \(httpResponse.statusCode) for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL"). Retry \(retryCount + 1)/\(maxRetries)."
                     )
                     retryCount += 1
                     if retryCount >= maxRetries {
@@ -1611,7 +1627,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
                 default:
                     LogManager.logError(
-                        "Network Service - Unexpected status code \(httpResponse.statusCode) for \(requestToSend.url?.absoluteString ?? "Unknown URL")"
+                        "Network Service - Unexpected status code \(httpResponse.statusCode) for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
                     )
                     throw NetworkError.requestFailed
                 }
@@ -1648,7 +1664,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
         // If loop finishes without returning/throwing (e.g., max retries for 5xx errors)
         LogManager.logError(
-            "Network Service - Max retry attempts reached for \(currentRequest.url?.absoluteString ?? "Unknown URL")."
+            "Network Service - Max retry attempts reached for \(currentRequest.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")."
         )
         throw NetworkError.maxRetryAttemptsReached
     }
@@ -1658,8 +1674,15 @@ public actor NetworkService: NetworkServiceProtocol {
         additionalHeaders: [String: String]?,
         scope: ExactAuthGeneratedRequestScope
     ) async throws -> (Data, URLResponse) {
+        guard let boundURL = request.url else {
+            scope.state.failContinuity()
+            throw ExactAuthGeneratedRequestContinuityError()
+        }
+        guard try await validateURL(boundURL) else {
+            scope.state.failContinuity()
+            throw NetworkError.securityViolation
+        }
         guard isActiveExactAuthRequestScope(scope),
-              let boundURL = request.url,
               ExactAuthRequestOrigin(boundURL) == scope.origin,
               request.httpBodyStream == nil,
               !Task.isCancelled,
@@ -1729,16 +1752,11 @@ public actor NetworkService: NetworkServiceProtocol {
             throw ExactAuthGeneratedRequestContinuityError()
         }
 
-        let (rawData, response) = try await exactAuthSession.data(for: prepared)
+        let (data, response) = try await Self.executeDataTask(prepared, using: exactAuthSession, delegate: exactAuthSessionDelegate)
         authCtx?.releaseAuthenticationLease()
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse(description: "Received non-HTTP response")
         }
-        let contentEncoding = ContentDecoding.headerValue(
-            named: "Content-Encoding",
-            in: httpResponse.allHeaderFields
-        )
-        let data = ContentDecoding.decompressIfNeeded(rawData, contentEncoding: contentEncoding)
 
         guard await exactAuthSnapshot(
             for: captured.provider,
@@ -1754,7 +1772,61 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         return (data, httpResponse)
     }
+    static func executeDataTask(
+        _ request: URLRequest,
+        using targetSession: URLSession,
+        delegate: HardenedURLSessionDelegate
+    ) async throws -> (Data, URLResponse) {
+        try Task.checkCancellation()
+        guard let url = request.url, let host = url.host?.lowercased() else {
+            throw NetworkError.invalidURL
+        }
+        let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
+        let addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+        let task = targetSession.dataTask(with: request)
+        let rawResult: (Data, URLResponse) = try await withTaskCancellationHandler {
+            try await withCheckedThrowingContinuation { continuation in
+                delegate.contextManager.register(task) { result in
+                    continuation.resume(with: result)
+                }
+                delegate.contextManager.setApprovedAddresses(addresses, for: task)
+                task.resume()
+                if Task.isCancelled {
+                    task.cancel()
+                }
+            }
+        } onCancel: {
+            task.cancel()
+        }
+        return (
+            try ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: delegate.limits),
+            rawResult.1
+        )
+    }
 
+    func executeUnauthenticatedRequest(
+        _ request: URLRequest
+    ) async throws -> (Data, URLResponse) {
+        guard let url = request.url else {
+            throw NetworkError.invalidURL
+        }
+        guard try await validateURL(url) else {
+            LogManager.logError("Security validation failed for unauthenticated request URL: \(LogManager.sanitizeURLForLogging(url))")
+            throw NetworkError.securityViolation
+        }
+        var sanitizedRequest = request
+        for header in ["Authorization", "DPoP", "Cookie", "Proxy-Authorization", "atproto-proxy"] {
+            sanitizedRequest.setValue(nil, forHTTPHeaderField: header)
+        }
+        if let userAgent = userAgent {
+            sanitizedRequest.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        }
+        return try await Self.executeDataTask(
+            sanitizedRequest,
+            using: exactAuthSession,
+            delegate: exactAuthSessionDelegate
+        )
+    }
     private func isActiveExactAuthRequestScope(_ scope: ExactAuthGeneratedRequestScope) -> Bool {
         guard scope.networkServiceID == exactAuthRequestScopeServiceID,
               activeExactAuthRequestScope?.id == scope.id,
@@ -1910,7 +1982,7 @@ public actor NetworkService: NetworkServiceProtocol {
         if let adapter = connectionPolicyAdapter {
             resolvedURL = await adapter.resolveConnectionURL(finalURL, endpoint: endpoint)
             if resolvedURL != finalURL {
-                LogManager.logInfo("Network Service - Connection policy adapter resolved URL: \(finalURL) -> \(resolvedURL)")
+                LogManager.logInfo("Network Service - Connection policy adapter resolved URL: \(LogManager.sanitizeURLForLogging(finalURL)) -> \(LogManager.sanitizeURLForLogging(resolvedURL))")
             }
         } else {
             resolvedURL = finalURL
@@ -1918,7 +1990,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
         // Validate URL for security
         if !(try await validateURL(resolvedURL)) {
-            LogManager.logError("Security validation failed for URL: \(resolvedURL). This may be due to DNS resolution to private IP ranges or network configuration issues.")
+            LogManager.logError("Security validation failed for URL: \(LogManager.sanitizeURLForLogging(resolvedURL)). This may be due to DNS resolution to private IP ranges or network configuration issues.")
             throw NetworkError.securityViolation
         }
 
@@ -1926,10 +1998,8 @@ public actor NetworkService: NetworkServiceProtocol {
         var request = URLRequest(url: resolvedURL)
         request.httpMethod = method
 
-        // NOTE: Don't set Accept-Encoding manually - let URLSession negotiate automatically.
-        // With the HardenedURLSessionDelegate not implementing didReceive(data:),
-        // URLSession will auto-decompress gzip, deflate, and br (Brotli).
-
+        // Let URLSession negotiate transparent decoding or wire transfer;
+        // executeDataTask normalizes the response through ContentDecoding.normalizeResponse.
         // Add custom headers
         for (key, value) in self.headers {
             request.setValue(value, forHTTPHeaderField: key)
@@ -2038,41 +2108,18 @@ public actor NetworkService: NetworkServiceProtocol {
         _ request: URLRequest,
         additionalHeaders: [String: String]? = nil
     ) async throws -> PreparedStreamingRequest {
-        var finalRequest = request
-        var authCtx: AuthContext? = nil
-        var requiresAuth = false
-
-        // Determine if authentication is needed (same logic as regular requests)
-        if let url = request.url,
-           !url.absoluteString.contains("/.well-known/"),
-           !url.absoluteString.contains("plc.directory"),
-           !url.absoluteString.contains("/oauth/")
-        {
-            requiresAuth = true
+        guard let url = request.url else {
+            throw NetworkError.invalidURL
         }
 
-        // Add Authentication if required and provider exists
-        if requiresAuth, let authProvider = authProvider {
-            do {
-                // Refresh token if needed
-                _ = try await authProvider.refreshTokenIfNeeded()
-
-                // Get authenticated request with OAuth/DPoP headers
-                let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(finalRequest)
-                finalRequest = authed
-                authCtx = ctx
-
-                LogManager.logDebug("Prepared authenticated streaming request for: \(finalRequest.url?.absoluteString ?? "Unknown URL")")
-            } catch AuthError.noActiveAccount {
-                LogManager.logError("No active account for streaming request: \(finalRequest.url?.absoluteString ?? "Unknown URL"). Proceeding without authentication.")
-                // Allow request to proceed without auth headers if no account exists
-            } catch {
-                LogManager.logError("Failed to prepare authenticated streaming request: \(error)")
-                throw NetworkError.authenticationFailed
-            }
-        } else if requiresAuth {
-            LogManager.logError("Authentication required but no provider set for streaming: \(finalRequest.url?.absoluteString ?? "Unknown URL")")
+        if !(try await validateURL(url)) {
+            LogManager.logError("Security validation failed for streaming URL: \(LogManager.sanitizeURLForLogging(url))")
+            throw NetworkError.securityViolation
         }
+
+        let policy = determineSecurityPolicy(for: url)
+        let (authedRequest, authCtx) = try await attachCredentialsIfAuthorized(request, policy: policy)
+        var finalRequest = authedRequest
 
         // Add custom headers
         for (name, value) in headers {
@@ -2154,10 +2201,16 @@ public actor NetworkService: NetworkServiceProtocol {
         if let adapter = connectionPolicyAdapter {
             resolvedURL = await adapter.resolveConnectionURL(url, endpoint: endpoint)
             if resolvedURL != url {
-                LogManager.logInfo("Network Service - Connection policy adapter resolved WebSocket URL: \(url) -> \(resolvedURL)")
+                LogManager.logInfo("Network Service - Connection policy adapter resolved WebSocket URL: \(LogManager.sanitizeURLForLogging(url)) -> \(LogManager.sanitizeURLForLogging(resolvedURL))")
             }
         } else {
             resolvedURL = url
+        }
+
+        // Validate WebSocket URL for security
+        if !(try await validateURL(resolvedURL)) {
+            LogManager.logError("Security validation failed for WebSocket URL: \(LogManager.sanitizeURLForLogging(resolvedURL))")
+            throw NetworkError.securityViolation
         }
 
         // Create URLRequest to add auth headers and optional proxy header
@@ -2168,33 +2221,32 @@ public actor NetworkService: NetworkServiceProtocol {
             request.setValue(did, forHTTPHeaderField: "atproto-proxy")
             LogManager.logInfo("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
         }
-
-        // Add authentication for WebSocket
         var authCtx: AuthContext? = nil
         defer {
             authCtx?.releaseAuthenticationLease()
         }
-
-        if let authProvider = authProvider {
-            do {
-                let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(request)
-                request = authed
-                authCtx = ctx
-            } catch {
-                LogManager.logError("Failed to add auth to WebSocket: \(error)")
-                throw NetworkError.authenticationFailed
+        let policy = determineSecurityPolicy(for: resolvedURL)
+        let (authedRequest, authedCtx) = try await attachCredentialsIfAuthorized(request, policy: policy)
+        request = authedRequest
+        authCtx = authedCtx
+        let webSocketTask: any WebSocketTaskProtocol = {
+            #if DEBUG
+            if let override = Self.webSocketTaskOverride {
+                return override(request)
             }
+            #endif
+            return session.webSocketTask(with: request)
+        }()
+        let websocketHost = resolvedURL.host?.lowercased() ?? ""
+        let websocketIsLocal = websocketHost == "localhost" || websocketHost == "127.0.0.1" || websocketHost == "::1"
+        let websocketAddresses = try await Self.resolveApprovedAddresses(host: websocketHost, isLocal: websocketIsLocal)
+        if let urlSessionTask = webSocketTask as? URLSessionTask {
+            sessionDelegate.contextManager.setApprovedAddresses(websocketAddresses, for: urlSessionTask)
         }
-
-        // Create WebSocket task with authenticated request
-        let webSocketTask = session.webSocketTask(with: request)
         webSocketTask.resume()
-        authCtx?.releaseAuthenticationLease()
 
-        LogManager.logInfo("WebSocket connection opened to \(resolvedURL.absoluteString)")
-
-        // Create async stream
-        return AsyncThrowingStream { continuation in
+        // Create bounded async throwing stream with buffer size 1000
+        return AsyncThrowingStream(bufferingPolicy: .bufferingNewest(1000)) { continuation in
             Task {
                 do {
                     while !Task.isCancelled {
@@ -2204,21 +2256,60 @@ public actor NetworkService: NetworkServiceProtocol {
                         case let .data(data):
                             do {
                                 let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self, endpoint: endpoint)
-                                continuation.yield(decodedMessage)
+                                let yieldResult = continuation.yield(decodedMessage)
+                                switch yieldResult {
+                                case .enqueued:
+                                    break
+                                case .dropped:
+                                    LogManager.logError("Subscription stream dropped messages due to full buffer - terminating with overflow")
+                                    continuation.finish(throwing: NetworkError.streamOverflow)
+                                    webSocketTask.cancel(with: .goingAway, reason: nil)
+                                    return
+                                case .terminated:
+                                    webSocketTask.cancel(with: .goingAway, reason: nil)
+                                    return
+                                @unknown default:
+                                    LogManager.logError("Unknown yield result on subscription stream - terminating")
+                                    continuation.finish(throwing: NetworkError.invalidResponse(description: "Unknown stream yield result"))
+                                    webSocketTask.cancel(with: .goingAway, reason: nil)
+                                    return
+                                }
                             } catch {
                                 LogManager.logError("Failed to decode WebSocket frame: \(error)")
                                 continuation.finish(throwing: error)
+                                webSocketTask.cancel(with: .goingAway, reason: nil)
                                 return
                             }
 
-                        case .string:
-                            LogManager.logWarning("Received unexpected text frame on subscription")
+                        case let .string(text):
+                            LogManager.logError("Received unexpected text frame on subscription: \(text.utf8.count) bytes")
+                            continuation.finish(throwing: NetworkError.invalidResponse(description: "Unexpected text frame received on binary WebSocket subscription"))
+                            webSocketTask.cancel(with: .goingAway, reason: nil)
+                            return
 
                         @unknown default:
-                            break
+                            LogManager.logError("Received unknown WebSocket message type")
+                            continuation.finish(throwing: NetworkError.invalidResponse(description: "Unknown WebSocket message type"))
+                            webSocketTask.cancel(with: .goingAway, reason: nil)
+                            return
                         }
                     }
                 } catch {
+                    if let urlSessionTask = webSocketTask as? URLSessionTask {
+                        if self.sessionDelegate.contextManager.isSecurityViolation(for: urlSessionTask) {
+                            self.sessionDelegate.contextManager.pruneCompletedTask(urlSessionTask)
+                            LogManager.logError("WebSocket terminated due to security violation")
+                            continuation.finish(throwing: NetworkError.securityViolation)
+                            return
+                        }
+                        if self.sessionDelegate.contextManager.isLimitExceeded(for: urlSessionTask) {
+                            self.sessionDelegate.contextManager.pruneCompletedTask(urlSessionTask)
+                            LogManager.logError("WebSocket terminated due to response limit exceeded")
+                            continuation.finish(throwing: NetworkError.responseLimitExceeded("Response limit exceeded"))
+                            return
+                        }
+                        self.sessionDelegate.contextManager.pruneCompletedTask(urlSessionTask)
+                    }
                     if let urlError = error as? URLError, urlError.code == .cancelled {
                         LogManager.logInfo("WebSocket connection closed")
                         continuation.finish()
@@ -2235,7 +2326,6 @@ public actor NetworkService: NetworkServiceProtocol {
             }
         }
     }
-
     /// Decode a subscription WebSocket frame containing two DAG-CBOR objects
     private func decodeSubscriptionFrame<Message: Codable & Sendable>(
         _ data: Data,
@@ -2246,9 +2336,7 @@ public actor NetworkService: NetworkServiceProtocol {
         do {
             return try jsonDecoder.decode(Message.self, from: decoded.jsonData)
         } catch {
-            if let jsonString = String(data: decoded.jsonData, encoding: .utf8) {
-                LogManager.logError("Failed to decode JSON for message type \(decoded.messageType): \(jsonString)")
-            }
+            LogManager.logError("Failed to decode JSON payload (\(decoded.jsonData.count) bytes) for message type: \(decoded.messageType)")
             throw error
         }
     }
@@ -2272,70 +2360,145 @@ public actor NetworkService: NetworkServiceProtocol {
         }
     }
 
-    /// Extract hostname from a DID (e.g., "did:web:mls.catbird.blue#atproto_mls" -> "mls.catbird.blue")
+    /// Extract hostname from a DID (e.g., "did:web:mls.catbird.blue#atproto_mls" -> "mls.catbird.blue", or nested path "did:web:evil.example:a:b" -> "evil.example")
     /// - Parameter did: The DID string
     /// - Returns: The hostname if extractable, nil otherwise
     private func extractHostFromDID(_ did: String) -> String? {
-        // Handle did:web format: did:web:hostname or did:web:hostname#fragment
-        if did.hasPrefix("did:web:") {
-            let withoutPrefix = did.dropFirst("did:web:".count)
-            let withoutFragment = withoutPrefix.split(separator: "#").first ?? withoutPrefix[...]
-            let host = String(withoutFragment)
-            return host.isEmpty ? nil : host
-        }
-        return nil
+        guard did.hasPrefix("did:web:") else { return nil }
+        let withoutPrefix = did.dropFirst("did:web:".count)
+        let withoutFragment = withoutPrefix.split(separator: "#").first ?? withoutPrefix[...]
+        // did:web separates authority and path components with colons ':'
+        // e.g. did:web:example.com:user:alice -> authority is example.com
+        let segments = withoutFragment.split(separator: ":", omittingEmptySubsequences: false)
+        guard let rawAuthority = segments.first else { return nil }
+        let rawAuthorityStr = String(rawAuthority)
+        // Handle percent-encoded port (e.g. host%3A8080)
+        let authorityParts = rawAuthorityStr.components(separatedBy: "%3A")
+        guard let hostSegment = authorityParts.first, !hostSegment.isEmpty else { return nil }
+        let host = hostSegment.removingPercentEncoding ?? hostSegment
+        return host.isEmpty ? nil : host
     }
 
-    /// Validates the URL for security.
+    private func validateURL(_ url: URL) async throws -> Bool {
+        try await Self.validateURL(url)
+    }
+
+    /// Validates the URL for security against scheme policy and DNS rebinding / private ranges.
     /// - Parameter url: The URL to validate.
     /// - Returns: A boolean indicating whether the URL is valid.
-    private func validateURL(_ url: URL) async throws -> Bool {
-        // Ensure only http or https schemes are allowed
-        guard url.scheme == "https" || url.scheme == "http" else {
-            LogManager.logError("Invalid URL scheme: \(url.scheme ?? "nil")")
+    package static func validateURL(_ url: URL) async throws -> Bool {
+        guard let scheme = url.scheme?.lowercased() else {
+            LogManager.logError("Missing URL scheme")
             return false
         }
 
-        // Resolve host and block private / loopback / link-local / unique-local ranges to mitigate SSRF
         guard let host = url.host, !host.isEmpty else { return false }
-
         let normalizedHost = host.lowercased()
 
-        // Quick check: if host is a literal IP, validate directly; otherwise resolve DNS
-        let ips: [String]
-        #if canImport(Network)
-            if IPv4Address(normalizedHost) != nil || IPv6Address(normalizedHost) != nil {
-                ips = [normalizedHost]
-            } else {
-                ips = try await Self.resolveHostIPsOffActor(host: normalizedHost)
-            }
-        #else
-            // Linux: Simple regex check for IP literal
-            let isIPv4 = normalizedHost.split(separator: ".").count == 4 && normalizedHost.allSatisfy { $0.isNumber || $0 == "." }
-            let isIPv6 = normalizedHost.contains(":")
-            if isIPv4 || isIPv6 {
-                ips = [normalizedHost]
-            } else {
-                ips = try await Self.resolveHostIPsOffActor(host: normalizedHost)
-            }
-        #endif
+        let isLocalTarget = normalizedHost == "localhost" || normalizedHost == "127.0.0.1" || normalizedHost == "::1"
 
-        if ips.isEmpty {
-            LogManager.logError("Failed to resolve host: \(normalizedHost)")
+        // Remote traffic requires HTTPS or WSS. HTTP and WS are only permitted for verified loopback targets.
+        if scheme == "http" || scheme == "ws" {
+            guard isLocalTarget else {
+                LogManager.logError("Rejected cleartext scheme (\(scheme)) for remote host: \(host)")
+                return false
+            }
+        } else if scheme != "https" && scheme != "wss" {
+            LogManager.logError("Invalid URL scheme: \(scheme)")
             return false
         }
 
-        for ip in ips {
-            if isPrivateOrReserved(ip: ip) {
-                LogManager.logError("Blocked request to private/reserved IP: \(ip) for host \(normalizedHost)")
-                return false
-            }
-        }
-
+        _ = try await Self.resolveApprovedAddresses(host: normalizedHost, isLocal: isLocalTarget)
         return true
     }
 
-    private static func resolveHostIPsOffActor(host: String) async throws -> [String] {
+    /// Resolves and validates host IP addresses against private and reserved ranges.
+    /// Returns the set of approved normalized IP addresses, or throws `NetworkError.securityViolation`.
+    package static func resolveApprovedAddresses(host: String, isLocal: Bool) async throws -> Set<String> {
+        let normalizedHost = host.lowercased()
+        let rawAddresses: [String]
+        #if canImport(Network)
+            if IPv4Address(normalizedHost) != nil || IPv6Address(normalizedHost) != nil {
+                rawAddresses = [normalizedHost]
+            } else {
+                rawAddresses = try await resolveHostIPsOffActor(host: normalizedHost)
+            }
+        #else
+            let isIPv4 = normalizedHost.split(separator: ".").count == 4 && normalizedHost.allSatisfy { $0.isNumber || $0 == "." }
+            let isIPv6 = normalizedHost.contains(":")
+            if isIPv4 || isIPv6 {
+                rawAddresses = [normalizedHost]
+            } else {
+                rawAddresses = try await resolveHostIPsOffActor(host: normalizedHost)
+            }
+        #endif
+        let addresses = Set(rawAddresses.map { IPAddress.normalizeIPv4MappedIPv6($0) })
+        guard !addresses.isEmpty else {
+            throw NetworkError.requestFailed
+        }
+        if isLocal {
+            guard addresses.allSatisfy({ $0 == "127.0.0.1" || $0 == "::1" }) else {
+                throw NetworkError.securityViolation
+            }
+        } else {
+            guard !addresses.contains(where: IPAddress.isPrivateOrReservedAddress) else {
+                throw NetworkError.securityViolation
+            }
+        }
+        return addresses
+    }
+
+    /// Attaches credentials to a request if authorized by policy and provider is available.
+    /// If policy is `.authenticated` and the target matches recipient origin, credentials are attached.
+    /// If no active account is currently signed in (`AuthError.noActiveAccount`), the request proceeds unauthenticated.
+    private func attachCredentialsIfAuthorized(
+        _ request: URLRequest,
+        policy: RequestSecurityPolicy,
+        skipTokenRefresh: Bool = false
+    ) async throws -> (URLRequest, AuthContext?) {
+        guard let url = request.url else {
+            return (request, nil)
+        }
+        let requiresAuth: Bool
+        switch policy {
+        case .unauthenticated:
+            requiresAuth = false
+        case let .authenticated(recipient):
+            if let origin = ExactAuthRequestOrigin(url), origin == recipient {
+                requiresAuth = true
+            } else {
+                requiresAuth = false
+            }
+        }
+        guard requiresAuth else {
+            LogManager.logDebug("No authentication required for: \(LogManager.sanitizeURLForLogging(url))")
+            return (request, nil)
+        }
+        guard let authProvider = authProvider else {
+            LogManager.logDebug("Authentication required but no auth provider set for: \(LogManager.sanitizeURLForLogging(url))")
+            return (request, nil)
+        }
+
+        do {
+            if !skipTokenRefresh {
+                _ = try await authProvider.refreshTokenIfNeeded()
+            }
+            let (authed, ctx) = try await authProvider.prepareAuthenticatedRequestWithContext(request)
+            LogManager.logDebug("Prepared authenticated request for: \(LogManager.sanitizeURLForLogging(url))")
+            return (authed, ctx)
+        } catch AuthError.noActiveAccount {
+            LogManager.logError("No active account for authenticated request: \(LogManager.sanitizeURLForLogging(url)). Proceeding without authentication.")
+            return (request, nil)
+        } catch {
+            LogManager.logError("Failed to prepare authenticated request for \(LogManager.sanitizeURLForLogging(url)): \(error)")
+            if let authErr = error as? AuthError {
+                throw authErr
+            }
+            throw NetworkError.authenticationFailed
+        }
+    }
+
+    static func resolveHostIPsOffActor(host: String) async throws -> [String] {
         try Task.checkCancellation()
 
         final class ResolutionState: @unchecked Sendable {
@@ -2459,68 +2622,6 @@ public actor NetworkService: NetworkServiceProtocol {
         return results
     }
 
-    private func isPrivateOrReserved(ip: String) -> Bool {
-        #if canImport(Network)
-            // IPv4 checks
-            if let v4 = IPv4Address(ip) {
-                let octets = v4.rawValue
-                let a = Int(octets[0])
-                let b = Int(octets[1])
-
-                // 10.0.0.0/8
-                if a == 10 { return true }
-                // 172.16.0.0/12 (172.16.0.0 - 172.31.255.255)
-                if a == 172 && (16 ... 31).contains(b) { return true }
-                // 192.168.0.0/16
-                if a == 192 && b == 168 { return true }
-                // 127.0.0.0/8 loopback
-                if a == 127 { return true }
-                // 169.254.0.0/16 link-local
-                if a == 169 && b == 254 { return true }
-                // 0.0.0.0/8 and 255.255.255.255 broadcast-like
-                if a == 0 || a == 255 { return true }
-            }
-
-            // IPv6 checks
-            if let v6 = IPv6Address(ip) {
-                let bytes = v6.rawValue
-                // ::1 loopback
-                if bytes == Data(repeating: 0, count: 15) + Data([1]) { return true }
-                // fe80::/10 link-local (1111 1110 10 ..)
-                if (bytes[0] == 0xFE) && ((bytes[1] & 0xC0) == 0x80) { return true }
-                // fc00::/7 unique local
-                if (bytes[0] & 0xFE) == 0xFC { return true }
-            }
-        #else
-            // Linux fallback: regex-based IP validation
-            // IPv4 checks - parse manually
-            let components = ip.split(separator: ".").compactMap { Int($0) }
-            if components.count == 4 {
-                let a = components[0]
-                let b = components[1]
-
-                // Private/reserved IPv4 ranges
-                if a == 10 { return true }
-                if a == 172 && (16 ... 31).contains(b) { return true }
-                if a == 192 && b == 168 { return true }
-                if a == 127 { return true }
-                if a == 169 && b == 254 { return true }
-                if a == 0 || a == 255 { return true }
-            }
-
-            // IPv6 checks - simplified for Linux
-            if ip.contains(":") {
-                // Loopback ::1
-                if ip == "::1" || ip == "0:0:0:0:0:0:0:1" { return true }
-                // Link-local fe80::/10
-                if ip.lowercased().hasPrefix("fe80:") { return true }
-                // Unique local fc00::/7
-                if ip.lowercased().hasPrefix("fc") || ip.lowercased().hasPrefix("fd") { return true }
-            }
-        #endif
-
-        return false
-    }
 }
 
 /// Extension to help with task value extraction

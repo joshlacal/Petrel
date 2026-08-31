@@ -114,6 +114,11 @@ public enum RelayCommitSemanticVerifier {
     guard event.prevDataCID == previous.dataCID else {
       throw RelayVerifierError.previousDataCIDMismatch
     }
+    guard let previousTID = try? PublicRepositoryTID(previous.revision),
+          let currentTID = try? PublicRepositoryTID(current.revision),
+          previousTID < currentTID else {
+      throw RelayVerifierError.revisionRollback
+    }
     let expected = try expectedDelta(previous: previous.records, current: current.records)
     guard event.ops == expected else {
       throw RelayVerifierError.repositoryDeltaMismatch
