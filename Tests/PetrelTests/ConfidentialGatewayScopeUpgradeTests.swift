@@ -172,7 +172,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
     override func setUp() {
         super.setUp()
         GatewayUpgradeTestURLProtocol.reset()
-        URLProtocol.registerClass(GatewayUpgradeTestURLProtocol.self)
+        _ = URLProtocol.registerClass(GatewayUpgradeTestURLProtocol.self)
         NetworkService.setNetworkTestProtocolClasses([GatewayUpgradeTestURLProtocol.self])
         NetworkService.dnsResolverOverride = { _ in ["93.184.216.34"] }
     }
