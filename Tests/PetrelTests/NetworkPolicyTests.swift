@@ -539,7 +539,7 @@ struct NetworkPolicyTests {
     // URLSessionTask(Transaction)Metrics.init() is unsupported on macOS (deprecated
     // 10.15, fatalErrors at runtime), so the stub-based rebinding test only exists
     // on platforms where the initializer works.
-    #if !os(macOS)
+    #if canImport(Darwin) && !os(macOS)
     @Test("DNS answer change causes request failure (SSRF / TOCTOU mitigation)")
     func dnsRebindingRejection() async throws {
         let delegate = HardenedURLSessionDelegate()

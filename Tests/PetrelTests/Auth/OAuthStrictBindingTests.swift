@@ -811,7 +811,8 @@ struct OAuthStrictBindingTests {
 
             let stateToken = UUID().uuidString
             let ephemeralKey = P256.Signing.PrivateKey()
-            let jwk = try await strategy.core.createJWK(from: ephemeralKey)
+            let jwk = try await strategy.core.createJWK(
+                from: P256.Signing.PrivateKey(rawRepresentation: ephemeralKey.rawRepresentation))
             let dpopJKT = try await strategy.core.calculateJWKThumbprint(jwk: jwk)
 
             // Persist state with nil tokenEndpoint
@@ -870,7 +871,8 @@ struct OAuthStrictBindingTests {
                 // Test Public Strategy Login (initialIdentifier != nil)
                 let stateTokenPub = UUID().uuidString
                 let ephemeralKeyPub = P256.Signing.PrivateKey()
-                let jwkPub = try await publicStrategy.core.createJWK(from: ephemeralKeyPub)
+                let jwkPub = try await publicStrategy.core.createJWK(
+                from: P256.Signing.PrivateKey(rawRepresentation: ephemeralKeyPub.rawRepresentation))
                 let dpopJKTPub = try await publicStrategy.core.calculateJWKThumbprint(jwk: jwkPub)
 
                 let statePub = OAuthState(
@@ -897,7 +899,8 @@ struct OAuthStrictBindingTests {
                 // Test CAB Strategy Login (initialIdentifier != nil)
                 let stateTokenCAB = UUID().uuidString
                 let ephemeralKeyCAB = P256.Signing.PrivateKey()
-                let jwkCAB = try await cabStrategy.core.createJWK(from: ephemeralKeyCAB)
+                let jwkCAB = try await cabStrategy.core.createJWK(
+                from: P256.Signing.PrivateKey(rawRepresentation: ephemeralKeyCAB.rawRepresentation))
                 let dpopJKTCAB = try await cabStrategy.core.calculateJWKThumbprint(jwk: jwkCAB)
 
                 let stateCAB = OAuthState(
@@ -945,7 +948,8 @@ struct OAuthStrictBindingTests {
 
             let stateToken = UUID().uuidString
             let ephemeralKey = P256.Signing.PrivateKey()
-            let jwk = try await strategy.core.createJWK(from: ephemeralKey)
+            let jwk = try await strategy.core.createJWK(
+                from: P256.Signing.PrivateKey(rawRepresentation: ephemeralKey.rawRepresentation))
             let dpopJKT = try await strategy.core.calculateJWKThumbprint(jwk: jwk)
 
             // Signup flow initiated at an entryway (e.g. https://bsky.social) but resolved DID PDS is testPDSHost (https://pds.strict.test)
@@ -997,7 +1001,8 @@ struct OAuthStrictBindingTests {
 
             let stateToken = UUID().uuidString
             let ephemeralKey = P256.Signing.PrivateKey()
-            let jwk = try await strategy.core.createJWK(from: ephemeralKey)
+            let jwk = try await strategy.core.createJWK(
+                from: P256.Signing.PrivateKey(rawRepresentation: ephemeralKey.rawRepresentation))
             let dpopJKT = try await strategy.core.calculateJWKThumbprint(jwk: jwk)
 
             let signupState = OAuthState(

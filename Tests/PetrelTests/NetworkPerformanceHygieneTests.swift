@@ -246,6 +246,9 @@ struct NetworkPerformanceHygieneTests {
 
     // MARK: - Task 8: HardenedURLSessionDelegate Tests
 
+    // The session-level auth-challenge delegate method (and this parameterless
+    // URLAuthenticationChallenge initializer) only exist on Darwin Foundation.
+    #if canImport(Darwin)
     @Test("HardenedURLSessionDelegate performs default handling for TLS challenge")
     func hardenedDelegateTLSChallengeDefaultHandling() async throws {
         let delegate = HardenedURLSessionDelegate()
@@ -265,6 +268,7 @@ struct NetworkPerformanceHygieneTests {
         let wasHandled = await flag.get()
         #expect(wasHandled == true)
     }
+    #endif
 
     // MARK: - Task 7: NetworkService URL Validation and SSRF Mitigation Tests
 
