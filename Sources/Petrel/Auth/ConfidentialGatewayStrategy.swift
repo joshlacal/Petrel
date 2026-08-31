@@ -1174,18 +1174,18 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         for expectedDID: String,
         callbackURL: URL
     ) async throws -> URL {
-        // Validate scopes
+        // Validate scopes. Mirrors the gateway's structural rules: length <= 256
+        // (parameterized `space:` scopes exceed 128) and no whitespace. Wildcard
+        // characters are legitimate scope syntax (e.g. `authority=*`); the
+        // gateway's exact-match allowlist is the authorization gate.
         guard !requesting.isEmpty, requesting.count <= 16 else {
             throw AuthError.invalidOAuthConfiguration
         }
         for scope in requesting {
-            guard !scope.isEmpty, scope.count <= 128 else {
+            guard !scope.isEmpty, scope.count <= 256 else {
                 throw AuthError.invalidOAuthConfiguration
             }
             guard !scope.contains(where: \.isWhitespace) else {
-                throw AuthError.invalidOAuthConfiguration
-            }
-            guard !scope.contains("*") else {
                 throw AuthError.invalidOAuthConfiguration
             }
         }

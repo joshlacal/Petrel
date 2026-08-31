@@ -330,17 +330,11 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 XCTFail("Expected failure for >16 scopes")
             } catch {}
 
-            // 3. Unbounded single scope (> 128 chars)
-            let longScope = String(repeating: "a", count: 129)
+            // 3. Unbounded single scope (> 256 chars)
+            let longScope = String(repeating: "a", count: 257)
             do {
                 _ = try await client.startGatewayScopeUpgrade(requesting: [longScope], for: self.aliceDID, callbackURL: self.validCallbackBase)
-                XCTFail("Expected failure for >128-char scope")
-            } catch {}
-
-            // 4. Wildcard scope
-            do {
-                _ = try await client.startGatewayScopeUpgrade(requesting: ["repo:*"], for: self.aliceDID, callbackURL: self.validCallbackBase)
-                XCTFail("Expected failure for wildcard scope")
+                XCTFail("Expected failure for >256-char scope")
             } catch {}
 
             // 5. Whitespace scope
