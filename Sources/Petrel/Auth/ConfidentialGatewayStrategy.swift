@@ -174,6 +174,7 @@ private struct PendingGatewayUpgradeState: Codable, Sendable {
     let callbackURL: URL
     var candidateSession: String?
     var candidateGrantedScopes: [String]?
+    var createdAt: Date? = nil
 
     var hasCandidate: Bool {
         if let candidateSession, !candidateSession.isEmpty {
@@ -183,6 +184,13 @@ private struct PendingGatewayUpgradeState: Codable, Sendable {
             return true
         }
         return false
+    }
+
+    var isPreCandidateExpired: Bool {
+        guard !hasCandidate else { return false }
+        guard let createdAt else { return false }
+        // Matches Nest UPGRADE_FLOW_TTL_SECONDS (600s / 10 minutes)
+        return Date().timeIntervalSince(createdAt) > 600
     }
 }
 
@@ -307,6 +315,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         case authenticationRequired
         case networkError(Error)
         case upgradeTemporarilyUnavailable
+        case upgradeFailed(String)
         var errorDescription: String? {
             switch self {
             case .missingSession:
@@ -325,6 +334,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 return "Network error: \(error.localizedDescription)"
             case .upgradeTemporarilyUnavailable:
                 return "Gateway upgrade is temporarily unavailable. Please try again later."
+            case let .upgradeFailed(message):
+                return message
             }
         }
     }
@@ -1224,6 +1235,11 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                 else {
                     throw GatewayError.invalidSession
                 }
+            } else if pendingState.isPreCandidateExpired {
+                // Pre-candidate flow expired without completion (abandoned/dismissed browser flow).
+                // Clean up stale pending data so fresh upgrade can proceed.
+                try await storage.deletePendingGatewayUpgradeData(for: expectedDID)
+                logger.info("startGatewayScopeUpgrade: purged expired pre-candidate pending upgrade state")
             } else {
                 // Pre-candidate pending state exists (browser flow in progress); fail to avoid overwriting
                 throw GatewayError.invalidSession
@@ -1289,6 +1305,13 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             if httpResponse.statusCode == 401 {
                 throw GatewayError.sessionExpired
             }
+            if httpResponse.statusCode == 429 || (500...599).contains(httpResponse.statusCode) {
+                throw GatewayError.upgradeTemporarilyUnavailable
+            }
+            if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: data),
+               let message = errorPayload.message, !message.isEmpty {
+                throw GatewayError.upgradeFailed(message)
+            }
             throw GatewayError.invalidSession
         }
 
@@ -1306,7 +1329,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             browserNonce: browserNonce,
             callbackURL: callbackURL,
             candidateSession: nil,
-            candidateGrantedScopes: nil
+            candidateGrantedScopes: nil,
+            createdAt: Date()
         )
         let stateData = try JSONCoders.encode(pendingState)
         try await storage.savePendingGatewayUpgradeData(stateData, for: expectedDID)

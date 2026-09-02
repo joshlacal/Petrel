@@ -1412,7 +1412,8 @@ public actor NetworkService: NetworkServiceProtocol {
                                      .invalidCallbackURL,
                                      .invalidGatewayURL,
                                      .networkError,
-                                     .upgradeTemporarilyUnavailable:
+                                     .upgradeTemporarilyUnavailable,
+                                     .upgradeFailed:
                                     return nil
                                 }
                             }()

@@ -1313,6 +1313,127 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         }
     }
 
+    func testStartScopeUpgradePurgesExpiredPreCandidatePendingUpgrade() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.start.expired.precandidate.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let (client, storage) = try await self.makeClient(
+                namespace: namespace,
+                initialSession: oldSessionUUID
+            )
+
+            let alice = self.aliceDID
+
+            // Plant expired pre-candidate pending upgrade state (e.g. 15 minutes old)
+            let expiredTimestamp = Date().addingTimeInterval(-900).timeIntervalSinceReferenceDate
+            let expiredPendingState = """
+            {
+                "oldSession": "\(oldSessionUUID)",
+                "expectedDID": "\(alice)",
+                "requestedScopes": ["identity:handle"],
+                "priorScopes": ["atproto", "transition:generic"],
+                "browserNonce": "browser-nonce-12345",
+                "callbackURL": "https://catbird.blue/oauth/permission-callback",
+                "candidateSession": null,
+                "candidateGrantedScopes": null,
+                "createdAt": \(expiredTimestamp)
+            }
+            """.data(using: .utf8)!
+            try await storage.savePendingGatewayUpgradeData(expiredPendingState, for: alice)
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/session" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                if request.url?.path == "/auth/upgrade" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "authorization_url": "https://auth.pds.test/oauth/authorize?req=new"
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            // Calling startGatewayScopeUpgrade should purge expired state and proceed
+            let authURL = try await client.startGatewayScopeUpgrade(
+                requesting: ["identity:handle"],
+                for: alice,
+                callbackURL: self.validCallbackBase
+            )
+            XCTAssertEqual(authURL.absoluteString, "https://auth.pds.test/oauth/authorize?req=new")
+
+            let pendingAfter = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertNotNil(pendingAfter)
+            XCTAssertNotEqual(pendingAfter, expiredPendingState)
+        }
+    }
+
+    func testStartScopeUpgradeSurfacesGatewayErrorMessageOnBadRequest() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.start.badrequest.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let (client, _) = try await self.makeClient(
+                namespace: namespace,
+                initialSession: oldSessionUUID
+            )
+
+            let alice = self.aliceDID
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/session" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                if request.url?.path == "/auth/upgrade" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "error": "bad_request",
+                        "message": "Scope is not allowlisted for progressive upgrade"
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            do {
+                _ = try await client.startGatewayScopeUpgrade(
+                    requesting: ["identity:handle"],
+                    for: alice,
+                    callbackURL: self.validCallbackBase
+                )
+                XCTFail("Expected startGatewayScopeUpgrade to throw error")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case let .upgradeFailed(message) = error else {
+                    XCTFail("Expected .upgradeFailed, got \(error)")
+                    return
+                }
+                XCTAssertEqual(message, "Scope is not allowlisted for progressive upgrade")
+            } catch {
+                XCTFail("Expected GatewayError, got \(error)")
+            }
+        }
+    }
+
     // MARK: - 5. Cancellation, Denial, and Fail-Closed Tests
 
     func testCancellationAndCallbackErrorsFailClosed() async throws {
