@@ -2497,10 +2497,15 @@ public actor NetworkService: NetworkServiceProtocol {
         } catch AuthError.noActiveAccount {
             LogManager.logError("No active account for authenticated request: \(LogManager.sanitizeURLForLogging(url)). Proceeding without authentication.")
             return (request, nil)
+        } catch is CancellationError {
+            throw CancellationError()
         } catch {
             LogManager.logError("Failed to prepare authenticated request for \(LogManager.sanitizeURLForLogging(url)): \(error)")
             if let authErr = error as? AuthError {
                 throw authErr
+            }
+            if Task.isCancelled {
+                throw CancellationError()
             }
             throw NetworkError.authenticationFailed
         }

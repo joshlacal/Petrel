@@ -488,6 +488,91 @@ struct NetworkPolicyTests {
         }
     }
 
+    @Test("Credential attachment propagates CancellationError from refreshTokenIfNeeded and prepareAuthenticatedRequestWithContext")
+    func credentialAttachmentPropagatesCancellation() async throws {
+        try await withPolicyTransport {
+            /// Auth provider that fails at a chosen step. `.prepareAfterRelease` parks inside
+            /// `prepareAuthenticatedRequestWithContext` (signalling `entered`) until `release`
+            /// is signalled, so a test can cancel the surrounding Task mid-flight.
+            final class FailingAuthProvider: AuthenticationProvider, @unchecked Sendable {
+                enum Failure {
+                    case refresh
+                    case prepare
+                    case prepareAfterRelease
+                }
+
+                let entered = AsyncBarrier()
+                let release = AsyncBarrier()
+                private let failure: Failure
+                private let error: any Error
+
+                init(_ failure: Failure, throwing error: any Error) {
+                    self.failure = failure
+                    self.error = error
+                }
+
+                func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest { request }
+                func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (URLRequest, AuthContext) {
+                    switch failure {
+                    case .refresh:
+                        return (request, AuthContext(did: nil, jkt: nil))
+                    case .prepare:
+                        throw error
+                    case .prepareAfterRelease:
+                        entered.signal()
+                        _ = try await release.wait()
+                        throw error
+                    }
+                }
+                func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
+                    if case .refresh = failure { throw error }
+                    return .stillValid
+                }
+                func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse) { (data, response) }
+                func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {}
+            }
+
+            let baseURL = URL(string: "https://pds.example.com")!
+            let simpleReq = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
+
+            /// Starts a request, cancels its Task while the provider is parked inside prepare,
+            /// then releases the provider to throw `error`.
+            func cancelledMidPrepare(throwing error: any Error) async throws -> Task<(Data, HTTPURLResponse), any Error> {
+                let provider = FailingAuthProvider(.prepareAfterRelease, throwing: error)
+                let service = NetworkService(baseURL: baseURL, authService: provider)
+                let task = Task { try await service.performRequest(simpleReq) }
+                _ = try await provider.entered.wait()
+                task.cancel()
+                provider.release.signal()
+                return task
+            }
+
+            // 1. refreshTokenIfNeeded throwing CancellationError must propagate, not become NetworkError.authenticationFailed
+            let refreshService = NetworkService(baseURL: baseURL, authService: FailingAuthProvider(.refresh, throwing: CancellationError()))
+            await #expect(throws: CancellationError.self) {
+                _ = try await refreshService.performRequest(simpleReq)
+            }
+
+            // 2. prepareAuthenticatedRequestWithContext throwing CancellationError must propagate, not become NetworkError.authenticationFailed
+            let prepareService = NetworkService(baseURL: baseURL, authService: FailingAuthProvider(.prepare, throwing: CancellationError()))
+            await #expect(throws: CancellationError.self) {
+                _ = try await prepareService.performRequest(simpleReq)
+            }
+
+            // 3. A non-CancellationError shape (URLError.cancelled) raised while the Task is cancelled must propagate CancellationError, not become NetworkError.authenticationFailed
+            let urlErrorTask = try await cancelledMidPrepare(throwing: URLError(.cancelled))
+            await #expect(throws: CancellationError.self) {
+                _ = try await urlErrorTask.value
+            }
+
+            // 4. A genuine non-noActiveAccount AuthError raised while the Task is cancelled must propagate AuthError, not become CancellationError
+            let authErrorTask = try await cancelledMidPrepare(throwing: AuthError.invalidCredentials)
+            await #expect(throws: AuthError.self) {
+                _ = try await authErrorTask.value
+            }
+        }
+    }
+
     @Test("Step 7 & N1-N1 & N1-N2: WebSocket subscription admitted for wss and requires auth for authorized origin")
     func subscriptionWSSAdmission() async throws {
         let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
