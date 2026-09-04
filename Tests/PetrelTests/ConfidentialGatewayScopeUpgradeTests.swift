@@ -497,32 +497,63 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             }
 
             // Start
-            _ = try await client.startGatewayScopeUpgrade(
+            let authURL = try await client.startGatewayScopeUpgrade(
                 requesting: ["identity:handle"],
                 for: self.aliceDID,
                 callbackURL: self.validCallbackBase
             )
+            XCTAssertEqual(authURL.absoluteString, "https://auth.pds.test/oauth/authorize?req=1")
 
             // Complete with valid code
             let incomingCallback = URL(string: "https://catbird.blue/oauth/permission-callback?code=auth-code-12345")!
             let granted = try await client.completeGatewayScopeUpgrade(callbackURL: incomingCallback, for: self.aliceDID)
 
             let reqs = GatewayUpgradeTestURLProtocol.recordedRequests()
+            let capturedUpgradeReq = reqs.first(where: { $0.url?.path == "/auth/upgrade" })
             let capturedExchangeReq = reqs.first(where: { $0.url?.path == "/auth/upgrade/exchange" })
             let capturedCommitReq = reqs.first(where: { $0.url?.path == "/auth/upgrade/commit" })
 
+            XCTAssertNotNil(capturedUpgradeReq)
             XCTAssertNotNil(capturedExchangeReq)
             XCTAssertNotNil(capturedCommitReq)
             XCTAssertEqual(granted, ["atproto", "transition:generic", "identity:handle"])
 
+            // Verify start upgrade request contract
+            XCTAssertEqual(capturedUpgradeReq?.httpMethod, "POST")
+            XCTAssertEqual(capturedUpgradeReq?.url?.path, "/auth/upgrade")
+            XCTAssertEqual(capturedUpgradeReq?.value(forHTTPHeaderField: "Authorization"), "Bearer \(initialSessionUUID)")
+            XCTAssertEqual(capturedUpgradeReq?.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(capturedUpgradeReq?.value(forHTTPHeaderField: "Accept"), "application/json")
+
+            let upgradeBodyData = capturedUpgradeReq?.httpBody ?? capturedUpgradeReq?.httpBodyStream.flatMap { stream in
+                var data = Data()
+                stream.open()
+                defer { stream.close() }
+                let bufferSize = 1024
+                let buffer = UnsafeMutablePointer<UInt8>.allocate(capacity: bufferSize)
+                defer { buffer.deallocate() }
+                while stream.hasBytesAvailable {
+                    let read = stream.read(buffer, maxLength: bufferSize)
+                    if read > 0 { data.append(buffer, count: read) } else { break }
+                }
+                return data
+            }
+            XCTAssertNotNil(upgradeBodyData)
+            let upgradeBodyObj = try JSONSerialization.jsonObject(with: upgradeBodyData ?? Data()) as? [String: Any]
+            XCTAssertEqual(upgradeBodyObj?["additional_scopes"] as? [String], ["identity:handle"])
+            let nonce = upgradeBodyObj?["browser_nonce"] as? String
+            XCTAssertNotNil(nonce)
+            XCTAssertEqual(nonce?.count, 43)
+
             // Verify exchange request
+            XCTAssertEqual(capturedExchangeReq?.httpMethod, "POST")
             XCTAssertEqual(capturedExchangeReq?.value(forHTTPHeaderField: "Authorization"), "Bearer \(initialSessionUUID)")
             XCTAssertEqual(capturedExchangeReq?.value(forHTTPHeaderField: "Origin"), "https://catbird.blue", "Origin must be derived from fixed callback, not gateway URL")
 
             // Verify commit request uses candidate bearer and empty body
+            XCTAssertEqual(capturedCommitReq?.httpMethod, "POST")
             XCTAssertEqual(capturedCommitReq?.value(forHTTPHeaderField: "Authorization"), "Bearer \(candidateSessionUUID)")
             XCTAssertNil(capturedCommitReq?.httpBody, "Commit request body must be empty")
-
             // Verify local session is now promoted
             let upgradedSession = try await storage.getGatewaySession(for: self.aliceDID)
             XCTAssertEqual(upgradedSession, candidateSessionUUID)
@@ -1430,6 +1461,159 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 XCTAssertEqual(message, "Scope is not allowlisted for progressive upgrade")
             } catch {
                 XCTFail("Expected GatewayError, got \(error)")
+            }
+        }
+    }
+    func testStartScopeUpgradeRejectsMalformedOrNonHttpsAuthorizationURLWithUpgradeFailed() async throws {
+        let invalidURLs = [
+            "http://insecure.pds.test/oauth/authorize",
+            "https://user:pass@auth.pds.test/oauth/authorize",
+            "https://auth.pds.test/oauth/authorize#frag",
+            "://not-a-url"
+        ]
+
+        for invalidURL in invalidURLs {
+            try await withInMemoryBackend { _ in
+                let namespace = "test.gateway.upgrade.start.invalidauthurl.\(UUID().uuidString)"
+                let oldSessionUUID = UUID().uuidString.lowercased()
+                let (client, _) = try await self.makeClient(
+                    namespace: namespace,
+                    initialSession: oldSessionUUID
+                )
+
+                let alice = self.aliceDID
+
+                GatewayUpgradeTestURLProtocol.setHandler { request in
+                    if request.url?.path == "/auth/session" {
+                        let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                        let body = """
+                        {
+                            "did": "\(alice)",
+                            "handle": "alice.test",
+                            "granted_scopes": ["atproto", "transition:generic"]
+                        }
+                        """.data(using: .utf8)!
+                        return (resp, body)
+                    }
+                    if request.url?.path == "/auth/upgrade" {
+                        let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                        let body = """
+                        {
+                            "authorization_url": "\(invalidURL)"
+                        }
+                        """.data(using: .utf8)!
+                        return (resp, body)
+                    }
+                    return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+                }
+
+                do {
+                    _ = try await client.startGatewayScopeUpgrade(
+                        requesting: ["identity:handle"],
+                        for: alice,
+                        callbackURL: self.validCallbackBase
+                    )
+                    XCTFail("Expected startGatewayScopeUpgrade to throw error for invalid URL: \(invalidURL)")
+                } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                    guard case let .upgradeFailed(message) = error else {
+                        XCTFail("Expected .upgradeFailed, got \(error) for invalid URL: \(invalidURL)")
+                        return
+                    }
+                    XCTAssertEqual(message, "Invalid authorization URL received from gateway.")
+                } catch {
+                    XCTFail("Expected GatewayError, got \(error) for invalid URL: \(invalidURL)")
+                }
+            }
+        }
+    }
+
+    func testStartScopeUpgradeSurfacesBackendErrorCodeWhenMessageMissing() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.start.errorcode.\(UUID().uuidString)"
+            let oldSessionUUID = UUID().uuidString.lowercased()
+            let (client, _) = try await self.makeClient(
+                namespace: namespace,
+                initialSession: oldSessionUUID
+            )
+
+            let alice = self.aliceDID
+
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path == "/auth/session" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "did": "\(alice)",
+                        "handle": "alice.test",
+                        "granted_scopes": ["atproto", "transition:generic"]
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                if request.url?.path == "/auth/upgrade" {
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    let body = """
+                    {
+                        "error": "scope_not_allowed"
+                    }
+                    """.data(using: .utf8)!
+                    return (resp, body)
+                }
+                return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
+            do {
+                _ = try await client.startGatewayScopeUpgrade(
+                    requesting: ["identity:handle"],
+                    for: alice,
+                    callbackURL: self.validCallbackBase
+                )
+                XCTFail("Expected startGatewayScopeUpgrade to throw error")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case let .upgradeFailed(message) = error else {
+                    XCTFail("Expected .upgradeFailed, got \(error)")
+                    return
+                }
+                XCTAssertEqual(message, "scope_not_allowed")
+            } catch {
+                XCTFail("Expected GatewayError, got \(error)")
+            }
+        }
+    }
+
+    func testStartScopeUpgradeValidatesGatewayBaseURL() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.upgrade.start.invalidbase.\(UUID().uuidString)"
+            let storage = KeychainStorage(namespace: namespace)
+            let accountManager = await AccountManager(storage: storage)
+            let insecureGateway = URL(string: "http://insecure.gateway.test")!
+            let strategy = ConfidentialGatewayStrategy(
+                gatewayURL: insecureGateway,
+                storage: storage,
+                accountManager: accountManager
+            )
+
+            let alice = self.aliceDID
+            let account = Account(did: alice, handle: "alice.test", pdsURL: self.gatewayURL)
+            try await storage.saveAccount(account, for: alice)
+            try await accountManager.setCurrentAccount(did: alice)
+            try await storage.saveCurrentDID(alice)
+            try await storage.saveGatewaySession(UUID().uuidString.lowercased(), for: alice)
+
+            do {
+                _ = try await strategy.startGatewayScopeUpgrade(
+                    requesting: ["identity:handle"],
+                    for: alice,
+                    callbackURL: self.validCallbackBase
+                )
+                XCTFail("Expected startGatewayScopeUpgrade to throw invalidGatewayURL for insecure base URL")
+            } catch let error as ConfidentialGatewayStrategy.GatewayError {
+                guard case .invalidGatewayURL = error else {
+                    XCTFail("Expected .invalidGatewayURL, got \(error)")
+                    return
+                }
+            } catch {
+                XCTFail("Expected GatewayError.invalidGatewayURL, got \(error)")
             }
         }
     }

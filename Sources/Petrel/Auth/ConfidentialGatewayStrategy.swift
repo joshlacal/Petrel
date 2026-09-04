@@ -1201,6 +1201,10 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             }
         }
 
+        // Reject an insecure or malformed gateway base URL before any
+        // session, storage, or network work.
+        try Self.validateGatewayBaseURL(gatewayURL)
+
         // Validate active identity strictly
         guard !expectedDID.isEmpty else {
             throw AuthError.invalidCredentials
@@ -1280,7 +1284,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let sortedScopes = requesting.sorted()
 
-        // Send POST /auth/upgrade
+        // (base URL validated at entry)
         var request = URLRequest(url: gatewayURL.appendingPathComponent("auth/upgrade"))
         request.httpMethod = "POST"
         request.setValue("Bearer \(oldSession)", forHTTPHeaderField: "Authorization")
@@ -1308,16 +1312,43 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             if httpResponse.statusCode == 429 || (500...599).contains(httpResponse.statusCode) {
                 throw GatewayError.upgradeTemporarilyUnavailable
             }
-            if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: data),
-               let message = errorPayload.message, !message.isEmpty {
-                throw GatewayError.upgradeFailed(message)
+            let serverMessage: String? = {
+                if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: data) {
+                    if let message = errorPayload.message, !message.isEmpty {
+                        return message
+                    }
+                    if let error = errorPayload.error, !error.isEmpty {
+                        return error
+                    }
+                }
+                if let stringBody = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !stringBody.isEmpty, !stringBody.hasPrefix("<") {
+                    return stringBody
+                }
+                return nil
+            }()
+            if let serverMessage {
+                throw GatewayError.upgradeFailed(serverMessage)
+            }
+            if (400...499).contains(httpResponse.statusCode) {
+                throw GatewayError.upgradeFailed("Upgrade request failed (HTTP \(httpResponse.statusCode)).")
             }
             throw GatewayError.invalidSession
         }
 
         let startResponse = try JSONCoders.decode(UpgradeStartResponse.self, from: data)
-        guard let authURL = URL(string: startResponse.authorization_url) else {
-            throw GatewayError.invalidGatewayURL
+        guard let authURL = URL(string: startResponse.authorization_url),
+              let components = URLComponents(url: authURL, resolvingAgainstBaseURL: false),
+              components.user == nil,
+              components.password == nil,
+              components.fragment == nil
+        else {
+            throw GatewayError.upgradeFailed("Invalid authorization URL received from gateway.")
+        }
+        do {
+            try Self.validateGatewayBaseURL(authURL)
+        } catch {
+            throw GatewayError.upgradeFailed("Invalid authorization URL received from gateway.")
         }
 
         // Durably store pending upgrade state
@@ -1363,8 +1394,32 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw GatewayError.invalidSession
         }
         if httpCommitResp.statusCode != 200 {
+            if httpCommitResp.statusCode == 401 {
+                throw GatewayError.sessionExpired
+            }
             if httpCommitResp.statusCode == 429 || (500...599).contains(httpCommitResp.statusCode) {
                 throw GatewayError.upgradeTemporarilyUnavailable
+            }
+            let serverMessage: String? = {
+                if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: commitData) {
+                    if let message = errorPayload.message, !message.isEmpty {
+                        return message
+                    }
+                    if let error = errorPayload.error, !error.isEmpty {
+                        return error
+                    }
+                }
+                if let stringBody = String(data: commitData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !stringBody.isEmpty, !stringBody.hasPrefix("<") {
+                    return stringBody
+                }
+                return nil
+            }()
+            if let serverMessage {
+                throw GatewayError.upgradeFailed(serverMessage)
+            }
+            if (400...499).contains(httpCommitResp.statusCode) {
+                throw GatewayError.upgradeFailed("Upgrade commit failed (HTTP \(httpCommitResp.statusCode)).")
             }
             throw GatewayError.invalidSession
         }
@@ -1523,7 +1578,37 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         } catch {
             throw GatewayError.networkError(error)
         }
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw GatewayError.invalidSession
+        }
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw GatewayError.sessionExpired
+            }
+            if httpResponse.statusCode == 429 || (500...599).contains(httpResponse.statusCode) {
+                throw GatewayError.upgradeTemporarilyUnavailable
+            }
+            let serverMessage: String? = {
+                if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: data) {
+                    if let message = errorPayload.message, !message.isEmpty {
+                        return message
+                    }
+                    if let error = errorPayload.error, !error.isEmpty {
+                        return error
+                    }
+                }
+                if let stringBody = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !stringBody.isEmpty, !stringBody.hasPrefix("<") {
+                    return stringBody
+                }
+                return nil
+            }()
+            if let serverMessage {
+                throw GatewayError.upgradeFailed(serverMessage)
+            }
+            if (400...499).contains(httpResponse.statusCode) {
+                throw GatewayError.upgradeFailed("Upgrade exchange failed (HTTP \(httpResponse.statusCode)).")
+            }
             throw GatewayError.invalidSession
         }
         let exchangeResp = try JSONCoders.decode(UpgradeExchangeResponse.self, from: data)

@@ -1386,6 +1386,22 @@ public actor NetworkService: NetworkServiceProtocol {
 
                     LogManager.logInfo("Network Service - Received 401 for \(LogManager.sanitizeURLForLogging(url)). Analyzing response.")
 
+                    // A 401 minted by a proxied service (atproto-proxy) for its own
+                    // device/authorization state is not a PDS session failure: refreshing
+                    // cannot fix it and auto-logout destroys a healthy session. Only the
+                    // codes that actually mean "your account session is bad" fall through.
+                    if let proxyTarget = requestToSend.value(forHTTPHeaderField: "atproto-proxy"),
+                       let serviceError = Self.serviceScopedUnauthorizedError(in: decompressedData)
+                    {
+                        LogManager.logInfo(
+                            "Network Service - 401 from proxied service \(proxyTarget) is service-scoped (\(serviceError)); not refreshing session."
+                        )
+                        if returnsTerminalHTTPErrorResponses {
+                            return (decompressedData, httpResponse)
+                        }
+                        throw NetworkError.serverError(code: 401, message: serviceError)
+                    }
+
                     // In gateway mode, don't try to handle DPoP nonce errors - gateway should handle them
                     // Just delegate to the auth provider's handleUnauthorizedResponse
                     if gatewayMode {
@@ -1857,6 +1873,25 @@ public actor NetworkService: NetworkServiceProtocol {
         default:
             return false
         }
+    }
+
+    /// Error codes on a 401 that mean the *account session* itself is invalid and a
+    /// refresh (or re-login) is the right response. Everything else on a proxied
+    /// request is the target service's own verdict about this device/actor.
+    private static let sessionScopedUnauthorizedCodes: Set<String> = [
+        "AccountSessionExpired", "AuthenticationRequired", "ExpiredToken", "InvalidToken",
+        "invalid_token", "use_dpop_nonce", "AuthMissing",
+    ]
+
+    /// The lexicon `error` code of a proxied service's 401 when it is not about the
+    /// account session; `nil` when the body is unparseable or names a session code.
+    nonisolated static func serviceScopedUnauthorizedError(in data: Data) -> String? {
+        struct Body: Decodable { let error: String }
+        guard let code = try? JSONDecoder().decode(Body.self, from: data).error,
+              !code.isEmpty,
+              !sessionScopedUnauthorizedCodes.contains(code)
+        else { return nil }
+        return code
     }
 
     /// Performs a GET request to the specified endpoint.

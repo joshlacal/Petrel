@@ -156,7 +156,7 @@ fun parseBinaryFrame(data: ByteArray, limits: CborLimits = CborLimits()): CborFr
         if (header.op == -1) {
             val payloadBytes = data.copyOfRange(headerLength, data.size)
             val payloadLength = CborItemScanner.measureItem(payloadBytes, 0, budget, depth = 1)
-            if (payloadLength <= 0 || payloadLength > payloadBytes.size) {
+            if (payloadLength <= 0 || payloadLength != payloadBytes.size) {
                 return null
             }
             val err = try {
@@ -192,7 +192,8 @@ fun decodeCborPayloadToJson(payload: ByteArray, limits: CborLimits = CborLimits(
 
 internal fun decodeCborPayloadToJson(payload: ByteArray, budget: CborBudget): JsonObject? {
     return try {
-        val (value, _) = CborValueParser.parse(payload, 0, budget, depth = 1)
+        val (value, consumed) = CborValueParser.parse(payload, 0, budget, depth = 1)
+        if (consumed != payload.size) return null
         CborValueParser.toJsonElement(value, budget, depth = 1) as? JsonObject
     } catch (e: CborLimitExceeded) {
         throw e
