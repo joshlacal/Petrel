@@ -209,6 +209,21 @@ class CborFramesTest {
     }
 
     @Test
+    fun testTrailingMessagePayloadBytesAreRejected() {
+        val frame = buildHeader() + buildSimpleMapPayload("seq", 123L)
+        assertNotNull(parseBinaryFrame(frame))
+        assertNull(parseBinaryFrame(frame + byteArrayOf(0x00)))
+        assertNull(decodeCborPayloadToJson(buildSimpleMapPayload("seq", 123L) + byteArrayOf(0x00)))
+    }
+
+    @Test
+    fun testTrailingErrorPayloadBytesAreRejected() {
+        val frame = buildErrorHeader() + byteArrayOf(0xa0.toByte())
+        assertTrue(parseBinaryFrame(frame) is CborFrame.Error)
+        assertNull(parseBinaryFrame(frame + byteArrayOf(0x00)))
+    }
+
+    @Test
     fun testTruncatedInputReturnsNull() {
         val header = buildHeader(op = 1, t = "#commit")
         val payload = buildSimpleMapPayload("seq", 123L)
