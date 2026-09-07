@@ -1738,7 +1738,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     private func prepareAuthenticatedRequestLocked(_ request: URLRequest) async throws -> URLRequest {
         var request = request
         let session = try await gatewaySessionLocked()
-        LogManager.logInfo(
+        LogManager.logDebug(
             "ConfidentialGatewayStrategy - Adding Bearer token to request: \(request.url?.absoluteString ?? "unknown")"
         )
         request.setValue("Bearer \(session)", forHTTPHeaderField: "Authorization")
@@ -1882,8 +1882,13 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                     )
                     throw GatewayError.sessionExpired
                 } else {
+                    // The presented token is not the stored one, so this process
+                    // is holding a session another process already rotated. Drop
+                    // the in-memory copy so the next request re-reads storage,
+                    // otherwise the stale token is retried until app restart.
+                    await storage.dropCachedGatewaySession(for: currentAccount.did)
                     logger.warning(
-                        "Gateway returned terminal auth error (reason: \(reason)) for stale presented session - preserving current session"
+                        "Gateway returned terminal auth error (reason: \(reason)) for stale presented session - preserving stored session and dropping cached copy"
                     )
                     throw GatewayError.authenticationRequired
                 }

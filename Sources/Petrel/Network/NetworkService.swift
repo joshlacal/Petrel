@@ -1240,7 +1240,7 @@ public actor NetworkService: NetworkServiceProtocol {
                     }
                     requestToSend.setValue(value, forHTTPHeaderField: name)
                     if name == "atproto-proxy" {
-                        LogManager.logInfo("Network Service - Setting atproto-proxy header: \(value) for endpoint: \(requestToSend.url?.path ?? "unknown")")
+                        LogManager.logDebug("Network Service - Setting atproto-proxy header: \(value) for endpoint: \(requestToSend.url?.path ?? "unknown")")
                     }
                 }
             }
@@ -2183,7 +2183,7 @@ public actor NetworkService: NetworkServiceProtocol {
                 }
                 finalRequest.setValue(value, forHTTPHeaderField: name)
                 if name == "atproto-proxy" {
-                    LogManager.logInfo("Setting atproto-proxy header for streaming: \(value)")
+                    LogManager.logDebug("Setting atproto-proxy header for streaming: \(value)")
                 }
             }
         }
@@ -2263,7 +2263,7 @@ public actor NetworkService: NetworkServiceProtocol {
         // If we are connecting via the PDS host, attach atproto-proxy so the PDS can forward
         if resolvedURL.host == baseURL.host, let did = resolvedDID {
             request.setValue(did, forHTTPHeaderField: "atproto-proxy")
-            LogManager.logInfo("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
+            LogManager.logDebug("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
         }
         var authCtx: AuthContext? = nil
         defer {

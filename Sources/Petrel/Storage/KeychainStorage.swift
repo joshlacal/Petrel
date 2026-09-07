@@ -302,6 +302,11 @@ private final class GatewaySessionMutationCoordinator: @unchecked Sendable {
 public actor KeychainStorage {
     let namespace: String
     private let accessGroup: String?
+    private struct GatewaySessionCacheEntry {
+        let session: String
+        let generation: UInt64
+    }
+    private var gatewaySessionCache: [String: GatewaySessionCacheEntry] = [:]
     private static let gatewayMutationCoordinator = GatewaySessionMutationCoordinator()
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
@@ -631,6 +636,7 @@ public actor KeychainStorage {
         do {
             try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             try await removeFromAccountsList(did)
+            gatewaySessionCache.removeValue(forKey: did)
             AccountMutationHub.shared.bumpGeneration(for: scopeDID)
             await AccountMutationHub.shared.notifyMutation(for: scopeDID)
         } catch {
@@ -742,6 +748,9 @@ public actor KeychainStorage {
             await endAuthContinuityMutation(continuityTicket)
             throw error
         }
+        let scopeDID = accountScopeDID(for: did)
+        let newGen = AccountMutationHub.shared.bumpGeneration(for: scopeDID)
+        gatewaySessionCache[did] = GatewaySessionCacheEntry(session: session, generation: newGen)
         LogManager.logInfo("KeychainStorage - Successfully saved gateway session for DID: \(did.prefix(20))...")
     }
 
@@ -752,15 +761,21 @@ public actor KeychainStorage {
     ///   Legacy migration is deliberately not attempted in that case: it would
     ///   overwrite a per-DID session that is present but momentarily unreadable.
     func getGatewaySession(for did: String) async throws -> String? {
+        let scopeDID = accountScopeDID(for: did)
+        let currentGen = AccountMutationHub.shared.generation(for: scopeDID)
+        if let cached = gatewaySessionCache[did], cached.generation == currentGen {
+            return cached.session
+        }
         let key = makeKey("gatewaySession", did: did)
-        LogManager.logInfo("KeychainStorage - Looking for gateway session with key: \(namespace).\(key)")
+        LogManager.logDebug("KeychainStorage - Looking for gateway session with key: \(namespace).\(key)")
         do {
             let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
-            LogManager.logInfo("KeychainStorage - Retrieved gateway session for DID: \(did.prefix(20))...")
+            LogManager.logDebug("KeychainStorage - Retrieved gateway session for DID: \(did.prefix(20))...")
             guard let session = String(data: data, encoding: .utf8) else {
                 LogManager.logError("KeychainStorage - Stored gateway session is not valid UTF-8 for key \(namespace).\(key)")
                 throw KeychainError.dataFormatError
             }
+            gatewaySessionCache[did] = GatewaySessionCacheEntry(session: session, generation: currentGen)
             return session
         } catch {
             guard KeychainManager.isItemNotFound(error) else {
@@ -787,6 +802,7 @@ public actor KeychainStorage {
             do {
                 if let migratedSession = try await migrateLegacyGatewaySessionIfNeeded(for: did) {
                     LogManager.logInfo("KeychainStorage - Successfully migrated legacy gateway session for DID: \(did.prefix(20))...")
+                    gatewaySessionCache[did] = GatewaySessionCacheEntry(session: migratedSession, generation: currentGen)
                     return migratedSession
                 }
             } catch {
@@ -836,6 +852,9 @@ public actor KeychainStorage {
             throw error
         }
         LogManager.logDebug("KeychainStorage - Deleted gateway session for DID: \(did.prefix(20))...")
+        let scopeDID = accountScopeDID(for: did)
+        AccountMutationHub.shared.bumpGeneration(for: scopeDID)
+        gatewaySessionCache.removeValue(forKey: did)
         let gKey = scopeKey(for: did)
         Self.inFlightMigrationClaims.withLock { inFlight in
             Self.completedMigrationHistory.withLock { history in
@@ -843,6 +862,26 @@ public actor KeychainStorage {
                 history.remove(gKey)
             }
         }
+    }
+
+    /// Invalidate in-memory gateway session cache for a specific DID, or all if nil.
+    public func invalidateGatewaySessionCache(for did: String? = nil) {
+        if let did {
+            let scopeDID = accountScopeDID(for: did)
+            AccountMutationHub.shared.bumpGeneration(for: scopeDID)
+            gatewaySessionCache.removeValue(forKey: did)
+        } else {
+            _ = AccountMutationHub.shared.nextEpoch()
+            gatewaySessionCache.removeAll()
+        }
+    }
+
+    /// Drop only the in-memory gateway session copy, leaving stored state and
+    /// the account generation untouched. Use when another process may have
+    /// rotated the session: the next read re-reads storage, and nothing that
+    /// keys off the account generation (MLS coordination included) is disturbed.
+    public func dropCachedGatewaySession(for did: String) {
+        gatewaySessionCache.removeValue(forKey: did)
     }
 
     /// Saves raw pending gateway upgrade data for a specific account.
@@ -950,6 +989,9 @@ public actor KeychainStorage {
             await endAuthContinuityMutation(continuityTicket)
             throw error
         }
+        let scopeDID = accountScopeDID(for: did)
+        let newGen = AccountMutationHub.shared.bumpGeneration(for: scopeDID)
+        gatewaySessionCache[did] = GatewaySessionCacheEntry(session: newSession, generation: newGen)
         LogManager.logInfo("KeychainStorage - Successfully CAS-promoted gateway session for DID: \(did.prefix(20))...")
         return true
     }
