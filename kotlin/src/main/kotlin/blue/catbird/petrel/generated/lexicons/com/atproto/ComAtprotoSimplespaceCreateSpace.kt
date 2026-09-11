@@ -15,47 +15,47 @@ object ComAtprotoSimplespaceCreateSpaceDefs {
     const val TYPE_IDENTIFIER = "com.atproto.simplespace.createSpace"
 }
 
-@Serializable(with = ComAtprotoSimplespaceCreateSpaceInputPolicyUnionSerializer::class)
-sealed interface ComAtprotoSimplespaceCreateSpaceInputPolicyUnion {
+@Serializable(with = ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnionSerializer::class)
+sealed interface ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion {
     @Serializable
-    data class PublicPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy) : ComAtprotoSimplespaceCreateSpaceInputPolicyUnion
+    data class PublicPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy) : ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion
 
     @Serializable
-    data class MemberListPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy) : ComAtprotoSimplespaceCreateSpaceInputPolicyUnion
+    data class MemberListPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy) : ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion
 
     @Serializable
-    data class ManagingAppPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy) : ComAtprotoSimplespaceCreateSpaceInputPolicyUnion
+    data class ManagingAppPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy) : ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion
 
     @Serializable
-    data class Unexpected(val value: JsonElement) : ComAtprotoSimplespaceCreateSpaceInputPolicyUnion
+    data class Unexpected(val value: JsonElement) : ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion
 }
 
-object ComAtprotoSimplespaceCreateSpaceInputPolicyUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoSimplespaceCreateSpaceInputPolicyUnion> {
+object ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion> {
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceCreateSpaceInputPolicyUnion")
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion")
 
-    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceCreateSpaceInputPolicyUnion) {
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
-            is ComAtprotoSimplespaceCreateSpaceInputPolicyUnion.PublicPolicy -> {
+            is ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.PublicPolicy -> {
                 val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#publicPolicy")
                 })
             }
-            is ComAtprotoSimplespaceCreateSpaceInputPolicyUnion.MemberListPolicy -> {
+            is ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.MemberListPolicy -> {
                 val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#memberListPolicy")
                 })
             }
-            is ComAtprotoSimplespaceCreateSpaceInputPolicyUnion.ManagingAppPolicy -> {
+            is ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.ManagingAppPolicy -> {
                 val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#managingAppPolicy")
                 })
             }
-            is ComAtprotoSimplespaceCreateSpaceInputPolicyUnion.Unexpected -> value.value
+            is ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
             // subscription codegen) are runtime-only sentinels; JSON round-trip
             // serialises them as an empty object tagged with the variant class
@@ -67,23 +67,96 @@ object ComAtprotoSimplespaceCreateSpaceInputPolicyUnionSerializer : kotlinx.seri
         jsonEncoder.encodeJsonElement(element)
     }
 
-    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceCreateSpaceInputPolicyUnion {
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion {
         val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
         val element = jsonDecoder.decodeJsonElement()
         val jsonObject = element.jsonObject
         val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
 
         return when (type) {
-            "com.atproto.simplespace.defs#publicPolicy" -> ComAtprotoSimplespaceCreateSpaceInputPolicyUnion.PublicPolicy(
+            "com.atproto.simplespace.defs#publicPolicy" -> ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.PublicPolicy(
                 jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), element)
             )
-            "com.atproto.simplespace.defs#memberListPolicy" -> ComAtprotoSimplespaceCreateSpaceInputPolicyUnion.MemberListPolicy(
+            "com.atproto.simplespace.defs#memberListPolicy" -> ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.MemberListPolicy(
                 jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), element)
             )
-            "com.atproto.simplespace.defs#managingAppPolicy" -> ComAtprotoSimplespaceCreateSpaceInputPolicyUnion.ManagingAppPolicy(
+            "com.atproto.simplespace.defs#managingAppPolicy" -> ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.ManagingAppPolicy(
                 jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), element)
             )
-            else -> ComAtprotoSimplespaceCreateSpaceInputPolicyUnion.Unexpected(element)
+            else -> ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnionSerializer::class)
+sealed interface ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion {
+    @Serializable
+    data class PublicPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy) : ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion
+
+    @Serializable
+    data class MemberListPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy) : ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion
+
+    @Serializable
+    data class ManagingAppPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy) : ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion
+}
+
+object ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.PublicPolicy -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#publicPolicy")
+                })
+            }
+            is ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.MemberListPolicy -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#memberListPolicy")
+                })
+            }
+            is ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.ManagingAppPolicy -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#managingAppPolicy")
+                })
+            }
+            is ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.simplespace.defs#publicPolicy" -> ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.PublicPolicy(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), element)
+            )
+            "com.atproto.simplespace.defs#memberListPolicy" -> ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.MemberListPolicy(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), element)
+            )
+            "com.atproto.simplespace.defs#managingAppPolicy" -> ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.ManagingAppPolicy(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), element)
+            )
+            else -> ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.Unexpected(element)
         }
     }
 }
@@ -153,8 +226,9 @@ object ComAtprotoSimplespaceCreateSpaceInputAppAccessUnionSerializer : kotlinx.s
     data class ComAtprotoSimplespaceCreateSpaceInput(
 // The NSID of the space type, describing the modality of the space (e.g. app.bsky.group, app.bsky.personal).        @SerialName("type")
         val type: NSID,// The space key. Used to differentiate multiple spaces of the same type under the same owner. Same syntax requirements as a record key. If not provided, one will be auto-generated (TID).        @SerialName("skey")
-        val skey: String? = null,// How the authority decides whether to authorize a requesting user.        @SerialName("policy")
-        val policy: ComAtprotoSimplespaceCreateSpaceInputPolicyUnion,// How the authority decides whether to authorize a requesting app.        @SerialName("appAccess")
+        val skey: String? = null,// How the authority decides whether to authorize a user to read the space.        @SerialName("readPolicy")
+        val readPolicy: ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion,// How the authority decides whether to track and forward a user's write notifications.        @SerialName("writePolicy")
+        val writePolicy: ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion,// How the authority decides whether to authorize a requesting app.        @SerialName("appAccess")
         val appAccess: ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion    )
 
     @Serializable
@@ -164,7 +238,7 @@ object ComAtprotoSimplespaceCreateSpaceInputAppAccessUnionSerializer : kotlinx.s
 
 sealed class ComAtprotoSimplespaceCreateSpaceError(val name: String, val description: String?) {
         object SpaceAlreadyExists: ComAtprotoSimplespaceCreateSpaceError("SpaceAlreadyExists", "A space with this owner, type, and skey already exists. A space that was previously deleted may be created again.")
-        object UnsupportedPolicy: ComAtprotoSimplespaceCreateSpaceError("UnsupportedPolicy", "The requested policy is not one the host implements.")
+        object UnsupportedPolicy: ComAtprotoSimplespaceCreateSpaceError("UnsupportedPolicy", "A requested policy is not one the host implements.")
         object UnsupportedAppAccess: ComAtprotoSimplespaceCreateSpaceError("UnsupportedAppAccess", "The requested appAccess variant is not one the host implements. A host will not store an app access policy it cannot enforce.")
     }
 

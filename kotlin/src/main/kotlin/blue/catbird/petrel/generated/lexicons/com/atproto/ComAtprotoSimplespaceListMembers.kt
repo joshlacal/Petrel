@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: com.atproto.simplespace.listMembers
-// List the members in a space's host-internal member list. Must be called on the space authority's PDS. Requires OAuth with a covering read grant; a space credential is not sufficient, so members hosted elsewhere cannot enumerate the list. This reflects the simplespace member list, not a protocol-level reader set.
+// List the members in a space's host-internal member list and their read and write access. Must be called on the space authority's PDS. Requires OAuth with a covering read grant; a space credential is not sufficient, so members hosted elsewhere cannot enumerate the list.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -18,7 +18,9 @@ object ComAtprotoSimplespaceListMembersDefs {
     @Serializable
     data class ComAtprotoSimplespaceListMembersMember(
         @SerialName("did")
-        val did: DID    ) {
+        val did: DID,        @SerialName("read")
+        val read: Boolean,        @SerialName("write")
+        val write: Boolean    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#comAtprotoSimplespaceListMembersMember"
         }
@@ -42,7 +44,7 @@ sealed class ComAtprotoSimplespaceListMembersError(val name: String, val descrip
     }
 
 /**
- * List the members in a space's host-internal member list. Must be called on the space authority's PDS. Requires OAuth with a covering read grant; a space credential is not sufficient, so members hosted elsewhere cannot enumerate the list. This reflects the simplespace member list, not a protocol-level reader set.
+ * List the members in a space's host-internal member list and their read and write access. Must be called on the space authority's PDS. Requires OAuth with a covering read grant; a space credential is not sufficient, so members hosted elsewhere cannot enumerate the list.
  *
  * Endpoint: com.atproto.simplespace.listMembers
  */

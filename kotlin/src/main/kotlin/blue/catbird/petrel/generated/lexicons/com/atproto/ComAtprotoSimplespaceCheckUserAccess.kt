@@ -1,5 +1,5 @@
 // Lexicon: 1, ID: com.atproto.simplespace.checkUserAccess
-// Ask a space's managing app whether to authorize a requesting user for a space credential. Served by the managingApp (not the PDS), called by the space authority at mint time when policy is 'managing-app'. Authenticated with service auth from the authority.
+// Ask a space's managing app whether to authorize a user to read or write. Served by the managingApp (not the PDS), called by the space authority when the corresponding policy is 'managing-app'. Authenticated with service auth from the authority.
 package blue.catbird.petrel.generated
 
 import kotlinx.serialization.*
@@ -19,7 +19,8 @@ object ComAtprotoSimplespaceCheckUserAccessDefs {
     data class ComAtprotoSimplespaceCheckUserAccessParameters(
 // Reference to the space.        @SerialName("space")
         val space: SpaceRef,// The DID of the requesting user.        @SerialName("user")
-        val user: DID,// The attested client_id, if a client attestation was presented.        @SerialName("clientId")
+        val user: DID,// The kind of access being checked.        @SerialName("access")
+        val access: String,// The attested client_id, if a client attestation was presented. Omitted for write checks.        @SerialName("clientId")
         val clientId: String? = null    )
 
     @Serializable
@@ -28,7 +29,7 @@ object ComAtprotoSimplespaceCheckUserAccessDefs {
         val authorized: Boolean    )
 
 /**
- * Ask a space's managing app whether to authorize a requesting user for a space credential. Served by the managingApp (not the PDS), called by the space authority at mint time when policy is 'managing-app'. Authenticated with service auth from the authority.
+ * Ask a space's managing app whether to authorize a user to read or write. Served by the managingApp (not the PDS), called by the space authority when the corresponding policy is 'managing-app'. Authenticated with service auth from the authority.
  *
  * Endpoint: com.atproto.simplespace.checkUserAccess
  */
