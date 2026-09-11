@@ -17,6 +17,7 @@ with a dated `0.2.0` heading only when the release tag is created.
 - A fail-closed DocC validator that treats documentation diagnostics as errors and compile-checks every Swift example in the public guides under the sealed release toolchain.
 
 ### Changed
+- Regenerated Swift and Kotlin SimpleSpace APIs against the September 10 Spaces alpha (`9d787ebf`): independent `readPolicy`/`writePolicy`, `putMember` with required read/write flags, and access-specific managing-app checks. The obsolete `addMember` endpoint is removed.
 - Generated namespace reference classes are immutable `Sendable` structs. This is an intentional pre-1.0 source compatibility break for code that named or relied on namespace class identity.
 - Petrel now owns shared overlay namespace roots; overlays add only their child namespaces.
 - Public installation documentation now targets Petrel 0.2.0 and the iOS 18/macOS 15 platform floors.

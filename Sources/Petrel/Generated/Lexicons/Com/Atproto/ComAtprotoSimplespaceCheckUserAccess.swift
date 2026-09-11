@@ -8,15 +8,18 @@ public enum ComAtprotoSimplespaceCheckUserAccess {
     public struct Parameters: Parametrizable {
         public let space: SpaceRef
         public let user: DID
+        public let access: String
         public let clientId: String?
 
         public init(
             space: SpaceRef,
             user: DID,
+            access: String,
             clientId: String? = nil
         ) {
             self.space = space
             self.user = user
+            self.access = access
             self.clientId = clientId
         }
     }
@@ -83,7 +86,7 @@ public enum ComAtprotoSimplespaceCheckUserAccess {
 public extension ATProtoClient.Com.Atproto.Simplespace {
     // MARK: - checkUserAccess
 
-    /// Ask a space's managing app whether to authorize a requesting user for a space credential. Served by the managingApp (not the PDS), called by the space authority at mint time when policy is 'managing-app'. Authenticated with service auth from the authority.
+    /// Ask a space's managing app whether to authorize a user to read or write. Served by the managingApp (not the PDS), called by the space authority when the corresponding policy is 'managing-app'. Authenticated with service auth from the authority.
     ///
     /// - Parameter input: The input parameters for the request
     ///

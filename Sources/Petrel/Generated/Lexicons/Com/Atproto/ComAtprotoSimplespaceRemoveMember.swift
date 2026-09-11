@@ -79,7 +79,7 @@ public enum ComAtprotoSimplespaceRemoveMember {
 public extension ATProtoClient.Com.Atproto.Simplespace {
     // MARK: - removeMember
 
-    // Remove a member from a space's member list. The member list is host-internal state consulted at credential-mint time when the space's policy is 'member-list'. Requires auth as the space owner.
+    // Remove a member from a space's host-internal member list. Requires auth as the space owner.
     //
     // - Parameter input: The input parameters for the request
 
