@@ -7,14 +7,14 @@
 
 import Foundation
 
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
     import ImageIO
     import UniformTypeIdentifiers
 #endif
 
 public class ImageMetadataStripper {
     public static func stripMetadata(from imageData: Data) -> Data? {
-        #if os(iOS) || os(macOS)
+        #if os(iOS) || os(macOS) || os(tvOS)
             guard let source = CGImageSourceCreateWithData(imageData as CFData, nil) else {
                 LogManager.logError("ImageMetadataStripper - Failed to create image source")
                 return nil
@@ -126,7 +126,7 @@ public class ImageMetadataStripper {
         _ data: Data,
         maxSizeInBytes: Int = 1_000_000
     ) -> Data? {
-        #if os(iOS) || os(macOS)
+        #if os(iOS) || os(macOS) || os(tvOS)
             guard data.count > maxSizeInBytes else { return data }
 
             let mimeType = detectMIMEType(from: data)
@@ -175,7 +175,7 @@ public class ImageMetadataStripper {
 
     // MARK: - Private Helpers
 
-    #if os(iOS) || os(macOS)
+    #if os(iOS) || os(macOS) || os(tvOS)
     private static var jpegTypeIdentifier: CFString {
         UTType.jpeg.identifier as CFString
     }

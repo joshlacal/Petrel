@@ -16,47 +16,47 @@ object ComAtprotoSimplespaceGetSpaceDefs {
     const val TYPE_IDENTIFIER = "com.atproto.simplespace.getSpace"
 }
 
-@Serializable(with = ComAtprotoSimplespaceGetSpaceOutputPolicyUnionSerializer::class)
-sealed interface ComAtprotoSimplespaceGetSpaceOutputPolicyUnion {
+@Serializable(with = ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnionSerializer::class)
+sealed interface ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion {
     @Serializable
-    data class PublicPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy) : ComAtprotoSimplespaceGetSpaceOutputPolicyUnion
+    data class PublicPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy) : ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion
 
     @Serializable
-    data class MemberListPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy) : ComAtprotoSimplespaceGetSpaceOutputPolicyUnion
+    data class MemberListPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy) : ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion
 
     @Serializable
-    data class ManagingAppPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy) : ComAtprotoSimplespaceGetSpaceOutputPolicyUnion
+    data class ManagingAppPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy) : ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion
 
     @Serializable
-    data class Unexpected(val value: JsonElement) : ComAtprotoSimplespaceGetSpaceOutputPolicyUnion
+    data class Unexpected(val value: JsonElement) : ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion
 }
 
-object ComAtprotoSimplespaceGetSpaceOutputPolicyUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoSimplespaceGetSpaceOutputPolicyUnion> {
+object ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion> {
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
-        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceGetSpaceOutputPolicyUnion")
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion")
 
-    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceGetSpaceOutputPolicyUnion) {
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
-            is ComAtprotoSimplespaceGetSpaceOutputPolicyUnion.PublicPolicy -> {
+            is ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion.PublicPolicy -> {
                 val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#publicPolicy")
                 })
             }
-            is ComAtprotoSimplespaceGetSpaceOutputPolicyUnion.MemberListPolicy -> {
+            is ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion.MemberListPolicy -> {
                 val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#memberListPolicy")
                 })
             }
-            is ComAtprotoSimplespaceGetSpaceOutputPolicyUnion.ManagingAppPolicy -> {
+            is ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion.ManagingAppPolicy -> {
                 val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), value.value)
                 kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
                     it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#managingAppPolicy")
                 })
             }
-            is ComAtprotoSimplespaceGetSpaceOutputPolicyUnion.Unexpected -> value.value
+            is ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
             // subscription codegen) are runtime-only sentinels; JSON round-trip
             // serialises them as an empty object tagged with the variant class
@@ -68,23 +68,96 @@ object ComAtprotoSimplespaceGetSpaceOutputPolicyUnionSerializer : kotlinx.serial
         jsonEncoder.encodeJsonElement(element)
     }
 
-    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceGetSpaceOutputPolicyUnion {
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion {
         val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
         val element = jsonDecoder.decodeJsonElement()
         val jsonObject = element.jsonObject
         val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
 
         return when (type) {
-            "com.atproto.simplespace.defs#publicPolicy" -> ComAtprotoSimplespaceGetSpaceOutputPolicyUnion.PublicPolicy(
+            "com.atproto.simplespace.defs#publicPolicy" -> ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion.PublicPolicy(
                 jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), element)
             )
-            "com.atproto.simplespace.defs#memberListPolicy" -> ComAtprotoSimplespaceGetSpaceOutputPolicyUnion.MemberListPolicy(
+            "com.atproto.simplespace.defs#memberListPolicy" -> ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion.MemberListPolicy(
                 jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), element)
             )
-            "com.atproto.simplespace.defs#managingAppPolicy" -> ComAtprotoSimplespaceGetSpaceOutputPolicyUnion.ManagingAppPolicy(
+            "com.atproto.simplespace.defs#managingAppPolicy" -> ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion.ManagingAppPolicy(
                 jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), element)
             )
-            else -> ComAtprotoSimplespaceGetSpaceOutputPolicyUnion.Unexpected(element)
+            else -> ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion.Unexpected(element)
+        }
+    }
+}
+
+@Serializable(with = ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnionSerializer::class)
+sealed interface ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion {
+    @Serializable
+    data class PublicPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy) : ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion
+
+    @Serializable
+    data class MemberListPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy) : ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion
+
+    @Serializable
+    data class ManagingAppPolicy(val value: blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy) : ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion
+}
+
+object ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnionSerializer : kotlinx.serialization.KSerializer<ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion.PublicPolicy -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#publicPolicy")
+                })
+            }
+            is ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion.MemberListPolicy -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#memberListPolicy")
+                })
+            }
+            is ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion.ManagingAppPolicy -> {
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#managingAppPolicy")
+                })
+            }
+            is ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion {
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+
+        return when (type) {
+            "com.atproto.simplespace.defs#publicPolicy" -> ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion.PublicPolicy(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), element)
+            )
+            "com.atproto.simplespace.defs#memberListPolicy" -> ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion.MemberListPolicy(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), element)
+            )
+            "com.atproto.simplespace.defs#managingAppPolicy" -> ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion.ManagingAppPolicy(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), element)
+            )
+            else -> ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion.Unexpected(element)
         }
     }
 }
@@ -158,8 +231,9 @@ object ComAtprotoSimplespaceGetSpaceOutputAppAccessUnionSerializer : kotlinx.ser
     @Serializable
     data class ComAtprotoSimplespaceGetSpaceOutput(
 // URI of the space.        @SerialName("uri")
-        val uri: SpaceRef,// How the authority decides whether to authorize a requesting user.        @SerialName("policy")
-        val policy: ComAtprotoSimplespaceGetSpaceOutputPolicyUnion,// How the authority decides whether to authorize a requesting app.        @SerialName("appAccess")
+        val uri: SpaceRef,// How the authority decides whether to authorize a user to read the space.        @SerialName("readPolicy")
+        val readPolicy: ComAtprotoSimplespaceGetSpaceOutputReadPolicyUnion,// How the authority decides whether to track and forward a user's write notifications.        @SerialName("writePolicy")
+        val writePolicy: ComAtprotoSimplespaceGetSpaceOutputWritePolicyUnion,// How the authority decides whether to authorize a requesting app.        @SerialName("appAccess")
         val appAccess: ComAtprotoSimplespaceGetSpaceOutputAppAccessUnion    )
 
 sealed class ComAtprotoSimplespaceGetSpaceError(val name: String, val description: String?) {

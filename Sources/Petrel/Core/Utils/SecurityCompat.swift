@@ -7,7 +7,7 @@
 
 import Foundation
 
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
     import Security
 #else
     // Define Security framework constants for cross-platform compatibility

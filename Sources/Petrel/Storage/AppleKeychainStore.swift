@@ -5,7 +5,7 @@
 //  Apple platform keychain storage implementation
 //
 
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
 
     import Foundation
     import Security
@@ -442,7 +442,7 @@
             keyTag: String,
             accessGroup: String?
         ) throws {
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
                 try storeDPoPKeyRepresentationiOS(
                     representation,
                     keyTag: keyTag,
@@ -458,7 +458,7 @@
         }
 
         func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data {
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
                 return try retrieveDPoPKeyRepresentationiOS(keyTag: keyTag, accessGroup: accessGroup)
             #elseif os(macOS)
                 return try retrieveDPoPKeyRepresentationmacOS(keyTag: keyTag, accessGroup: accessGroup)
@@ -466,7 +466,7 @@
         }
 
         func deleteDPoPKey(keyTag: String, accessGroup: String?) throws {
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
                 try deleteDPoPKeyiOS(keyTag: keyTag, accessGroup: accessGroup)
             #elseif os(macOS)
                 try deleteDPoPKeymacOS(keyTag: keyTag, accessGroup: accessGroup)
@@ -475,7 +475,7 @@
 
         // MARK: - iOS DPoP Key Implementation
 
-        #if os(iOS)
+        #if os(iOS) || os(tvOS)
             private func storeDPoPKeyRepresentationiOS(
                 _ representation: Data,
                 keyTag: String,
