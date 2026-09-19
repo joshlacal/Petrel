@@ -4,6 +4,7 @@ import blue.catbird.petrel.auth.gateway.ConfidentialGatewayStrategy
 import blue.catbird.petrel.auth.gateway.CurrentAccount
 import blue.catbird.petrel.auth.gateway.GatewayCallbackResult
 import blue.catbird.petrel.auth.gateway.GatewaySessionStorage
+import io.ktor.client.HttpClient
 import java.util.Collections
 import java.util.WeakHashMap
 
@@ -30,6 +31,7 @@ private val strategies: MutableMap<ATProtoClient, ConfidentialGatewayStrategy> =
  *                       Android apps should back this with
  *                       `EncryptedSharedPreferences`.
  * @param currentAccount Tracks which DID is the "current" account.
+ * @param httpClient Optional caller-configured transport; the strategy owns and closes it.
  *
  * Replaces an existing strategy on this client, if any.
  */
@@ -38,6 +40,7 @@ fun ATProtoClient.configureGateway(
     callbackUrl: String,
     storage: GatewaySessionStorage,
     currentAccount: CurrentAccount,
+    httpClient: HttpClient? = null,
 ): ConfidentialGatewayStrategy {
     // Close any previously-installed strategy so its ktor engine is released.
     strategies.remove(this)?.close()
@@ -48,6 +51,7 @@ fun ATProtoClient.configureGateway(
         storage = storage,
         currentAccount = currentAccount,
         networkService = networkService,
+        httpClient = httpClient,
     )
     strategies[this] = strategy
     setAuthMode(AuthMode.Gateway)
