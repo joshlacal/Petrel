@@ -835,6 +835,11 @@ public actor NetworkService: NetworkServiceProtocol {
         // Create a session with a delegate for enhanced security
         let sessionDelegate = HardenedURLSessionDelegate(allowsRedirects: true, limits: limits)
         self.sessionDelegate = sessionDelegate
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = sessionDelegate.fixtureTransport {
+            do { try fixture.configure(config) } catch { preconditionFailure("Invalid debug fixture session") }
+        }
+        #endif
         session = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
         let exactConfig = URLSessionConfiguration.ephemeral
         exactConfig.timeoutIntervalForRequest = config.timeoutIntervalForRequest
@@ -852,6 +857,11 @@ public actor NetworkService: NetworkServiceProtocol {
         #endif
         let exactAuthDelegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
         self.exactAuthSessionDelegate = exactAuthDelegate
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = exactAuthDelegate.fixtureTransport {
+            do { try fixture.configure(exactConfig) } catch { preconditionFailure("Invalid debug fixture session") }
+        }
+        #endif
         exactAuthSession = URLSession(
             configuration: exactConfig,
             delegate: exactAuthDelegate,
@@ -1807,7 +1817,16 @@ public actor NetworkService: NetworkServiceProtocol {
             throw NetworkError.invalidURL
         }
         let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
-        let addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+        let addresses: Set<String>
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = delegate.fixtureTransport {
+            addresses = try fixture.approvedAddresses(for: url)
+        } else {
+            addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+        }
+        #else
+        addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+        #endif
         let task = targetSession.dataTask(with: request)
         let rawResult: (Data, URLResponse) = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -2424,7 +2443,10 @@ public actor NetworkService: NetworkServiceProtocol {
     }
 
     private func validateURL(_ url: URL) async throws -> Bool {
-        try await Self.validateURL(url)
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = sessionDelegate.fixtureTransport { return fixture.permits(url) }
+        #endif
+        return try await Self.validateURL(url)
     }
 
     /// Validates the URL for security against scheme policy and DNS rebinding / private ranges.

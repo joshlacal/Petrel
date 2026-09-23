@@ -534,6 +534,11 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             #endif
             let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
             self.sessionDelegate = delegate
+            #if DEBUG && canImport(Network) && canImport(Security)
+            if let fixture = delegate.fixtureTransport {
+                do { try fixture.configure(config) } catch { preconditionFailure("Invalid debug fixture session") }
+            }
+            #endif
             self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         }
     }
@@ -542,9 +547,14 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard let url = request.url else {
             throw GatewayError.invalidGatewayURL
         }
-        guard try await NetworkService.validateURL(url) else {
-            throw GatewayError.networkError(NetworkError.securityViolation)
-        }
+        let approved: Bool
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = sessionDelegate?.fixtureTransport { approved = fixture.permits(url) }
+        else { approved = try await NetworkService.validateURL(url) }
+        #else
+        approved = try await NetworkService.validateURL(url)
+        #endif
+        guard approved else { throw GatewayError.networkError(NetworkError.securityViolation) }
         guard let delegate = sessionDelegate else {
             do {
                 let (data, response) = try await urlSession.data(for: request)
@@ -778,6 +788,28 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             try await self.handleOAuthCallbackLocked(url: url)
         }
     }
+
+    #if DEBUG && canImport(Network) && canImport(Security)
+    /// DEBUG qualification only: adopts an opaque session issued by the local client runtime
+    /// gateway, which has no OAuth login. Refused unless a `DebugFixtureTransport` is installed
+    /// and this strategy targets exactly that fixture's origin, so it can never touch Nest.
+    func adoptFixtureGatewaySession(_ sessionId: String) async throws -> (did: String, handle: String?, pdsURL: URL) {
+        try await coordinator.run { [self] in
+            guard let fixture = DebugFixtureTransport.current, fixture.origin == gatewayURL,
+                  !sessionId.isEmpty, sessionId.count <= 256
+            else { throw GatewayError.invalidSession }
+            let info = try await fetchSessionFromGateway(sessionId: sessionId)
+            guard info.active != false,
+                  fixture.accounts.contains(where: { $0.did == info.did })
+            else { throw GatewayError.invalidSession }
+            try await saveGatewaySession(sessionId, for: info.did)
+            try await storage.saveAccount(Account(did: info.did, handle: info.handle, pdsURL: gatewayURL), for: info.did)
+            try await accountManager.updateAccountFromStorage(did: info.did)
+            try await accountManager.setCurrentAccount(did: info.did)
+            return (did: info.did, handle: info.handle, pdsURL: gatewayURL)
+        }
+    }
+    #endif
 
     private func handleOAuthCallbackLocked(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
         // Legacy fragment session path is strictly rejected
