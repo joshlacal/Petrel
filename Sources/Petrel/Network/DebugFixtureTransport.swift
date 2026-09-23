@@ -199,10 +199,24 @@
         }
     }
 
-    private final class FixtureSessionDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    private final class FixtureSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, @unchecked Sendable {
         let transport: DebugFixtureTransport
         init(transport: DebugFixtureTransport) {
             self.transport = transport
+        }
+
+        func urlSession(
+            _ session: URLSession,
+            didReceive challenge: URLAuthenticationChallenge,
+            completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
+        ) {
+            guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+                  let trust = challenge.protectionSpace.serverTrust,
+                  transport.evaluate(trust, hostname: challenge.protectionSpace.host)
+            else {
+                completionHandler(.cancelAuthenticationChallenge, nil); return
+            }
+            completionHandler(.useCredential, URLCredential(trust: trust))
         }
 
         func urlSession(
