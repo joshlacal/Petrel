@@ -19,6 +19,20 @@ public extension Parametrizable {
                 return array.map { $0.asQueryItem(name: label) }.compactMap { $0 }
             } else if let value = child.value as? QueryParameterConvertible {
                 return [value.asQueryItem(name: label)].compactMap { $0 }
+            } else if let seq = child.value as? any Sequence {
+                var items: [URLQueryItem] = []
+                for element in seq {
+                    let elemVal: String
+                    if let raw = (element as? any RawRepresentable)?.rawValue {
+                        elemVal = String(describing: raw)
+                    } else {
+                        elemVal = String(describing: element)
+                    }
+                    items.append(URLQueryItem(name: label, value: elemVal))
+                }
+                return items
+            } else if let raw = (child.value as? any RawRepresentable)?.rawValue {
+                return [URLQueryItem(name: label, value: String(describing: raw))]
             }
 
             return []
