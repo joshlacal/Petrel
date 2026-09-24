@@ -397,6 +397,21 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
+        #if DEBUG && canImport(Network) && canImport(Security)
+        // Server trust arrives here, not at the task-level handler, whenever this session-level
+        // method exists. A fixture session must evaluate against the fixture CA or it fails -1202.
+        if let fixture = fixtureTransport {
+            guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+                  let trust = challenge.protectionSpace.serverTrust,
+                  fixture.evaluate(trust, hostname: challenge.protectionSpace.host)
+            else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+            completionHandler(.useCredential, URLCredential(trust: trust))
+            return
+        }
+        #endif
         completionHandler(.performDefaultHandling, nil)
     }
 
