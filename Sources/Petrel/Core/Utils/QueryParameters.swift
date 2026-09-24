@@ -9,17 +9,26 @@ import Foundation
 
 public protocol Parametrizable: Sendable {}
 
+private func unwrapOptional(_ value: Any) -> Any? {
+    let mirror = Mirror(reflecting: value)
+    if mirror.displayStyle == .optional {
+        return mirror.children.first?.value
+    }
+    return value
+}
+
 public extension Parametrizable {
     func asQueryItems() -> [URLQueryItem] {
         let mirror = Mirror(reflecting: self)
         return mirror.children.flatMap { child -> [URLQueryItem] in
             guard let label = child.label else { return [] }
+            guard let unwrapped = unwrapOptional(child.value) else { return [] }
 
-            if let array = child.value as? [QueryParameterConvertible] {
+            if let array = unwrapped as? [QueryParameterConvertible] {
                 return array.map { $0.asQueryItem(name: label) }.compactMap { $0 }
-            } else if let value = child.value as? QueryParameterConvertible {
+            } else if let value = unwrapped as? QueryParameterConvertible {
                 return [value.asQueryItem(name: label)].compactMap { $0 }
-            } else if let seq = child.value as? any Sequence {
+            } else if let seq = unwrapped as? any Sequence {
                 var items: [URLQueryItem] = []
                 for element in seq {
                     let elemVal: String
@@ -31,7 +40,7 @@ public extension Parametrizable {
                     items.append(URLQueryItem(name: label, value: elemVal))
                 }
                 return items
-            } else if let raw = (child.value as? any RawRepresentable)?.rawValue {
+            } else if let raw = (unwrapped as? any RawRepresentable)?.rawValue {
                 return [URLQueryItem(name: label, value: String(describing: raw))]
             }
 
