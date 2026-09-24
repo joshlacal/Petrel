@@ -101,6 +101,21 @@ struct AppleKeychainStoreTests {
         #expect(recorder.calls == [.copyMatching])
     }
 
+    @Test("non-fixture mode fails closed with storageUnavailable when access group cannot be resolved")
+    func nonFixtureBuildFailsClosedWhenAccessGroupCannotBeResolved() {
+        let recorder = KeychainOperationRecorder(
+            copyMatchingStatuses: [errSecInteractionNotAllowed],
+            addStatuses: [errSecInteractionNotAllowed]
+        )
+        let store = AppleKeychainStore(operations: recorder.operations)
+        #if DEBUG && canImport(Network) && canImport(Security)
+        #expect(DebugFixtureTransport.current == nil, "Test assumes non-fixture execution")
+        #endif
+        #expect(throws: KeychainError.self) {
+            try store.store(key: "secret", value: Data([1, 2, 3]), namespace: "test", accessGroup: nil)
+        }
+    }
+
     @Test("failed default access group resolution fails closed without emitting unscoped query")
     func failedDefaultAccessGroupResolutionFailsClosed() {
         let recorder = KeychainOperationRecorder(

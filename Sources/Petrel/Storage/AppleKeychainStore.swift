@@ -174,6 +174,14 @@
             if let resolved = resolveDefaultAccessGroup(), !resolved.isEmpty {
                 return [kSecAttrAccessGroup as String: resolved]
             }
+            #if DEBUG && os(macOS)
+            // Debug fixture launch mode on macOS: when running under an active DebugFixtureTransport,
+            // an ad-hoc signed native build has no access group entitlement. Fall back to omitting
+            // the access group attribute so items use the login keychain, namespaced to the fixture.
+            if DebugFixtureTransport.current != nil {
+                return [:]
+            }
+            #endif
             throw KeychainError.storageUnavailable("Could not resolve default keychain access group")
         }
 
