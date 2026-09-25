@@ -165,6 +165,22 @@
         /// Returns access group attributes (explicit group or resolved default group).
         /// Fails closed with KeychainError.storageUnavailable if no access group can be resolved.
         private func accessGroupAttributes(_ accessGroup: String?) throws -> [String: Any] {
+            #if DEBUG && os(macOS)
+            // Debug fixture launch mode on macOS: when running under fixture configuration or
+            // active DebugFixtureTransport, an ad-hoc signed native build has no access group
+            // entitlement. Fall back to omitting the access group attribute and scoping the service
+            // to the fixture origin host so early startup reads isolate safely without triggering
+            // login keychain prompts or blocking in CSSM_DecryptDataFinal.
+            let isFixtureLaunch = DebugFixtureTransport.current != nil
+                || ProcessInfo.processInfo.environment["CATBIRD_RUNTIME_FIXTURE_CONFIG"] != nil
+                || ProcessInfo.processInfo.environment["CATMOS_RUNTIME_FIXTURE_CONFIG"] != nil
+                || ProcessInfo.processInfo.arguments.contains(where: { $0.contains("catbird-runtime-fixture-config") })
+            if isFixtureLaunch {
+                // One stable service for the whole launch: early reads run before the transport
+                // (and its origin host) is installed, so a host-derived name would split the store.
+                return [kSecAttrService as String: "blue.catbird.fixture"]
+            }
+            #endif
             if let accessGroup, !accessGroup.isEmpty {
                 return [kSecAttrAccessGroup as String: accessGroup]
             }
@@ -175,9 +191,6 @@
                 return [kSecAttrAccessGroup as String: resolved]
             }
             #if DEBUG && os(macOS)
-            // Debug fixture launch mode on macOS: when running under an active DebugFixtureTransport,
-            // an ad-hoc signed native build has no access group entitlement. Fall back to omitting
-            // the access group attribute so items use the login keychain, namespaced to the fixture.
             if DebugFixtureTransport.current != nil {
                 return [:]
             }
