@@ -32,4 +32,31 @@ struct QueryParametersTests {
 
         #expect(languageValues == ["en", "fr"])
     }
+
+    enum ProtocolVersion: String, Codable, Sendable {
+        case one = "1"
+        case two = "2"
+    }
+
+    /// Shape of generated lexicon parameters such as
+    /// `blue.catbird.chat.getConversations.supportedProtocolVersions`.
+    struct VersionedParameters: Parametrizable {
+        let limit: Int
+        let supportedProtocolVersions: [ProtocolVersion]?
+    }
+
+    @Test("Optional enum arrays emit one raw value per element")
+    func optionalEnumArrayPresent() {
+        let items = VersionedParameters(limit: 5, supportedProtocolVersions: [.one, .two]).asQueryItems()
+        #expect(items.filter { $0.name == "supportedProtocolVersions" }.map(\.value) == ["1", "2"])
+        #expect(items.first(where: { $0.name == "limit" })?.value == "5")
+    }
+
+    @Test("Absent and empty optional enum arrays emit no items")
+    func optionalEnumArrayNilAndEmpty() {
+        for versions in [nil, []] as [[ProtocolVersion]?] {
+            let items = VersionedParameters(limit: 5, supportedProtocolVersions: versions).asQueryItems()
+            #expect(items.map(\.name) == ["limit"])
+        }
+    }
 }
