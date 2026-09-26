@@ -45,10 +45,10 @@
             }
 
             static let live = Operations(
-                copyMatching: { SecItemCopyMatching($0, $1) },
-                update: { SecItemUpdate($0, $1) },
-                add: { SecItemAdd($0, $1) },
-                delete: { SecItemDelete($0) },
+                copyMatching: { KeychainSecItem.copyMatching($0, $1) },
+                update: { KeychainSecItem.update($0, $1) },
+                add: { KeychainSecItem.add($0, $1) },
+                delete: { KeychainSecItem.delete($0) },
                 isLive: true
             )
         }
@@ -166,19 +166,10 @@
         /// Fails closed with KeychainError.storageUnavailable if no access group can be resolved.
         private func accessGroupAttributes(_ accessGroup: String?) throws -> [String: Any] {
             #if DEBUG && os(macOS)
-            // Debug fixture launch mode on macOS: when running under fixture configuration or
-            // active DebugFixtureTransport, an ad-hoc signed native build has no access group
-            // entitlement. Fall back to omitting the access group attribute and scoping the service
-            // to the fixture origin host so early startup reads isolate safely without triggering
-            // login keychain prompts or blocking in CSSM_DecryptDataFinal.
-            let isFixtureLaunch = DebugFixtureTransport.current != nil
-                || ProcessInfo.processInfo.environment["CATBIRD_RUNTIME_FIXTURE_CONFIG"] != nil
-                || ProcessInfo.processInfo.environment["CATMOS_RUNTIME_FIXTURE_CONFIG"] != nil
-                || ProcessInfo.processInfo.arguments.contains(where: { $0.contains("catbird-runtime-fixture-config") })
-            if isFixtureLaunch {
-                // One stable service for the whole launch: early reads run before the transport
-                // (and its origin host) is installed, so a host-derived name would split the store.
-                return [kSecAttrService as String: "blue.catbird.fixture"]
+            // A runtime-fixture launch keeps its items in the fixture profile (FixtureLaunch);
+            // there is no access group to resolve, probe, or scope by.
+            if operations.isLive, FixtureLaunch.keychain != nil {
+                return [:]
             }
             #endif
             if let accessGroup, !accessGroup.isEmpty {
