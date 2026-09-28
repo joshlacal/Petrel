@@ -835,6 +835,11 @@ public actor NetworkService: NetworkServiceProtocol {
         // Create a session with a delegate for enhanced security
         let sessionDelegate = HardenedURLSessionDelegate(allowsRedirects: true, limits: limits)
         self.sessionDelegate = sessionDelegate
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = sessionDelegate.fixtureTransport {
+            do { try fixture.configure(config) } catch { preconditionFailure("Invalid debug fixture session") }
+        }
+        #endif
         session = URLSession(configuration: config, delegate: sessionDelegate, delegateQueue: nil)
         let exactConfig = URLSessionConfiguration.ephemeral
         exactConfig.timeoutIntervalForRequest = config.timeoutIntervalForRequest
@@ -852,6 +857,11 @@ public actor NetworkService: NetworkServiceProtocol {
         #endif
         let exactAuthDelegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
         self.exactAuthSessionDelegate = exactAuthDelegate
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = exactAuthDelegate.fixtureTransport {
+            do { try fixture.configure(exactConfig) } catch { preconditionFailure("Invalid debug fixture session") }
+        }
+        #endif
         exactAuthSession = URLSession(
             configuration: exactConfig,
             delegate: exactAuthDelegate,
@@ -1240,7 +1250,7 @@ public actor NetworkService: NetworkServiceProtocol {
                     }
                     requestToSend.setValue(value, forHTTPHeaderField: name)
                     if name == "atproto-proxy" {
-                        LogManager.logInfo("Network Service - Setting atproto-proxy header: \(value) for endpoint: \(requestToSend.url?.path ?? "unknown")")
+                        LogManager.logDebug("Network Service - Setting atproto-proxy header: \(value) for endpoint: \(requestToSend.url?.path ?? "unknown")")
                     }
                 }
             }
@@ -1385,6 +1395,22 @@ public actor NetworkService: NetworkServiceProtocol {
                     }
 
                     LogManager.logInfo("Network Service - Received 401 for \(LogManager.sanitizeURLForLogging(url)). Analyzing response.")
+
+                    // A 401 minted by a proxied service (atproto-proxy) for its own
+                    // device/authorization state is not a PDS session failure: refreshing
+                    // cannot fix it and auto-logout destroys a healthy session. Only the
+                    // codes that actually mean "your account session is bad" fall through.
+                    if let proxyTarget = requestToSend.value(forHTTPHeaderField: "atproto-proxy"),
+                       let serviceError = Self.serviceScopedUnauthorizedError(in: decompressedData)
+                    {
+                        LogManager.logInfo(
+                            "Network Service - 401 from proxied service \(proxyTarget) is service-scoped (\(serviceError)); not refreshing session."
+                        )
+                        if returnsTerminalHTTPErrorResponses {
+                            return (decompressedData, httpResponse)
+                        }
+                        throw NetworkError.serverError(code: 401, message: serviceError)
+                    }
 
                     // In gateway mode, don't try to handle DPoP nonce errors - gateway should handle them
                     // Just delegate to the auth provider's handleUnauthorizedResponse
@@ -1791,7 +1817,16 @@ public actor NetworkService: NetworkServiceProtocol {
             throw NetworkError.invalidURL
         }
         let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
-        let addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+        let addresses: Set<String>
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = delegate.fixtureTransport {
+            addresses = try fixture.approvedAddresses(for: url)
+        } else {
+            addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+        }
+        #else
+        addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
+        #endif
         let task = targetSession.dataTask(with: request)
         let rawResult: (Data, URLResponse) = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -1857,6 +1892,25 @@ public actor NetworkService: NetworkServiceProtocol {
         default:
             return false
         }
+    }
+
+    /// Error codes on a 401 that mean the *account session* itself is invalid and a
+    /// refresh (or re-login) is the right response. Everything else on a proxied
+    /// request is the target service's own verdict about this device/actor.
+    private static let sessionScopedUnauthorizedCodes: Set<String> = [
+        "AccountSessionExpired", "AuthenticationRequired", "ExpiredToken", "InvalidToken",
+        "invalid_token", "use_dpop_nonce", "AuthMissing",
+    ]
+
+    /// The lexicon `error` code of a proxied service's 401 when it is not about the
+    /// account session; `nil` when the body is unparseable or names a session code.
+    nonisolated static func serviceScopedUnauthorizedError(in data: Data) -> String? {
+        struct Body: Decodable { let error: String }
+        guard let code = try? JSONDecoder().decode(Body.self, from: data).error,
+              !code.isEmpty,
+              !sessionScopedUnauthorizedCodes.contains(code)
+        else { return nil }
+        return code
     }
 
     /// Performs a GET request to the specified endpoint.
@@ -2148,7 +2202,7 @@ public actor NetworkService: NetworkServiceProtocol {
                 }
                 finalRequest.setValue(value, forHTTPHeaderField: name)
                 if name == "atproto-proxy" {
-                    LogManager.logInfo("Setting atproto-proxy header for streaming: \(value)")
+                    LogManager.logDebug("Setting atproto-proxy header for streaming: \(value)")
                 }
             }
         }
@@ -2228,7 +2282,7 @@ public actor NetworkService: NetworkServiceProtocol {
         // If we are connecting via the PDS host, attach atproto-proxy so the PDS can forward
         if resolvedURL.host == baseURL.host, let did = resolvedDID {
             request.setValue(did, forHTTPHeaderField: "atproto-proxy")
-            LogManager.logInfo("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
+            LogManager.logDebug("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
         }
         var authCtx: AuthContext? = nil
         defer {
@@ -2389,7 +2443,10 @@ public actor NetworkService: NetworkServiceProtocol {
     }
 
     private func validateURL(_ url: URL) async throws -> Bool {
-        try await Self.validateURL(url)
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = sessionDelegate.fixtureTransport { return fixture.permits(url) }
+        #endif
+        return try await Self.validateURL(url)
     }
 
     /// Validates the URL for security against scheme policy and DNS rebinding / private ranges.

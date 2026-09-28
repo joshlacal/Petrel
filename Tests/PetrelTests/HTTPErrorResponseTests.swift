@@ -113,6 +113,75 @@ final class HTTPErrorResponseTests: XCTestCase {
         }
     }
 
+    /// A 401 minted by a proxied service for its own device state (here mls-ds
+    /// `NotAuthorized`) must not be mistaken for a PDS session failure: no
+    /// refresh, no retry, no auto-logout, body preserved for the caller.
+    func testProxiedServiceScoped401IsReturnedWithoutRefreshOrLogout() async throws {
+        let body = Data(#"{"error":"NotAuthorized","message":"NotAuthorized"}"#.utf8)
+        HTTPErrorResponseURLProtocol.install(.response(statusCode: 401, body: body))
+        let provider = HTTPErrorResponseAuthProvider()
+        let networkService = NetworkService(baseURL: baseURL, authService: provider)
+        await provider.install(networkService: networkService)
+        let logoutEvents = HTTPErrorResponseLogoutRecorder()
+        await AuthEventBroadcaster.shared.addObserver { event in
+            if case .autoLogoutTriggered = event { logoutEvents.record() }
+        }
+
+        let (data, response) = try await networkService
+            .performRequestReturningHTTPErrorResponses(
+                request(path: "xrpc/blue.catbird.chat.createConversation"),
+                skipTokenRefresh: false,
+                additionalHeaders: ["atproto-proxy": "did:web:chat.example#atproto_mls"]
+            )
+
+        XCTAssertEqual(response.statusCode, 401)
+        XCTAssertEqual(data, body)
+        let unauthorizedCount = await provider.unauthorizedCount
+        XCTAssertEqual(unauthorizedCount, 0, "service-scoped 401 must not enter session refresh")
+        XCTAssertEqual(HTTPErrorResponseURLProtocol.requestCount, 1)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(logoutEvents.count, 0, "service-scoped 401 must not auto-logout")
+
+        // Throwing path: the caller still gets the service's code, not "login again".
+        HTTPErrorResponseURLProtocol.install(.response(statusCode: 401, body: body))
+        do {
+            _ = try await networkService.performRequest(
+                request(path: "xrpc/blue.catbird.chat.sendMessage"),
+                skipTokenRefresh: false,
+                additionalHeaders: ["atproto-proxy": "did:web:chat.example#atproto_mls"]
+            )
+            XCTFail("Expected a thrown server error")
+        } catch let NetworkError.serverError(code, message) {
+            XCTAssertEqual(code, 401)
+            XCTAssertEqual(message, "NotAuthorized")
+        }
+    }
+
+    /// A proxied 401 that names the account session still goes through refresh.
+    func testProxiedSessionScoped401StillRefreshes() async throws {
+        let expired = Data(#"{"error":"AccountSessionExpired"}"#.utf8)
+        let finalBody = Data(#"{"ok":true}"#.utf8)
+        HTTPErrorResponseURLProtocol.install([
+            .response(statusCode: 401, body: expired),
+            .response(statusCode: 200, body: finalBody),
+        ])
+        let provider = HTTPErrorResponseAuthProvider()
+        let networkService = NetworkService(baseURL: baseURL, authService: provider)
+        await provider.install(networkService: networkService)
+
+        let (data, response) = try await networkService
+            .performRequestReturningHTTPErrorResponses(
+                request(path: "xrpc/blue.catbird.chat.getConversations"),
+                skipTokenRefresh: false,
+                additionalHeaders: ["atproto-proxy": "did:web:chat.example#atproto_mls"]
+            )
+
+        XCTAssertEqual(response.statusCode, 200)
+        XCTAssertEqual(data, finalBody)
+        let unauthorizedCount = await provider.unauthorizedCount
+        XCTAssertEqual(unauthorizedCount, 1)
+    }
+
     func testNamedPolicyDoesNotApplyToAuthenticationSubrequests() async {
         HTTPErrorResponseURLProtocol.install([
             .response(
@@ -344,6 +413,13 @@ private enum HTTPErrorResponseOutcome: Equatable {
 private enum HTTPErrorResponseStubResult {
     case response(statusCode: Int, body: Data)
     case failure(URLError)
+}
+
+private final class HTTPErrorResponseLogoutRecorder: @unchecked Sendable {
+    private let lock = NSLock()
+    private var events = 0
+    var count: Int { lock.withLock { events } }
+    func record() { lock.withLock { events += 1 } }
 }
 
 private actor HTTPErrorResponseAuthProvider: AuthenticationProvider {

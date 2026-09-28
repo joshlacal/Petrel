@@ -239,6 +239,17 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         return try await activeStrategy.handleOAuthCallback(url: url)
     }
 
+    #if DEBUG && canImport(Network) && canImport(Security)
+    func adoptFixtureGatewaySession(_ session: String) async throws -> (did: String, handle: String?, pdsURL: URL) {
+        guard currentMode == .gateway, let gateway = activeStrategy as? ConfidentialGatewayStrategy else {
+            throw AuthError.invalidOAuthConfiguration
+        }
+        await beginAuthContinuityMutation()
+        defer { endAuthContinuityMutation() }
+        return try await gateway.adoptFixtureGatewaySession(session)
+    }
+    #endif
+
     func loginWithPassword(
         identifier: String,
         password: String,

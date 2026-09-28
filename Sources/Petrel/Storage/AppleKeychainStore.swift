@@ -5,7 +5,7 @@
 //  Apple platform keychain storage implementation
 //
 
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
 
     import Foundation
     import Security
@@ -45,10 +45,10 @@
             }
 
             static let live = Operations(
-                copyMatching: { SecItemCopyMatching($0, $1) },
-                update: { SecItemUpdate($0, $1) },
-                add: { SecItemAdd($0, $1) },
-                delete: { SecItemDelete($0) },
+                copyMatching: { KeychainSecItem.copyMatching($0, $1) },
+                update: { KeychainSecItem.update($0, $1) },
+                add: { KeychainSecItem.add($0, $1) },
+                delete: { KeychainSecItem.delete($0) },
                 isLive: true
             )
         }
@@ -165,6 +165,13 @@
         /// Returns access group attributes (explicit group or resolved default group).
         /// Fails closed with KeychainError.storageUnavailable if no access group can be resolved.
         private func accessGroupAttributes(_ accessGroup: String?) throws -> [String: Any] {
+            #if DEBUG && os(macOS)
+            // A runtime-fixture launch keeps its items in the fixture profile (FixtureLaunch);
+            // there is no access group to resolve, probe, or scope by.
+            if operations.isLive, FixtureLaunch.keychain != nil {
+                return [:]
+            }
+            #endif
             if let accessGroup, !accessGroup.isEmpty {
                 return [kSecAttrAccessGroup as String: accessGroup]
             }
@@ -174,6 +181,11 @@
             if let resolved = resolveDefaultAccessGroup(), !resolved.isEmpty {
                 return [kSecAttrAccessGroup as String: resolved]
             }
+            #if DEBUG && os(macOS)
+            if DebugFixtureTransport.current != nil {
+                return [:]
+            }
+            #endif
             throw KeychainError.storageUnavailable("Could not resolve default keychain access group")
         }
 
@@ -442,7 +454,7 @@
             keyTag: String,
             accessGroup: String?
         ) throws {
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
                 try storeDPoPKeyRepresentationiOS(
                     representation,
                     keyTag: keyTag,
@@ -458,7 +470,7 @@
         }
 
         func retrieveDPoPKeyRepresentation(keyTag: String, accessGroup: String?) throws -> Data {
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
                 return try retrieveDPoPKeyRepresentationiOS(keyTag: keyTag, accessGroup: accessGroup)
             #elseif os(macOS)
                 return try retrieveDPoPKeyRepresentationmacOS(keyTag: keyTag, accessGroup: accessGroup)
@@ -466,7 +478,7 @@
         }
 
         func deleteDPoPKey(keyTag: String, accessGroup: String?) throws {
-            #if os(iOS)
+            #if os(iOS) || os(tvOS)
                 try deleteDPoPKeyiOS(keyTag: keyTag, accessGroup: accessGroup)
             #elseif os(macOS)
                 try deleteDPoPKeymacOS(keyTag: keyTag, accessGroup: accessGroup)
@@ -475,7 +487,7 @@
 
         // MARK: - iOS DPoP Key Implementation
 
-        #if os(iOS)
+        #if os(iOS) || os(tvOS)
             private func storeDPoPKeyRepresentationiOS(
                 _ representation: Data,
                 keyTag: String,

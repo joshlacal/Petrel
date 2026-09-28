@@ -8,7 +8,7 @@
 import Crypto
 import Foundation
 import Synchronization
-#if os(iOS) || os(macOS)
+#if os(iOS) || os(macOS) || os(tvOS)
     import Security
 #endif
 
@@ -41,7 +41,7 @@ enum KeychainError: Error, LocalizedError {
     }
 
     var failureReason: String? {
-        #if os(iOS) || os(macOS)
+        #if os(iOS) || os(macOS) || os(tvOS)
             switch self {
             case let .itemStoreError(status) where status == Int(errSecDuplicateItem):
                 return "An item with this key already exists in the keychain."
@@ -79,7 +79,7 @@ enum KeychainError: Error, LocalizedError {
     }
 
     var recoverySuggestion: String? {
-        #if os(iOS) || os(macOS)
+        #if os(iOS) || os(macOS) || os(tvOS)
             switch self {
             case let .itemStoreError(status) where status == Int(errSecAuthFailed),
                  .itemRetrievalError(let status) where status == Int(errSecAuthFailed),
@@ -112,7 +112,7 @@ enum KeychainManager {
 
     /// The secure storage backend used by this manager
     private static let defaultStorage: SecureStorage = {
-        #if os(iOS) || os(macOS)
+        #if os(iOS) || os(macOS) || os(tvOS)
             return AppleKeychainStore()
         #elseif os(Linux)
             return createLinuxStorage()
@@ -222,13 +222,13 @@ enum KeychainManager {
     /// platforms (no-op elsewhere). Existing items keep their previous attribute
     /// until rewritten.
     static func configureAccessibility(_ accessibility: KeychainAccessibility) {
-        #if os(iOS) || os(macOS)
+        #if os(iOS) || os(macOS) || os(tvOS)
             AppleKeychainStore.configureAccessibility(accessibility)
         #endif
     }
 
     static let itemNotFoundStatus: Int = {
-        #if os(iOS) || os(macOS)
+        #if os(iOS) || os(macOS) || os(tvOS)
             return Int(errSecItemNotFound)
         #else
             return -25300

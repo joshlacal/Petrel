@@ -534,6 +534,11 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             #endif
             let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
             self.sessionDelegate = delegate
+            #if DEBUG && canImport(Network) && canImport(Security)
+            if let fixture = delegate.fixtureTransport {
+                do { try fixture.configure(config) } catch { preconditionFailure("Invalid debug fixture session") }
+            }
+            #endif
             self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         }
     }
@@ -542,9 +547,14 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard let url = request.url else {
             throw GatewayError.invalidGatewayURL
         }
-        guard try await NetworkService.validateURL(url) else {
-            throw GatewayError.networkError(NetworkError.securityViolation)
-        }
+        let approved: Bool
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = sessionDelegate?.fixtureTransport { approved = fixture.permits(url) }
+        else { approved = try await NetworkService.validateURL(url) }
+        #else
+        approved = try await NetworkService.validateURL(url)
+        #endif
+        guard approved else { throw GatewayError.networkError(NetworkError.securityViolation) }
         guard let delegate = sessionDelegate else {
             do {
                 let (data, response) = try await urlSession.data(for: request)
@@ -778,6 +788,28 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             try await self.handleOAuthCallbackLocked(url: url)
         }
     }
+
+    #if DEBUG && canImport(Network) && canImport(Security)
+    /// DEBUG qualification only: adopts an opaque session issued by the local client runtime
+    /// gateway, which has no OAuth login. Refused unless a `DebugFixtureTransport` is installed
+    /// and this strategy targets exactly that fixture's origin, so it can never touch Nest.
+    func adoptFixtureGatewaySession(_ sessionId: String) async throws -> (did: String, handle: String?, pdsURL: URL) {
+        try await coordinator.run { [self] in
+            guard let fixture = DebugFixtureTransport.current, fixture.origin == gatewayURL,
+                  !sessionId.isEmpty, sessionId.count <= 256
+            else { throw GatewayError.invalidSession }
+            let info = try await fetchSessionFromGateway(sessionId: sessionId)
+            guard info.active != false,
+                  fixture.accounts.contains(where: { $0.did == info.did })
+            else { throw GatewayError.invalidSession }
+            try await saveGatewaySession(sessionId, for: info.did)
+            try await storage.saveAccount(Account(did: info.did, handle: info.handle, pdsURL: gatewayURL), for: info.did)
+            try await accountManager.updateAccountFromStorage(did: info.did)
+            try await accountManager.setCurrentAccount(did: info.did)
+            return (did: info.did, handle: info.handle, pdsURL: gatewayURL)
+        }
+    }
+    #endif
 
     private func handleOAuthCallbackLocked(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
         // Legacy fragment session path is strictly rejected
@@ -1201,6 +1233,10 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             }
         }
 
+        // Reject an insecure or malformed gateway base URL before any
+        // session, storage, or network work.
+        try Self.validateGatewayBaseURL(gatewayURL)
+
         // Validate active identity strictly
         guard !expectedDID.isEmpty else {
             throw AuthError.invalidCredentials
@@ -1280,7 +1316,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
         let sortedScopes = requesting.sorted()
 
-        // Send POST /auth/upgrade
+        // (base URL validated at entry)
         var request = URLRequest(url: gatewayURL.appendingPathComponent("auth/upgrade"))
         request.httpMethod = "POST"
         request.setValue("Bearer \(oldSession)", forHTTPHeaderField: "Authorization")
@@ -1308,16 +1344,43 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             if httpResponse.statusCode == 429 || (500...599).contains(httpResponse.statusCode) {
                 throw GatewayError.upgradeTemporarilyUnavailable
             }
-            if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: data),
-               let message = errorPayload.message, !message.isEmpty {
-                throw GatewayError.upgradeFailed(message)
+            let serverMessage: String? = {
+                if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: data) {
+                    if let message = errorPayload.message, !message.isEmpty {
+                        return message
+                    }
+                    if let error = errorPayload.error, !error.isEmpty {
+                        return error
+                    }
+                }
+                if let stringBody = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !stringBody.isEmpty, !stringBody.hasPrefix("<") {
+                    return stringBody
+                }
+                return nil
+            }()
+            if let serverMessage {
+                throw GatewayError.upgradeFailed(serverMessage)
+            }
+            if (400...499).contains(httpResponse.statusCode) {
+                throw GatewayError.upgradeFailed("Upgrade request failed (HTTP \(httpResponse.statusCode)).")
             }
             throw GatewayError.invalidSession
         }
 
         let startResponse = try JSONCoders.decode(UpgradeStartResponse.self, from: data)
-        guard let authURL = URL(string: startResponse.authorization_url) else {
-            throw GatewayError.invalidGatewayURL
+        guard let authURL = URL(string: startResponse.authorization_url),
+              let components = URLComponents(url: authURL, resolvingAgainstBaseURL: false),
+              components.user == nil,
+              components.password == nil,
+              components.fragment == nil
+        else {
+            throw GatewayError.upgradeFailed("Invalid authorization URL received from gateway.")
+        }
+        do {
+            try Self.validateGatewayBaseURL(authURL)
+        } catch {
+            throw GatewayError.upgradeFailed("Invalid authorization URL received from gateway.")
         }
 
         // Durably store pending upgrade state
@@ -1363,8 +1426,32 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw GatewayError.invalidSession
         }
         if httpCommitResp.statusCode != 200 {
+            if httpCommitResp.statusCode == 401 {
+                throw GatewayError.sessionExpired
+            }
             if httpCommitResp.statusCode == 429 || (500...599).contains(httpCommitResp.statusCode) {
                 throw GatewayError.upgradeTemporarilyUnavailable
+            }
+            let serverMessage: String? = {
+                if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: commitData) {
+                    if let message = errorPayload.message, !message.isEmpty {
+                        return message
+                    }
+                    if let error = errorPayload.error, !error.isEmpty {
+                        return error
+                    }
+                }
+                if let stringBody = String(data: commitData, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !stringBody.isEmpty, !stringBody.hasPrefix("<") {
+                    return stringBody
+                }
+                return nil
+            }()
+            if let serverMessage {
+                throw GatewayError.upgradeFailed(serverMessage)
+            }
+            if (400...499).contains(httpCommitResp.statusCode) {
+                throw GatewayError.upgradeFailed("Upgrade commit failed (HTTP \(httpCommitResp.statusCode)).")
             }
             throw GatewayError.invalidSession
         }
@@ -1523,7 +1610,37 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         } catch {
             throw GatewayError.networkError(error)
         }
-        guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw GatewayError.invalidSession
+        }
+        guard httpResponse.statusCode == 200 else {
+            if httpResponse.statusCode == 401 {
+                throw GatewayError.sessionExpired
+            }
+            if httpResponse.statusCode == 429 || (500...599).contains(httpResponse.statusCode) {
+                throw GatewayError.upgradeTemporarilyUnavailable
+            }
+            let serverMessage: String? = {
+                if let errorPayload = try? JSONCoders.decode(GatewayErrorResponse.self, from: data) {
+                    if let message = errorPayload.message, !message.isEmpty {
+                        return message
+                    }
+                    if let error = errorPayload.error, !error.isEmpty {
+                        return error
+                    }
+                }
+                if let stringBody = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                   !stringBody.isEmpty, !stringBody.hasPrefix("<") {
+                    return stringBody
+                }
+                return nil
+            }()
+            if let serverMessage {
+                throw GatewayError.upgradeFailed(serverMessage)
+            }
+            if (400...499).contains(httpResponse.statusCode) {
+                throw GatewayError.upgradeFailed("Upgrade exchange failed (HTTP \(httpResponse.statusCode)).")
+            }
             throw GatewayError.invalidSession
         }
         let exchangeResp = try JSONCoders.decode(UpgradeExchangeResponse.self, from: data)
@@ -1653,7 +1770,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     private func prepareAuthenticatedRequestLocked(_ request: URLRequest) async throws -> URLRequest {
         var request = request
         let session = try await gatewaySessionLocked()
-        LogManager.logInfo(
+        LogManager.logDebug(
             "ConfidentialGatewayStrategy - Adding Bearer token to request: \(request.url?.absoluteString ?? "unknown")"
         )
         request.setValue("Bearer \(session)", forHTTPHeaderField: "Authorization")
@@ -1797,8 +1914,13 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                     )
                     throw GatewayError.sessionExpired
                 } else {
+                    // The presented token is not the stored one, so this process
+                    // is holding a session another process already rotated. Drop
+                    // the in-memory copy so the next request re-reads storage,
+                    // otherwise the stale token is retried until app restart.
+                    await storage.dropCachedGatewaySession(for: currentAccount.did)
                     logger.warning(
-                        "Gateway returned terminal auth error (reason: \(reason)) for stale presented session - preserving current session"
+                        "Gateway returned terminal auth error (reason: \(reason)) for stale presented session - preserving stored session and dropping cached copy"
                     )
                     throw GatewayError.authenticationRequired
                 }

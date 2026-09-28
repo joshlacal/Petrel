@@ -221,25 +221,84 @@ public actor SpaceHostResolver {
         }
     }
 
+    /// Read an account's public PDS record without trusting a DID-document URL as a network route.
+    /// The pinned-address delegate rejects DNS rebinding and redirects; only signed debug fixtures
+    /// can route synthetic hosts to loopback.
+    public static func fetchBoundedPublicJSON(
+        from url: URL,
+        limits: NetworkResponseLimits,
+        fixtureSession: URLSession? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
+        guard url.scheme == "https", let host = url.host,
+              url.user == nil, url.password == nil, url.fragment == nil else {
+            throw SpaceHostResolutionError.networkError("Invalid public service endpoint")
+        }
+        #if DEBUG && canImport(Network) && canImport(Security)
+        let fixture = DebugFixtureTransport.current
+        let fixtureAllowed = fixture?.permits(url) == true
+        #else
+        let fixtureAllowed = false
+        #endif
+        guard fixtureAllowed || (
+            host != "localhost" && host != "127.0.0.1" && host != "::1" &&
+            (url.port == nil || url.port == 443)
+        ) else {
+            throw SpaceHostResolutionError.networkError("Public service endpoint is not allowed")
+        }
+        if !fixtureAllowed {
+            guard try await NetworkService.validateURL(url) else {
+                throw SpaceHostResolutionError.networkError("Public service endpoint failed validation")
+            }
+        }
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 10
+        let data: Data
+        let response: URLResponse
+        if fixtureAllowed, let fixtureSession {
+            (data, response) = try await fixtureSession.data(for: request)
+        } else {
+            let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
+            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+            (data, response) = try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+        }
+        guard let http = response as? HTTPURLResponse,
+              data.count <= limits.maximumDecodedBytes,
+              http.url == url else {
+            throw SpaceHostResolutionError.networkError("Invalid public service response")
+        }
+        return (data, http)
+    }
+
     /// Fetches and decodes the DID document using the hardened network path.
+    /// A tighter limit is useful for authority documents at security boundaries.
     public static func fetchDIDDocument(
         for did: String,
-        urlSession: URLSession? = nil
+        urlSession: URLSession? = nil,
+        limits: NetworkResponseLimits = .default
     ) async throws -> DIDDocument {
-        try await fetchDIDDocument(for: did, urlSession: urlSession, sessionDelegate: nil)
+        try await fetchDIDDocument(for: did, urlSession: urlSession, sessionDelegate: nil, limits: limits)
     }
 
     package static func fetchDIDDocument(
         for did: String,
         urlSession: URLSession? = nil,
-        sessionDelegate: HardenedURLSessionDelegate? = nil
+        sessionDelegate: HardenedURLSessionDelegate? = nil,
+        limits: NetworkResponseLimits = .default
     ) async throws -> DIDDocument {
         let url = try didDocumentURL(for: did)
-        guard try await NetworkService.validateURL(url) else {
-            throw SpaceHostResolutionError.networkError("Security validation failed for DID document URL")
+        #if DEBUG && canImport(Network) && canImport(Security)
+        let fixtureAllowed = DebugFixtureTransport.current?.permits(url) == true
+        #else
+        let fixtureAllowed = false
+        #endif
+        if !fixtureAllowed {
+            guard try await NetworkService.validateURL(url) else {
+                throw SpaceHostResolutionError.networkError("Security validation failed for DID document URL")
+            }
         }
 
-        var request = URLRequest(url: url)
+        var request = URLRequest(url: url, cachePolicy: .reloadIgnoringLocalCacheData)
         request.httpMethod = "GET"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -262,7 +321,7 @@ public actor SpaceHostResolver {
                     config.protocolClasses = testClasses
                 }
                 #endif
-                let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+                let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
                 let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
                 (data, response) = try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
             }
@@ -270,6 +329,9 @@ public actor SpaceHostResolver {
             throw SpaceHostResolutionError.networkError(error.localizedDescription)
         }
 
+        guard data.count <= limits.maximumDecodedBytes else {
+            throw SpaceHostResolutionError.networkError("DID document exceeds response limit")
+        }
         guard let httpResponse = response as? HTTPURLResponse, httpResponse.statusCode == 200 else {
             let statusCode = (response as? HTTPURLResponse)?.statusCode ?? -1
             throw SpaceHostResolutionError.networkError("HTTP status \(statusCode)")

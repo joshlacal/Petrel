@@ -17,6 +17,9 @@ import Foundation
 #endif
 
 package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
+    #if DEBUG && canImport(Network) && canImport(Security)
+    let fixtureTransport = DebugFixtureTransport.current
+    #endif
     private let maxRedirects = 5
     package let limits: NetworkResponseLimits
     package let allowsRedirects: Bool
@@ -27,7 +30,11 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         limits: NetworkResponseLimits = .default,
         resolver: @escaping @Sendable (String) async throws -> [String] = { try await NetworkService.resolveHostIPsOffActor(host: $0) }
     ) {
+        #if DEBUG && canImport(Network) && canImport(Security)
+        self.allowsRedirects = fixtureTransport == nil && allowsRedirects
+        #else
         self.allowsRedirects = allowsRedirects
+        #endif
         self.limits = limits
         self.resolver = resolver
         super.init()
@@ -359,6 +366,20 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             completionHandler(.performDefaultHandling, nil)
             return
         }
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = fixtureTransport {
+            guard let url = task.originalRequest?.url, fixture.permits(url),
+                  url.host == challenge.protectionSpace.host,
+                  let trust = challenge.protectionSpace.serverTrust,
+                  fixture.evaluate(trust, hostname: challenge.protectionSpace.host) else {
+                contextManager.recordSecurityViolation(for: task)
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+            completionHandler(.useCredential, URLCredential(trust: trust))
+            return
+        }
+        #endif
         Task {
             guard await self.serverTrustIsApproved(for: task, host: host) else {
                 self.contextManager.recordSecurityViolation(for: task)
@@ -376,6 +397,21 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         didReceive challenge: URLAuthenticationChallenge,
         completionHandler: @escaping @Sendable (URLSession.AuthChallengeDisposition, URLCredential?) -> Void
     ) {
+        #if DEBUG && canImport(Network) && canImport(Security)
+        // Server trust arrives here, not at the task-level handler, whenever this session-level
+        // method exists. A fixture session must evaluate against the fixture CA or it fails -1202.
+        if let fixture = fixtureTransport {
+            guard challenge.protectionSpace.authenticationMethod == NSURLAuthenticationMethodServerTrust,
+                  let trust = challenge.protectionSpace.serverTrust,
+                  fixture.evaluate(trust, hostname: challenge.protectionSpace.host)
+            else {
+                completionHandler(.cancelAuthenticationChallenge, nil)
+                return
+            }
+            completionHandler(.useCredential, URLCredential(trust: trust))
+            return
+        }
+        #endif
         completionHandler(.performDefaultHandling, nil)
     }
 
@@ -386,6 +422,19 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         task: URLSessionTask,
         didFinishCollecting metrics: URLSessionTaskMetrics
     ) {
+        #if DEBUG && canImport(Network) && canImport(Security)
+        if let fixture = fixtureTransport {
+            guard let url = task.originalRequest?.url, fixture.permits(url),
+                  metrics.transactionMetrics.allSatisfy({ metric in
+                      metric.remoteAddress.map { IPAddress.normalizeIPv4MappedIPv6($0) == "127.0.0.1" } ?? true
+                  }) else {
+                contextManager.recordSecurityViolation(for: task)
+                task.cancel()
+                return
+            }
+            return
+        }
+        #endif
         // Inspect the actual remote address connected to by the transport (DNS rebinding defense)
         let isLocalTarget: Bool = {
             guard let host = task.originalRequest?.url?.host?.lowercased() else { return false }
