@@ -6,6 +6,17 @@ from enum_generator import EnumGenerator
 from type_converter import TypeConverter
 from base_code_generator import BaseCodeGenerator
 
+# Swift types `Parametrizable.asQueryItems()` (Sources/Petrel/Core/Utils/QueryParameters.swift)
+# can put on the wire, each through a QueryParameterConvertible conformance. A query
+# parameter of any other type would never reach the server, so generation stops instead.
+# Adding a type here takes that conformance plus a field in
+# QueryParametersTests.EveryLeafParameters.
+QUERY_ENCODABLE_SWIFT_TYPES = frozenset({
+    "String", "Int", "Bool",
+    "CID", "ATProtocolDate", "URI", "ATProtocolURI", "SpaceRef", "ATIdentifier",
+    "DID", "Handle", "NSID", "TID", "RecordKey", "LanguageCodeContainer",
+})
+
 class SwiftCodeGenerator(BaseCodeGenerator):
     def __init__(self, lexicon: Dict[str, Any], cycle_detector=None, emit_server_contracts=False, emit_xrpc_error_parsing=False):
         super().__init__(lexicon, cycle_detector)
@@ -231,7 +242,21 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             "Parameters",
             nullable_fields=parameters.get('nullable', []),
         )
+        for prop in properties:
+            self.check_query_parameter_encodable(prop, parameters['properties'][prop['name']])
         return self.template_manager.query_parameters_template.render(properties=properties)
+
+    def check_query_parameter_encodable(self, prop: Dict[str, Any], schema: Dict[str, Any]) -> None:
+        leaf = schema.get('items', {}) if schema.get('type') == 'array' else schema
+        if leaf.get('type') == 'string' and 'enum' in leaf:
+            return  # a generated closed string enum, sent as its raw value
+        leaf_type = prop['type'].strip('[]?')
+        if leaf_type not in QUERY_ENCODABLE_SWIFT_TYPES:
+            raise ValueError(
+                f"{self.lexicon_id} query parameter '{prop['name']}' is a {prop['type']}, "
+                "which Parametrizable.asQueryItems() cannot encode; give the type a "
+                "QueryParameterConvertible conformance and add it to QUERY_ENCODABLE_SWIFT_TYPES"
+            )
 
     def generate_input_struct(self, input_obj: Optional[Dict[str, Any]]) -> str:
         if not input_obj:
