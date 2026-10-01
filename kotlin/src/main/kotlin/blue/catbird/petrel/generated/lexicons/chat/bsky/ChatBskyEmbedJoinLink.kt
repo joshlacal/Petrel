@@ -35,26 +35,54 @@ object ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnionSerializer : kotlinx.seriali
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion")
 
+    private val TYPE_JoinLinkPreviewView = kotlinx.serialization.json.JsonPrimitive("chat.bsky.group.defs#joinLinkPreviewView")
+    private val TYPE_DisabledJoinLinkPreviewView = kotlinx.serialization.json.JsonPrimitive("chat.bsky.group.defs#disabledJoinLinkPreviewView")
+    private val TYPE_InvalidJoinLinkPreviewView = kotlinx.serialization.json.JsonPrimitive("chat.bsky.group.defs#invalidJoinLinkPreviewView")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion.JoinLinkPreviewView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyGroupDefsJoinLinkPreviewView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.group.defs#joinLinkPreviewView")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyGroupDefsJoinLinkPreviewView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_JoinLinkPreviewView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_JoinLinkPreviewView)
+                }
+                obj
             }
             is ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion.DisabledJoinLinkPreviewView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyGroupDefsDisabledJoinLinkPreviewView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.group.defs#disabledJoinLinkPreviewView")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyGroupDefsDisabledJoinLinkPreviewView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DisabledJoinLinkPreviewView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DisabledJoinLinkPreviewView)
+                }
+                obj
             }
             is ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion.InvalidJoinLinkPreviewView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyGroupDefsInvalidJoinLinkPreviewView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.group.defs#invalidJoinLinkPreviewView")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyGroupDefsInvalidJoinLinkPreviewView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_InvalidJoinLinkPreviewView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_InvalidJoinLinkPreviewView)
+                }
+                obj
             }
             is ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -69,10 +97,14 @@ object ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnionSerializer : kotlinx.seriali
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion.Unexpected(element)
 
         return when (type) {
             "chat.bsky.group.defs#joinLinkPreviewView" -> ChatBskyEmbedJoinLinkViewJoinLinkPreviewUnion.JoinLinkPreviewView(

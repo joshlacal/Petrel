@@ -47,50 +47,114 @@ object AppBskyAgeassuranceDefsConfigRegionRulesUnionSerializer : kotlinx.seriali
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyAgeassuranceDefsConfigRegionRulesUnion")
 
+    private val TYPE_ConfigRegionRuleDefault = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleDefault")
+    private val TYPE_ConfigRegionRuleIfDeclaredOverAge = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge")
+    private val TYPE_ConfigRegionRuleIfDeclaredUnderAge = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge")
+    private val TYPE_ConfigRegionRuleIfAssuredOverAge = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge")
+    private val TYPE_ConfigRegionRuleIfAssuredUnderAge = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge")
+    private val TYPE_ConfigRegionRuleIfAccountNewerThan = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan")
+    private val TYPE_ConfigRegionRuleIfAccountOlderThan = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyAgeassuranceDefsConfigRegionRulesUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyAgeassuranceDefsConfigRegionRulesUnion.ConfigRegionRuleDefault -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleDefault.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleDefault")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleDefault.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ConfigRegionRuleDefault
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ConfigRegionRuleDefault)
+                }
+                obj
             }
             is AppBskyAgeassuranceDefsConfigRegionRulesUnion.ConfigRegionRuleIfDeclaredOverAge -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfDeclaredOverAge.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ConfigRegionRuleIfDeclaredOverAge
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ConfigRegionRuleIfDeclaredOverAge)
+                }
+                obj
             }
             is AppBskyAgeassuranceDefsConfigRegionRulesUnion.ConfigRegionRuleIfDeclaredUnderAge -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfDeclaredUnderAge.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ConfigRegionRuleIfDeclaredUnderAge
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ConfigRegionRuleIfDeclaredUnderAge)
+                }
+                obj
             }
             is AppBskyAgeassuranceDefsConfigRegionRulesUnion.ConfigRegionRuleIfAssuredOverAge -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfAssuredOverAge.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ConfigRegionRuleIfAssuredOverAge
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ConfigRegionRuleIfAssuredOverAge)
+                }
+                obj
             }
             is AppBskyAgeassuranceDefsConfigRegionRulesUnion.ConfigRegionRuleIfAssuredUnderAge -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ConfigRegionRuleIfAssuredUnderAge
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ConfigRegionRuleIfAssuredUnderAge)
+                }
+                obj
             }
             is AppBskyAgeassuranceDefsConfigRegionRulesUnion.ConfigRegionRuleIfAccountNewerThan -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ConfigRegionRuleIfAccountNewerThan
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ConfigRegionRuleIfAccountNewerThan)
+                }
+                obj
             }
             is AppBskyAgeassuranceDefsConfigRegionRulesUnion.ConfigRegionRuleIfAccountOlderThan -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ConfigRegionRuleIfAccountOlderThan
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ConfigRegionRuleIfAccountOlderThan)
+                }
+                obj
             }
             is AppBskyAgeassuranceDefsConfigRegionRulesUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -105,10 +169,14 @@ object AppBskyAgeassuranceDefsConfigRegionRulesUnionSerializer : kotlinx.seriali
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyAgeassuranceDefsConfigRegionRulesUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyAgeassuranceDefsConfigRegionRulesUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyAgeassuranceDefsConfigRegionRulesUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyAgeassuranceDefsConfigRegionRulesUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.ageassurance.defs#configRegionRuleDefault" -> AppBskyAgeassuranceDefsConfigRegionRulesUnion.ConfigRegionRuleDefault(

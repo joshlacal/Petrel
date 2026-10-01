@@ -32,20 +32,39 @@ object ComAtprotoTempCheckHandleAvailabilityOutputResultUnionSerializer : kotlin
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoTempCheckHandleAvailabilityOutputResultUnion")
 
+    private val TYPE_ResultAvailable = kotlinx.serialization.json.JsonPrimitive("com.atproto.temp.checkHandleAvailability#resultAvailable")
+    private val TYPE_ResultUnavailable = kotlinx.serialization.json.JsonPrimitive("com.atproto.temp.checkHandleAvailability#resultUnavailable")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoTempCheckHandleAvailabilityOutputResultUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ComAtprotoTempCheckHandleAvailabilityOutputResultUnion.ResultAvailable -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoTempCheckHandleAvailabilityResultAvailable.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.temp.checkHandleAvailability#resultAvailable")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoTempCheckHandleAvailabilityResultAvailable.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ResultAvailable
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ResultAvailable)
+                }
+                obj
             }
             is ComAtprotoTempCheckHandleAvailabilityOutputResultUnion.ResultUnavailable -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoTempCheckHandleAvailabilityResultUnavailable.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.temp.checkHandleAvailability#resultUnavailable")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoTempCheckHandleAvailabilityResultUnavailable.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ResultUnavailable
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ResultUnavailable)
+                }
+                obj
             }
             is ComAtprotoTempCheckHandleAvailabilityOutputResultUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -60,10 +79,14 @@ object ComAtprotoTempCheckHandleAvailabilityOutputResultUnionSerializer : kotlin
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoTempCheckHandleAvailabilityOutputResultUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ComAtprotoTempCheckHandleAvailabilityOutputResultUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ComAtprotoTempCheckHandleAvailabilityOutputResultUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ComAtprotoTempCheckHandleAvailabilityOutputResultUnion.Unexpected(element)
 
         return when (type) {
             "com.atproto.temp.checkHandleAvailability#resultAvailable" -> ComAtprotoTempCheckHandleAvailabilityOutputResultUnion.ResultAvailable(

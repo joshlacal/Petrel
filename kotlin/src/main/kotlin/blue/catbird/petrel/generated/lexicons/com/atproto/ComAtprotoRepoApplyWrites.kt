@@ -35,26 +35,54 @@ object ComAtprotoRepoApplyWritesInputWritesUnionSerializer : kotlinx.serializati
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoRepoApplyWritesInputWritesUnion")
 
+    private val TYPE_Create = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#create")
+    private val TYPE_Update = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#update")
+    private val TYPE_Delete = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#delete")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoRepoApplyWritesInputWritesUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ComAtprotoRepoApplyWritesInputWritesUnion.Create -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesCreate.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#create")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesCreate.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Create
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Create)
+                }
+                obj
             }
             is ComAtprotoRepoApplyWritesInputWritesUnion.Update -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesUpdate.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#update")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesUpdate.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Update
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Update)
+                }
+                obj
             }
             is ComAtprotoRepoApplyWritesInputWritesUnion.Delete -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesDelete.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#delete")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesDelete.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Delete
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Delete)
+                }
+                obj
             }
             is ComAtprotoRepoApplyWritesInputWritesUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -69,10 +97,14 @@ object ComAtprotoRepoApplyWritesInputWritesUnionSerializer : kotlinx.serializati
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoRepoApplyWritesInputWritesUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ComAtprotoRepoApplyWritesInputWritesUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ComAtprotoRepoApplyWritesInputWritesUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ComAtprotoRepoApplyWritesInputWritesUnion.Unexpected(element)
 
         return when (type) {
             "com.atproto.repo.applyWrites#create" -> ComAtprotoRepoApplyWritesInputWritesUnion.Create(
@@ -108,26 +140,54 @@ object ComAtprotoRepoApplyWritesOutputResultsUnionSerializer : kotlinx.serializa
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoRepoApplyWritesOutputResultsUnion")
 
+    private val TYPE_CreateResult = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#createResult")
+    private val TYPE_UpdateResult = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#updateResult")
+    private val TYPE_DeleteResult = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#deleteResult")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoRepoApplyWritesOutputResultsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ComAtprotoRepoApplyWritesOutputResultsUnion.CreateResult -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesCreateResult.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#createResult")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesCreateResult.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_CreateResult
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_CreateResult)
+                }
+                obj
             }
             is ComAtprotoRepoApplyWritesOutputResultsUnion.UpdateResult -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesUpdateResult.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#updateResult")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesUpdateResult.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_UpdateResult
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_UpdateResult)
+                }
+                obj
             }
             is ComAtprotoRepoApplyWritesOutputResultsUnion.DeleteResult -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesDeleteResult.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.applyWrites#deleteResult")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoRepoApplyWritesDeleteResult.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DeleteResult
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DeleteResult)
+                }
+                obj
             }
             is ComAtprotoRepoApplyWritesOutputResultsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -142,10 +202,14 @@ object ComAtprotoRepoApplyWritesOutputResultsUnionSerializer : kotlinx.serializa
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoRepoApplyWritesOutputResultsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ComAtprotoRepoApplyWritesOutputResultsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ComAtprotoRepoApplyWritesOutputResultsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ComAtprotoRepoApplyWritesOutputResultsUnion.Unexpected(element)
 
         return when (type) {
             "com.atproto.repo.applyWrites#createResult" -> ComAtprotoRepoApplyWritesOutputResultsUnion.CreateResult(

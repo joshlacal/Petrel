@@ -29,14 +29,24 @@ object AppBskyActorStatusEmbedUnionSerializer : kotlinx.serialization.KSerialize
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorStatusEmbedUnion")
 
+    private val TYPE_External = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorStatusEmbedUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyActorStatusEmbedUnion.External -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternal.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternal.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_External
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_External)
+                }
+                obj
             }
             is AppBskyActorStatusEmbedUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -51,10 +61,14 @@ object AppBskyActorStatusEmbedUnionSerializer : kotlinx.serialization.KSerialize
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorStatusEmbedUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyActorStatusEmbedUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyActorStatusEmbedUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyActorStatusEmbedUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.embed.external" -> AppBskyActorStatusEmbedUnion.External(

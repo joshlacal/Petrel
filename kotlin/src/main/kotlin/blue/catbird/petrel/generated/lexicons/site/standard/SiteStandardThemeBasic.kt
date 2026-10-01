@@ -29,14 +29,24 @@ object SiteStandardThemeBasicAccentUnionSerializer : kotlinx.serialization.KSeri
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("SiteStandardThemeBasicAccentUnion")
 
+    private val TYPE_Rgb = kotlinx.serialization.json.JsonPrimitive("site.standard.theme.color#rgb")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: SiteStandardThemeBasicAccentUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is SiteStandardThemeBasicAccentUnion.Rgb -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.SiteStandardThemeColorRgb.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("site.standard.theme.color#rgb")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.SiteStandardThemeColorRgb.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Rgb
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Rgb)
+                }
+                obj
             }
             is SiteStandardThemeBasicAccentUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -51,10 +61,14 @@ object SiteStandardThemeBasicAccentUnionSerializer : kotlinx.serialization.KSeri
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): SiteStandardThemeBasicAccentUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("SiteStandardThemeBasicAccentUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return SiteStandardThemeBasicAccentUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return SiteStandardThemeBasicAccentUnion.Unexpected(element)
 
         return when (type) {
             "site.standard.theme.color#rgb" -> SiteStandardThemeBasicAccentUnion.Rgb(
@@ -78,14 +92,24 @@ object SiteStandardThemeBasicAccentForegroundUnionSerializer : kotlinx.serializa
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("SiteStandardThemeBasicAccentForegroundUnion")
 
+    private val TYPE_Rgb = kotlinx.serialization.json.JsonPrimitive("site.standard.theme.color#rgb")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: SiteStandardThemeBasicAccentForegroundUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is SiteStandardThemeBasicAccentForegroundUnion.Rgb -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.SiteStandardThemeColorRgb.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("site.standard.theme.color#rgb")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.SiteStandardThemeColorRgb.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Rgb
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Rgb)
+                }
+                obj
             }
             is SiteStandardThemeBasicAccentForegroundUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -100,10 +124,14 @@ object SiteStandardThemeBasicAccentForegroundUnionSerializer : kotlinx.serializa
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): SiteStandardThemeBasicAccentForegroundUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("SiteStandardThemeBasicAccentForegroundUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return SiteStandardThemeBasicAccentForegroundUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return SiteStandardThemeBasicAccentForegroundUnion.Unexpected(element)
 
         return when (type) {
             "site.standard.theme.color#rgb" -> SiteStandardThemeBasicAccentForegroundUnion.Rgb(
@@ -127,14 +155,24 @@ object SiteStandardThemeBasicBackgroundUnionSerializer : kotlinx.serialization.K
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("SiteStandardThemeBasicBackgroundUnion")
 
+    private val TYPE_Rgb = kotlinx.serialization.json.JsonPrimitive("site.standard.theme.color#rgb")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: SiteStandardThemeBasicBackgroundUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is SiteStandardThemeBasicBackgroundUnion.Rgb -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.SiteStandardThemeColorRgb.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("site.standard.theme.color#rgb")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.SiteStandardThemeColorRgb.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Rgb
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Rgb)
+                }
+                obj
             }
             is SiteStandardThemeBasicBackgroundUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -149,10 +187,14 @@ object SiteStandardThemeBasicBackgroundUnionSerializer : kotlinx.serialization.K
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): SiteStandardThemeBasicBackgroundUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("SiteStandardThemeBasicBackgroundUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return SiteStandardThemeBasicBackgroundUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return SiteStandardThemeBasicBackgroundUnion.Unexpected(element)
 
         return when (type) {
             "site.standard.theme.color#rgb" -> SiteStandardThemeBasicBackgroundUnion.Rgb(
@@ -176,14 +218,24 @@ object SiteStandardThemeBasicForegroundUnionSerializer : kotlinx.serialization.K
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("SiteStandardThemeBasicForegroundUnion")
 
+    private val TYPE_Rgb = kotlinx.serialization.json.JsonPrimitive("site.standard.theme.color#rgb")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: SiteStandardThemeBasicForegroundUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is SiteStandardThemeBasicForegroundUnion.Rgb -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.SiteStandardThemeColorRgb.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("site.standard.theme.color#rgb")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.SiteStandardThemeColorRgb.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Rgb
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Rgb)
+                }
+                obj
             }
             is SiteStandardThemeBasicForegroundUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -198,10 +250,14 @@ object SiteStandardThemeBasicForegroundUnionSerializer : kotlinx.serialization.K
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): SiteStandardThemeBasicForegroundUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("SiteStandardThemeBasicForegroundUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return SiteStandardThemeBasicForegroundUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return SiteStandardThemeBasicForegroundUnion.Unexpected(element)
 
         return when (type) {
             "site.standard.theme.color#rgb" -> SiteStandardThemeBasicForegroundUnion.Rgb(

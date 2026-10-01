@@ -50,56 +50,129 @@ object AppBskyEmbedRecordViewRecordUnionSerializer : kotlinx.serialization.KSeri
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyEmbedRecordViewRecordUnion")
 
+    private val TYPE_ViewRecord = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#viewRecord")
+    private val TYPE_ViewNotFound = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#viewNotFound")
+    private val TYPE_ViewBlocked = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#viewBlocked")
+    private val TYPE_ViewDetached = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#viewDetached")
+    private val TYPE_GeneratorView = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#generatorView")
+    private val TYPE_ListView = kotlinx.serialization.json.JsonPrimitive("app.bsky.graph.defs#listView")
+    private val TYPE_LabelerView = kotlinx.serialization.json.JsonPrimitive("app.bsky.labeler.defs#labelerView")
+    private val TYPE_StarterPackViewBasic = kotlinx.serialization.json.JsonPrimitive("app.bsky.graph.defs#starterPackViewBasic")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyEmbedRecordViewRecordUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyEmbedRecordViewRecordUnion.ViewRecord -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedRecordViewRecord.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#viewRecord")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedRecordViewRecord.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewRecord
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewRecord)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordUnion.ViewNotFound -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedRecordViewNotFound.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#viewNotFound")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedRecordViewNotFound.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewNotFound
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewNotFound)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordUnion.ViewBlocked -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedRecordViewBlocked.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#viewBlocked")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedRecordViewBlocked.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewBlocked
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewBlocked)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordUnion.ViewDetached -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedRecordViewDetached.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#viewDetached")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedRecordViewDetached.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewDetached
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewDetached)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordUnion.GeneratorView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsGeneratorView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#generatorView")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsGeneratorView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_GeneratorView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_GeneratorView)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordUnion.ListView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyGraphDefsListView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.graph.defs#listView")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyGraphDefsListView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ListView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ListView)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordUnion.LabelerView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyLabelerDefsLabelerView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.labeler.defs#labelerView")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyLabelerDefsLabelerView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LabelerView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LabelerView)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordUnion.StarterPackViewBasic -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyGraphDefsStarterPackViewBasic.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.graph.defs#starterPackViewBasic")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyGraphDefsStarterPackViewBasic.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_StarterPackViewBasic
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_StarterPackViewBasic)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -114,10 +187,14 @@ object AppBskyEmbedRecordViewRecordUnionSerializer : kotlinx.serialization.KSeri
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyEmbedRecordViewRecordUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyEmbedRecordViewRecordUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyEmbedRecordViewRecordUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyEmbedRecordViewRecordUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.embed.record#viewRecord" -> AppBskyEmbedRecordViewRecordUnion.ViewRecord(
@@ -177,44 +254,99 @@ object AppBskyEmbedRecordViewRecordEmbedsUnionSerializer : kotlinx.serialization
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyEmbedRecordViewRecordEmbedsUnion")
 
+    private val TYPE_View = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.images#view")
+    private val TYPE_AppBskyEmbedVideoView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video#view")
+    private val TYPE_AppBskyEmbedGalleryView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#view")
+    private val TYPE_AppBskyEmbedExternalView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
+    private val TYPE_AppBskyEmbedRecordView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#view")
+    private val TYPE_AppBskyEmbedRecordWithMediaView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.recordWithMedia#view")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyEmbedRecordViewRecordEmbedsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyEmbedRecordViewRecordEmbedsUnion.View -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedImagesView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.images#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedImagesView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_View
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_View)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordEmbedsUnion.AppBskyEmbedVideoView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedVideoView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedVideoView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedVideoView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedVideoView)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordEmbedsUnion.AppBskyEmbedGalleryView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedGalleryView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedGalleryView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedGalleryView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedGalleryView)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordEmbedsUnion.AppBskyEmbedExternalView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternalView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternalView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedExternalView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedExternalView)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordEmbedsUnion.AppBskyEmbedRecordView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedRecordView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedRecordView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedRecordView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedRecordView)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordEmbedsUnion.AppBskyEmbedRecordWithMediaView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedRecordWithMediaView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.recordWithMedia#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedRecordWithMediaView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedRecordWithMediaView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedRecordWithMediaView)
+                }
+                obj
             }
             is AppBskyEmbedRecordViewRecordEmbedsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -229,10 +361,14 @@ object AppBskyEmbedRecordViewRecordEmbedsUnionSerializer : kotlinx.serialization
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyEmbedRecordViewRecordEmbedsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyEmbedRecordViewRecordEmbedsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyEmbedRecordViewRecordEmbedsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyEmbedRecordViewRecordEmbedsUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.embed.images#view" -> AppBskyEmbedRecordViewRecordEmbedsUnion.View(

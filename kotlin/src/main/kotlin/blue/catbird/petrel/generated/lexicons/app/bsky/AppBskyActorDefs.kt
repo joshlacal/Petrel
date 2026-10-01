@@ -74,104 +74,249 @@ object AppBskyActorDefsPreferencesPreferencesUnionSerializer : kotlinx.serializa
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsPreferencesPreferencesUnion")
 
+    private val TYPE_AdultContentPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#adultContentPref")
+    private val TYPE_ContentLabelPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#contentLabelPref")
+    private val TYPE_SavedFeedsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPref")
+    private val TYPE_SavedFeedsPrefV2 = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPrefV2")
+    private val TYPE_PersonalDetailsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#personalDetailsPref")
+    private val TYPE_DeclaredAgePref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#declaredAgePref")
+    private val TYPE_FeedViewPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#feedViewPref")
+    private val TYPE_ThreadViewPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#threadViewPref")
+    private val TYPE_InterestsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#interestsPref")
+    private val TYPE_MutedWordsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#mutedWordsPref")
+    private val TYPE_HiddenPostsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#hiddenPostsPref")
+    private val TYPE_BskyAppStatePref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#bskyAppStatePref")
+    private val TYPE_LabelersPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#labelersPref")
+    private val TYPE_PostInteractionSettingsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#postInteractionSettingsPref")
+    private val TYPE_VerificationPrefs = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#verificationPrefs")
+    private val TYPE_LiveEventPreferences = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#liveEventPreferences")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsPreferencesPreferencesUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyActorDefsPreferencesPreferencesUnion.AdultContentPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsAdultContentPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#adultContentPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsAdultContentPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AdultContentPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AdultContentPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.ContentLabelPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsContentLabelPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#contentLabelPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsContentLabelPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ContentLabelPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ContentLabelPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.SavedFeedsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsSavedFeedsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsSavedFeedsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SavedFeedsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SavedFeedsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.SavedFeedsPrefV2 -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsSavedFeedsPrefV2.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPrefV2")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsSavedFeedsPrefV2.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SavedFeedsPrefV2
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SavedFeedsPrefV2)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.PersonalDetailsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsPersonalDetailsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#personalDetailsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsPersonalDetailsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_PersonalDetailsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_PersonalDetailsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.DeclaredAgePref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsDeclaredAgePref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#declaredAgePref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsDeclaredAgePref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DeclaredAgePref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DeclaredAgePref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.FeedViewPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsFeedViewPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#feedViewPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsFeedViewPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_FeedViewPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_FeedViewPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.ThreadViewPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsThreadViewPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#threadViewPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsThreadViewPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ThreadViewPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ThreadViewPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.InterestsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsInterestsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#interestsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsInterestsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_InterestsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_InterestsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.MutedWordsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsMutedWordsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#mutedWordsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsMutedWordsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_MutedWordsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_MutedWordsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.HiddenPostsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsHiddenPostsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#hiddenPostsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsHiddenPostsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_HiddenPostsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_HiddenPostsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.BskyAppStatePref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsBskyAppStatePref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#bskyAppStatePref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsBskyAppStatePref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_BskyAppStatePref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_BskyAppStatePref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.LabelersPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsLabelersPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#labelersPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsLabelersPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LabelersPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LabelersPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.PostInteractionSettingsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsPostInteractionSettingsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#postInteractionSettingsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsPostInteractionSettingsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_PostInteractionSettingsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_PostInteractionSettingsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.VerificationPrefs -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsVerificationPrefs.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#verificationPrefs")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsVerificationPrefs.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_VerificationPrefs
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_VerificationPrefs)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.LiveEventPreferences -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsLiveEventPreferences.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#liveEventPreferences")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsLiveEventPreferences.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LiveEventPreferences
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LiveEventPreferences)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesPreferencesUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -186,10 +331,14 @@ object AppBskyActorDefsPreferencesPreferencesUnionSerializer : kotlinx.serializa
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsPreferencesPreferencesUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyActorDefsPreferencesPreferencesUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyActorDefsPreferencesPreferencesUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyActorDefsPreferencesPreferencesUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.actor.defs#adultContentPref" -> AppBskyActorDefsPreferencesPreferencesUnion.AdultContentPref(
@@ -303,104 +452,249 @@ object AppBskyActorDefsPreferencesUnionSerializer : kotlinx.serialization.KSeria
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsPreferencesUnion")
 
+    private val TYPE_AdultContentPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#adultContentPref")
+    private val TYPE_ContentLabelPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#contentLabelPref")
+    private val TYPE_SavedFeedsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPref")
+    private val TYPE_SavedFeedsPrefV2 = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPrefV2")
+    private val TYPE_PersonalDetailsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#personalDetailsPref")
+    private val TYPE_DeclaredAgePref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#declaredAgePref")
+    private val TYPE_FeedViewPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#feedViewPref")
+    private val TYPE_ThreadViewPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#threadViewPref")
+    private val TYPE_InterestsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#interestsPref")
+    private val TYPE_MutedWordsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#mutedWordsPref")
+    private val TYPE_HiddenPostsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#hiddenPostsPref")
+    private val TYPE_BskyAppStatePref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#bskyAppStatePref")
+    private val TYPE_LabelersPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#labelersPref")
+    private val TYPE_PostInteractionSettingsPref = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#postInteractionSettingsPref")
+    private val TYPE_VerificationPrefs = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#verificationPrefs")
+    private val TYPE_LiveEventPreferences = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#liveEventPreferences")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsPreferencesUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyActorDefsPreferencesUnion.AdultContentPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsAdultContentPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#adultContentPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsAdultContentPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AdultContentPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AdultContentPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.ContentLabelPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsContentLabelPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#contentLabelPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsContentLabelPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ContentLabelPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ContentLabelPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.SavedFeedsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsSavedFeedsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsSavedFeedsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SavedFeedsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SavedFeedsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.SavedFeedsPrefV2 -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsSavedFeedsPrefV2.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#savedFeedsPrefV2")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsSavedFeedsPrefV2.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SavedFeedsPrefV2
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SavedFeedsPrefV2)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.PersonalDetailsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsPersonalDetailsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#personalDetailsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsPersonalDetailsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_PersonalDetailsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_PersonalDetailsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.DeclaredAgePref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsDeclaredAgePref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#declaredAgePref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsDeclaredAgePref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DeclaredAgePref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DeclaredAgePref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.FeedViewPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsFeedViewPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#feedViewPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsFeedViewPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_FeedViewPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_FeedViewPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.ThreadViewPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsThreadViewPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#threadViewPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsThreadViewPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ThreadViewPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ThreadViewPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.InterestsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsInterestsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#interestsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsInterestsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_InterestsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_InterestsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.MutedWordsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsMutedWordsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#mutedWordsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsMutedWordsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_MutedWordsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_MutedWordsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.HiddenPostsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsHiddenPostsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#hiddenPostsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsHiddenPostsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_HiddenPostsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_HiddenPostsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.BskyAppStatePref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsBskyAppStatePref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#bskyAppStatePref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsBskyAppStatePref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_BskyAppStatePref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_BskyAppStatePref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.LabelersPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsLabelersPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#labelersPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsLabelersPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LabelersPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LabelersPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.PostInteractionSettingsPref -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsPostInteractionSettingsPref.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#postInteractionSettingsPref")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsPostInteractionSettingsPref.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_PostInteractionSettingsPref
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_PostInteractionSettingsPref)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.VerificationPrefs -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsVerificationPrefs.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#verificationPrefs")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsVerificationPrefs.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_VerificationPrefs
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_VerificationPrefs)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.LiveEventPreferences -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyActorDefsLiveEventPreferences.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.actor.defs#liveEventPreferences")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyActorDefsLiveEventPreferences.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LiveEventPreferences
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LiveEventPreferences)
+                }
+                obj
             }
             is AppBskyActorDefsPreferencesUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -415,10 +709,14 @@ object AppBskyActorDefsPreferencesUnionSerializer : kotlinx.serialization.KSeria
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsPreferencesUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyActorDefsPreferencesUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyActorDefsPreferencesUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyActorDefsPreferencesUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.actor.defs#adultContentPref" -> AppBskyActorDefsPreferencesUnion.AdultContentPref(
@@ -496,32 +794,69 @@ object AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnionSeria
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion")
 
+    private val TYPE_MentionRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#mentionRule")
+    private val TYPE_FollowerRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followerRule")
+    private val TYPE_FollowingRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followingRule")
+    private val TYPE_ListRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#listRule")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.MentionRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedThreadgateMentionRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#mentionRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedThreadgateMentionRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_MentionRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_MentionRule)
+                }
+                obj
             }
             is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.FollowerRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedThreadgateFollowerRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followerRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedThreadgateFollowerRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_FollowerRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_FollowerRule)
+                }
+                obj
             }
             is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.FollowingRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedThreadgateFollowingRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followingRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedThreadgateFollowingRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_FollowingRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_FollowingRule)
+                }
+                obj
             }
             is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.ListRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedThreadgateListRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#listRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedThreadgateListRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ListRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ListRule)
+                }
+                obj
             }
             is AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -536,10 +871,14 @@ object AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnionSeria
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.threadgate#mentionRule" -> AppBskyActorDefsPostInteractionSettingsPrefThreadgateAllowRulesUnion.MentionRule(
@@ -572,14 +911,24 @@ object AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnionSer
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion")
 
+    private val TYPE_DisableRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.postgate#disableRule")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.DisableRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedPostgateDisableRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.postgate#disableRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedPostgateDisableRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DisableRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DisableRule)
+                }
+                obj
             }
             is AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -594,10 +943,14 @@ object AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnionSer
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.postgate#disableRule" -> AppBskyActorDefsPostInteractionSettingsPrefPostgateEmbeddingRulesUnion.DisableRule(
@@ -621,14 +974,24 @@ object AppBskyActorDefsStatusViewEmbedUnionSerializer : kotlinx.serialization.KS
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyActorDefsStatusViewEmbedUnion")
 
+    private val TYPE_View = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyActorDefsStatusViewEmbedUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyActorDefsStatusViewEmbedUnion.View -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternalView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternalView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_View
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_View)
+                }
+                obj
             }
             is AppBskyActorDefsStatusViewEmbedUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -643,10 +1006,14 @@ object AppBskyActorDefsStatusViewEmbedUnionSerializer : kotlinx.serialization.KS
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyActorDefsStatusViewEmbedUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyActorDefsStatusViewEmbedUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyActorDefsStatusViewEmbedUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyActorDefsStatusViewEmbedUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.embed.external#view" -> AppBskyActorDefsStatusViewEmbedUnion.View(

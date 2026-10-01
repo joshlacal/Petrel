@@ -59,74 +59,174 @@ object ChatBskyModerationSubscribeModEventsMessageUnionSerializer : kotlinx.seri
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyModerationSubscribeModEventsMessageUnion")
 
+    private val TYPE_EventConvoFirstMessage = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage")
+    private val TYPE_EventGroupChatCreated = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated")
+    private val TYPE_EventGroupChatMemberAdded = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded")
+    private val TYPE_EventGroupChatMemberJoined = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined")
+    private val TYPE_EventGroupChatJoinRequest = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest")
+    private val TYPE_EventGroupChatJoinRequestApproved = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved")
+    private val TYPE_EventGroupChatJoinRequestRejected = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected")
+    private val TYPE_EventChatAccepted = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventChatAccepted")
+    private val TYPE_EventGroupChatMemberLeft = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft")
+    private val TYPE_EventGroupChatUpdated = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated")
+    private val TYPE_EventRateLimitExceeded = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyModerationSubscribeModEventsMessageUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventConvoFirstMessage -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventConvoFirstMessage.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventConvoFirstMessage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventConvoFirstMessage
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventConvoFirstMessage)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventGroupChatCreated -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatCreated.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatCreated.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventGroupChatCreated
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventGroupChatCreated)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventGroupChatMemberAdded -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatMemberAdded.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatMemberAdded.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventGroupChatMemberAdded
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventGroupChatMemberAdded)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventGroupChatMemberJoined -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatMemberJoined.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatMemberJoined.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventGroupChatMemberJoined
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventGroupChatMemberJoined)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventGroupChatJoinRequest -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatJoinRequest.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatJoinRequest.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventGroupChatJoinRequest
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventGroupChatJoinRequest)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventGroupChatJoinRequestApproved -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatJoinRequestApproved.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatJoinRequestApproved.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventGroupChatJoinRequestApproved
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventGroupChatJoinRequestApproved)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventGroupChatJoinRequestRejected -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatJoinRequestRejected.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatJoinRequestRejected.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventGroupChatJoinRequestRejected
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventGroupChatJoinRequestRejected)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventChatAccepted -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventChatAccepted.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventChatAccepted")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventChatAccepted.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventChatAccepted
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventChatAccepted)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventGroupChatMemberLeft -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatMemberLeft.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatMemberLeft.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventGroupChatMemberLeft
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventGroupChatMemberLeft)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventGroupChatUpdated -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatUpdated.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventGroupChatUpdated.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventGroupChatUpdated
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventGroupChatUpdated)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.EventRateLimitExceeded -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventRateLimitExceeded.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationSubscribeModEventsEventRateLimitExceeded.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_EventRateLimitExceeded
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_EventRateLimitExceeded)
+                }
+                obj
             }
             is ChatBskyModerationSubscribeModEventsMessageUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -141,10 +241,14 @@ object ChatBskyModerationSubscribeModEventsMessageUnionSerializer : kotlinx.seri
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyModerationSubscribeModEventsMessageUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ChatBskyModerationSubscribeModEventsMessageUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ChatBskyModerationSubscribeModEventsMessageUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ChatBskyModerationSubscribeModEventsMessageUnion.Unexpected(element)
 
         return when (type) {
             "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage" -> ChatBskyModerationSubscribeModEventsMessageUnion.EventConvoFirstMessage(

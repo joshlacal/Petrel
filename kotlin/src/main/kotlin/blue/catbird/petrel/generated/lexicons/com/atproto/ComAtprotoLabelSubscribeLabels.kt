@@ -32,20 +32,39 @@ object ComAtprotoLabelSubscribeLabelsMessageUnionSerializer : kotlinx.serializat
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoLabelSubscribeLabelsMessageUnion")
 
+    private val TYPE_Labels = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.subscribeLabels#labels")
+    private val TYPE_Info = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.subscribeLabels#info")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoLabelSubscribeLabelsMessageUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ComAtprotoLabelSubscribeLabelsMessageUnion.Labels -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoLabelSubscribeLabelsLabels.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.subscribeLabels#labels")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoLabelSubscribeLabelsLabels.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Labels
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Labels)
+                }
+                obj
             }
             is ComAtprotoLabelSubscribeLabelsMessageUnion.Info -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoLabelSubscribeLabelsInfo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.subscribeLabels#info")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoLabelSubscribeLabelsInfo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Info
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Info)
+                }
+                obj
             }
             is ComAtprotoLabelSubscribeLabelsMessageUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -60,10 +79,14 @@ object ComAtprotoLabelSubscribeLabelsMessageUnionSerializer : kotlinx.serializat
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoLabelSubscribeLabelsMessageUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ComAtprotoLabelSubscribeLabelsMessageUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ComAtprotoLabelSubscribeLabelsMessageUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ComAtprotoLabelSubscribeLabelsMessageUnion.Unexpected(element)
 
         return when (type) {
             "com.atproto.label.subscribeLabels#labels" -> ComAtprotoLabelSubscribeLabelsMessageUnion.Labels(

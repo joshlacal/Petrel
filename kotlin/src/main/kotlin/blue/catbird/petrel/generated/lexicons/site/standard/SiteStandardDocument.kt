@@ -42,10 +42,14 @@ object SiteStandardDocumentContentUnionSerializer : kotlinx.serialization.KSeria
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): SiteStandardDocumentContentUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("SiteStandardDocumentContentUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return SiteStandardDocumentContentUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return SiteStandardDocumentContentUnion.Unexpected(element)
 
         return when (type) {
             else -> SiteStandardDocumentContentUnion.Unexpected(element)
@@ -66,14 +70,24 @@ object SiteStandardDocumentLabelsUnionSerializer : kotlinx.serialization.KSerial
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("SiteStandardDocumentLabelsUnion")
 
+    private val TYPE_SelfLabels = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: SiteStandardDocumentLabelsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is SiteStandardDocumentLabelsUnion.SelfLabels -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SelfLabels
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SelfLabels)
+                }
+                obj
             }
             is SiteStandardDocumentLabelsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -88,10 +102,14 @@ object SiteStandardDocumentLabelsUnionSerializer : kotlinx.serialization.KSerial
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): SiteStandardDocumentLabelsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("SiteStandardDocumentLabelsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return SiteStandardDocumentLabelsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return SiteStandardDocumentLabelsUnion.Unexpected(element)
 
         return when (type) {
             "com.atproto.label.defs#selfLabels" -> SiteStandardDocumentLabelsUnion.SelfLabels(
@@ -128,10 +146,14 @@ object SiteStandardDocumentLinksUnionSerializer : kotlinx.serialization.KSeriali
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): SiteStandardDocumentLinksUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("SiteStandardDocumentLinksUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return SiteStandardDocumentLinksUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return SiteStandardDocumentLinksUnion.Unexpected(element)
 
         return when (type) {
             else -> SiteStandardDocumentLinksUnion.Unexpected(element)

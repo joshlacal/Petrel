@@ -116,188 +116,459 @@ object ChatBskyConvoGetLogOutputLogsUnionSerializer : kotlinx.serialization.KSer
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyConvoGetLogOutputLogsUnion")
 
+    private val TYPE_LogBeginConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logBeginConvo")
+    private val TYPE_LogAcceptConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAcceptConvo")
+    private val TYPE_LogLeaveConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLeaveConvo")
+    private val TYPE_LogMuteConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMuteConvo")
+    private val TYPE_LogUnmuteConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logUnmuteConvo")
+    private val TYPE_LogCreateMessage = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logCreateMessage")
+    private val TYPE_LogDeleteMessage = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logDeleteMessage")
+    private val TYPE_LogReadMessage = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadMessage")
+    private val TYPE_LogAddReaction = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAddReaction")
+    private val TYPE_LogRemoveReaction = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRemoveReaction")
+    private val TYPE_LogReadConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadConvo")
+    private val TYPE_LogAddMember = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAddMember")
+    private val TYPE_LogRemoveMember = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRemoveMember")
+    private val TYPE_LogMemberJoin = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMemberJoin")
+    private val TYPE_LogMemberLeave = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMemberLeave")
+    private val TYPE_LogLockConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLockConvo")
+    private val TYPE_LogUnlockConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logUnlockConvo")
+    private val TYPE_LogLockConvoPermanently = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLockConvoPermanently")
+    private val TYPE_LogEditGroup = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEditGroup")
+    private val TYPE_LogCreateJoinLink = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logCreateJoinLink")
+    private val TYPE_LogEditJoinLink = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEditJoinLink")
+    private val TYPE_LogEnableJoinLink = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEnableJoinLink")
+    private val TYPE_LogDisableJoinLink = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logDisableJoinLink")
+    private val TYPE_LogIncomingJoinRequest = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logIncomingJoinRequest")
+    private val TYPE_LogApproveJoinRequest = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logApproveJoinRequest")
+    private val TYPE_LogRejectJoinRequest = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRejectJoinRequest")
+    private val TYPE_LogOutgoingJoinRequest = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logOutgoingJoinRequest")
+    private val TYPE_LogWithdrawIncomingJoinRequest = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logWithdrawIncomingJoinRequest")
+    private val TYPE_LogWithdrawOutgoingJoinRequest = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest")
+    private val TYPE_LogReadJoinRequests = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadJoinRequests")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyConvoGetLogOutputLogsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ChatBskyConvoGetLogOutputLogsUnion.LogBeginConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogBeginConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logBeginConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogBeginConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogBeginConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogBeginConvo)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogAcceptConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogAcceptConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAcceptConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogAcceptConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogAcceptConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogAcceptConvo)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogLeaveConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogLeaveConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLeaveConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogLeaveConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogLeaveConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogLeaveConvo)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogMuteConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogMuteConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMuteConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogMuteConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogMuteConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogMuteConvo)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogUnmuteConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogUnmuteConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logUnmuteConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogUnmuteConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogUnmuteConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogUnmuteConvo)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogCreateMessage -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogCreateMessage.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logCreateMessage")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogCreateMessage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogCreateMessage
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogCreateMessage)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogDeleteMessage -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogDeleteMessage.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logDeleteMessage")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogDeleteMessage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogDeleteMessage
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogDeleteMessage)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogReadMessage -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogReadMessage.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadMessage")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogReadMessage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogReadMessage
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogReadMessage)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogAddReaction -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogAddReaction.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAddReaction")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogAddReaction.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogAddReaction
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogAddReaction)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogRemoveReaction -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogRemoveReaction.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRemoveReaction")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogRemoveReaction.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogRemoveReaction
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogRemoveReaction)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogReadConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogReadConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogReadConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogReadConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogReadConvo)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogAddMember -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogAddMember.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logAddMember")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogAddMember.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogAddMember
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogAddMember)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogRemoveMember -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogRemoveMember.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRemoveMember")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogRemoveMember.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogRemoveMember
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogRemoveMember)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogMemberJoin -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogMemberJoin.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMemberJoin")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogMemberJoin.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogMemberJoin
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogMemberJoin)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogMemberLeave -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogMemberLeave.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logMemberLeave")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogMemberLeave.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogMemberLeave
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogMemberLeave)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogLockConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogLockConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLockConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogLockConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogLockConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogLockConvo)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogUnlockConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogUnlockConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logUnlockConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogUnlockConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogUnlockConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogUnlockConvo)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogLockConvoPermanently -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogLockConvoPermanently.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logLockConvoPermanently")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogLockConvoPermanently.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogLockConvoPermanently
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogLockConvoPermanently)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogEditGroup -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogEditGroup.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEditGroup")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogEditGroup.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogEditGroup
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogEditGroup)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogCreateJoinLink -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogCreateJoinLink.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logCreateJoinLink")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogCreateJoinLink.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogCreateJoinLink
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogCreateJoinLink)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogEditJoinLink -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogEditJoinLink.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEditJoinLink")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogEditJoinLink.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogEditJoinLink
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogEditJoinLink)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogEnableJoinLink -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogEnableJoinLink.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logEnableJoinLink")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogEnableJoinLink.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogEnableJoinLink
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogEnableJoinLink)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogDisableJoinLink -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogDisableJoinLink.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logDisableJoinLink")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogDisableJoinLink.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogDisableJoinLink
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogDisableJoinLink)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogIncomingJoinRequest -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogIncomingJoinRequest.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logIncomingJoinRequest")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogIncomingJoinRequest.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogIncomingJoinRequest
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogIncomingJoinRequest)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogApproveJoinRequest -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogApproveJoinRequest.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logApproveJoinRequest")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogApproveJoinRequest.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogApproveJoinRequest
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogApproveJoinRequest)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogRejectJoinRequest -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogRejectJoinRequest.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logRejectJoinRequest")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogRejectJoinRequest.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogRejectJoinRequest
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogRejectJoinRequest)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogOutgoingJoinRequest -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogOutgoingJoinRequest.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logOutgoingJoinRequest")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogOutgoingJoinRequest.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogOutgoingJoinRequest
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogOutgoingJoinRequest)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogWithdrawIncomingJoinRequest -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogWithdrawIncomingJoinRequest.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logWithdrawIncomingJoinRequest")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogWithdrawIncomingJoinRequest.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogWithdrawIncomingJoinRequest
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogWithdrawIncomingJoinRequest)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogWithdrawOutgoingJoinRequest -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogWithdrawOutgoingJoinRequest.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogWithdrawOutgoingJoinRequest.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogWithdrawOutgoingJoinRequest
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogWithdrawOutgoingJoinRequest)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.LogReadJoinRequests -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyConvoDefsLogReadJoinRequests.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.convo.defs#logReadJoinRequests")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyConvoDefsLogReadJoinRequests.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_LogReadJoinRequests
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_LogReadJoinRequests)
+                }
+                obj
             }
             is ChatBskyConvoGetLogOutputLogsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -312,10 +583,14 @@ object ChatBskyConvoGetLogOutputLogsUnionSerializer : kotlinx.serialization.KSer
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyConvoGetLogOutputLogsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ChatBskyConvoGetLogOutputLogsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ChatBskyConvoGetLogOutputLogsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ChatBskyConvoGetLogOutputLogsUnion.Unexpected(element)
 
         return when (type) {
             "chat.bsky.convo.defs#logBeginConvo" -> ChatBskyConvoGetLogOutputLogsUnion.LogBeginConvo(
