@@ -9,11 +9,15 @@ public enum ComAtprotoSimplespaceListMembers {
     public struct Member: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.simplespace.listMembers#member"
         public let did: DID
+        public let read: Bool
+        public let write: Bool
 
         public init(
-            did: DID
+            did: DID, read: Bool, write: Bool
         ) {
             self.did = did
+            self.read = read
+            self.write = write
         }
 
         public init(from decoder: Decoder) throws {
@@ -24,21 +28,43 @@ public enum ComAtprotoSimplespaceListMembers {
                 LogManager.logError("Decoding error for required property 'did': \(error)")
                 throw error
             }
+            do {
+                read = try container.decode(Bool.self, forKey: .read)
+            } catch {
+                LogManager.logError("Decoding error for required property 'read': \(error)")
+                throw error
+            }
+            do {
+                write = try container.decode(Bool.self, forKey: .write)
+            } catch {
+                LogManager.logError("Decoding error for required property 'write': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
+            try container.encode(read, forKey: .read)
+            try container.encode(write, forKey: .write)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
+            hasher.combine(read)
+            hasher.combine(write)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
             if did != other.did {
+                return false
+            }
+            if read != other.read {
+                return false
+            }
+            if write != other.write {
                 return false
             }
             return true
@@ -53,12 +79,18 @@ public enum ComAtprotoSimplespaceListMembers {
             map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
+            let readValue = try read.toCBORValue()
+            map = map.adding(key: "read", value: readValue)
+            let writeValue = try write.toCBORValue()
+            map = map.adding(key: "write", value: writeValue)
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case did
+            case read
+            case write
         }
     }
 
@@ -175,7 +207,7 @@ public enum ComAtprotoSimplespaceListMembers {
 public extension ATProtoClient.Com.Atproto.Simplespace {
     // MARK: - listMembers
 
-    /// List the members in a space's host-internal member list. Must be called on the space authority's PDS. Requires OAuth with a covering read grant; a space credential is not sufficient, so members hosted elsewhere cannot enumerate the list. This reflects the simplespace member list, not a protocol-level reader set.
+    /// List the members in a space's host-internal member list and their read and write access. Must be called on the space authority's PDS. Requires OAuth with a covering read grant; a space credential is not sufficient, so members hosted elsewhere cannot enumerate the list.
     ///
     /// - Parameter input: The input parameters for the request
     ///
