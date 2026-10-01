@@ -60,9 +60,9 @@ struct QueryParametersTests {
         }
     }
 
-    // `asQueryItems()` silently drops a value that is not `QueryParameterConvertible`,
-    // a `Sequence`, or `RawRepresentable`, so a leaf type missing the conformance
-    // sends the request without that parameter at all.
+    // `asQueryItems()` used to drop a leaf value it had no encoding for without a
+    // trace, so getBlob went out with no `cid`. Every leaf type the generator can
+    // emit is pinned below, and an unencodable one now stops a debug build.
 
     static let cidString = "bafyreigcxd76a5xqjzw2l6fq3u7d26hjtybdslqj2kxlzpvfyrvhycbr2a"
 
@@ -123,4 +123,95 @@ struct QueryParametersTests {
             #expect(items.filter { $0.name == name }.map(\.value) == [wire], "\(endpoint).\(name)")
         }
     }
+
+    /// One field per Swift type the generator may emit for a query parameter
+    /// (`QUERY_ENCODABLE_SWIFT_TYPES` in generator/swift_code_generator.py), plus a
+    /// closed string enum. Keep the two lists in step.
+    struct EveryLeafParameters: Parametrizable {
+        let string: String
+        let int: Int
+        let bool: Bool
+        let cid: CID
+        let datetime: ATProtocolDate
+        let uri: URI
+        let atUri: ATProtocolURI
+        let space: SpaceRef
+        let actor: ATIdentifier
+        let did: DID
+        let handle: Handle
+        let nsid: NSID
+        let tid: TID
+        let rkey: RecordKey
+        let lang: LanguageCodeContainer
+        let version: ProtocolVersion
+    }
+
+    @Test("Every leaf type the generator can emit becomes exactly one query item")
+    func everyGeneratableLeafTypeIsEncoded() throws {
+        let parameters = try EveryLeafParameters(
+            string: "swift",
+            int: 25,
+            bool: false,
+            cid: CID.parse(Self.cidString),
+            datetime: #require(ATProtocolDate(iso8601String: "2026-10-01T12:34:56.789Z")),
+            uri: URI(uriString: "https://example.com/page"),
+            atUri: ATProtocolURI(uriString: "at://did:plc:asdf123/app.bsky.feed.post/3jzfcijpj2z2a"),
+            space: SpaceRef(uriString: "at://did:plc:asdf123/space/com.example.group/default"),
+            actor: ATIdentifier(string: "alice.bsky.social"),
+            did: DID(didString: "did:plc:asdf123"),
+            handle: Handle(handleString: "alice.bsky.social"),
+            nsid: NSID(nsidString: "app.bsky.feed.post"),
+            tid: TID(tidString: "3jzfcijpj2z2a"),
+            rkey: RecordKey(keyString: "self"),
+            lang: LanguageCodeContainer(languageCode: "en"),
+            version: .two
+        )
+
+        #expect(parameters.asQueryItems() == [
+            URLQueryItem(name: "string", value: "swift"),
+            URLQueryItem(name: "int", value: "25"),
+            URLQueryItem(name: "bool", value: "false"),
+            URLQueryItem(name: "cid", value: Self.cidString),
+            URLQueryItem(name: "datetime", value: "2026-10-01T12:34:56.789Z"),
+            URLQueryItem(name: "uri", value: "https://example.com/page"),
+            URLQueryItem(name: "atUri", value: "at://did:plc:asdf123/app.bsky.feed.post/3jzfcijpj2z2a"),
+            URLQueryItem(name: "space", value: "at://did:plc:asdf123/space/com.example.group/default"),
+            URLQueryItem(name: "actor", value: "alice.bsky.social"),
+            URLQueryItem(name: "did", value: "did:plc:asdf123"),
+            URLQueryItem(name: "handle", value: "alice.bsky.social"),
+            URLQueryItem(name: "nsid", value: "app.bsky.feed.post"),
+            URLQueryItem(name: "tid", value: "3jzfcijpj2z2a"),
+            URLQueryItem(name: "rkey", value: "self"),
+            URLQueryItem(name: "lang", value: "en"),
+            URLQueryItem(name: "version", value: "2"),
+        ])
+    }
+
+    // Exit tests (`processExitsWith:`) arrived in Swift 6.2; the minimum CI lanes run 6.1.
+    #if compiler(>=6.2) && DEBUG && (os(macOS) || os(Linux))
+        @Test("An unencodable leaf stops a debug build instead of leaving the request")
+        func unencodableLeafTrapsInDebug() async {
+            await #expect(processExitsWith: .failure) {
+                _ = UnencodableLeafParameters(leaf: UnencodableLeaf()).asQueryItems()
+            }
+        }
+
+        @Test("An unencodable array element stops a debug build instead of being sent as its description")
+        func unencodableArrayElementTrapsInDebug() async {
+            await #expect(processExitsWith: .failure) {
+                _ = UnencodableArrayParameters(leaves: [UnencodableLeaf()]).asQueryItems()
+            }
+        }
+    #endif
+}
+
+/// A value type `asQueryItems()` has no encoding for.
+private struct UnencodableLeaf: Sendable {}
+
+private struct UnencodableLeafParameters: Parametrizable {
+    let leaf: UnencodableLeaf
+}
+
+private struct UnencodableArrayParameters: Parametrizable {
+    let leaves: [UnencodableLeaf]
 }

@@ -31,22 +31,33 @@ public extension Parametrizable {
             } else if let seq = unwrapped as? any Sequence {
                 var items: [URLQueryItem] = []
                 for element in seq {
-                    let elemVal: String
-                    if let raw = (element as? any RawRepresentable)?.rawValue {
-                        elemVal = String(describing: raw)
+                    if let value = element as? QueryParameterConvertible {
+                        value.asQueryItem(name: label).map { items.append($0) }
+                    } else if let raw = (element as? any RawRepresentable)?.rawValue {
+                        items.append(URLQueryItem(name: label, value: String(describing: raw)))
                     } else {
-                        elemVal = String(describing: element)
+                        reportUnencodable(element, label: label)
                     }
-                    items.append(URLQueryItem(name: label, value: elemVal))
                 }
                 return items
             } else if let raw = (unwrapped as? any RawRepresentable)?.rawValue {
                 return [URLQueryItem(name: label, value: String(describing: raw))]
             }
 
+            reportUnencodable(unwrapped, label: label)
             return []
         }
     }
+}
+
+/// A leaf with no query encoding would otherwise leave the request without a trace
+/// (or, as an array element, go out as its debug description). The fix is a
+/// `QueryParameterConvertible` conformance for its type.
+private func reportUnencodable(_ value: Any, label: String) {
+    let message = "Parametrizable.asQueryItems(): '\(label)' is a \(type(of: value)), "
+        + "which has no query encoding; the parameter is not sent"
+    LogManager.logError(message, category: .network)
+    assertionFailure(message)
 }
 
 protocol QueryParameterConvertible {
