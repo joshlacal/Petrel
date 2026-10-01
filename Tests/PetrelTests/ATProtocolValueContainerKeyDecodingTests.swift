@@ -119,7 +119,8 @@ struct ATProtocolValueContainerKeyDecodingTests {
         #expect(try Value(from: ATProtocolValueContainerDecoder(value: .array(values))) == .array(values))
         guard case let .object(object) = decoded,
               case let .knownType(typed)? = object["known"],
-              case let .unknownType(type, raw)? = object["unknown"] else {
+              case let .unknownType(type, raw)? = object["unknown"]
+        else {
             Issue.record("In-memory keyed decode must retain the semantic enum cases")
             return
         }
@@ -136,7 +137,15 @@ struct ATProtocolValueContainerKeyDecodingTests {
 
 private struct DynamicValueTestCodingKey: CodingKey {
     let stringValue: String
-    var intValue: Int? { nil }
-    init(stringValue: String) { self.stringValue = stringValue }
-    init?(intValue: Int) { return nil }
+    var intValue: Int? {
+        nil
+    }
+
+    init(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue: Int) {
+        return nil
+    }
 }

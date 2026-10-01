@@ -542,15 +542,15 @@ public actor ATProtoClient {
     }
 
     #if DEBUG && canImport(Network) && canImport(Security)
-    /// DEBUG qualification only: adopts a synthetic session from the local client runtime gateway.
-    /// Refused unless an installed `DebugFixtureTransport` origin is exactly this client's gateway.
-    public func adoptFixtureGatewaySession(_ session: String) async throws {
-        guard let authManager else {
-            throw APIError.unauthenticatedClient("Cannot adopt a fixture session on an unauthenticated client")
+        /// DEBUG qualification only: adopts a synthetic session from the local client runtime gateway.
+        /// Refused unless an installed `DebugFixtureTransport` origin is exactly this client's gateway.
+        public func adoptFixtureGatewaySession(_ session: String) async throws {
+            guard let authManager else {
+                throw APIError.unauthenticatedClient("Cannot adopt a fixture session on an unauthenticated client")
+            }
+            justAuthenticatedAccount = try await authManager.adoptFixtureGatewaySession(session)
+            await initializeFromStoredAccount()
         }
-        justAuthenticatedAccount = try await authManager.adoptFixtureGatewaySession(session)
-        await initializeFromStoredAccount()
-    }
     #endif
 
     /// Logs out the current user.

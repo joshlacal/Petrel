@@ -3647,12 +3647,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         from container: KeyedDecodingContainer<DynamicCodingKeys>,
         decoder: Decoder
     ) throws -> ATProtocolValueContainer {
-        if let specialObject = try decodeSpecialObject(from: container, decoder: decoder) {
+        let keys = container.allKeys
+        if let specialObject = try decodeSpecialObject(from: container, keys: keys, decoder: decoder) {
             return specialObject
         }
 
-        let rawObject = try decodeAny(from: container)
-        guard let typeKey = container.allKeys.first(where: { $0.stringValue == "$type" }) else {
+        let rawObject = try decodeAny(from: container, keys: keys)
+        guard let typeKey = keys.first(where: { $0.stringValue == "$type" }) else {
             return rawObject
         }
 
@@ -4018,9 +4019,10 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
 
     private static func decodeSpecialObject(
         from container: KeyedDecodingContainer<DynamicCodingKeys>,
+        keys: [DynamicCodingKeys],
         decoder: Decoder
     ) throws -> ATProtocolValueContainer? {
-        guard container.allKeys.count == 1, let onlyKey = container.allKeys.first else {
+        guard keys.count == 1, let onlyKey = keys.first else {
             return nil
         }
 
@@ -4173,9 +4175,10 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         }
     }
 
-    private static func decodeAny(from container: KeyedDecodingContainer<DynamicCodingKeys>) throws -> ATProtocolValueContainer {
+    private static func decodeAny(from container: KeyedDecodingContainer<DynamicCodingKeys>, keys: [DynamicCodingKeys]) throws -> ATProtocolValueContainer {
         var dictionary = [String: ATProtocolValueContainer]()
-        for key in container.allKeys {
+        dictionary.reserveCapacity(keys.count)
+        for key in keys {
             if try container.decodeNil(forKey: key) {
                 dictionary[key.stringValue] = .null
             } else {
@@ -4190,6 +4193,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
 
     private static func decodeAny(from unkeyedContainer: inout UnkeyedDecodingContainer) throws -> [ATProtocolValueContainer] {
         var array = [ATProtocolValueContainer]()
+        if let count = unkeyedContainer.count {
+            array.reserveCapacity(count)
+        }
         while !unkeyedContainer.isAtEnd {
             if try unkeyedContainer.decodeNil() {
                 array.append(.null)
