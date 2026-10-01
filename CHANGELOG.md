@@ -15,6 +15,7 @@ with a dated `0.2.0` heading only when the release tag is created.
 - Deterministic generated-source ownership, stale-file removal, and pinned release tooling.
 - A two-overlay compiler fixture proving PetrelCatbird and PetrelBluemoji can extend one Petrel-owned `Blue` namespace.
 - A fail-closed DocC validator that treats documentation diagnostics as errors and compile-checks every Swift example in the public guides under the sealed release toolchain.
+- PetrelCrypto service JWTs can bind an XRPC request body through the `requestBodyDigest` claim.
 
 ### Changed
 - Generated namespace reference classes are immutable `Sendable` structs. This is an intentional pre-1.0 source compatibility break for code that named or relied on namespace class identity.
@@ -31,6 +32,7 @@ with a dated `0.2.0` heading only when the release tag is created.
 - Generated endpoints receive declared terminal HTTP errors after the existing authentication and retry pipeline, allowing their typed error parsers to inspect the real response body.
 - Regeneration removes only stale files carrying Petrel's exact generated-source ownership header.
 - Authentication refresh callers now await the shared refresh task and receive its actual result or failure instead of an early success result.
+- `com.atproto.space` and `com.atproto.simplespace` lexicons are re-vendored verbatim from bluesky-social/atproto PR #5187 (`57b0a0424fb27d8e4989e74fa37fbc0ce4527ded`). This replaces a non-upstream `com.atproto.space.defs#signedCommit` shape (a "v2 authenticated transition" with optional `did`, `space`, `prevRev`, `prevHash`, `path`, `action`, `cid`, `prevCid`, `val` and optional `ikm`/`mac`) with the upstream v1 shape, where `ikm` and `mac` are required and the v2-only fields no longer exist. This is a source-breaking change for code that constructed or read the removed fields. The same vendor drop replaces `simplespace.addMember` with `simplespace.putMember` and adds `space.notifyCredentialRevoked`.
 
 ## [0.1.0] - 2026-06-12
 
