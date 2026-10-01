@@ -11,13 +11,19 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import io.ktor.utils.io.readAvailable
+import java.io.BufferedInputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.InflaterInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.serializer
 
 data class ATProtoResponse<T>(
@@ -80,8 +86,104 @@ class ResponseSizeExceededException(message: String) : NetworkSecurityException(
 
 class CleartextNotPermittedException(message: String) : NetworkSecurityException(message)
 
+private class BoundedCountingInputStream(
+    private val delegate: InputStream,
+    private val maxBytes: Long,
+) : InputStream() {
+    var bytesRead: Long = 0L
+        private set
+
+    override fun read(): Int {
+        val b = delegate.read()
+        if (b != -1) {
+            bytesRead++
+            if (bytesRead > maxBytes) {
+                throw ResponseSizeExceededException("Response payload exceeded limit of $maxBytes bytes")
+            }
+        }
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val n = delegate.read(b, off, len)
+        if (n > 0) {
+            bytesRead += n
+            if (bytesRead > maxBytes) {
+                throw ResponseSizeExceededException("Response payload exceeded limit of $maxBytes bytes")
+            }
+        }
+        return n
+    }
+
+    override fun skip(n: Long): Long {
+        val skipped = delegate.skip(n)
+        if (skipped > 0) {
+            bytesRead += skipped
+            if (bytesRead > maxBytes) {
+                throw ResponseSizeExceededException("Response payload exceeded limit of $maxBytes bytes")
+            }
+        }
+        return skipped
+    }
+
+    override fun available(): Int = delegate.available()
+    override fun close() = delegate.close()
+}
+
+private class DecompressLimitingInputStream(
+    private val delegate: InputStream,
+    private val wireStream: BoundedCountingInputStream,
+    private val maxDecodedBytes: Long,
+    private val maxRatio: Double,
+) : InputStream() {
+    var decodedBytes: Long = 0L
+        private set
+
+    private fun checkLimits(added: Long) {
+        decodedBytes += added
+        if (decodedBytes > maxDecodedBytes) {
+            throw ResponseSizeExceededException(
+                "Decoded response ($decodedBytes bytes) exceeded limit ($maxDecodedBytes bytes)"
+            )
+        }
+        val wireRead = wireStream.bytesRead
+        if (wireRead > 0 && decodedBytes > 64 * 1024L && decodedBytes > (wireRead * maxRatio)) {
+            throw ResponseSizeExceededException(
+                "Decompressed response exceeded compression ratio limit of ${maxRatio}x"
+            )
+        }
+    }
+
+    override fun read(): Int {
+        val b = delegate.read()
+        if (b != -1) {
+            checkLimits(1L)
+        }
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val n = delegate.read(b, off, len)
+        if (n > 0) {
+            checkLimits(n.toLong())
+        }
+        return n
+    }
+
+    override fun skip(n: Long): Long {
+        val skipped = delegate.skip(n)
+        if (skipped > 0) {
+            checkLimits(skipped)
+        }
+        return skipped
+    }
+
+    override fun available(): Int = delegate.available()
+    override fun close() = delegate.close()
+}
+
 val DEFAULT_JSON: Json = Json {
-    prettyPrint = true
+    prettyPrint = false
     isLenient = true
     ignoreUnknownKeys = true
 }
