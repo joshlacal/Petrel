@@ -773,15 +773,15 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
     private static func base64SextetValue(_ byte: UInt8) -> UInt8? {
         switch byte {
-        case Character("A").asciiValue! ... Character("Z").asciiValue!:
-            return byte - Character("A").asciiValue!
-        case Character("a").asciiValue! ... Character("z").asciiValue!:
-            return byte - Character("a").asciiValue! + 26
-        case Character("0").asciiValue! ... Character("9").asciiValue!:
-            return byte - Character("0").asciiValue! + 52
-        case Character("+").asciiValue!:
+        case 65 ... 90:
+            return byte - 65
+        case 97 ... 122:
+            return byte - 97 + 26
+        case 48 ... 57:
+            return byte - 48 + 52
+        case 43:
             return 62
-        case Character("/").asciiValue!:
+        case 47:
             return 63
         default:
             return nil
