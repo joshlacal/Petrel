@@ -13,15 +13,27 @@ object {{ union_name }}Serializer : kotlinx.serialization.KSerializer<{{ union_n
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("{{ union_name | escapeStringLiteral }}")
 
+    {% for variant in variants %}
+    private val TYPE_{{ variant.short_name }} = kotlinx.serialization.json.JsonPrimitive("{{ variant.lexicon_ref | escapeStringLiteral }}")
+    {% endfor %}
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: {{ union_name }}) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             {% for variant in variants %}
             is {{ union_name }}.{{ variant.short_name }} -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.{{ variant.type }}.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("{{ variant.lexicon_ref | escapeStringLiteral }}")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.{{ variant.type }}.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_{{ variant.short_name }}
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_{{ variant.short_name }})
+                }
+                obj
             }
             {% endfor %}
             is {{ union_name }}.Unexpected -> value.value
@@ -37,10 +49,14 @@ object {{ union_name }}Serializer : kotlinx.serialization.KSerializer<{{ union_n
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): {{ union_name }} {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("{{ union_name }} can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return {{ union_name }}.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return {{ union_name }}.Unexpected(element)
 
         return when (type) {
             {% for variant in variants %}

@@ -29,14 +29,24 @@ object AppBskyLabelerServiceLabelsUnionSerializer : kotlinx.serialization.KSeria
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyLabelerServiceLabelsUnion")
 
+    private val TYPE_SelfLabels = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyLabelerServiceLabelsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyLabelerServiceLabelsUnion.SelfLabels -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SelfLabels
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SelfLabels)
+                }
+                obj
             }
             is AppBskyLabelerServiceLabelsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -51,10 +61,14 @@ object AppBskyLabelerServiceLabelsUnionSerializer : kotlinx.serialization.KSeria
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyLabelerServiceLabelsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyLabelerServiceLabelsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyLabelerServiceLabelsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyLabelerServiceLabelsUnion.Unexpected(element)
 
         return when (type) {
             "com.atproto.label.defs#selfLabels" -> AppBskyLabelerServiceLabelsUnion.SelfLabels(

@@ -32,20 +32,39 @@ object ChatBskyModerationDefsConvoViewKindUnionSerializer : kotlinx.serializatio
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ChatBskyModerationDefsConvoViewKindUnion")
 
+    private val TYPE_DirectConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.defs#directConvo")
+    private val TYPE_GroupConvo = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.defs#groupConvo")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ChatBskyModerationDefsConvoViewKindUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ChatBskyModerationDefsConvoViewKindUnion.DirectConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationDefsDirectConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.defs#directConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationDefsDirectConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DirectConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DirectConvo)
+                }
+                obj
             }
             is ChatBskyModerationDefsConvoViewKindUnion.GroupConvo -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ChatBskyModerationDefsGroupConvo.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("chat.bsky.moderation.defs#groupConvo")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ChatBskyModerationDefsGroupConvo.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_GroupConvo
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_GroupConvo)
+                }
+                obj
             }
             is ChatBskyModerationDefsConvoViewKindUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -60,10 +79,14 @@ object ChatBskyModerationDefsConvoViewKindUnionSerializer : kotlinx.serializatio
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ChatBskyModerationDefsConvoViewKindUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ChatBskyModerationDefsConvoViewKindUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ChatBskyModerationDefsConvoViewKindUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ChatBskyModerationDefsConvoViewKindUnion.Unexpected(element)
 
         return when (type) {
             "chat.bsky.moderation.defs#directConvo" -> ChatBskyModerationDefsConvoViewKindUnion.DirectConvo(

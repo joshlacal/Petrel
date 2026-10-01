@@ -29,14 +29,24 @@ object AppBskyEmbedGalleryViewItemsUnionSerializer : kotlinx.serialization.KSeri
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyEmbedGalleryViewItemsUnion")
 
+    private val TYPE_ViewImage = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#viewImage")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyEmbedGalleryViewItemsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyEmbedGalleryViewItemsUnion.ViewImage -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedGalleryViewImage.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#viewImage")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedGalleryViewImage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewImage
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewImage)
+                }
+                obj
             }
             is AppBskyEmbedGalleryViewItemsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -51,10 +61,14 @@ object AppBskyEmbedGalleryViewItemsUnionSerializer : kotlinx.serialization.KSeri
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyEmbedGalleryViewItemsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyEmbedGalleryViewItemsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyEmbedGalleryViewItemsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyEmbedGalleryViewItemsUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.embed.gallery#viewImage" -> AppBskyEmbedGalleryViewItemsUnion.ViewImage(
@@ -78,14 +92,24 @@ object AppBskyEmbedGalleryItemsUnionSerializer : kotlinx.serialization.KSerializ
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyEmbedGalleryItemsUnion")
 
+    private val TYPE_Image = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#image")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyEmbedGalleryItemsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyEmbedGalleryItemsUnion.Image -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedGalleryImage.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#image")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedGalleryImage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_Image
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_Image)
+                }
+                obj
             }
             is AppBskyEmbedGalleryItemsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -100,10 +124,14 @@ object AppBskyEmbedGalleryItemsUnionSerializer : kotlinx.serialization.KSerializ
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyEmbedGalleryItemsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyEmbedGalleryItemsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyEmbedGalleryItemsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyEmbedGalleryItemsUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.embed.gallery#image" -> AppBskyEmbedGalleryItemsUnion.Image(
