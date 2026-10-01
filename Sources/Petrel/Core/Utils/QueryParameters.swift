@@ -71,6 +71,18 @@ extension Int: QueryParameterConvertible {
     }
 }
 
+extension CID: QueryParameterConvertible {
+    func asQueryItem(name: String) -> URLQueryItem? {
+        return URLQueryItem(name: name, value: string)
+    }
+}
+
+extension ATProtocolDate: QueryParameterConvertible {
+    func asQueryItem(name: String) -> URLQueryItem? {
+        return URLQueryItem(name: name, value: iso8601String)
+    }
+}
+
 extension Optional where Wrapped: QueryParameterConvertible {
     func asQueryItem(name: String) -> URLQueryItem? {
         switch self {
