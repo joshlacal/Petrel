@@ -23,6 +23,8 @@ with a dated `0.2.0` heading only when the release tag is created.
 - Public installation documentation now targets Petrel 0.2.0 and the iOS 18/macOS 15 platform floors.
 - The 0.2.0 SPM release gate is explicitly Swift-scoped; Kotlin publication and parity remain outside this release candidate.
 - PetrelLoad rejects unsupported scenarios and invalid base URLs, propagates OAuth setup and verification failures, and exits nonzero when stress requests fail.
+- Spaces lexicons follow the October 1, 2026 alpha (atproto `679724ad`). Source-breaking renames: `ComAtprotoSimplespaceCreateSpace.Input.type` and `ComAtprotoSpaceListSpaces.Parameters.type` are now `spaceType`; `ComAtprotoSpaceNotifyWrite.Input.rev` and `ComAtprotoSpaceListRepos.Repo.rev` are now `repoRev`. `notifyWrite` adds optional `spaceRev`/`prevSpaceRev` and typed `SpaceNotFound`/`FutureRev` errors; `listRepos` entries add `spaceRev`, and its cursor is an exclusive space-revision checkpoint.
+- `SpaceCredentialManager` binds space credentials with HTTP Message Signatures instead of Spaces DPoP. The `getSpaceCredential` exchange signs `Authorization` with the fresh key's `did:key` as `keyid`; `get(url:space:audience:)` sends `Authorization: Atproto-Space`, `Atproto-Space-Audience` (the `repo` DID, else the space authority DID), and a signature over both. A `401 CredentialRevoked` response drops the cached credential. Ordinary OAuth DPoP is unchanged.
 
 ### Fixed
 - Generated wire discriminators preserve exact lexicon fragments, including underscore-bearing Bluemoji format identifiers.

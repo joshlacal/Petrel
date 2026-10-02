@@ -5,6 +5,7 @@
 
 import Crypto
 import Foundation
+import PetrelCrypto
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
@@ -72,64 +73,91 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     }
 }
 
-// MARK: - SpaceDPoP
+// MARK: - SpaceHTTPSignature
 
-enum SpaceDPoP {
-    private static func base64URLEncode(_ data: Data) -> String {
-        data.base64EncodedString()
-            .replacingOccurrences(of: "+", with: "-")
-            .replacingOccurrences(of: "/", with: "_")
-            .replacingOccurrences(of: "=", with: "")
+/// HTTP Message Signatures (RFC 9421) binding atproto Spaces requests to a
+/// credential key, replacing the earlier Spaces DPoP binding. Ordinary OAuth
+/// DPoP is unrelated and unchanged.
+///
+/// Two forms, matching the reference `createSpaceSigHeaders`:
+/// - Delegation exchange (`getSpaceCredential`): `Authorization: Bearer <token>`,
+///   covering `("authorization")` with `keyid` = the credential key's P-256 `did:key`.
+/// - Credential use: `Authorization: Atproto-Space <credential>` plus
+///   `Atproto-Space-Audience: <DID>`, covering
+///   `("authorization" "atproto-space-audience")`.
+///
+/// The signature base is the covered component lines followed by the
+/// `"@signature-params"` line, joined by LF with no trailing LF, signed with
+/// `ecdsa-p256-sha256` and carried as the 64-byte raw `r || s` value in
+/// standard base64.
+enum SpaceHTTPSignature {
+    static let label = "atproto-space"
+
+    /// The credential key's public half as a P-256 `did:key`.
+    static func keyID(for key: P256.Signing.PrivateKey) -> String {
+        P256DIDKey(publicKey: key.publicKey).value
     }
 
-    /// dpop+jwt proof signed by `key`. `accessToken` non-nil adds `ath`.
-    static func proof(
-        key: P256.Signing.PrivateKey,
-        htm: String,
-        htu: String,
-        accessToken: String?,
-        now: Date = .init()
-    ) throws -> String {
-        let x963 = key.publicKey.x963Representation
-        let xData = Data(x963.dropFirst().prefix(32))
-        let yData = Data(x963.suffix(32))
+    /// The inner list (with parameters) that follows `atproto-space=` in
+    /// `Signature-Input` and ends the signature base. `coversAudience == false`
+    /// is the delegation-exchange form, which must name its key.
+    static func signatureParams(keyID: String, coversAudience: Bool) -> String {
+        coversAudience
+            ? #"("authorization" "atproto-space-audience")"#
+            : #"("authorization");keyid="\#(keyID)""#
+    }
 
-        let headerDict: [String: Any] = [
-            "typ": "dpop+jwt",
-            "alg": "ES256",
-            "jwk": [
-                "kty": "EC",
-                "crv": "P-256",
-                "x": base64URLEncode(xData),
-                "y": base64URLEncode(yData),
-            ] as [String: Any],
-        ]
-
-        var payloadDict: [String: Any] = [
-            "jti": "\(UUID().uuidString)-\(UInt64.random(in: 0...UInt64.max))",
-            "htm": htm,
-            "htu": htu,
-            "iat": Int(now.timeIntervalSince1970),
-        ]
-
-        if let accessToken {
-            let hash = SHA256.hash(data: Data(accessToken.utf8))
-            payloadDict["ath"] = base64URLEncode(Data(hash))
+    static func signatureBase(
+        authorization: String,
+        audience: String?,
+        signatureParams: String
+    ) -> Data {
+        var lines = [#""authorization": "# + authorization.trimmingCharacters(in: .whitespacesAndNewlines)]
+        if let audience {
+            lines.append(#""atproto-space-audience": "# + audience.trimmingCharacters(in: .whitespacesAndNewlines))
         }
-
-        let headerData = try JSONSerialization.data(withJSONObject: headerDict, options: [])
-        let payloadData = try JSONSerialization.data(withJSONObject: payloadDict, options: [])
-
-        let headerB64 = base64URLEncode(headerData)
-        let payloadB64 = base64URLEncode(payloadData)
-
-        let signingInput = "\(headerB64).\(payloadB64)"
-        let signature = try key.signature(for: Data(signingInput.utf8))
-        let sigB64 = base64URLEncode(signature.rawRepresentation)
-
-        return "\(signingInput).\(sigB64)"
+        lines.append(#""@signature-params": "# + signatureParams)
+        return Data(lines.joined(separator: "\n").utf8)
     }
 
+    /// Request headers for a space request signed by `key`. Pass `audience`
+    /// when using a space credential; omit it for the delegation exchange.
+    static func headers(
+        key: P256.Signing.PrivateKey,
+        authorization: String,
+        audience: String?
+    ) throws -> [String: String] {
+        let params = signatureParams(keyID: keyID(for: key), coversAudience: audience != nil)
+        let base = signatureBase(authorization: authorization, audience: audience, signatureParams: params)
+        let signature = try P256WireSignature.sign(base, using: key)
+
+        var headers = [
+            "Authorization": authorization,
+            "Signature-Input": "\(label)=\(params)",
+            "Signature": "\(label)=:\(signature.base64EncodedString()):",
+        ]
+        if let audience {
+            headers["Atproto-Space-Audience"] = audience
+        }
+        return headers
+    }
+
+    /// The audience DID a credential-bearing request is bound to: the repo
+    /// owner's DID (`repo` query parameter) for repo operations, otherwise the
+    /// space authority's bare DID. Never a hostname or service identifier.
+    static func audience(for url: URL, space: SpaceRef) -> String {
+        if let repo = URLComponents(url: url, resolvingAgainstBaseURL: false)?
+            .queryItems?.first(where: { $0.name == "repo" })?.value,
+            !repo.isEmpty {
+            return repo
+        }
+        return space.spaceDID
+    }
+}
+
+// MARK: - SpaceCredentialJWT
+
+enum SpaceCredentialJWT {
     /// Decode a JWT payload without verification (for exp extraction).
     static func payload(ofJWT jwt: String) throws -> [String: Any] {
         let parts = jwt.split(separator: ".", omittingEmptySubsequences: false)
@@ -231,8 +259,8 @@ public actor SpaceCredentialManager {
         )
     }
 
-    /// Cached credential for the space, exchanging a fresh one when absent
-    /// or within 60s of expiry.
+    /// Cached credential for the space, exchanging a fresh one (with a fresh
+    /// key) when absent or within 60s of the credential's own `exp`.
     public func credential(for space: SpaceRef) async throws -> SpaceCredential {
         let now = Date()
         if let cached = cache[space], cached.expiresAt > now.addingTimeInterval(60) {
@@ -285,15 +313,27 @@ public actor SpaceCredentialManager {
         inFlight.removeValue(forKey: space)?.cancel()
     }
 
-    /// Performs an authenticated GET against an arbitrary repo host:
-    /// Authorization: DPoP <credential> plus a per-request DPoP proof with
-    /// htm/htu/iat/jti and ath = base64url(SHA256(credential)).
-    public func get(url: URL, space: SpaceRef) async throws -> (Data, HTTPURLResponse) {
+    /// Performs an authenticated GET with the space credential:
+    /// `Authorization: Atproto-Space <credential>`, `Atproto-Space-Audience`,
+    /// and an HTTP message signature over both, made with the credential key.
+    ///
+    /// - Parameter audience: The DID the request is addressed to. Defaults to
+    ///   the URL's `repo` query parameter (repo operations) or, without one,
+    ///   the space authority's DID (space-host operations).
+    ///
+    /// A `401 CredentialRevoked` response drops the cached credential so it is
+    /// never presented again; the response is returned to the caller unchanged
+    /// and nothing is retried here.
+    public func get(url: URL, space: SpaceRef, audience: String? = nil) async throws -> (Data, HTTPURLResponse) {
         guard Self.isSecureOrLoopback(url) else {
             throw SpaceCredentialError.insecureURL(url.absoluteString)
         }
         guard try await NetworkService.validateURL(url) else {
             throw SpaceCredentialError.insecureURL(url.absoluteString)
+        }
+        let audience = audience ?? SpaceHTTPSignature.audience(for: url, space: space)
+        guard DID.isValidDID(audience) else {
+            throw SpaceCredentialError.invalidSpaceRef("invalid space audience DID: \(audience)")
         }
 
         let cred = try await credential(for: space)
@@ -301,18 +341,16 @@ public actor SpaceCredentialManager {
             throw SpaceCredentialError.invalidKey
         }
 
-        let htu = canonicalHTU(url)
-        let dpopProof = try SpaceDPoP.proof(
-            key: privateKey,
-            htm: "GET",
-            htu: htu,
-            accessToken: cred.token
-        )
-
         var request = URLRequest(url: url)
         request.httpMethod = "GET"
-        request.setValue("DPoP \(cred.token)", forHTTPHeaderField: "Authorization")
-        request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
+        let headers = try SpaceHTTPSignature.headers(
+            key: privateKey,
+            authorization: "Atproto-Space \(cred.token)",
+            audience: audience
+        )
+        for (name, value) in headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
 
         let data: Data
         let response: URLResponse
@@ -326,6 +364,14 @@ public actor SpaceCredentialManager {
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SpaceCredentialError.invalidResponse
+        }
+        if httpResponse.statusCode == 401,
+           ATProtoErrorParser.parseGeneric(data: data, statusCode: 401)?.error == "CredentialRevoked",
+           cache[space]?.token == cred.token {
+            // A revoked credential is never presented again. Any replacement
+            // comes from a fresh delegation exchange, which the user's session
+            // and the authority must both still authorize.
+            cache.removeValue(forKey: space)
         }
         return (data, httpResponse)
     }
@@ -366,19 +412,19 @@ public actor SpaceCredentialManager {
             throw SpaceCredentialError.insecureURL(exchangeURL.absoluteString)
         }
 
-        let htu = canonicalHTU(exchangeURL)
-        let dpopProof = try SpaceDPoP.proof(
-            key: ephemeralKey,
-            htm: "POST",
-            htu: htu,
-            accessToken: nil
-        )
-
         var request = URLRequest(url: exchangeURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("Bearer \(delegationToken)", forHTTPHeaderField: "Authorization")
-        request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
+        // The signature's keyid (the fresh key's did:key) becomes the issued
+        // credential's cnf.kid.
+        let headers = try SpaceHTTPSignature.headers(
+            key: ephemeralKey,
+            authorization: "Bearer \(delegationToken)",
+            audience: nil
+        )
+        for (name, value) in headers {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
 
         let input = ComAtprotoSpaceGetSpaceCredential.Input(space: space)
         request.httpBody = try JSONEncoder().encode(input)
@@ -448,7 +494,7 @@ public actor SpaceCredentialManager {
         let output = try JSONDecoder().decode(ComAtprotoSpaceGetSpaceCredential.Output.self, from: data)
         let token = output.credential
 
-        let payload = try SpaceDPoP.payload(ofJWT: token)
+        let payload = try SpaceCredentialJWT.payload(ofJWT: token)
         guard let expValue = payload["exp"] else {
             throw SpaceCredentialError.invalidToken("Missing exp claim in credential JWT")
         }
@@ -470,21 +516,6 @@ public actor SpaceCredentialManager {
             expiresAt: expiresAt,
             keyRawRepresentation: ephemeralKey.rawRepresentation
         )
-    }
-
-    private func canonicalHTU(_ url: URL) -> String {
-        guard var comps = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return url.absoluteString
-        }
-        comps.scheme = comps.scheme?.lowercased()
-        comps.host = comps.host?.lowercased()
-        if (comps.scheme == "https" && comps.port == 443) || (comps.scheme == "http" && comps.port == 80) {
-            comps.port = nil
-        }
-        if comps.path.isEmpty { comps.path = "/" }
-        comps.fragment = nil
-        comps.query = nil
-        return comps.string ?? url.absoluteString
     }
 
     private func probeServerEvidence(spaceHost: URL) async -> String? {
