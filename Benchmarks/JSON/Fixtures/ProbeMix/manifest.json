@@ -1,0 +1,28 @@
+{
+  "fixtures": [
+    {
+      "id": "probe-booleans",
+      "file": "probe-booleans.json",
+      "modelKind": "records",
+      "bytes": 1463492,
+      "sha256": "b58fac93be175f97e82682dd147169cde827c997b2ab80d216b86e1da93803fd",
+      "note": "Original 32 binary extension records plus 300 scalar values per record; fixed Base64 work remains in both binaries"
+    },
+    {
+      "id": "probe-integers",
+      "file": "probe-integers.json",
+      "modelKind": "records",
+      "bytes": 1446916,
+      "sha256": "7aedc7448fb59f7f84f5d15b749e2d847eaeb46077808f0ca0f8a0c497aff9e0",
+      "note": "Original 32 binary extension records plus 300 scalar values per record; fixed Base64 work remains in both binaries"
+    },
+    {
+      "id": "probe-strings",
+      "file": "probe-strings.json",
+      "modelKind": "records",
+      "bytes": 1612292,
+      "sha256": "937609b341685618fffb02eeceb635ffc43560be3f03b37ca61fcf34b58f7a04",
+      "note": "Original 32 binary extension records plus 300 scalar values per record; fixed Base64 work remains in both binaries"
+    }
+  ]
+}

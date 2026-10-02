@@ -1,0 +1,6 @@
+.build/
+.swiftpm/
+Vendor/
+Results/
+Binaries/
+__pycache__/

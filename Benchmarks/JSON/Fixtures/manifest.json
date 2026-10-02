@@ -1,0 +1,142 @@
+{
+  "schemaVersion": 1,
+  "generatorSeed": 20260930,
+  "serialization": "UTF-8, ensure_ascii=false, compact separators, LF terminator; no BOM",
+  "fixtures": [
+    {
+      "id": "small-profile",
+      "file": "small-profile.json",
+      "category": "A",
+      "modelKind": "profile",
+      "swiftType": "AppBskyActorGetProfile.Output",
+      "bytes": 1017,
+      "sha256": "c4ec412d8e325ea25e27ca75ac58d992f8eb95d39e538610f1f54a42973b9daa",
+      "jsonValueNodes": 29,
+      "description": "One detailed profile with URLs, semantic identifiers, dates, viewer state and a pinned post.",
+      "provenance": "synthetic; generated from checked-in Petrel lexicon/model shapes"
+    },
+    {
+      "id": "medium-search",
+      "file": "medium-search.json",
+      "category": "B",
+      "modelKind": "search",
+      "swiftType": "AppBskyActorSearchActors.Output",
+      "bytes": 33567,
+      "sha256": "0d8428a6f299312d1d950b1a9864a8ed8377da986f0f459a1531a6080ede5d72",
+      "jsonValueNodes": 1003,
+      "description": "50 actor-search results with Unicode in one third of profiles.",
+      "provenance": "synthetic; generated from checked-in Petrel lexicon/model shapes",
+      "expectedTopLevelCounts": {
+        "actors": 50
+      }
+    },
+    {
+      "id": "large-feed",
+      "file": "large-feed.json",
+      "category": "C",
+      "modelKind": "timeline",
+      "swiftType": "AppBskyFeedGetTimeline.Output",
+      "bytes": 467235,
+      "sha256": "a977ecf94e154c4b23faaebfe78c66a547e1ecd2c51aa950308e5cb1115e9a10",
+      "jsonValueNodes": 17386,
+      "description": "100 feed entries: images, link cards, quotes, quotes with images, facets, replies, reposts, labels, viewer state.",
+      "provenance": "synthetic; generated from checked-in Petrel lexicon/model shapes",
+      "expectedTopLevelCounts": {
+        "feed": 100,
+        "postsWithEmbed": 80,
+        "feedItemsWithReply": 25,
+        "feedItemsWithReason": 17,
+        "knownPostRecords": 100,
+        "unknownPostRecords": 0
+      }
+    },
+    {
+      "id": "very-large-feed",
+      "file": "very-large-feed.json",
+      "category": "D",
+      "modelKind": "timeline",
+      "swiftType": "AppBskyFeedGetTimeline.Output",
+      "bytes": 3738557,
+      "sha256": "84b60f969e939bea7281373c175647ed5934dc3cb2ec04c490e177f5966a989a",
+      "jsonValueNodes": 138997,
+      "description": "Expanded timeline with 800 varied entries. Stress workload larger than a normal endpoint page.",
+      "provenance": "synthetic; generated from checked-in Petrel lexicon/model shapes",
+      "expectedTopLevelCounts": {
+        "feed": 800,
+        "postsWithEmbed": 640,
+        "feedItemsWithReply": 200,
+        "feedItemsWithReason": 134,
+        "knownPostRecords": 800,
+        "unknownPostRecords": 0
+      }
+    },
+    {
+      "id": "unicode-feed",
+      "file": "unicode-feed.json",
+      "category": "E",
+      "modelKind": "timeline",
+      "swiftType": "AppBskyFeedGetTimeline.Output",
+      "bytes": 546809,
+      "sha256": "2abb67d22081143d26b0a59e6d77e2af2efa179ab982f1d3e610343acfd375e0",
+      "jsonValueNodes": 17576,
+      "description": "100 feed entries with CJK, Arabic, Hebrew, Hangul, emoji, ZWJ, modifiers, decomposed accents, URLs, and valid UTF-8 facet offsets.",
+      "provenance": "synthetic; generated from checked-in Petrel lexicon/model shapes",
+      "expectedTopLevelCounts": {
+        "feed": 100,
+        "postsWithEmbed": 80,
+        "feedItemsWithReply": 25,
+        "feedItemsWithReason": 17,
+        "knownPostRecords": 100,
+        "unknownPostRecords": 0
+      }
+    },
+    {
+      "id": "base64-records",
+      "file": "base64-records.json",
+      "category": "F",
+      "modelKind": "records",
+      "swiftType": "ComAtprotoRepoListRecords.Output",
+      "bytes": 1410148,
+      "sha256": "2d1ff3906347e8d87f535d6e9d8ebb3e9d60a4eec5241ea72ae6fd463041e4c9",
+      "jsonValueNodes": 483,
+      "description": "32 synthetic extension records containing exact IPLD $bytes objects (32 KiB each); real Petrel bytes path, not typical feed image transport.",
+      "provenance": "synthetic; generated from checked-in Petrel lexicon/model shapes",
+      "expectedTopLevelCounts": {
+        "records": 32,
+        "decodedPayloadBytes": 1048576
+      }
+    },
+    {
+      "id": "difficult-feed",
+      "file": "difficult-feed.json",
+      "category": "G",
+      "modelKind": "timeline",
+      "swiftType": "AppBskyFeedGetTimeline.Output",
+      "bytes": 537455,
+      "sha256": "eccf84a63946398eb3693c800374a679e754750a636419fedc3d29aebc30d67c",
+      "jsonValueNodes": 22039,
+      "description": "Nested dynamic dictionaries and arrays, known/unknown records, unknown union variants, explicit nulls, and optional/absent fields.",
+      "provenance": "synthetic; generated from checked-in Petrel lexicon/model shapes",
+      "expectedTopLevelCounts": {
+        "feed": 100,
+        "postsWithEmbed": 87,
+        "feedItemsWithReply": 25,
+        "feedItemsWithReason": 29,
+        "knownPostRecords": 80,
+        "unknownPostRecords": 20
+      }
+    }
+  ],
+  "componentFixtures": [
+    {
+      "file": "base64-payload.bin",
+      "bytes": 32768,
+      "sha256": "d3cd5d109234eaaec77a0750ee8fd0919f4c615275bf2b08e12d81e8973bf50b"
+    },
+    {
+      "file": "base64-payload.txt",
+      "bytes": 43692,
+      "sha256": "e937354d9499827cf45c115530fd1ee2cb3fb7ac64da8042d91f287d46ec3e28"
+    }
+  ]
+}
