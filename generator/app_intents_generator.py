@@ -116,7 +116,7 @@ import aiofiles
 
 from cycle_detector import CycleDetector
 from main import DEFAULT_EXCLUDED_NAMESPACES, load_lexicons, lower_camel
-from templates import TemplateManager
+from templates import TemplateManager, escape_swift_string_literal
 from type_converter import CurationError, intent_entity_extraction, intent_facing_type
 from utils import convert_ref, convert_to_camel_case
 
@@ -212,7 +212,7 @@ def client_path(lexicon_id: str) -> str:
 
 
 def _escape_swift_string(s: str) -> str:
-    return s.replace('\\', '\\\\').replace('"', '\\"').replace('\n', ' ')
+    return escape_swift_string_literal(s)
 
 
 def _display_noun(display_type_name: str) -> str:
@@ -1436,7 +1436,7 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
             'swift_type': swift_type,
             'optional': overall_optional,
             'per_source_expr': per_source_expr,
-            'title': prop_cfg['title'] or _default_property_title(swift_name),
+            'title': _escape_swift_string(prop_cfg['title'] or _default_property_title(swift_name)),
         })
 
     # --- Custom (bridged) properties: manifest-authored Swift expressions for
@@ -1455,7 +1455,7 @@ def resolve_entity(lex_index: LexiconIndex, entity_cfg: dict, resolved_intents: 
             'swift_name': cp_name,
             'swift_type': cp_type,
             'optional': bool(cp.get('optional', False)),
-            'title': cp.get('title') or _default_property_title(cp_name),
+            'title': _escape_swift_string(cp.get('title') or _default_property_title(cp_name)),
             'per_source_expr': {src['qualified']: cp_expr for src in sources},
         })
 

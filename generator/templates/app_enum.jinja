@@ -5,14 +5,14 @@ import AppIntents
 @available({{ availability }}, *)
 enum {{ enum_name }}: String, AppEnum {
 {%- for value, label in values %}
-    case {{ value | enum_case }} = "{{ value }}"
+    case {{ value | enum_case | sanitizeKeyword }} = "{{ value | escapeStringLiteral }}"
 {%- endfor %}
 
     static var typeDisplayRepresentation: TypeDisplayRepresentation = "{{ enum_name }}"
 
     static var caseDisplayRepresentations: [{{ enum_name }}: DisplayRepresentation] = [
 {%- for value, label in values %}
-        .{{ value | enum_case }}: "{{ label }}",
+        .{{ value | enum_case | sanitizeKeyword }}: "{{ label | escapeStringLiteral }}",
 {%- endfor %}
     ]
 }

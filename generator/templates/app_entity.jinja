@@ -47,7 +47,7 @@ struct {{ name }}Query: EntityQuery{% if string_query %}, EntityStringQuery{% en
 }
 {% if syncable %}
 
-@available(iOS 27.0, *)
+@available(anyAppleOS 27.0, *)
 extension {{ name }}: SyncableEntity {}
 {% endif %}
 {% if indexed %}

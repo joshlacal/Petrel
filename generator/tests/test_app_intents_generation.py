@@ -12,7 +12,6 @@ import unittest
 GENERATOR_DIR = pathlib.Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(GENERATOR_DIR))
 
-from app_intents_generator import AppIntentsGenerator
 from main import run_manifest
 from type_converter import CurationError, intent_entity_extraction, intent_facing_type
 

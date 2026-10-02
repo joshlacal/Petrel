@@ -277,6 +277,14 @@ def intent_facing_type(prop: Dict[str, Any], enum_type_name: Optional[str] = Non
     """
     prop_type = prop.get('type')
 
+    # These formats now produce dedicated core types. Treating them as a
+    # String would emit a Parameters/Input initializer with the wrong type.
+    # Keep them outside App Intents until an explicit bridge is implemented.
+    if prop_type == 'string' and ('enum' in prop or prop.get('format') == 'space-ref'):
+        raise CurationError(
+            "closed string enums and space-ref require an explicit App Intents bridge"
+        )
+
     if prop_type == 'string' and prop.get('knownValues'):
         if not enum_type_name:
             raise CurationError(
@@ -346,6 +354,8 @@ def intent_entity_extraction(prop: Dict[str, Any]) -> Optional[Dict[str, str]]:
     Callers must turn None into a CurationError that names the offending
     property for context.
     """
+    if prop.get('type') == 'string' and 'enum' in prop:
+        return None
     if prop.get('type') == 'integer':
         return {
             'swift_type': 'Int',
