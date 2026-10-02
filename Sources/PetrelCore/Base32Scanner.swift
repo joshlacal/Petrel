@@ -106,7 +106,7 @@ enum Base32 {
             let n = u.count
             guard n >= 1, n <= 200 else { return nil }
             var result = Data(count: n * 5 / 8)
-            let complete = result.withUnsafeMutableBytes { raw -> Bool in
+            let complete = result.withUnsafeMutableBytes { (raw: UnsafeMutableRawBufferPointer) -> Bool in
                 var bits = 0
                 var value: UInt32 = 0
                 var written = 0

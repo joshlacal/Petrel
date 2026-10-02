@@ -102,6 +102,7 @@ private func outcome(_ body: () async throws -> AppBskyFeedGetTimeline.Output) a
 
 // MARK: - Splitter
 
+#if compiler(>=6.2)
 @Suite("JSONTopLevelArraySplitter")
 struct JSONTopLevelArraySplitterTests {
     private func elements(_ json: String, _ key: String = "feed") -> [String]? {
@@ -185,6 +186,18 @@ struct JSONTopLevelArraySplitterTests {
     }
 }
 
+#else
+@Suite("JSONTopLevelArraySplitter fallback")
+struct JSONTopLevelArraySplitterTests {
+    @Test("Compilers without Span decline splitting and leave decoding to Foundation")
+    func declinesUnavailableSplitter() {
+        for json in [#"{"feed":[]}"#, #"{"feed":[{"a":1}]}"#, #"{"feed":[{"a":tru}]}"#] {
+            #expect(JSONTopLevelArraySplitter.split(Data(json.utf8), arrayKey: "feed") == nil)
+        }
+    }
+}
+#endif
+
 // MARK: - Parallel decode equivalence
 
 @Suite("XRPC parallel array decoding")
@@ -214,14 +227,22 @@ struct XRPCParallelArrayDecodingTests {
         var before = XRPCResponseDecoding.statistics()
         _ = try await decodeTimeline(large, forced(chunks: 4))
         var after = XRPCResponseDecoding.statistics()
+        #if compiler(>=6.2)
         #expect(after.parallelDecodes >= before.parallelDecodes + 1)
+        #else
+        #expect(after.splitterDeclined >= before.splitterDeclined + 1)
+        #endif
 
         var thresholds = forced(chunks: 4)
         thresholds.parallelMinimumElements = 8
         before = XRPCResponseDecoding.statistics()
         _ = try await decodeTimeline(small, thresholds)
         after = XRPCResponseDecoding.statistics()
+        #if compiler(>=6.2)
         #expect(after.belowThreshold >= before.belowThreshold + 1)
+        #else
+        #expect(after.splitterDeclined >= before.splitterDeclined + 1)
+        #endif
 
         before = XRPCResponseDecoding.statistics()
         _ = try? await decodeTimeline(Data("\u{FEFF}".utf8) + large, forced(chunks: 4))
@@ -303,6 +324,7 @@ struct XRPCParallelArrayDecodingTests {
         #expect(!((ComAtprotoServerDescribeServer.Output.self as Any.Type) is any XRPCParallelArrayDecodable.Type))
     }
 
+    #if compiler(>=6.2)
     @Test("Prototype decode (array blanked to []) plus elements reassembles Output.init(from:)'s value")
     func prototypeAssembly() throws {
         for cursor in [#""cursor":"abc","#, #""cursor":42,"#, #""cursor":null,"#, ""] {
@@ -323,6 +345,7 @@ struct XRPCParallelArrayDecodingTests {
             try XRPCParallelArrayDecoder.decodePrototype(AppBskyFeedGetTimeline.Output.self, from: broken, array: layout.array)
         }
     }
+    #endif
 }
 
 // MARK: - Cancellation
