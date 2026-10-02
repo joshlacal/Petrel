@@ -243,12 +243,40 @@ public struct CID: Equatable, Hashable, Codable, Sendable, CustomStringConvertib
 
     /// Returns the full binary representation of the CID (version + codec + multihash)
     public var bytes: Data {
-        Data([CID.version, codec.rawValue]) + multihash.bytes
+        var result = Data(capacity: 4 + multihash.digest.count)
+        result.append(CID.version)
+        result.append(codec.rawValue)
+        result.append(multihash.algorithm)
+        result.append(multihash.length)
+        result.append(multihash.digest)
+        return result
     }
 
     /// Returns the base32 string representation (e.g., "bafy...")
+    ///
+    /// Written directly into the string's storage: `"b"` followed by the lowercase
+    /// RFC 4648 base32 (no padding) of version, codec, multihash algorithm, length and
+    /// digest. Byte-identical to the former `"b" + base32Encode(bytes).lowercased()`.
     public var string: String {
-        "b" + base32Encode(bytes).lowercased()
+        let digest = multihash.digest
+        let byteCount = 4 + digest.count
+        let header: (UInt8, UInt8, UInt8, UInt8) = (CID.version, codec.rawValue, multihash.algorithm, multihash.length)
+        return String(unsafeUninitializedCapacity: 1 + Base32.encodedCount(byteCount)) { output in
+            output[0] = 0x62 // "b"
+            var encoder = Base32.Encoder()
+            var written = 1
+            encoder.append(header.0, into: output, at: &written)
+            encoder.append(header.1, into: output, at: &written)
+            encoder.append(header.2, into: output, at: &written)
+            encoder.append(header.3, into: output, at: &written)
+            digest.withUnsafeBytes { raw in
+                for byte in raw {
+                    encoder.append(byte, into: output, at: &written)
+                }
+            }
+            encoder.finish(into: output, at: &written)
+            return written
+        }
     }
 
     public var description: String {
@@ -276,6 +304,20 @@ public struct CID: Equatable, Hashable, Codable, Sendable, CustomStringConvertib
     }
 
     public static func parse(_ cidString: String) throws -> CID {
+        // Fast path: ASCII bytes decoded through a case-folding table into a stack
+        // buffer. It only ever *accepts*; any input it does not fully accept (wrong
+        // prefix or length, a byte outside the base32 alphabet, including the
+        // non-ASCII lookalikes that the legacy `uppercased()`/`lowercased()` round trip
+        // folds to ASCII, or a structurally invalid CID) is re-parsed below, which
+        // decides acceptance and throws the legacy error.
+        if let cid = fastParse(cidString) {
+            return cid
+        }
+        return try legacyParse(cidString)
+    }
+
+    /// The original parser, unchanged; the exact fallback for `parse(_:)`.
+    static func legacyParse(_ cidString: String) throws -> CID {
         // Input validation
         guard !cidString.isEmpty else {
             throw CIDParseError.invalidPrefix("CID string cannot be empty")
@@ -292,7 +334,7 @@ public struct CID: Equatable, Hashable, Codable, Sendable, CustomStringConvertib
 
         let base32Part = String(cidString.dropFirst())
 
-        guard let cidBytes = base32Decode(base32Part.uppercased()) else {
+        guard let cidBytes = legacyBase32Decode(base32Part.uppercased()) else {
             throw CIDParseError.invalidBase32Encoding
         }
 
@@ -876,7 +918,27 @@ private let base32Lookup: [UInt8: UInt8] = {
 }()
 
 /// Encodes data to a Base32 string (lowercase, no padding)
+///
+/// Table-free byte encoder writing straight into the string's storage; the output
+/// is byte-identical to `legacyBase32Encode(_:)`.
 public func base32Encode(_ data: Data) -> String {
+    let count = data.count
+    guard count > 0 else { return "" }
+    return String(unsafeUninitializedCapacity: Base32.encodedCount(count)) { output in
+        var encoder = Base32.Encoder()
+        var written = 0
+        data.withUnsafeBytes { raw in
+            for byte in raw {
+                encoder.append(byte, into: output, at: &written)
+            }
+        }
+        encoder.finish(into: output, at: &written)
+        return written
+    }
+}
+
+/// The original Character-indexed encoder, kept as the reference implementation.
+func legacyBase32Encode(_ data: Data) -> String {
     var result = ""
     var bits = 0
     var value: UInt32 = 0 // Use UInt32 to avoid overflow during shifts
@@ -903,7 +965,20 @@ public func base32Encode(_ data: Data) -> String {
 }
 
 /// Decodes a Base32 string (lowercase or uppercase, no padding) to data
+///
+/// Fast path for ASCII input of 1...200 bytes made only of base32 letters (either
+/// case) and digits 2-7: a case-folding byte decode with no case-mapped copy and no
+/// dictionary. Every other input, including non-ASCII characters that
+/// `lowercased()` folds to ASCII (KELVIN SIGN to "k"), takes the original code.
 public func base32Decode(_ string: String) -> Data? {
+    if let data = Base32.fastDecode(string) {
+        return data
+    }
+    return legacyBase32Decode(string)
+}
+
+/// The original decoder, unchanged; the exact fallback for `base32Decode(_:)`.
+func legacyBase32Decode(_ string: String) -> Data? {
     // Input validation
     guard !string.isEmpty else {
         return nil

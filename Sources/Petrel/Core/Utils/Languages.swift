@@ -18,9 +18,30 @@ public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Senda
         return languageTag
     }
 
+    /// The parsed language. Built on access from the wire tag when this container
+    /// came from a string, so decoding never constructs a `Locale.Language` (an ICU
+    /// round trip per `langs` element that decoding, re-encoding, `==` and hashing
+    /// never read). `Locale.Language(identifier:)` is a pure function of the tag, so
+    /// the derived value equals the one the initializer used to store eagerly.
+    /// Setting it behaves as before: the explicit value is stored and the wire tag
+    /// is cleared.
     public var lang: Locale.Language {
-        didSet { wireTag = nil }
+        get {
+            if let explicitLanguage {
+                return explicitLanguage.lang
+            }
+            return Locale.Language(bcp47LanguageTag: wireTag ?? "")
+        }
+        set {
+            explicitLanguage = LanguageBox(newValue)
+            wireTag = nil
+        }
     }
+
+    /// A `Locale.Language` given explicitly (`init(lang:)` or the `lang` setter).
+    /// Boxed so the container stays small (`Locale.Language` is 96 bytes inline).
+    /// Exactly one of `explicitLanguage` and `wireTag` is non-nil.
+    private var explicitLanguage: LanguageBox?
 
     /// The BCP-47 tag exactly as it was written, when this container came from a
     /// string (wire record or caller-supplied code).
@@ -35,25 +56,29 @@ public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Senda
 
     /// The BCP-47 tag for this language, preserving region/script subtags when known.
     public var languageTag: String {
-        wireTag ?? lang.languageCode?.identifier ?? lang.minimalIdentifier
+        if let wireTag {
+            return wireTag
+        }
+        let language = self.lang
+        return language.languageCode?.identifier ?? language.minimalIdentifier
     }
 
     /// Standard initializer
     public init(lang: Locale.Language) {
-        self.lang = lang
+        explicitLanguage = LanguageBox(lang)
         wireTag = nil
     }
 
     /// Convenience initializer with String
     public init(languageCode: String) {
-        lang = Locale.Language(bcp47LanguageTag: languageCode)
+        explicitLanguage = nil
         wireTag = languageCode
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let languageTag = try container.decode(String.self)
-        lang = Locale.Language(bcp47LanguageTag: languageTag)
+        explicitLanguage = nil
         wireTag = languageTag
     }
 
@@ -68,6 +93,15 @@ public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Senda
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(languageTag)
+    }
+}
+
+/// Immutable box for an explicitly supplied `Locale.Language`.
+private final class LanguageBox: Sendable {
+    let lang: Locale.Language
+
+    init(_ lang: Locale.Language) {
+        self.lang = lang
     }
 }
 

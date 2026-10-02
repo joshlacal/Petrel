@@ -107,6 +107,22 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     public init(uriString: String) throws {
         originalString = uriString
 
+        // Fast path: one byte pass over the public grammar, each validator run once.
+        // Anything it cannot decide exactly (space URIs, extra segments, non-ASCII,
+        // trailing line terminators, invalid input) falls through to the unchanged
+        // parser below, which also produces the legacy error text.
+        if let parsed = LeafScan.parsePublicATURI(uriString) {
+            authority = parsed.authority
+            collection = parsed.collection
+            recordKey = parsed.recordKey
+            isSpace = false
+            spaceDID = nil
+            spaceType = nil
+            skey = nil
+            authorDID = parsed.authorityIsDID ? parsed.authority : nil
+            return
+        }
+
         guard uriString.hasPrefix("at://"),
               uriString.utf8.count <= 8192
         else {
@@ -125,11 +141,14 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
         }
 
         let authorityStr = String(components[0])
-        guard DID.isValidDID(authorityStr) || Handle.isValidHandle(authorityStr) else {
+        // The authority's DID check is computed once and reused for `authorDID` /
+        // `spaceDID` (same string, deterministic validator).
+        let authorityIsDID = DID.isValidDID(authorityStr)
+        guard authorityIsDID || Handle.isValidHandle(authorityStr) else {
             throw ATProtocolError.invalidURI("Invalid authority in AT URI: \(authorityStr)")
         }
 
-        let parsed = try ATProtocolURI.parseSegments(components)
+        let parsed = try ATProtocolURI.parseSegments(components, authorityIsDID: authorityIsDID)
         authority = parsed.authority
         collection = parsed.collection
         recordKey = parsed.recordKey
@@ -159,7 +178,7 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     /// Assigning positionally without checking for the `space` marker reports the
     /// marker as the collection and silently discards the space's `skey`, so the
     /// two are separated here. `segments[0]` is the authority.
-    private static func parseSegments(_ segments: [Substring]) throws -> ParsedURI {
+    private static func parseSegments(_ segments: [Substring], authorityIsDID: Bool) throws -> ParsedURI {
         let authority = String(segments[0])
         let path = segments.dropFirst().map(String.init)
 
@@ -197,7 +216,7 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
                 spaceDID: nil,
                 spaceType: nil,
                 skey: nil,
-                authorDID: DID.isValidDID(authority) ? authority : nil
+                authorDID: authorityIsDID ? authority : nil
             )
         }
 
@@ -213,7 +232,7 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             collection: segment(4),
             recordKey: segment(5),
             isSpace: true,
-            spaceDID: DID.isValidDID(authority) ? authority : nil,
+            spaceDID: authorityIsDID ? authority : nil,
             spaceType: segment(1).flatMap { NSID.isValidNSID($0) ? $0 : nil },
             skey: segment(2),
             authorDID: author.flatMap { DID.isValidDID($0) ? $0 : nil }
@@ -811,10 +830,39 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 // MARK: - DID Identifier
 
 public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
-    public let method: String
-    public let authority: String
-    public let segments: [String]
+    /// The validated DID exactly as given. Every other field is a deterministic
+    /// function of it, so it is the only stored property: `method`, `authority` and
+    /// `segments` are derived on access (no split or allocation while decoding), and
+    /// equality and hashing compare this string.
     private let originalString: String
+
+    /// The DID method (`plc` in `did:plc:abc`). Derived on access.
+    public var method: String {
+        components.method
+    }
+
+    /// The first colon-separated segment of the method-specific identifier. May be
+    /// empty (e.g. `did:method::x`). Derived on access.
+    public var authority: String {
+        components.authority
+    }
+
+    /// The remaining colon-separated segments of the method-specific identifier.
+    /// Derived on access.
+    public var segments: [String] {
+        components.segments
+    }
+
+    /// The legacy decomposition, unchanged: the validated grammar guarantees a
+    /// `did:` prefix, a non-empty method and at least one byte of identifier, so
+    /// there are always at least two components.
+    private var components: (method: String, authority: String, segments: [String]) {
+        let components = originalString.dropFirst(4).split(separator: ":", omittingEmptySubsequences: false)
+        let method = String(components[0])
+        let authority = components.count > 1 ? String(components[1]) : ""
+        let segments = components.count > 2 ? components.dropFirst(2).map { String($0) } : []
+        return (method, authority, segments)
+    }
 
     /// Per https://atproto.com/specs/did the method must be lowercase letters, the
     /// method-specific identifier allows [a-zA-Z0-9._:%-] (including empty colon-separated
@@ -831,8 +879,6 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     }
 
     public init(didString: String) throws {
-        originalString = didString
-
         guard didString.utf8.count <= 2048,
               DID.isValidDID(didString)
         else {
@@ -840,18 +886,28 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         }
 
         // The regex guarantees a "did:" prefix, a non-empty method, and at least one
-        // character of method-specific identifier (so components.count >= 2).
-        let components = didString.dropFirst(4).split(separator: ":", omittingEmptySubsequences: false)
-
-        method = String(components[0])
-        // The method-specific identifier may contain empty colon-separated segments
-        // (e.g. "did:method::."), so the authority segment may legitimately be empty.
-        authority = components.count > 1 ? String(components[1]) : ""
-        segments = components.count > 2 ? components.dropFirst(2).map { String($0) } : []
+        // character of method-specific identifier (so the derived components always
+        // number at least two). The method-specific identifier may contain empty
+        // colon-separated segments (e.g. "did:method::."), so the derived authority
+        // may legitimately be empty.
+        originalString = didString
     }
 
     /// Gate a space URI's authority and author on being well-formed DIDs, as the space grammar requires.
     public static func isValidDID(_ did: String) -> Bool {
+        switch LeafScan.didVerdict(did) {
+        case .valid:
+            return true
+        case .invalid:
+            return false
+        case .undecided:
+            return isValidDIDRegex(did)
+        }
+    }
+
+    /// The original regex validator, kept as the exact fallback for input the byte
+    /// scanner leaves undecided (a trailing line terminator, which ICU's `$` accepts).
+    static func isValidDIDRegex(_ did: String) -> Bool {
         guard !did.isEmpty, did.utf8.count <= 2048, did.allSatisfy({ $0.isASCII }) else {
             return false
         }
@@ -869,12 +925,12 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         return originalString
     }
 
+    /// The DID string. This used to rebuild `did:{method}:{authority}[:{segments}]`;
+    /// for every string the validator accepts, splitting on ":" without omitting
+    /// empty pieces and re-joining with ":" is the identity, so the rebuild always
+    /// equalled the original string, which is now returned directly.
     public func didString() -> String {
-        var didString = "did:\(method):\(authority)"
-        if !segments.isEmpty {
-            didString += ":" + segments.joined(separator: ":")
-        }
-        return didString
+        originalString
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -882,8 +938,16 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             return false
         }
 
-        return method == otherDID.method && authority == otherDID.authority
-            && segments == otherDID.segments
+        // (method, authority, segments) is a bijective function of the validated
+        // string, so component equality is string equality.
+        return originalString == otherDID.originalString
+    }
+
+    /// Equality on the original string. Previously synthesized over
+    /// (method, authority, segments, originalString), all of which are determined
+    /// by the original string, so the relation is unchanged.
+    public static func == (lhs: DID, rhs: DID) -> Bool {
+        lhs.originalString == rhs.originalString
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -895,10 +959,11 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         return URLQueryItem(name: name, value: didString())
     }
 
+    /// Hashes the original string (consistent with `==`). Hash values are
+    /// per-process seeded and never persisted, so the different mixing is not
+    /// observable.
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(method)
-        hasher.combine(authority)
-        hasher.combine(segments)
+        hasher.combine(originalString)
     }
 
     public func toCBORValue() throws -> Any {
@@ -972,14 +1037,47 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
     }
 
     public init(handleString: String) throws {
-        guard Handle.isValidHandle(handleString) else {
+        // The scanner verdict for a handle is always definitive (see
+        // `LeafScan.handle`); the regex path is kept only for completeness.
+        let valid: Bool
+        let hasUppercase: Bool
+        switch LeafScan.withBytes(handleString, { u -> (LeafVerdict, Bool) in
+            let verdict = LeafScan.handle(u, 0, u.count)
+            return (verdict, verdict == .valid && LeafScan.containsUppercase(u, 0, u.count))
+        }) {
+        case (.valid, let upper):
+            valid = true
+            hasUppercase = upper
+        case (.invalid, _):
+            valid = false
+            hasUppercase = false
+        case (.undecided, _):
+            valid = Handle.isValidHandleRegex(handleString)
+            hasUppercase = true
+        }
+        guard valid else {
             throw ATProtocolError.invalidURI("Invalid handle format: \(handleString)")
         }
 
-        value = handleString.lowercased()
+        // A valid handle is pure ASCII, so `lowercased()` only maps A-Z; skip the
+        // allocation when there is nothing to map.
+        value = hasUppercase ? handleString.lowercased() : handleString
     }
 
     public static func isValidHandle(_ handle: String) -> Bool {
+        switch LeafScan.handleVerdict(handle) {
+        case .valid:
+            return true
+        case .invalid:
+            return false
+        case .undecided:
+            return isValidHandleRegex(handle)
+        }
+    }
+
+    /// The original validator (label pre-checks plus regex), kept as the reference
+    /// implementation behind the byte scanner.
+    static func isValidHandleRegex(_ handle: String) -> Bool {
         // Basic validation before regex
         guard !handle.isEmpty, handle.utf8.count <= 253 else {
             return false
@@ -1154,6 +1252,19 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
 
     /// Gate a space URI's type segment, as the space grammar requires.
     public static func isValidNSID(_ nsid: String) -> Bool {
+        switch LeafScan.nsidVerdict(nsid) {
+        case .valid:
+            return true
+        case .invalid:
+            return false
+        case .undecided:
+            return isValidNSIDRegex(nsid)
+        }
+    }
+
+    /// The original regex validator, kept as the exact fallback for input the byte
+    /// scanner leaves undecided (a trailing line terminator, which ICU's `$` accepts).
+    static func isValidNSIDRegex(_ nsid: String) -> Bool {
         // Basic validation before regex
         guard !nsid.isEmpty, nsid.utf8.count <= 317, nsid.allSatisfy({ $0.isASCII }) else {
             return false
@@ -1242,6 +1353,19 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
         value = keyString
     }
     public static func isValidRecordKey(_ key: String) -> Bool {
+        switch LeafScan.recordKeyVerdict(key) {
+        case .valid:
+            return true
+        case .invalid:
+            return false
+        case .undecided:
+            return isValidRecordKeyRegex(key)
+        }
+    }
+
+    /// The original regex validator, kept as the exact fallback for input the byte
+    /// scanner leaves undecided (a trailing line terminator, which ICU's `$` accepts).
+    static func isValidRecordKeyRegex(_ key: String) -> Bool {
         // Basic validation before regex
         guard !key.isEmpty, key.utf8.count <= 512, key != ".", key != "..", key.allSatisfy({ $0.isASCII }) else {
             return false
