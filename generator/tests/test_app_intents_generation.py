@@ -188,13 +188,19 @@ class AppIntentsGenerationTests(unittest.TestCase):
                 self.assertIsNone(intent_entity_extraction(schema))
 
     def test_invalid_manifest_and_kotlin_mode_do_not_create_output(self):
-        for mode in ("kotlin", "unknown-key", "required-exclusion"):
+        for mode in ("kotlin", "unknown-key", "unknown-parameter", "required-exclusion"):
             with self.subTest(mode=mode):
                 manifest = copy.deepcopy(self.manifest)
                 if mode == "unknown-key":
                     manifest["appIntents"]["intents"][0]["paramters"] = {}
-                elif mode == "required-exclusion":
+                elif mode == "unknown-parameter":
                     manifest["appIntents"]["intents"][0]["excludeParameters"] = ["missing"]
+                elif mode == "required-exclusion":
+                    path = self.lexicons / "com.example.actor.search.json"
+                    schema = json.loads(path.read_text())
+                    schema["defs"]["main"]["parameters"]["required"] = ["q"]
+                    path.write_text(json.dumps(schema), encoding="utf-8")
+                    manifest["appIntents"]["intents"][0]["excludeParameters"] = ["q"]
                 self.manifest_path.write_text(json.dumps(manifest), encoding="utf-8")
                 with self.assertRaises(ValueError):
                     asyncio.run(run_manifest(
