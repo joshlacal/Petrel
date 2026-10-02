@@ -255,19 +255,32 @@ public actor SpaceHostResolver {
         request.timeoutInterval = 10
         let data: Data
         let response: URLResponse
+        // Release and Linux builds have no fixture transport, so `fixtureAllowed` is the literal
+        // `false` there and an unguarded fixture branch is dead code the warning gate rejects.
+        #if DEBUG && canImport(Network) && canImport(Security)
         if fixtureAllowed, let fixtureSession {
             (data, response) = try await fixtureSession.data(for: request)
         } else {
-            let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
-            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-            (data, response) = try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+            (data, response) = try await fetchThroughHardenedSession(request, limits: limits)
         }
+        #else
+        (data, response) = try await fetchThroughHardenedSession(request, limits: limits)
+        #endif
         guard let http = response as? HTTPURLResponse,
               data.count <= limits.maximumDecodedBytes,
               http.url == url else {
             throw SpaceHostResolutionError.networkError("Invalid public service response")
         }
         return (data, http)
+    }
+
+    private static func fetchThroughHardenedSession(
+        _ request: URLRequest,
+        limits: NetworkResponseLimits
+    ) async throws -> (Data, URLResponse) {
+        let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
+        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+        return try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
     }
 
     /// Fetches and decodes the DID document using the hardened network path.
