@@ -160,19 +160,22 @@ class KotlinStrictRefByteStabilityTests(unittest.TestCase):
                 )
 
     def test_ordinary_swift_shapes_remain_byte_identical_to_pre_strict_ref_output(self):
+        # Updated following the generated-decode change (shared LexiconCodingKey decode
+        # container, String/Int array decoders, out-of-line decode diagnostics, and the
+        # `self = try .init(_lexiconContainer:)` wrapper that keeps namespaces SwiftFormat enums).
         expected = {
             "blue.catbird.test.ordinaryObject": (
-                "3e6c64d3f955f3f2e7c76ff67b7f064464775c6681874090bfb5cd668c5ef99b"
+                "00fc6293ccf3ed78c51163268a7953cada8410e3e5558600e5e33b1f4cb51aa5"
             ),
             # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
             "blue.catbird.test.ordinaryProcedure": (
-                "d29ff2cef9cadbfa554448c42a6ab432d676ade992671bc19e3e72ca25604137"
+                "1d4909457e96f99488bab775e7a095081bcb0cc1cd43a1bb2e3b178a2dfacb54"
             ),
             "blue.catbird.test.ordinaryRecord": (
-                "64d9efecd9bfc95390371a71cae9960a42195e0c6fe697aaca511186bcfce9c4"
+                "71cbdadefa382a39c36f8138630d4a0a0ad1de09d8d31ede7b9110a2ffaad90a"
             ),
             "blue.catbird.test.ordinarySubscription": (
-                "09d9b312435723060b7044ceec839df9a766b9c3ef319a6e782dfbcf7d414c7a"
+                "cdf3ac391736aff075998bf2fb23e4e600d3221bef6eabc2e81bb85885804f39"
             ),
         }
         for lexicon in ordinary_lexicons():

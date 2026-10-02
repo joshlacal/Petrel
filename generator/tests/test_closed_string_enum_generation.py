@@ -15,6 +15,7 @@ sys.path.insert(0, str(GENERATOR_DIR))
 from cycle_detector import CycleDetector
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+from tests.swift_runtime_stubs import LEXICON_DECODING_STUBS
 
 
 def _gradle_env():
@@ -329,6 +330,7 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             public enum LogManager {{
                 public static func logError(_ message: String) {{}}
             }}
+{LEXICON_DECODING_STUBS}
 
             {declarations}
 
@@ -387,7 +389,7 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             "\"blue.catbird.mls.finalizeGroupChange#receipt\")",
             generated,
         )
-        self.assertNotIn("property 'optionalStrict' — degrading to nil", generated)
+        self.assertNotIn('optionalPropertyDegraded("optionalStrict"', generated)
         self.assertIn("decodeIfPresent(Receipt.self, forKey: .optionalOrdinary)", generated)
 
     def test_inline_closed_enum_is_typed_in_swift_and_kotlin(self):

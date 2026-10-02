@@ -12,6 +12,7 @@ sys.path.insert(0, str(GENERATOR_DIR))
 
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+from tests.swift_runtime_stubs import LEXICON_DECODING_STUBS
 from cycle_detector import CycleDetector
 
 
@@ -236,6 +237,7 @@ class StrictRefUnknownKeysTests(unittest.TestCase):
                 public static func logError(_ message: String) {{}}
                 public static func logWarning(_ message: String) {{}}
             }}
+{LEXICON_DECODING_STUBS}
             extension Int {{ public func toCBORValue() throws -> Any {{ self }} }}
             extension String {{ public func toCBORValue() throws -> Any {{ self }} }}
 

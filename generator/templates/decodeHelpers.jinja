@@ -1,0 +1,22 @@
+{#- Shared decode-expression macros for generated model templates.
+
+    decode_value(prop, method, key) renders `container.<method>(<Type>.self, forKey: <key>)`.
+    Arrays of String/Int decode through _LexiconStringArray/_LexiconIntArray, which use the
+    unkeyed container's concrete decode(String.self)/decode(Int.self) requirement instead of
+    Array.init(from:)'s per-element generic decode<T>. Values, error types, messages and
+    coding paths are unchanged (see Sources/Petrel/Core/Types/LexiconDecoding.swift).
+
+    lexicon_key(prop) renders the LexiconCodingKey string literal for a property (the
+    implicit raw value of the property's CodingKeys case, i.e. its wire name). -#}
+{%- macro decode_value(prop, method, key) -%}
+{%- if prop.type == '[String]' -%}
+container.{{ method }}(_LexiconStringArray.self, forKey: {{ key }}){{ '?' if method == 'decodeIfPresent' else '' }}.values
+{%- elif prop.type == '[Int]' -%}
+container.{{ method }}(_LexiconIntArray.self, forKey: {{ key }}){{ '?' if method == 'decodeIfPresent' else '' }}.values
+{%- else -%}
+container.{{ method }}({{ prop.type }}.self, forKey: {{ key }})
+{%- endif -%}
+{%- endmacro %}
+{%- macro lexicon_key(prop) -%}
+"{{ prop.name | escapeStringLiteral }}"
+{%- endmacro %}

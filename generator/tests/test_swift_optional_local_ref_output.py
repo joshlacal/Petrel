@@ -50,7 +50,7 @@ class SwiftOptionalLocalRefOutputTests(unittest.TestCase):
             "\"blue.catbird.test.receipt#sequencerReceipt\")",
             generated,
         )
-        self.assertNotIn("property 'receipt' — degrading to nil", generated)
+        self.assertNotIn('optionalPropertyDegraded("receipt"', generated)
         self.assertIn("encodeIfPresent(receipt, forKey: .receipt)", generated)
         self.assertIn("case receipt", generated)
 

@@ -64,19 +64,13 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
     {%- endfor %}
 
     public init(from decoder: Decoder) throws {
-        // One keyed container serves both the `$type` read and object variants
-        // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
-        let container = try decoder.container(keyedBy: LexiconCodingKey.self)
-        let typeValue = try container.decode(String.self, forKey: "$type")
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let typeValue = try container.decode(String.self, forKey: .type)
 
         switch typeValue {
         {%- for ref in refs %}
         case "{{ ref.ref | escapeStringLiteral }}":
-            {%- if ref.shares_container %}
-            let value = try {{ ref.swift_ref }}(_lexiconContainer: container)
-            {%- else %}
             let value = try {{ ref.swift_ref }}(from: decoder)
-            {%- endif %}
             self = .{{ ref.camel_case_label | lowerCamelCase }}(value)
         {%- endfor %}
         default:

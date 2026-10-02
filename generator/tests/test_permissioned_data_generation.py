@@ -13,6 +13,7 @@ sys.path.insert(0, str(GENERATOR_DIR))
 
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+from tests.swift_runtime_stubs import LEXICON_DECODING_STUBS
 
 from main import generate_swift_from_lexicons_recursive
 
@@ -236,17 +237,18 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         ).convert()
         create = generated_struct(generated, "Create", "Delete")
 
-        self.assertIn("if container.contains(.rkey) {", create)
+        self.assertIn('if container.contains("rkey") {', create)
         self.assertIn(
-            "guard try !container.decodeNil(forKey: .rkey) else {",
+            'guard try !container.decodeNil(forKey: "rkey") else {',
             create,
         )
         self.assertIn(
-            "self.rkey = try container.decode(RecordKey.self, forKey: .rkey)",
+            'self.rkey = try container.decode(RecordKey.self, forKey: "rkey")',
             create,
         )
-        self.assertNotIn("decodeIfPresent(RecordKey.self, forKey: .rkey)", create)
+        self.assertNotIn('decodeIfPresent(RecordKey.self, forKey: "rkey")', create)
         self.assertNotIn("LogManager.", create)
+        self.assertNotIn("_LexiconDecodeDiagnostics.optionalPropertyDegraded", create)
         self.assertNotIn(r"\(error)", create)
 
     def test_server_contract_output_only_optional_field_remains_permissive(self):
@@ -257,10 +259,10 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         result = generated_struct(generated, "Result")
 
         self.assertIn(
-            "self.cursor = try container.decodeIfPresent(RecordKey.self, forKey: .cursor)",
+            'self.cursor = try container.decodeIfPresent(RecordKey.self, forKey: "cursor")',
             result,
         )
-        self.assertIn("degrading to nil", result)
+        self.assertIn('_LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)', result)
 
     def test_server_contract_direct_optional_input_is_presence_aware(self):
         generated = SwiftCodeGenerator(
@@ -289,9 +291,11 @@ class PermissionedDataGenerationTests(unittest.TestCase):
 
         self.assertEqual(ordinary, explicit_false)
         # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
+        # and the generated-decode change (LexiconCodingKey decode container, array decoders,
+        # out-of-line decode diagnostics).
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "7139da5752c79fc9e21913eef3782b608129ca2596568f3eb041a7219dc09290",
+            "00122076f730dc8306f6ac16de8eb7903fa82442976a06e513d7eea0044f3641",
         )
 
     def test_server_contract_flag_false_preserves_direct_input_bytes(self):
@@ -303,9 +307,11 @@ class PermissionedDataGenerationTests(unittest.TestCase):
 
         self.assertEqual(ordinary, explicit_false)
         # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
+        # and the generated-decode change (LexiconCodingKey decode container, array decoders,
+        # out-of-line decode diagnostics).
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "66e6f0b0c4294726a9fee4543bc7197826749c61827838d2fc859c7478cb3720",
+            "e0a1c8ae98828828194c4f853836b0e5633ca46268d38b32513a05017cb93fa7",
         )
 
     def test_server_contract_presence_aware_decoders_compile_and_reject_malformed_values(self):
@@ -345,6 +351,7 @@ class PermissionedDataGenerationTests(unittest.TestCase):
             public enum LogManager {{
                 public static func logWarning(_ message: String) {{}}
             }}
+{LEXICON_DECODING_STUBS}
             public struct NSID: Codable, Equatable, Hashable {{
                 public let value: String
                 public init(from decoder: Decoder) throws {{

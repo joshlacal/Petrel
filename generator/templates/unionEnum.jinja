@@ -49,13 +49,19 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     {%- endfor %}
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        let typeValue = try container.decode(String.self, forKey: .type)
+        // One keyed container serves both the `$type` read and object variants
+        // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+        let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+        let typeValue = try container.decode(String.self, forKey: "$type")
 
         switch typeValue {
         {%- for variant in variants %}
         case "{{ variant | escapeStringLiteral }}":
+            {%- if container_variants is defined and variant in container_variants %}
+            let value = try {{ variant | convertRefToSwift }}(_lexiconContainer: container)
+            {%- else %}
             let value = try {{ variant | convertRefToSwift }}(from: decoder)
+            {%- endif %}
             self = .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
         {%- endfor %}
         default:
@@ -105,7 +111,7 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
             return lhsValue == rhsValue
         {%- endfor %}
         case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
-            return lhsValue.isEqual(to: rhsValue)
+            return lhsValue == rhsValue
         {%- if variants %}
         default:
             return false
@@ -118,32 +124,16 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
         return self == other
     }
     
-    // DAGCBOR encoding with field ordering
+    // DAGCBOR encoding with field ordering: `$type` first, then the variant's
+    // own entries in order (see OrderedCBORMap.unionVariant).
     public func toCBORValue() throws -> Any {
-        {%- if variants %}
-        // Create an ordered map to maintain field order
-        var map = OrderedCBORMap()
-        {%- endif %}
-        
         switch self {
         {%- for variant in variants %}
         case .{{ variant | convertRefToSwift | lowerCamelCase }}(let value):
-            map = map.adding(key: "$type", value: "{{ variant | escapeStringLiteral }}")
-            
-            let valueDict = try value.toCBORValue()
-
-            // If the value is already an OrderedCBORMap, merge its entries
-            if let orderedMap = valueDict as? OrderedCBORMap {
-                for (key, value) in orderedMap.entries where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            } else if let dict = valueDict as? [String: Any] {
-                // Otherwise add each key-value pair from the dictionary
-                for (key, value) in dict where key != "$type" {
-                    map = map.adding(key: key, value: value)
-                }
-            }
-            return map
+            return try OrderedCBORMap.unionVariant(
+                typeIdentifier: "{{ variant | escapeStringLiteral }}",
+                payload: value.toCBORValue()
+            )
         {%- endfor %}
         case .unexpected(let container):
             return try container.toCBORValue()

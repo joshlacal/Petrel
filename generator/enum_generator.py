@@ -4,6 +4,26 @@ class EnumGenerator:
     def __init__(self, swift_code_generator):
         self.swift_code_generator = swift_code_generator
 
+    def supports_lexicon_container_init(self, ref):
+        """True when union variant `ref` resolves to a generated object or record struct.
+
+        Those structs (lexiconDefinitions.jinja, properties.jinja, record.jinja) expose
+        `init(_lexiconContainer:)`, so the union can hand over the keyed container it read
+        `$type` from instead of letting the variant re-open (and re-materialize) it. Any
+        other or unresolvable target keeps the plain `init(from:)` call.
+        """
+        nsid, _, fragment = ref.partition('#')
+        fragment = fragment or 'main'
+        generator = self.swift_code_generator
+        schema = None
+        if not nsid or nsid == generator.lexicon_id:
+            schema = generator.defs.get(fragment)
+        if schema is None and nsid:
+            registry = getattr(generator.cycle_detector, 'schemas_by_ref', None)
+            if registry is not None:
+                schema = registry.get(nsid if fragment == 'main' else f"{nsid}#{fragment}")
+        return isinstance(schema, dict) and schema.get('type') in ('object', 'record')
+
     def generate_enum_for_union(self, context_struct_name, union_name, variants):
         unique_union_name = f"{context_struct_name}{convert_to_camel_case(union_name)}Union"
 
@@ -42,6 +62,7 @@ class EnumGenerator:
         enum_code = enum_template.render(
             name=unique_union_name, 
             variants=processed_variants, 
+            container_variants=[v for v in processed_variants if self.supports_lexicon_container_init(v)],
             lexicon_id=self.swift_code_generator.lexicon_id,
             is_recursive=is_recursive
         )
@@ -95,6 +116,7 @@ class EnumGenerator:
         enum_code = enum_template.render(
             name=unique_union_name,
             variants=processed_variants,
+            container_variants=[v for v in processed_variants if self.supports_lexicon_container_init(v)],
             lexicon_id=self.swift_code_generator.lexicon_id,
             is_recursive=is_recursive,
         )
@@ -110,10 +132,12 @@ class EnumGenerator:
         refs_info = []
         for ref in refs:
             swift_ref = self.swift_code_generator.type_converter.convert_ref(ref)
+            qualified_ref = self.swift_code_generator.lexicon_id + ref if ref.startswith('#') else ref
             refs_info.append({
-                'ref': self.swift_code_generator.lexicon_id + ref if ref.startswith('#') else ref,
+                'ref': qualified_ref,
                 'swift_ref': swift_ref,
                 'camel_case_label': lowercase_first_letter(swift_ref),
+                'shares_container': self.supports_lexicon_container_init(qualified_ref),
             })
         union_array_template = self.swift_code_generator.template_manager.env.get_template('unionArray.jinja')
         swift_code = union_array_template.render(array_name=name, union_name=unique_union_name, refs=refs_info, lexicon_id=self.swift_code_generator.lexicon_id)

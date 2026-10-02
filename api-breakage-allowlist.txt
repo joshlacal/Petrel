@@ -115,3 +115,4 @@ API breakage: constructor AppBskyUnspeccedGetTrends.Output.init(trends:) has bee
 API breakage: constructor AppBskyUnspeccedGetTrendsSkeleton.Output.init(trends:) has been removed
 API breakage: constructor AppBskyVideoDefs.JobStatus.init(jobId:did:state:progress:blob:error:message:) has been removed
 API breakage: constructor ComAtprotoServerDescribeServer.Output.init(inviteCodeRequired:phoneVerificationRequired:availableUserDomains:links:contact:did:) has been removed
+API breakage: func OrderedCBORMap.adding(key:value:) has self access kind changing from NonMutating to Consuming

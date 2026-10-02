@@ -13,6 +13,7 @@ sys.path.insert(0, str(GENERATOR_DIR))
 
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+from tests.swift_runtime_stubs import LEXICON_DECODING_STUBS
 
 
 def required_nullable_lexicon():
@@ -28,12 +29,12 @@ class RequiredNullableGenerationTests(unittest.TestCase):
             "public let nullableCID: CID?",
             "public let requiredCount: Int",
             "public let optionalNote: String?",
-            "guard container.contains(.nullableScalar) else {",
-            "guard container.contains(.nullableCID) else {",
-            "self.nullableScalar = try container.decodeIfPresent(String.self, forKey: .nullableScalar)",
-            "self.nullableCID = try container.decodeIfPresent(CID.self, forKey: .nullableCID)",
-            "self.requiredCount = try container.decode(Int.self, forKey: .requiredCount)",
-            "self.optionalNote = try container.decodeIfPresent(String.self, forKey: .optionalNote)",
+            'guard container.contains("nullableScalar") else {',
+            'guard container.contains("nullableCID") else {',
+            'self.nullableScalar = try container.decodeIfPresent(String.self, forKey: "nullableScalar")',
+            'self.nullableCID = try container.decodeIfPresent(CID.self, forKey: "nullableCID")',
+            'self.requiredCount = try container.decode(Int.self, forKey: "requiredCount")',
+            'self.optionalNote = try container.decodeIfPresent(String.self, forKey: "optionalNote")',
             "try container.encode(nullableScalar, forKey: .nullableScalar)",
             "try container.encode(nullableCID, forKey: .nullableCID)",
             "try container.encode(requiredCount, forKey: .requiredCount)",
@@ -90,6 +91,7 @@ class RequiredNullableGenerationTests(unittest.TestCase):
                 public static func logWarning(_ message: String) {{}}
                 public static func logDebug(_ message: String) {{}}
             }}
+{LEXICON_DECODING_STUBS}
             public struct CID: Codable, Equatable, Hashable {{
                 public let value: String
                 public init(from decoder: Decoder) throws {{
