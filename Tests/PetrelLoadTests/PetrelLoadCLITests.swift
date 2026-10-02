@@ -1,3 +1,4 @@
+#if os(macOS) || os(Linux)
 import Foundation
 import Petrel
 @testable import PetrelLoad
@@ -830,3 +831,4 @@ struct PetrelLoadCLITests {
             .deletingLastPathComponent()
     }
 }
+#endif

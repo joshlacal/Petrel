@@ -49,12 +49,16 @@ jobs:
           xcrun simctl list runtimes --json > "$EVIDENCE_DIR/runtimes.json"
           xcrun simctl list devices available --json > "$EVIDENCE_DIR/devices.json"
           python3 - <<'PY'
-          import json, os, pathlib, re
+          import json, os, pathlib, re, subprocess
 
           evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
-          allowed = {".github/workflows/ios18-scanner-qualification.yml"}
+          cli_tests = "Tests/PetrelLoadTests/PetrelLoadCLITests.swift"
+          allowed = {".github/workflows/ios18-scanner-qualification.yml", cli_tests}
           changed = set((evidence / "source-delta.txt").read_text().splitlines())
           assert changed == allowed, f"Unexpected source delta: {sorted(changed)}"
+          original_cli_tests = subprocess.check_output(["git", "show", f'{os.environ["FROZEN_SOURCE"]}:{cli_tests}'])
+          guarded_cli_tests = pathlib.Path(os.environ["GITHUB_WORKSPACE"], cli_tests).read_bytes()
+          assert guarded_cli_tests == b"#if os(macOS) || os(Linux)\n" + original_cli_tests + b"#endif\n", "CLI test change exceeds the approved host-platform guard"
           assert (evidence / "xcode-version.txt").read_text().splitlines() == ["Xcode 16.4", "Build version 16F6"], "Xcode identity mismatch"
           assert (evidence / "simulator-sdk-version.txt").read_text().strip() == "18.5", "SDK identity mismatch"
           runtimes = json.loads((evidence / "runtimes.json").read_text())["runtimes"]
