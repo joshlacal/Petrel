@@ -207,7 +207,7 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         let responseGate = AsyncGate(initiallyOpen: false)
         let fixture = await makeFixture(responseGate: responseGate)
         let task = Task {
-            try await XRPCResponseDecoding.$configurationOverride.withValue(.standard) {
+            try await XRPCResponseDecoding.configurationOverride.withValue(.standard) {
                 try await fixture.client.com.atproto.server.describeServer()
             }
         }
@@ -231,7 +231,7 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         let responseGate = AsyncGate(initiallyOpen: false)
         let fixture = await makeFixture(responseGate: responseGate)
         let task = Task {
-            try await XRPCResponseDecoding.$configurationOverride.withValue(
+            try await XRPCResponseDecoding.configurationOverride.withValue(
                 XRPCResponseDecoding.Configuration(checksCancellationBeforeDecode: false)
             ) {
                 try await fixture.client.com.atproto.server.describeServer()

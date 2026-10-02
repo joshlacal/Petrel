@@ -81,12 +81,14 @@ public enum XRPCResponseDecoding {
     }
 
     /// Scoped configuration for the current task and its child tasks (tests, benchmarks).
+    /// Explicit storage keeps both the value type and the binding under SPI on
+    /// Swift 6.1, whose TaskLocal macro does not preserve SPI on its projection.
     @_spi(XRPCDecodeExperimental)
-    @TaskLocal public static var configurationOverride: Configuration?
+    public static let configurationOverride = TaskLocal<Configuration?>(wrappedValue: nil)
 
     @inline(__always)
     static func effectiveConfiguration() -> Configuration {
-        if let configurationOverride { return configurationOverride }
+        if let configurationOverride = configurationOverride.get() { return configurationOverride }
         return processConfiguration.withLock { $0 }
     }
 

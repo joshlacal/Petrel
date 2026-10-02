@@ -59,7 +59,7 @@ private func sequentialDecode(_ kind: String, _ data: Data) throws -> Model {
 }
 
 private func parallelDecode(_ kind: String, _ data: Data, _ configuration: XRPCResponseDecoding.Configuration) async throws -> Model {
-    try await XRPCResponseDecoding.$configurationOverride.withValue(configuration) {
+    try await XRPCResponseDecoding.configurationOverride.withValue(configuration) {
         switch kind {
         case "search": return try await XRPCResponseDecoding.decode(AppBskyActorSearchActors.Output.self, from: data, endpoint: "gate")
         case "timeline": return try await XRPCResponseDecoding.decode(AppBskyFeedGetTimeline.Output.self, from: data, endpoint: "gate")
@@ -275,7 +275,7 @@ func parallelGate(_ fixtures: [Fixture], _ out: String, mutations mutationsPerFi
         let task = Task { () -> String in
             withUnsafeCurrentTask { $0?.cancel() }
             do {
-                let value: Model = try await XRPCResponseDecoding.$configurationOverride.withValue(configuration) {
+                let value: Model = try await XRPCResponseDecoding.configurationOverride.withValue(configuration) {
                     if parallelOverload {
                         return try await XRPCResponseDecoding.decode(AppBskyFeedGetTimeline.Output.self, from: data, endpoint: "gate")
                     }

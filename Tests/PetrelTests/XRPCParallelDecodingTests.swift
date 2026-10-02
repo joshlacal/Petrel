@@ -58,7 +58,7 @@ private func forced(chunks: Int?, workers: Int? = nil) -> XRPCResponseDecoding.C
 }
 
 private func decodeTimeline(_ data: Data, _ configuration: XRPCResponseDecoding.Configuration) async throws -> AppBskyFeedGetTimeline.Output {
-    try await XRPCResponseDecoding.$configurationOverride.withValue(configuration) {
+    try await XRPCResponseDecoding.configurationOverride.withValue(configuration) {
         try await XRPCResponseDecoding.decode(AppBskyFeedGetTimeline.Output.self, from: data, endpoint: "test")
     }
 }
@@ -371,7 +371,7 @@ struct XRPCDecodeCancellationTests {
     func generalOverload() async {
         let before = CountingOutput.decodes.load(ordering: .relaxed)
         let result = await runCancelled {
-            try await XRPCResponseDecoding.$configurationOverride.withValue(.standard) {
+            try await XRPCResponseDecoding.configurationOverride.withValue(.standard) {
                 try await XRPCResponseDecoding.decode(CountingOutput.self, from: Data("{}".utf8), endpoint: "test")
             }
         }
@@ -401,7 +401,7 @@ struct XRPCDecodeCancellationTests {
             #expect(try canonical(result.get()) == sequential)
         }
         let counted = await runCancelled {
-            try await XRPCResponseDecoding.$configurationOverride.withValue(XRPCResponseDecoding.Configuration(checksCancellationBeforeDecode: false)) {
+            try await XRPCResponseDecoding.configurationOverride.withValue(XRPCResponseDecoding.Configuration(checksCancellationBeforeDecode: false)) {
                 try await XRPCResponseDecoding.decode(CountingOutput.self, from: Data("{}".utf8), endpoint: "test")
             }
         }
@@ -413,16 +413,16 @@ struct XRPCDecodeCancellationTests {
         let data = ParallelFixtures.data(ParallelFixtures.timeline(count: 20))
         let sequential = try canonical(JSONDecoder().decode(AppBskyFeedGetTimeline.Output.self, from: data))
         for configuration in [XRPCResponseDecoding.Configuration.standard, forced(chunks: 4)] {
-            let value = try await XRPCResponseDecoding.$configurationOverride.withValue(configuration) {
+            let value = try await XRPCResponseDecoding.configurationOverride.withValue(configuration) {
                 try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyFeedGetTimeline.Output.self, from: data, endpoint: "test")
             }
             #expect(try canonical(#require(value)) == sequential)
-            let failed = try await XRPCResponseDecoding.$configurationOverride.withValue(configuration) {
+            let failed = try await XRPCResponseDecoding.configurationOverride.withValue(configuration) {
                 try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyFeedGetTimeline.Output.self, from: Data(#"{"feed":[{}]}"#.utf8), endpoint: "test")
             }
             #expect(failed == nil)
             let cancelled = await runCancelled {
-                try await XRPCResponseDecoding.$configurationOverride.withValue(configuration) {
+                try await XRPCResponseDecoding.configurationOverride.withValue(configuration) {
                     try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyFeedGetTimeline.Output.self, from: data, endpoint: "test")
                 }
             }
