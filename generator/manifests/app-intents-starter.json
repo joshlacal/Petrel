@@ -1,0 +1,70 @@
+{
+  "$comment": "Validation-only starter manifest for the app-intents emit mode (generator/app_intents_generator.py). Exercises 2 intents (searchActors: collection-return via outputPath; getProfile: whole-output single-entity return) and 1 entity (ProfileEntity, reconciling ProfileView + ProfileViewDetailed via two init(from:) overloads, plus a string query backed by searchActors and a byIds query backed by getProfiles). This is NOT the production Catbird manifest — see docs/superpowers/plans for that. Unlike core/overlay manifests, lexicons.reference and swift.output here are resolved relative to THIS file's directory, not the invocation CWD (see app_intents_generator.py module docstring).",
+  "package": {
+    "kind": "app-intents",
+    "name": "CatbirdAppIntentsStarter"
+  },
+  "lexicons": {
+    "reference": ["../lexicons"]
+  },
+  "swift": {
+    "output": "../../.build/app-intents-validation"
+  },
+  "appIntents": {
+    "availability": "iOS 18.0",
+    "intents": [
+      {
+        "id": "app.bsky.actor.searchActors",
+        "kind": "query",
+        "structName": "SearchBlueskyProfilesIntent",
+        "title": "Search Bluesky Profiles",
+        "description": "Find Bluesky profiles matching a search query.",
+        "excludeParameters": ["term", "cursor"],
+        "parameters": {
+          "q": { "title": "Search Query", "requestValue": true },
+          "limit": { "title": "Result Limit" }
+        },
+        "confirmation": false,
+        "returns": { "entity": "ProfileEntity", "outputPath": "actors" }
+      },
+      {
+        "id": "app.bsky.actor.getProfile",
+        "kind": "query",
+        "structName": "GetBlueskyProfileIntent",
+        "title": "Get Bluesky Profile",
+        "description": "Look up a single Bluesky profile by handle or DID.",
+        "parameters": {
+          "actor": { "title": "Handle or DID" }
+        },
+        "confirmation": false,
+        "returns": { "entity": "ProfileEntity" }
+      }
+    ],
+    "entities": [
+      {
+        "name": "ProfileEntity",
+        "source": "app.bsky.actor.defs#profileViewDetailed",
+        "identifier": "did",
+        "syncable": true,
+        "display": {
+          "title": "displayName",
+          "titleFallback": "handle",
+          "subtitle": "handle",
+          "image": "avatar"
+        },
+        "properties": ["handle", "displayName", "description", "avatar"],
+        "query": {
+          "kind": "string",
+          "nsid": "app.bsky.actor.searchActors",
+          "param": "q",
+          "resultsPath": "actors",
+          "byIds": {
+            "nsid": "app.bsky.actor.getProfiles",
+            "param": "actors",
+            "resultsPath": "profiles"
+          }
+        }
+      }
+    ]
+  }
+}
