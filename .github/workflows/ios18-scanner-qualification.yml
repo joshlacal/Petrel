@@ -72,6 +72,27 @@ jobs:
           print(json.dumps({"runtime": runtime["version"], "device": device["name"], "udid": device["udid"]}))
           PY
 
+      - name: Require the package test scheme from the selected Xcode
+        timeout-minutes: 10
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcodebuild -list -json \
+            -disableAutomaticPackageResolution \
+            -onlyUsePackageVersionsFromResolvedFile \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/petrel-ios18-packages" \
+            > "$EVIDENCE_DIR/xcode-schemes.json" 2> "$EVIDENCE_DIR/xcode-schemes.stderr"
+          python3 - <<'PY' 2>&1 | tee "$EVIDENCE_DIR/test-scheme-check.log"
+          import json, os, pathlib
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          inventory = json.loads((evidence / "xcode-schemes.json").read_text())
+          schemes = sorted({scheme for kind in ("workspace", "project") for scheme in inventory.get(kind, {}).get("schemes", [])})
+          print(json.dumps({"availableSchemes": schemes, "requiredTestScheme": "Petrel-Package"}, indent=2))
+          # Apple documents <package>-Package as the aggregate scheme for multi-product package tests.
+          assert "Petrel-Package" in schemes, "Required aggregate test scheme is absent; inspect xcode-schemes.json"
+          PY
+
       - name: Execute scanner and URI equivalence tests on iOS 18.5
         timeout-minutes: 35
         shell: bash
@@ -80,7 +101,7 @@ jobs:
           xcrun simctl bootstatus "$SIMULATOR_UDID" -b | tee "$EVIDENCE_DIR/simulator-boot.log"
           xcrun simctl list devices --json > "$EVIDENCE_DIR/devices-after-boot.json"
           command=(xcodebuild test
-            -scheme Petrel
+            -scheme Petrel-Package
             -destination "platform=iOS Simulator,id=$SIMULATOR_UDID"
             -jobs 2
             -parallel-testing-enabled NO
