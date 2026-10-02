@@ -27,6 +27,29 @@ ROOT=$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)
 CANONICAL=${PETREL_CANONICAL_REPO:-$ROOT}
 EXPECTED_TAG_COMMIT=02de350792158ffc9f2ad9902ac61f101ea84bca
 
+# Keep local qualification bounded when app and dependency builds share a host.
+# SwiftPM's common options must precede diagnose-api-breaking-changes.
+API_JOBS=${PETREL_API_JOBS:-4}
+[[ $API_JOBS =~ ^[1-9][0-9]*$ ]] || {
+  echo "PETREL_API_JOBS must be a positive integer" >&2
+  exit 1
+}
+SWIFT_PACKAGE_ARGS=(package --jobs "$API_JOBS")
+if [[ -n ${PETREL_API_BUILD_SYSTEM:-} ]]; then
+  case $PETREL_API_BUILD_SYSTEM in
+    native|swiftbuild) SWIFT_PACKAGE_ARGS+=(--build-system "$PETREL_API_BUILD_SYSTEM") ;;
+    *) echo "PETREL_API_BUILD_SYSTEM must be native or swiftbuild" >&2; exit 1 ;;
+  esac
+fi
+
+cleanup_api_temp() {
+  if [[ ${PETREL_API_KEEP_TEMP:-0} == 1 ]]; then
+    echo "Preserved API compatibility evidence: $1" >&2
+  else
+    rm -rf "$1"
+  fi
+}
+
 [[ -n ${RELEASE_SWIFT:-} && $RELEASE_SWIFT == /* && -x $RELEASE_SWIFT ]] || {
   echo "RELEASE_SWIFT must name the activated absolute Swift executable" >&2
   exit 1
@@ -84,13 +107,13 @@ run_diagnosis() {
   stdout_file=$capture_dir/stdout.log
   stderr_file=$capture_dir/stderr.log
   (
-    trap 'rm -rf "$capture_dir"' EXIT
+    trap 'cleanup_api_temp "$capture_dir"' EXIT
     # SwiftPM builds in parallel. Capture its streams independently so compiler
     # stderr cannot splice bytes into the stdout API summary when callers use 2>&1.
     if [[ $USE_ALLOWLIST == 1 ]]; then
       if (
         cd "$checkout"
-        "$RELEASE_SWIFT" package diagnose-api-breaking-changes 0.1.0 \
+        "$RELEASE_SWIFT" "${SWIFT_PACKAGE_ARGS[@]}" diagnose-api-breaking-changes 0.1.0 \
           --breakage-allowlist-path api-breakage-allowlist.txt
       ) >"$stdout_file" 2>"$stderr_file"; then
         command_status=0
@@ -100,7 +123,7 @@ run_diagnosis() {
     else
       if (
         cd "$checkout"
-        "$RELEASE_SWIFT" package diagnose-api-breaking-changes 0.1.0
+        "$RELEASE_SWIFT" "${SWIFT_PACKAGE_ARGS[@]}" diagnose-api-breaking-changes 0.1.0
       ) >"$stdout_file" 2>"$stderr_file"; then
         command_status=0
       else
@@ -142,7 +165,7 @@ case $MODE in
     }
 
     TMP=$(mktemp -d /tmp/petrel-api-compatibility.XXXXXX)
-    trap 'rm -rf "$TMP"' EXIT
+    trap 'cleanup_api_temp "$TMP"' EXIT
     /usr/bin/git init --bare "$TMP/mirror.git"
     /usr/bin/git --git-dir="$TMP/mirror.git" fetch --no-tags "$CANONICAL" "$CANDIDATE"
     [[ $(/usr/bin/git --git-dir="$TMP/mirror.git" rev-parse FETCH_HEAD) == "$CANDIDATE" ]] || {

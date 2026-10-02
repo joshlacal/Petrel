@@ -9,6 +9,9 @@ The changes below are the Petrel 0.2.0 release candidate. Replace this paragraph
 with a dated `0.2.0` heading only when the release tag is created.
 
 ### Added
+- Equivalent UTF-8 identifier, CID, date, language, and URI decoding fast paths, with legacy fallback for ambiguous inputs.
+- Bounded typed-first JSON decoding, shared keyed-container generated decoders, and a cancellable XRPC decode entry. Parallel array decoding remains experimental and opt-in.
+- Reproducible decoder equivalence fixtures and generated wire-identity checks. These generated API changes require the coordinated minor-version release train; no release is tagged by this integration.
 - Exact typed AT Protocol errors for generated queries and procedures.
 - A lossless DAG-CBOR/DAG-JSON bridge for Blob, Bytes, CID, null, and integer values within the signed 64-bit range.
 - A generated-value-container decoder that preserves primitive roots, special link/byte objects, unknown fields, and re-encodable fallback values.
@@ -17,6 +20,8 @@ with a dated `0.2.0` heading only when the release tag is created.
 - A fail-closed DocC validator that treats documentation diagnostics as errors and compile-checks every Swift example in the public guides under the sealed release toolchain.
 
 ### Changed
+- Preserve URI wire text and legacy blob shapes on re-encode, including links with ports and escaped characters.
+- Reduce CBOR container allocations and redundant CAR/DAG-CBOR payload copies while preserving error text and decoding outcomes.
 - Regenerated Swift and Kotlin SimpleSpace APIs against the September 10 Spaces alpha (`9d787ebf`): independent `readPolicy`/`writePolicy`, `putMember` with required read/write flags, and access-specific managing-app checks. The obsolete `addMember` endpoint is removed.
 - Generated namespace reference classes are immutable `Sendable` structs. This is an intentional pre-1.0 source compatibility break for code that named or relied on namespace class identity.
 - Petrel now owns shared overlay namespace roots; overlays add only their child namespaces.
