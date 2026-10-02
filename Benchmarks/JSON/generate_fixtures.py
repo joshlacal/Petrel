@@ -194,6 +194,98 @@ def timeline(count: int, unicode: bool = False, difficult: bool = False) -> dict
             "feed": [feed_item(i, unicode, difficult) for i in range(count)]}
 
 
+# Wire-fidelity edge cases. Each URI is valid on the wire but was normalized by the
+# legacy URI decoder (ports, userinfo, percent-escapes and non-ASCII text were lost
+# or rewritten on re-encode), which demoted the enclosing record to unknownType.
+# Whitespace-padded URIs stay demoted by design: decoding trims them.
+FIDELITY_EDGE_URIS = [
+    ("clean", "https://example.test/notes/{i}"),
+    ("port", "https://example.test:8443/notes/{i}"),
+    ("userinfo", "https://reader@example.test/notes/{i}"),
+    ("userinfo-password-port-query-fragment", "https://reader:secret@example.test:8080/notes/{i}?a=1#top"),
+    ("empty-port", "https://example.test:/notes/{i}"),
+    ("ipv6-port", "https://[2001:db8::1]:8443/notes/{i}"),
+    ("non-ascii-path", "https://ja.wikipedia.org/wiki/\u65e5\u672c\u8a9e_{i}"),
+    ("latin1-path", "https://example.test/caf\u00e9/{i}"),
+    ("emoji-path", "https://example.test/\U0001f426/{i}"),
+    ("idn-host", "https://b\u00fccher.example/notes/{i}"),
+    ("punycode-host", "https://xn--bcher-kva.example/notes/{i}"),
+    ("pct-2F", "https://example.test/a%2Fb/{i}"),
+    ("pct-26-query", "https://example.test/search?q=a%26b&n={i}"),
+    ("pct-lowercase-hex", "https://example.test/q?x=%e6%97%a5&n={i}"),
+    ("mailto", "mailto:birds{i}@example.test"),
+    ("uppercase-scheme-host", "HTTPS://EXAMPLE.test/Notes/{i}"),
+    ("whitespace-padded", "  https://example.test/notes/{i}  "),
+    ("trailing-newline", "https://example.test/notes/{i}\n"),
+]
+FIDELITY_PADDED = {"whitespace-padded", "trailing-newline"}
+
+
+def legacy_blob(index: int) -> dict:
+    return {"cid": cid(index, True), "mimeType": "image/jpeg"}
+
+
+def edge_uri(slot: int, index: int) -> tuple[str, str]:
+    name, template = FIDELITY_EDGE_URIS[slot % len(FIDELITY_EDGE_URIS)]
+    return name, template.format(i=index)
+
+
+def set_link_facet(record: dict, uri: str) -> None:
+    links = [f for f in record["facets"] if f["features"][0]["$type"] == "app.bsky.richtext.facet#link"]
+    assert len(links) == 1
+    links[0]["features"][0]["uri"] = uri
+
+
+def legacy_images(embed: dict, index: int, first_only: bool) -> None:
+    images = embed["images"] if embed["$type"] == "app.bsky.embed.images" else embed["media"]["images"]
+    for offset, image in enumerate(images):
+        if offset == 0 or not first_only:
+            image["image"] = legacy_blob(700000 + index * 4 + offset)
+
+
+def fidelity_edge_item(index: int) -> dict:
+    item = feed_item(index)
+    post_view = item["post"]
+    record = post_view["record"]
+    facet_name, facet_uri = edge_uri(index, index)
+    set_link_facet(record, facet_uri)
+    external_name, blob_kind = "-", "-"
+    if index % 2 == 0:
+        external_name, uri = edge_uri(index // 2, index)
+        record_embed, view_embed = external_embeds(index)
+        record_embed["external"]["uri"] = uri
+        view_embed["external"]["uri"] = uri
+        record["embed"], post_view["embed"] = record_embed, view_embed
+    elif index % 4 == 1:
+        record_embed, view_embed = image_embeds(index)
+        legacy_images(record_embed, index, first_only=False)
+        record["embed"], post_view["embed"] = record_embed, view_embed
+        blob_kind = "legacy"
+    elif record.get("embed", {}).get("$type") in ("app.bsky.embed.images", "app.bsky.embed.recordWithMedia"):
+        legacy_images(record["embed"], index, first_only=True)
+        blob_kind = "mixed"
+    if "reply" in item:
+        reply_name, reply_uri = edge_uri(index + 9, index)
+        set_link_facet(item["reply"]["parent"]["record"], reply_uri)
+    else:
+        reply_name = "-"
+    item["feedContext"] = f"fidelity-edge facet={facet_name} external={external_name} blob={blob_kind} replyParentFacet={reply_name}"
+    return item
+
+
+def record_has_padded_uri(record: dict) -> bool:
+    uris = [f["features"][0].get("uri") for f in record.get("facets", [])]
+    embed = record.get("embed", {})
+    if embed.get("$type") == "app.bsky.embed.external":
+        uris.append(embed["external"]["uri"])
+    return any(isinstance(u, str) and u != u.strip() for u in uris)
+
+
+def fidelity_edge_timeline(count: int) -> dict:
+    return {"cursor": f"2026-09-01T00:00:00.000Z::fidelity-edge::{count}",
+            "feed": [fidelity_edge_item(i) for i in range(count)]}
+
+
 def base64_records() -> tuple[dict, bytes]:
     # 32 KiB each, deterministic incompressible-looking content. Real $bytes
     # representation used by Petrel's dynamic IPLD path, synthetic application.
@@ -286,6 +378,10 @@ def check_schema(value: object, schema: dict, namespace: str, path: str = "$", o
     elif kind == "boolean":
         assert isinstance(value, bool), (path, kind)
     elif kind == "blob":
+        if isinstance(value, dict) and "$type" not in value and set(value) == {"cid", "mimeType"}:
+            # Legacy (2023-era) blob shape {cid, mimeType}; still accepted by the spec's readers.
+            assert isinstance(value["cid"], str) and isinstance(value["mimeType"], str), path
+            return
         assert isinstance(value, dict) and value.get("$type") == "blob", (path, kind)
         assert isinstance(value["ref"]["$link"], str) and isinstance(value["mimeType"], str), path
         assert 0 <= value["size"] <= schema.get("maxSize", 2**63), path
@@ -309,6 +405,7 @@ def main() -> None:
         ("unicode-feed", "E", "timeline", "AppBskyFeedGetTimeline.Output", timeline(100, unicode=True), "100 feed entries with CJK, Arabic, Hebrew, Hangul, emoji, ZWJ, modifiers, decomposed accents, URLs, and valid UTF-8 facet offsets."),
         ("base64-records", "F", "records", "ComAtprotoRepoListRecords.Output", binary_fixture, "32 synthetic extension records containing exact IPLD $bytes objects (32 KiB each); real Petrel bytes path, not typical feed image transport."),
         ("difficult-feed", "G", "timeline", "AppBskyFeedGetTimeline.Output", timeline(100, unicode=True, difficult=True), "Nested dynamic dictionaries and arrays, known/unknown records, unknown union variants, explicit nulls, and optional/absent fields."),
+        ("fidelity-edge-feed", "H", "timeline", "AppBskyFeedGetTimeline.Output", fidelity_edge_timeline(72), "72 feed entries whose link facets and link cards carry valid-but-unusual URIs (port, userinfo, empty port, IPv6, non-ASCII/IDN/emoji, %2F, %26, lowercase escapes, mailto, uppercase) plus legacy {cid,mimeType} image blobs; whitespace-padded URIs stay demoted by design."),
     ]
     fixtures = []
     for name, category, kind, swift_type, value, description in specs:
@@ -331,6 +428,13 @@ def main() -> None:
                 "feedItemsWithReason": sum("reason" in item for item in feed),
                 "knownPostRecords": sum(item["post"]["record"]["$type"] == "app.bsky.feed.post" for item in feed),
                 "unknownPostRecords": sum(item["post"]["record"]["$type"] != "app.bsky.feed.post" for item in feed)}
+            if name == "fidelity-edge-feed":
+                # Expected under wire-preserving URI and lossless legacy-blob decoding: only records
+                # carrying a whitespace-padded URI are demoted (decoding trims, re-encode differs).
+                padded = sum(record_has_padded_uri(item["post"]["record"]) for item in feed)
+                fixtures[-1]["validator"] = "fidelity-edge"
+                fixtures[-1]["expectedTopLevelCounts"]["knownPostRecords"] -= padded
+                fixtures[-1]["expectedTopLevelCounts"]["unknownPostRecords"] += padded
         elif kind == "records":
             fixtures[-1]["expectedTopLevelCounts"] = {"records": 32, "decodedPayloadBytes": 32 * len(binary_raw)}
         elif kind == "search":

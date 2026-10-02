@@ -23,6 +23,10 @@ struct FixtureEntry: Decodable, Sendable {
     let modelKind: String
     let bytes: Int
     let sha256: String
+    /// Manifest expectations; optional so older manifests still decode.
+    let expectedTopLevelCounts: [String: Int]?
+    /// Selects a fixture-specific corpus validator (e.g. "fidelity-edge").
+    let validator: String?
 }
 struct Manifest: Decodable { let fixtures: [FixtureEntry] }
 struct Fixture: Sendable { let entry: FixtureEntry; let data: Data }
@@ -202,7 +206,11 @@ struct Memory: Codable {
         progress("Typed structure checks passed: \(rows.count) fixture/strategy cells")
     case "canonical":
         // Persist semantic output outside measurements for differential checks across binaries.
-        let checks = try validateCorpus(fixtures); try save(checks,out+"/corpus-validation.json")
+        // --no-validate writes outputs even when corpus expectations fail (used to diff a
+        // library whose typed/unknown classification legitimately differs on a fixture).
+        if !args.contains("--no-validate") {
+            let checks = try validateCorpus(fixtures); try save(checks,out+"/corpus-validation.json")
+        }
         for f in fixtures {
             for s in strategies {
                 let encoded = try canonical(decode(f,Context(s)))
@@ -268,6 +276,7 @@ struct Memory: Codable {
             }
           }
         }
+    case "encode": try encodeMode(fixtures,iterations,out)
     case "micro": try micro(fixtures,iterations,out)
     case "transport": try transportCopyExperiment(fixtures,iterations,out)
     case "stages": try stageExperiment(fixtures,iterations,out)

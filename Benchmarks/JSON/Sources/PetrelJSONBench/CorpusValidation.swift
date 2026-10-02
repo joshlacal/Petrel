@@ -28,6 +28,10 @@ func validateCorpus(_ fixtures: [Fixture], strategy: Strategy = .foundationFresh
             checks.append("\(name): 50 actors including Unicode names; nested fields and dates retained")
         case "timeline":
             let model = try decode(fixture, context) as! AppBskyFeedGetTimeline.Output
+            if fixture.entry.validator == "fidelity-edge" {
+                checks.append(try validateFidelityEdge(fixture, model, root))
+                continue
+            }
             let feed = root["feed"] as! [[String: Any]]
             let expected = name == "very-large-feed" ? 800 : 100
             try corpusRequire(model.feed.count == expected && feed.count == expected, "\(name): feed count")

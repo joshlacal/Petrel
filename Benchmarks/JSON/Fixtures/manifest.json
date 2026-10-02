@@ -125,6 +125,27 @@
         "knownPostRecords": 80,
         "unknownPostRecords": 20
       }
+    },
+    {
+      "id": "fidelity-edge-feed",
+      "file": "fidelity-edge-feed.json",
+      "category": "H",
+      "modelKind": "timeline",
+      "swiftType": "AppBskyFeedGetTimeline.Output",
+      "bytes": 307924,
+      "sha256": "53966aba726efd139297c453fb0ffaf3e009e01d6753bea14f44043b8463ae8b",
+      "jsonValueNodes": 11060,
+      "description": "72 feed entries whose link facets and link cards carry valid-but-unusual URIs (port, userinfo, empty port, IPv6, non-ASCII/IDN/emoji, %2F, %26, lowercase escapes, mailto, uppercase) plus legacy {cid,mimeType} image blobs; whitespace-padded URIs stay demoted by design.",
+      "provenance": "synthetic; generated from checked-in Petrel lexicon/model shapes",
+      "expectedTopLevelCounts": {
+        "feed": 72,
+        "postsWithEmbed": 69,
+        "feedItemsWithReply": 18,
+        "feedItemsWithReason": 12,
+        "knownPostRecords": 62,
+        "unknownPostRecords": 10
+      },
+      "validator": "fidelity-edge"
     }
   ],
   "componentFixtures": [

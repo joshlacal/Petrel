@@ -387,13 +387,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     public let query: String?
     public let fragment: String?
     public let isDID: Bool
-    /// True when this value was decoded from wire data (`init(from:)`) and parsed as a
-    /// well-formed URI. It then re-encodes, describes itself and resolves `url` from
-    /// `originalString` (the whitespace-trimmed wire text) instead of a string rebuilt
-    /// from the normalized components, which drop ports and userinfo and percent-decode
-    /// paths, queries and fragments. Values built in code keep the rebuilt form.
-    /// Provenance only: excluded from `==` and `hash(into:)`.
-    private let encodesOriginalString: Bool
     public let originalString: String?
 
     enum URIError: Error {
@@ -404,7 +397,7 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        let raw = URIScan.trimmingWhitespaceAndNewlines(try container.decode(String.self))
+        let raw = try container.decode(String.self).trimmingCharacters(in: .whitespacesAndNewlines)
 
         if raw.starts(with: "did:") {
             isDID = true
@@ -416,7 +409,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             query = nil
             fragment = nil
             originalString = raw
-            encodesOriginalString = true
         } else if raw.starts(with: "at://") {
             isDID = false
             scheme = "at"
@@ -432,38 +424,32 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             query = nil
             fragment = nil
             originalString = raw
-            encodesOriginalString = true
         } else {
             // Defensive parse for non-DID URIs: reject obviously malformed strings like "//"
             // Require a non-empty scheme and avoid passing bad input to URLComponents.
             isDID = false
-            switch URIScan.parseGeneric(raw) {
-            case .invalid:
-                // Safe fallback to a benign invalid host. Not wire-preserving: an invalid
-                // URI still re-encodes as the placeholder, so the lossless-decode guard
-                // keeps demoting records that carry one.
+            if raw.isEmpty || raw.hasPrefix("//") || URI.detectScheme(in: raw) == nil {
+                // Safe fallback to a benign invalid host
                 scheme = "https"
                 authority = "invalid.invalid"
                 path = nil
                 query = nil
                 fragment = nil
                 originalString = raw.isEmpty ? nil : raw
-                encodesOriginalString = false
-            case let .parts(parts):
-                scheme = parts?.scheme ?? ""
-                authority = parts?.host ?? ""
-                path = parts?.path
-                query = parts?.query
-                fragment = parts?.fragment
+            } else {
+                let comps = URLComponents(string: raw)
+                scheme = comps?.scheme ?? ""
+                authority = comps?.host ?? ""
+                path = comps?.path.isEmpty ?? true ? nil : comps?.path
+                query = comps?.query
+                fragment = comps?.fragment
                 originalString = raw
-                // URLComponents rejected the string: keep the legacy rebuild (and demotion).
-                encodesOriginalString = parts != nil
             }
         }
     }
 
     public init(uriString: String) {
-        let raw = URIScan.trimmingWhitespaceAndNewlines(uriString)
+        let raw = uriString.trimmingCharacters(in: .whitespacesAndNewlines)
         if raw.starts(with: "did:") {
             isDID = true
             let components = raw.split(separator: ":")
@@ -473,7 +459,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             query = nil
             fragment = nil
             originalString = raw
-            encodesOriginalString = false
         } else if raw.starts(with: "at://") {
             isDID = false
             scheme = "at"
@@ -489,11 +474,9 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             query = nil
             fragment = nil
             originalString = raw
-            encodesOriginalString = false
         } else {
             isDID = false
-            switch URIScan.parseGeneric(raw) {
-            case .invalid:
+            if raw.isEmpty || raw.hasPrefix("//") || URI.detectScheme(in: raw) == nil {
                 // Safe fallback
                 scheme = "https"
                 authority = "invalid.invalid"
@@ -501,18 +484,25 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
                 query = nil
                 fragment = nil
                 originalString = raw.isEmpty ? nil : raw
-                encodesOriginalString = false
-            case let .parts(parts):
+            } else {
+                let comps = URLComponents(string: raw)
                 let defaultScheme = "https"
-                scheme = parts?.scheme ?? defaultScheme
-                authority = parts?.host ?? ""
-                path = parts?.path
-                query = parts?.query
-                fragment = parts?.fragment
+                scheme = comps?.scheme ?? defaultScheme
+                authority = comps?.host ?? ""
+                path = comps?.path.isEmpty ?? true ? nil : comps?.path
+                query = comps?.query
+                fragment = comps?.fragment
                 originalString = raw
-                encodesOriginalString = false
             }
         }
+    }
+
+    /// Detect a valid URI scheme prefix (e.g., https:, http:, ftp:, etc.)
+    private static func detectScheme(in s: String) -> String? {
+        // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ':'
+        // Use a lightweight regex
+        let pattern = "^[A-Za-z][A-Za-z0-9+.-]*:"
+        return s.range(of: pattern, options: .regularExpression).map { _ in String(s.prefix { $0 != ":" }) }
     }
 
     public func isValid() -> Bool {
@@ -531,9 +521,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     }
 
     public func uriString() -> String {
-        if encodesOriginalString, let originalString {
-            return originalString
-        }
         if isDID {
             var didString = "did:\(authority)"
             if let path = path {
@@ -570,7 +557,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         if scheme == "at" {
             let raw = url.absoluteString
             originalString = raw
-            encodesOriginalString = false
             let afterPrefix = raw.dropFirst(5)
             if let slashIndex = afterPrefix.firstIndex(of: "/") {
                 authority = String(afterPrefix[..<slashIndex])
@@ -588,7 +574,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             query = url.query
             fragment = url.fragment
             originalString = url.absoluteString
-            encodesOriginalString = false
         }
     }
 
@@ -597,9 +582,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         guard !isDID else { return nil }
         if scheme == "at" {
             return URL(string: uriString())
-        }
-        if encodesOriginalString, let originalString, let wireURL = URL(string: originalString) {
-            return wireURL
         }
         var components = URLComponents()
         components.scheme = scheme.isEmpty ? nil : scheme
@@ -630,24 +612,6 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             && query == otherURI.query && fragment == otherURI.fragment && isDID == otherURI.isDID
     }
 
-    /// The synthesized equality before `encodesOriginalString` existed: decoded and
-    /// code-built values of the same text stay equal.
-    public static func == (lhs: URI, rhs: URI) -> Bool {
-        lhs.scheme == rhs.scheme && lhs.authority == rhs.authority && lhs.path == rhs.path
-            && lhs.query == rhs.query && lhs.fragment == rhs.fragment && lhs.isDID == rhs.isDID
-            && lhs.originalString == rhs.originalString
-    }
-
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(scheme)
-        hasher.combine(authority)
-        hasher.combine(path)
-        hasher.combine(query)
-        hasher.combine(fragment)
-        hasher.combine(isDID)
-        hasher.combine(originalString)
-    }
-
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
         let uriString = self.uriString()
@@ -667,11 +631,6 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
     public let mimeType: String
     public let size: Int
     public let cid: String?
-    /// True when decoded from the legacy `{cid, mimeType}` shape (no `$type`, `size` or
-    /// `ref`). Such a blob encodes in that same shape, so records written before the
-    /// modern blob format round-trip losslessly instead of failing the lossless-decode
-    /// guard on a fabricated `$type`/`size: 0`. Provenance only: excluded from `==`/`hash`.
-    private let isLegacyFormat: Bool
 
     enum CodingKeys: String, CodingKey {
         case type = "$type"
@@ -689,7 +648,6 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
         self.mimeType = mimeType
         self.size = size
         self.cid = cid
-        isLegacyFormat = false
     }
 
     public init(from decoder: Decoder) throws {
@@ -703,9 +661,6 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
             mimeType = try container.decode(String.self, forKey: .mimeType)
             size = 0 // Legacy format doesn't include size, use 0 as placeholder
             cid = try container.decode(String.self, forKey: .cid)
-            // Only the exact legacy shape re-encodes as legacy; a hybrid carrying `size` or
-            // `ref` keeps the modern re-encode (and its existing fidelity outcome).
-            isLegacyFormat = !container.contains(.size) && !container.contains(.ref)
         } else {
             // Modern blob format: { "$type": "blob", "ref": {...}, "mimeType": "...", "size": ... }
             type = try container.decode(String.self, forKey: .type)
@@ -713,21 +668,13 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
             mimeType = try container.decode(String.self, forKey: .mimeType)
             size = try container.decode(Int.self, forKey: .size)
             cid = try container.decodeIfPresent(String.self, forKey: .cid)
-            isLegacyFormat = false
         }
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
-        if isLegacyFormat, let cid {
-            // Re-emit the legacy shape this blob was decoded from.
-            try container.encode(cid, forKey: .cid)
-            try container.encode(mimeType, forKey: .mimeType)
-            return
-        }
-
-        // Encode in modern format when writing
+        // Always encode in modern format when writing
         try container.encode(type, forKey: .type)
         try container.encodeIfPresent(ref, forKey: .ref)
         try container.encode(mimeType, forKey: .mimeType)
@@ -740,13 +687,6 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
         return self == otherBlob
     }
 
-    /// The synthesized equality before `isLegacyFormat` existed: a legacy-decoded blob
-    /// equals `Blob(type: "blob", mimeType:, size: 0, cid:)`, as it always has.
-    public static func == (lhs: Blob, rhs: Blob) -> Bool {
-        lhs.type == rhs.type && lhs.ref == rhs.ref && lhs.mimeType == rhs.mimeType
-            && lhs.size == rhs.size && lhs.cid == rhs.cid
-    }
-
     public func hash(into hasher: inout Hasher) {
         hasher.combine(type)
         hasher.combine(ref)
@@ -757,11 +697,6 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
-        if isLegacyFormat, let cid {
-            map.append(key: "cid", value: cid)
-            map.append(key: "mimeType", value: mimeType)
-            return map
-        }
         map.append(key: "$type", value: type) // Assuming 'type' holds the lexicon identifier like "blob"
 
         if let refLink = ref {

@@ -3,6 +3,19 @@
 #include <string>
 #ifdef __APPLE__
 #include <malloc/malloc.h>
+#include <libproc.h>
+#include <unistd.h>
+#include <atomic>
+typedef void(bench_malloc_logger_t)(uint32_t type, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t result, uint32_t num_hot_frames_to_skip);
+extern "C" bench_malloc_logger_t *malloc_logger;
+static std::atomic<uint64_t> g_bench_allocs{0}, g_bench_alloc_bytes{0};
+/* libmalloc stack_logging flags: 2 = allocate, 4 = deallocate, 8 = has zone (arg1 = zone). */
+static void bench_count_malloc(uint32_t type, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t, uint32_t) {
+ if (!(type & 2)) return;
+ g_bench_allocs.fetch_add(1, std::memory_order_relaxed);
+ uintptr_t size = (type & 4) ? a3 : ((type & 8) ? a2 : a1); /* realloc logs (zone, old ptr, new size) */
+ g_bench_alloc_bytes.fetch_add(size, std::memory_order_relaxed);
+}
 #endif
 #include "../../Vendor/simdutf-swift/simdutf/include/simdutf.h"
 uint64_t bench_cpu_ns(void) {
@@ -31,3 +44,34 @@ uint64_t bench_live_blocks(void) {
 #endif
 }
 const char *bench_simdutf_backend(void) { static const std::string name(simdutf::get_active_implementation()->name()); return name.c_str(); }
+
+void bench_malloc_counting(int enable) {
+#ifdef __APPLE__
+ malloc_logger = enable ? bench_count_malloc : nullptr;
+#else
+ (void)enable;
+#endif
+}
+uint64_t bench_malloc_count(void) {
+#ifdef __APPLE__
+ return g_bench_allocs.load(std::memory_order_relaxed);
+#else
+ return 0;
+#endif
+}
+uint64_t bench_malloc_bytes(void) {
+#ifdef __APPLE__
+ return g_bench_alloc_bytes.load(std::memory_order_relaxed);
+#else
+ return 0;
+#endif
+}
+uint64_t bench_instructions(void) {
+#ifdef __APPLE__
+ struct rusage_info_v4 ri;
+ if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri) != 0) return 0;
+ return ri.ri_instructions;
+#else
+ return 0;
+#endif
+}
