@@ -15,6 +15,7 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
+import Synchronization
 
 package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
     #if DEBUG && canImport(Network) && canImport(Security)
@@ -39,111 +40,141 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         self.resolver = resolver
         super.init()
     }
-    package final class TaskContextManager: @unchecked Sendable {
-        private let lock = NSLock()
-        private var taskContexts = [Int: TaskContext]()
-        // ponytail: bounded FIFO/LRU list for task violation status, 128 max capacity; pruned at task finish or FIFO eviction
-        private var securityViolatedTaskIDs = [Int]()
-        private var limitExceededTaskIDs = [Int]()
-        private let maxRetainedViolations = 128
+    /// Per-task transport state, guarded by one `Mutex`.
+    ///
+    /// Every mutation happens in place through the dictionary's `_modify` accessor
+    /// (`taskContexts[id, default: TaskContext()]`), so the accumulated response `Data` stays
+    /// uniquely referenced and `append` is amortised O(chunk). The previous copy-out/append/write-back
+    /// shape copied the whole accumulated body on every `didReceive data` chunk (quadratic in body
+    /// size) while holding the session-wide lock.
+    package final class TaskContextManager: Sendable {
+        private struct State {
+            var taskContexts = [Int: TaskContext]()
+            // ponytail: bounded FIFO/LRU list for task violation status, 128 max capacity; pruned at task finish or FIFO eviction
+            var securityViolatedTaskIDs = [Int]()
+            var limitExceededTaskIDs = [Int]()
+        }
+
+        private let state = Mutex(State())
+        private static let maxRetainedViolations = 128
+
+        package init() {}
 
         package func getContext(for task: URLSessionTask) -> TaskContext {
-            lock.lock()
-            defer { lock.unlock() }
-            return taskContexts[task.taskIdentifier] ?? TaskContext()
+            let id = task.taskIdentifier
+            return state.withLock { $0.taskContexts[id] ?? TaskContext() }
         }
 
         package func register(_ task: URLSessionTask, completion: @escaping @Sendable (Result<(Data, URLResponse), Error>) -> Void) {
-            lock.lock()
-            defer { lock.unlock() }
-            taskContexts[task.taskIdentifier] = TaskContext(completion: completion)
+            let id = task.taskIdentifier
+            state.withLock { $0.taskContexts[id] = TaskContext(completion: completion) }
         }
 
         package func updateContext(for task: URLSessionTask, update: (inout TaskContext) -> Void) {
-            lock.lock()
-            defer { lock.unlock() }
-            var context = taskContexts[task.taskIdentifier] ?? TaskContext()
-            update(&context)
-            taskContexts[task.taskIdentifier] = context
+            let id = task.taskIdentifier
+            state.withLock { update(&$0.taskContexts[id, default: TaskContext()]) }
         }
 
         package func addWireBytes(_ count: Int, for task: URLSessionTask, limit: Int) -> Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            var context = taskContexts[task.taskIdentifier] ?? TaskContext()
+            let id = task.taskIdentifier
+            return state.withLock { state in
+                let exceeded = Self.countWireBytes(count, into: &state.taskContexts[id, default: TaskContext()], limit: limit)
+                if exceeded {
+                    Self.retainLimitExceeded(id, in: &state)
+                }
+                return exceeded
+            }
+        }
+
+        /// One `didReceive data` chunk: wire-limit accounting and the in-place append, in a single
+        /// critical section. Returns `true` when the wire limit is exceeded; the chunk is then not
+        /// appended (the same outcome as `addWireBytes` followed by `append` only when not exceeded).
+        package func receive(_ chunk: Data, for task: URLSessionTask, limit: Int) -> Bool {
+            let id = task.taskIdentifier
+            return state.withLock { state in
+                let exceeded = Self.accumulate(chunk, into: &state.taskContexts[id, default: TaskContext()], limit: limit)
+                if exceeded {
+                    Self.retainLimitExceeded(id, in: &state)
+                }
+                return exceeded
+            }
+        }
+
+        private static func countWireBytes(_ count: Int, into context: inout TaskContext, limit: Int) -> Bool {
             context.wireBytesReceived += count
             if context.wireBytesReceived > limit {
                 context.limitExceeded = true
-                if !limitExceededTaskIDs.contains(task.taskIdentifier) {
-                    limitExceededTaskIDs.append(task.taskIdentifier)
-                    if limitExceededTaskIDs.count > maxRetainedViolations {
-                        limitExceededTaskIDs.removeFirst()
-                    }
-                }
-                taskContexts[task.taskIdentifier] = context
                 return true
             }
-            taskContexts[task.taskIdentifier] = context
             return false
         }
 
-        package func recordSecurityViolation(for task: URLSessionTask) {
-            lock.lock()
-            if !securityViolatedTaskIDs.contains(task.taskIdentifier) {
-                securityViolatedTaskIDs.append(task.taskIdentifier)
-                if securityViolatedTaskIDs.count > maxRetainedViolations {
-                    securityViolatedTaskIDs.removeFirst()
+        private static func accumulate(_ chunk: Data, into context: inout TaskContext, limit: Int) -> Bool {
+            if countWireBytes(chunk.count, into: &context, limit: limit) {
+                return true
+            }
+            context.data.append(chunk)
+            return false
+        }
+
+        private static func retainLimitExceeded(_ id: Int, in state: inout State) {
+            if !state.limitExceededTaskIDs.contains(id) {
+                state.limitExceededTaskIDs.append(id)
+                if state.limitExceededTaskIDs.count > maxRetainedViolations {
+                    state.limitExceededTaskIDs.removeFirst()
                 }
             }
-            var context = taskContexts[task.taskIdentifier] ?? TaskContext()
-            context.securityViolation = true
-            taskContexts[task.taskIdentifier] = context
-            lock.unlock()
+        }
+
+        private static func retainSecurityViolation(_ id: Int, in state: inout State) {
+            if !state.securityViolatedTaskIDs.contains(id) {
+                state.securityViolatedTaskIDs.append(id)
+                if state.securityViolatedTaskIDs.count > maxRetainedViolations {
+                    state.securityViolatedTaskIDs.removeFirst()
+                }
+            }
+        }
+
+        package func recordSecurityViolation(for task: URLSessionTask) {
+            let id = task.taskIdentifier
+            state.withLock { state in
+                Self.retainSecurityViolation(id, in: &state)
+                state.taskContexts[id, default: TaskContext()].securityViolation = true
+            }
         }
 
         package func recordLimitExceeded(for task: URLSessionTask) {
-            lock.lock()
-            if !limitExceededTaskIDs.contains(task.taskIdentifier) {
-                limitExceededTaskIDs.append(task.taskIdentifier)
-                if limitExceededTaskIDs.count > maxRetainedViolations {
-                    limitExceededTaskIDs.removeFirst()
-                }
+            let id = task.taskIdentifier
+            state.withLock { state in
+                Self.retainLimitExceeded(id, in: &state)
+                state.taskContexts[id, default: TaskContext()].limitExceeded = true
             }
-            var context = taskContexts[task.taskIdentifier] ?? TaskContext()
-            context.limitExceeded = true
-            taskContexts[task.taskIdentifier] = context
-            lock.unlock()
         }
 
         package func hasAnySecurityViolation() -> Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            return taskContexts.values.contains { $0.securityViolation }
+            state.withLock { $0.taskContexts.values.contains { $0.securityViolation } }
         }
 
         package func hasAnyLimitExceeded() -> Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            return taskContexts.values.contains { $0.limitExceeded }
+            state.withLock { $0.taskContexts.values.contains { $0.limitExceeded } }
         }
 
         package func isSecurityViolation(for task: URLSessionTask) -> Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            return securityViolatedTaskIDs.contains(task.taskIdentifier) || (taskContexts[task.taskIdentifier]?.securityViolation ?? false)
+            let id = task.taskIdentifier
+            return state.withLock { $0.securityViolatedTaskIDs.contains(id) || ($0.taskContexts[id]?.securityViolation ?? false) }
         }
 
         package func isLimitExceeded(for task: URLSessionTask) -> Bool {
-            lock.lock()
-            defer { lock.unlock() }
-            return limitExceededTaskIDs.contains(task.taskIdentifier) || (taskContexts[task.taskIdentifier]?.limitExceeded ?? false)
+            let id = task.taskIdentifier
+            return state.withLock { $0.limitExceededTaskIDs.contains(id) || ($0.taskContexts[id]?.limitExceeded ?? false) }
         }
 
         package func pruneCompletedTask(_ task: URLSessionTask) {
-            lock.lock()
-            securityViolatedTaskIDs.removeAll { $0 == task.taskIdentifier }
-            limitExceededTaskIDs.removeAll { $0 == task.taskIdentifier }
-            lock.unlock()
+            let id = task.taskIdentifier
+            state.withLock { state in
+                state.securityViolatedTaskIDs.removeAll { $0 == id }
+                state.limitExceededTaskIDs.removeAll { $0 == id }
+            }
         }
 
         package func setApprovedAddresses(_ addresses: Set<String>, for task: URLSessionTask) {
@@ -162,33 +193,36 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         package func setResponse(_ response: URLResponse, for task: URLSessionTask) {
             updateContext(for: task) { $0.response = response }
         }
+
         package func append(_ data: Data, for task: URLSessionTask) {
             updateContext(for: task) { $0.data.append(data) }
         }
 
         package func finish(_ task: URLSessionTask, error: Error?) {
-            lock.lock()
-            let wasViolated = securityViolatedTaskIDs.contains(task.taskIdentifier)
-            let wasLimitExceeded = limitExceededTaskIDs.contains(task.taskIdentifier)
-            guard let context = taskContexts.removeValue(forKey: task.taskIdentifier) else {
-                lock.unlock()
-                return
+            let id = task.taskIdentifier
+            let outcome: (completion: (@Sendable (Result<(Data, URLResponse), Error>) -> Void)?, result: Result<(Data, URLResponse), Error>)? = state.withLock { state in
+                let wasViolated = state.securityViolatedTaskIDs.contains(id)
+                let wasLimitExceeded = state.limitExceededTaskIDs.contains(id)
+                guard let context = state.taskContexts.removeValue(forKey: id) else {
+                    return nil
+                }
+                let result: Result<(Data, URLResponse), Error>
+                if context.securityViolation || wasViolated {
+                    result = .failure(NetworkError.securityViolation)
+                } else if context.limitExceeded || wasLimitExceeded {
+                    result = .failure(NetworkError.responseLimitExceeded("Response limit exceeded"))
+                } else if let error {
+                    result = .failure(error)
+                } else if let response = context.response {
+                    // The context was removed from the dictionary, so this Data is uniquely owned.
+                    result = .success((context.data, response))
+                } else {
+                    result = .failure(NetworkError.invalidResponse(description: "Received no response"))
+                }
+                return (context.completion, result)
             }
-            let completion = context.completion
-            let result: Result<(Data, URLResponse), Error>
-            if context.securityViolation || wasViolated {
-                result = .failure(NetworkError.securityViolation)
-            } else if context.limitExceeded || wasLimitExceeded {
-                result = .failure(NetworkError.responseLimitExceeded("Response limit exceeded"))
-            } else if let error {
-                result = .failure(error)
-            } else if let response = context.response {
-                result = .success((context.data, response))
-            } else {
-                result = .failure(NetworkError.invalidResponse(description: "Received no response"))
-            }
-            lock.unlock()
-            completion?(result)
+            guard let outcome else { return }
+            outcome.completion?(outcome.result)
         }
     }
 
@@ -198,7 +232,7 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             && !normalized.contains(where: IPAddress.isPrivateOrReservedAddress)
             && !normalized.isDisjoint(with: approved)
     }
-    package struct TaskContext {
+    package struct TaskContext: Sendable {
         var redirectCount = 0
         var wireBytesReceived = 0
         var limitExceeded = false
@@ -331,12 +365,10 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         dataTask: URLSessionDataTask,
         didReceive data: Data
     ) {
-        let exceeded = contextManager.addWireBytes(data.count, for: dataTask, limit: limits.maximumWireBytes)
+        let exceeded = contextManager.receive(data, for: dataTask, limit: limits.maximumWireBytes)
         if exceeded {
             LogManager.logError("Wire bytes exceeded maximum limit of \(limits.maximumWireBytes) bytes")
             dataTask.cancel()
-        } else {
-            contextManager.append(data, for: dataTask)
         }
     }
 

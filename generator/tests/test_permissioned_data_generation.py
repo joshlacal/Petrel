@@ -295,7 +295,7 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         # out-of-line decode diagnostics).
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "00122076f730dc8306f6ac16de8eb7903fa82442976a06e513d7eea0044f3641",
+            "f1df256f26b6d189f3dafb5120b4ece104faa9ce214b074f1e170405fe4f4ebb",
         )
 
     def test_server_contract_flag_false_preserves_direct_input_bytes(self):
@@ -311,7 +311,7 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         # out-of-line decode diagnostics).
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "e0a1c8ae98828828194c4f853836b0e5633ca46268d38b32513a05017cb93fa7",
+            "74912d26d9918283e69f963b2bde7406e0c9f864a4fe97b4969196f25168f3ca",
         )
 
     def test_server_contract_presence_aware_decoders_compile_and_reject_malformed_values(self):
@@ -346,6 +346,9 @@ class PermissionedDataGenerationTests(unittest.TestCase):
             }}
             public struct OrderedCBORMap {{
                 public init() {{}}
+                public init(minimumCapacity: Int) {{}}
+                public mutating func append(key: String, value: Any) {{}}
+                public static func unionVariant(typeIdentifier: String, payload: Any) -> Self {{ Self() }}
                 public func adding(key: String, value: Any) -> Self {{ self }}
             }}
             public enum LogManager {{

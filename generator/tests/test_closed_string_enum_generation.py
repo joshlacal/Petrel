@@ -325,6 +325,9 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             }}
             public struct OrderedCBORMap {{
                 public init() {{}}
+                public init(minimumCapacity: Int) {{}}
+                public mutating func append(key: String, value: Any) {{}}
+                public static func unionVariant(typeIdentifier: String, payload: Any) -> Self {{ Self() }}
                 public func adding(key: String, value: Any) -> Self {{ self }}
             }}
             public enum LogManager {{

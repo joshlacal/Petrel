@@ -1366,7 +1366,7 @@ class GeneratorProjectionPublicationTests(unittest.TestCase):
         ])
         value_container = expected_files["Core/Types/ATProtocolValueContainer.swift"]
         self.assertIn(
-            "self = try ATProtocolValueContainer.decodeValue(from: decoder)",
+            "self = try Self.decodeValue(",
             value_container,
         )
         self.assertIn("container.decode(UInt64.self)", value_container)

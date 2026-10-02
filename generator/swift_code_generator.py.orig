@@ -316,7 +316,6 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             'is_type_alias': False,
             'properties': [],
             'type_alias_target': None,
-            'parallel_array': None,
         }
 
         if output_schema.get('type') == 'ref':
@@ -338,60 +337,8 @@ class SwiftCodeGenerator(BaseCodeGenerator):
                 "Output",
                 nullable_fields=output_schema.get('nullable', []),
             )
-            context['parallel_array'] = self.parallel_array_member(
-                encoding, output_schema, context['properties']
-            )
 
         return self.template_manager.output_struct_template.render(**context)
-
-    def parallel_array_member(self, encoding, output_schema, properties):
-        """Return the template context for an output that is eligible for parallel array decoding.
-
-        Eligible: an application/json object output with exactly one required, non-nullable array
-        property whose items are a union or a ref to an object/record definition. The other members
-        are decoded by Output.init(from:) itself (from the document with the array blanked to `[]`),
-        so they need no special handling. Returns None otherwise.
-        """
-        if encoding != 'application/json' or not properties:
-            return None
-        schemas = output_schema.get('properties', {})
-        candidates = []
-        for prop in properties:
-            schema = schemas.get(prop['name'])
-            if not isinstance(schema, dict) or schema.get('type') != 'array':
-                continue
-            items = schema.get('items')
-            if not isinstance(items, dict) or prop.get('optional') or prop.get('strict_decode') or prop.get('boxed'):
-                continue
-            item_kind = items.get('type')
-            if item_kind == 'union':
-                candidates.append(prop)
-            elif item_kind == 'ref' and self.ref_targets_object(items.get('ref', '')):
-                candidates.append(prop)
-        if len(candidates) != 1:
-            return None
-        prop = candidates[0]
-        swift_type = prop['type']
-        if not (swift_type.startswith('[') and swift_type.endswith(']')) or ':' in swift_type:
-            return None
-        return {
-            'name': prop['name'],
-            'json_key': prop['name'],
-            'element_type': swift_type[1:-1],
-        }
-
-    def ref_targets_object(self, ref: str) -> bool:
-        """True when `ref` resolves to an object or record definition."""
-        if not isinstance(ref, str) or not ref:
-            return False
-        nsid, separator, fragment = ref.partition('#')
-        if not nsid:
-            schema = self.defs.get(fragment)
-        else:
-            key = nsid if not separator or fragment == 'main' else ref
-            registry = getattr(self.cycle_detector, 'schemas_by_ref', None)
-            schema = registry.get(key) if registry is not None else None
-        return isinstance(schema, dict) and schema.get('type') in ('object', 'record')
 
     def validate_output_local_refs(self) -> None:
         """Reject references to missing local definitions in every output shape."""

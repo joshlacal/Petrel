@@ -164,16 +164,10 @@ extension ATProtoClient.{{ template_namespace_name }} {
             }
             {% endif %}
 
-            {% if output_encoding == "application/json" %}do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode({{ output_type }}.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("{{ endpoint | escapeStringLiteral }}", error)
-                return (responseCode, nil)
-            }{% else %}let decodedData = {{ output_type }}(data: responseData)
+            {% if output_encoding == "application/json" %}// A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse({{ output_type }}.self, from: responseData, endpoint: "{{ endpoint | escapeStringLiteral }}")
+            return (responseCode, decodedData){% else %}let decodedData = {{ output_type }}(data: responseData)
             return (responseCode, decodedData){% endif %}
         } else {
             {% if has_errors %}// Try to parse a declared structured error response

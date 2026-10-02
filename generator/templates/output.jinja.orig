@@ -2,7 +2,7 @@
 {% if is_type_alias %}
     public typealias Output = {{ type_alias_target }}
     {% else %}
-    public struct Output: ATProtocolCodable{% if parallel_array %}, XRPCParallelArrayDecodable{% endif %} {
+    public struct Output: ATProtocolCodable {
         {% if properties and properties|length > 0 %}
         {% for prop in properties %}
         public let {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
@@ -138,24 +138,7 @@
             {% endif %}
         }
         
-        {% if parallel_array %}
-        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
-
-        public typealias ParallelArrayElement = {{ parallel_array.element_type }}
-
-        public static var parallelArrayKey: String { "{{ parallel_array.json_key | escapeStringLiteral }}" }
-
-        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
-            {%- for prop in properties %}
-            {%- if prop.name == parallel_array.name %}
-            self.{{ prop.name|sanitizeKeyword }} = elements
-            {%- else %}
-            self.{{ prop.name|sanitizeKeyword }} = prototype.{{ prop.name|sanitizeKeyword }}
-            {%- endif %}
-            {%- endfor %}
-        }
-
-        {% endif %}{% if properties and properties|length > 0 %}
+        {% if properties and properties|length > 0 %}
         {% if properties | selectattr('strict_decode') | list %}{% include 'strictRefDecoding.jinja' %}
 
         {% endif %}private enum CodingKeys: String, CodingKey {

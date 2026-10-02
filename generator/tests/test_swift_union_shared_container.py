@@ -123,6 +123,9 @@ class UnionSharedContainerTests(unittest.TestCase):
             }}
             public struct OrderedCBORMap {{
                 public init() {{}}
+                public init(minimumCapacity: Int) {{}}
+                public mutating func append(key: String, value: Any) {{}}
+                public static func unionVariant(typeIdentifier: String, payload: Any) -> Self {{ Self() }}
                 public var entries: [(String, Any)] {{ [] }}
                 public func adding(key: String, value: Any) -> Self {{ self }}
             }}

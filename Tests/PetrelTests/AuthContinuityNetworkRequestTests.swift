@@ -2,7 +2,7 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
-@testable import Petrel
+@_spi(XRPCDecodeExperimental) @testable import Petrel
 import XCTest
 
 final class AuthContinuityNetworkRequestTests: XCTestCase {
@@ -198,6 +198,61 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         assertContinuityChanged(result)
         let requestCount = await fixture.transport.requests.count
         XCTAssertEqual(requestCount, 1)
+    }
+
+    /// The generated endpoint routes its decode through `XRPCResponseDecoding`, which checks for
+    /// cancellation first: a caller cancelled while its request was in flight gets
+    /// `CancellationError` instead of a late decoded value.
+    func testGeneratedEndpointThrowsCancellationErrorWhenCallerCancelledInFlight() async throws {
+        let responseGate = AsyncGate(initiallyOpen: false)
+        let fixture = await makeFixture(responseGate: responseGate)
+        let task = Task {
+            try await XRPCResponseDecoding.$configurationOverride.withValue(.standard) {
+                try await fixture.client.com.atproto.server.describeServer()
+            }
+        }
+        await fixture.transport.waitForRequestCount(1)
+        task.cancel()
+        await responseGate.open()
+
+        do {
+            let value = try await task.value
+            XCTFail("Expected CancellationError, got \(value.responseCode)")
+        } catch is CancellationError {
+            // expected
+        }
+        let requestCount = await fixture.transport.requests.count
+        XCTAssertEqual(requestCount, 1)
+    }
+
+    /// Control for the test above: with the decode-entry cancellation check switched off, the same
+    /// cancelled caller receives the decoded response (the behaviour before the decode entry existed).
+    func testGeneratedEndpointDecodesForCancelledCallerWhenCheckIsOff() async throws {
+        let responseGate = AsyncGate(initiallyOpen: false)
+        let fixture = await makeFixture(responseGate: responseGate)
+        let task = Task {
+            try await XRPCResponseDecoding.$configurationOverride.withValue(
+                XRPCResponseDecoding.Configuration(checksCancellationBeforeDecode: false)
+            ) {
+                try await fixture.client.com.atproto.server.describeServer()
+            }
+        }
+        await fixture.transport.waitForRequestCount(1)
+        task.cancel()
+        await responseGate.open()
+
+        let value = try await task.value
+        XCTAssertEqual(value.responseCode, 200)
+        XCTAssertEqual(value.data?.did.didString(), "did:web:example")
+    }
+
+    /// A decode failure is still reported as `(code, nil)`, not thrown.
+    func testGeneratedEndpointDecodeFailureStillReturnsNilData() async throws {
+        let fixture = await makeFixture(headers: ["Content-Type": "application/json"])
+        await fixture.transport.setBody(Data(#"{"availableUserDomains":"not-an-array","did":"did:web:example"}"#.utf8))
+        let value = try await fixture.client.com.atproto.server.describeServer()
+        XCTAssertEqual(value.responseCode, 200)
+        XCTAssertNil(value.data)
     }
 
     func testProviderCannotRewritePreparedRequestOrigin() async throws {
@@ -783,6 +838,11 @@ private actor ExactAuthTransport {
     private let responseGate: AsyncGate?
     private let requestEvent = AsyncEvent()
     private(set) var requests: [URLRequest] = []
+    private var body = Data(#"{"availableUserDomains":["example"],"did":"did:web:example"}"#.utf8)
+
+    func setBody(_ body: Data) {
+        self.body = body
+    }
 
     init(statusCode: Int, headers: [String: String], responseGate: AsyncGate?) {
         self.statusCode = statusCode
@@ -803,7 +863,6 @@ private actor ExactAuthTransport {
             httpVersion: "HTTP/1.1",
             headerFields: responseHeaders
         )!
-        let body = Data(#"{"availableUserDomains":["example"],"did":"did:web:example"}"#.utf8)
         protocolInstance.client?.urlProtocol(protocolInstance, didReceive: response, cacheStoragePolicy: .notAllowed)
         protocolInstance.client?.urlProtocol(protocolInstance, didLoad: body)
         protocolInstance.client?.urlProtocolDidFinishLoading(protocolInstance)

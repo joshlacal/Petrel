@@ -78,20 +78,12 @@ class RequiredNullableGenerationTests(unittest.TestCase):
         source = textwrap.dedent(
             f"""
             public protocol ATProtocolCodable: Codable {{}}
-            public protocol XRPCParallelArrayDecodable: Decodable {{
-                associatedtype ParallelArrayElement: Decodable
-                static var parallelArrayKey: String {{ get }}
-                init(parallelArrayPrototype prototype: Self, parallelArrayElements elements: [ParallelArrayElement])
-            }}
             public protocol ATProtocolValue: Codable, Equatable, Hashable {{
                 func isEqual(to other: any ATProtocolValue) -> Bool
                 func toCBORValue() throws -> Any
             }}
             public struct OrderedCBORMap {{
                 public init() {{}}
-                public init(minimumCapacity: Int) {{}}
-                public mutating func append(key: String, value: Any) {{}}
-                public static func unionVariant(typeIdentifier: String, payload: Any) -> Self {{ Self() }}
                 public func adding(key: String, value: Any) -> Self {{ self }}
             }}
             public enum LogManager {{
@@ -192,16 +184,6 @@ class RequiredNullableGenerationTests(unittest.TestCase):
                 optionalNote: "custom"
             )
             precondition(explicitConstructed.optionalNote == "custom")
-
-            typealias Output = BlueCatbirdTestRequiredNullable.Output
-            precondition(Output.parallelArrayKey == "entries")
-            let outputData = Data(
-                #"{{"entries":[{{"nullableScalar":null,"nullableCID":null,"requiredCount":1}},{{"nullableScalar":"x","nullableCID":null,"requiredCount":2,"optionalNote":"n"}}]}}"#.utf8
-            )
-            let prototype = try! decoder.decode(Output.self, from: Data(#"{{"entries":[]}}"#.utf8))
-            let elements = try! decoder.decode(Output.self, from: outputData).entries
-            let assembled = Output(parallelArrayPrototype: prototype, parallelArrayElements: elements)
-            precondition(assembled.entries.count == 2 && assembled.entries[1].optionalNote == "n")
             """
         )
 
