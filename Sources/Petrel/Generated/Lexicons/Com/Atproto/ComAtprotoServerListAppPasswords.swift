@@ -107,7 +107,7 @@ public enum ComAtprotoServerListAppPasswords {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let passwords: [AppPassword]
 
         /// Standard public initializer
@@ -137,6 +137,18 @@ public enum ComAtprotoServerListAppPasswords {
             map.append(key: "passwords", value: passwordsValue)
 
             return map
+        }
+
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = AppPassword
+
+        public static var parallelArrayKey: String {
+            "passwords"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            passwords = elements
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -194,16 +206,10 @@ public extension ATProtoClient.Com.Atproto.Server {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoServerListAppPasswords.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.listAppPasswords", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(ComAtprotoServerListAppPasswords.Output.self, from: responseData, endpoint: "com.atproto.server.listAppPasswords")
+            return (responseCode, decodedData)
         } else {
             // Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(

@@ -83,7 +83,7 @@ public enum ComAtprotoSyncListReposByCollection {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let repos: [Repo]
@@ -138,6 +138,19 @@ public enum ComAtprotoSyncListReposByCollection {
             return map
         }
 
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = Repo
+
+        public static var parallelArrayKey: String {
+            "repos"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            repos = elements
+        }
+
         private enum CodingKeys: String, CodingKey {
             case cursor
             case repos
@@ -185,16 +198,10 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSyncListReposByCollection.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.sync.listReposByCollection", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(ComAtprotoSyncListReposByCollection.Output.self, from: responseData, endpoint: "com.atproto.sync.listReposByCollection")
+            return (responseCode, decodedData)
         } else {
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)

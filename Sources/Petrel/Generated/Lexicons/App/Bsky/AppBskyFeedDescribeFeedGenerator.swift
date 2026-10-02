@@ -160,7 +160,7 @@ public enum AppBskyFeedDescribeFeedGenerator {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let did: DID
 
         public let feeds: [Feed]
@@ -228,6 +228,20 @@ public enum AppBskyFeedDescribeFeedGenerator {
             return map
         }
 
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = Feed
+
+        public static var parallelArrayKey: String {
+            "feeds"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            did = prototype.did
+            feeds = elements
+            links = prototype.links
+        }
+
         private enum CodingKeys: String, CodingKey {
             case did
             case feeds
@@ -274,16 +288,10 @@ public extension ATProtoClient.App.Bsky.Feed {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyFeedDescribeFeedGenerator.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.feed.describeFeedGenerator", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyFeedDescribeFeedGenerator.Output.self, from: responseData, endpoint: "app.bsky.feed.describeFeedGenerator")
+            return (responseCode, decodedData)
         } else {
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)

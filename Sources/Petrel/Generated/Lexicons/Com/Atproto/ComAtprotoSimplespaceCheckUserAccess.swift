@@ -123,16 +123,10 @@ public extension ATProtoClient.Com.Atproto.Simplespace {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSimplespaceCheckUserAccess.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.simplespace.checkUserAccess", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(ComAtprotoSimplespaceCheckUserAccess.Output.self, from: responseData, endpoint: "com.atproto.simplespace.checkUserAccess")
+            return (responseCode, decodedData)
         } else {
             if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
                 throw genericError

@@ -152,7 +152,7 @@ public enum ComAtprotoSyncListHosts {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let hosts: [Host]
@@ -207,6 +207,19 @@ public enum ComAtprotoSyncListHosts {
             return map
         }
 
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = Host
+
+        public static var parallelArrayKey: String {
+            "hosts"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            hosts = elements
+        }
+
         private enum CodingKeys: String, CodingKey {
             case cursor
             case hosts
@@ -254,16 +267,10 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSyncListHosts.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.sync.listHosts", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(ComAtprotoSyncListHosts.Output.self, from: responseData, endpoint: "com.atproto.sync.listHosts")
+            return (responseCode, decodedData)
         } else {
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)

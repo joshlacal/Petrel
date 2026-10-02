@@ -27,7 +27,7 @@ public enum ChatBskyModerationGetMessageContext {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let messages: [OutputMessagesUnion]
 
         /// Standard public initializer
@@ -57,6 +57,18 @@ public enum ChatBskyModerationGetMessageContext {
             map.append(key: "messages", value: messagesValue)
 
             return map
+        }
+
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = OutputMessagesUnion
+
+        public static var parallelArrayKey: String {
+            "messages"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            messages = elements
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -213,16 +225,10 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyModerationGetMessageContext.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.moderation.getMessageContext", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(ChatBskyModerationGetMessageContext.Output.self, from: responseData, endpoint: "chat.bsky.moderation.getMessageContext")
+            return (responseCode, decodedData)
         } else {
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)

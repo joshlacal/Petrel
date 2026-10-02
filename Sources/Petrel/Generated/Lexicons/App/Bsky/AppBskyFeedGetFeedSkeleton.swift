@@ -21,7 +21,7 @@ public enum AppBskyFeedGetFeedSkeleton {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let feed: [AppBskyFeedDefs.SkeletonFeedPost]
@@ -99,6 +99,20 @@ public enum AppBskyFeedGetFeedSkeleton {
             return map
         }
 
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = AppBskyFeedDefs.SkeletonFeedPost
+
+        public static var parallelArrayKey: String {
+            "feed"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            feed = elements
+            reqId = prototype.reqId
+        }
+
         private enum CodingKeys: String, CodingKey {
             case cursor
             case feed
@@ -158,16 +172,10 @@ public extension ATProtoClient.App.Bsky.Feed {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyFeedGetFeedSkeleton.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.feed.getFeedSkeleton", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyFeedGetFeedSkeleton.Output.self, from: responseData, endpoint: "app.bsky.feed.getFeedSkeleton")
+            return (responseCode, decodedData)
         } else {
             // Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(

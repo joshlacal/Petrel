@@ -21,7 +21,7 @@ public enum ChatBskyConvoGetMessages {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let messages: [OutputMessagesUnion]
@@ -97,6 +97,20 @@ public enum ChatBskyConvoGetMessages {
             }
 
             return map
+        }
+
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = OutputMessagesUnion
+
+        public static var parallelArrayKey: String {
+            "messages"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            messages = elements
+            relatedProfiles = prototype.relatedProfiles
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -290,16 +304,10 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyConvoGetMessages.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.getMessages", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(ChatBskyConvoGetMessages.Output.self, from: responseData, endpoint: "chat.bsky.convo.getMessages")
+            return (responseCode, decodedData)
         } else {
             // Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(

@@ -110,7 +110,7 @@ public enum AppBskyGraphGetListsWithMembership {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let listsWithMembership: [ListWithMembership]
@@ -165,6 +165,19 @@ public enum AppBskyGraphGetListsWithMembership {
             return map
         }
 
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = ListWithMembership
+
+        public static var parallelArrayKey: String {
+            "listsWithMembership"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            listsWithMembership = elements
+        }
+
         private enum CodingKeys: String, CodingKey {
             case cursor
             case listsWithMembership
@@ -212,16 +225,10 @@ public extension ATProtoClient.App.Bsky.Graph {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyGraphGetListsWithMembership.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.graph.getListsWithMembership", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyGraphGetListsWithMembership.Output.self, from: responseData, endpoint: "app.bsky.graph.getListsWithMembership")
+            return (responseCode, decodedData)
         } else {
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)

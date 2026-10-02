@@ -24,7 +24,7 @@ public enum AppBskyActorSearchActors {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let actors: [AppBskyActorDefs.ProfileView]
@@ -79,6 +79,19 @@ public enum AppBskyActorSearchActors {
             return map
         }
 
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = AppBskyActorDefs.ProfileView
+
+        public static var parallelArrayKey: String {
+            "actors"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            actors = elements
+        }
+
         private enum CodingKeys: String, CodingKey {
             case cursor
             case actors
@@ -126,16 +139,10 @@ public extension ATProtoClient.App.Bsky.Actor {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyActorSearchActors.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.actor.searchActors", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyActorSearchActors.Output.self, from: responseData, endpoint: "app.bsky.actor.searchActors")
+            return (responseCode, decodedData)
         } else {
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)

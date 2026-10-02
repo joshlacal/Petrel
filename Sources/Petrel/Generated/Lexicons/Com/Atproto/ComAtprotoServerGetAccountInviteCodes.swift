@@ -18,7 +18,7 @@ public enum ComAtprotoServerGetAccountInviteCodes {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let codes: [ComAtprotoServerDefs.InviteCode]
 
         /// Standard public initializer
@@ -48,6 +48,18 @@ public enum ComAtprotoServerGetAccountInviteCodes {
             map.append(key: "codes", value: codesValue)
 
             return map
+        }
+
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = ComAtprotoServerDefs.InviteCode
+
+        public static var parallelArrayKey: String {
+            "codes"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            codes = elements
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -107,16 +119,10 @@ public extension ATProtoClient.Com.Atproto.Server {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoServerGetAccountInviteCodes.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.getAccountInviteCodes", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(ComAtprotoServerGetAccountInviteCodes.Output.self, from: responseData, endpoint: "com.atproto.server.getAccountInviteCodes")
+            return (responseCode, decodedData)
         } else {
             // Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(

@@ -21,7 +21,7 @@ public enum ChatBskyModerationGetConvoMembers {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let members: [ChatBskyActorDefs.ProfileViewBasic]
@@ -74,6 +74,19 @@ public enum ChatBskyModerationGetConvoMembers {
             map.append(key: "members", value: membersValue)
 
             return map
+        }
+
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = ChatBskyActorDefs.ProfileViewBasic
+
+        public static var parallelArrayKey: String {
+            "members"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            members = elements
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -134,16 +147,10 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyModerationGetConvoMembers.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.moderation.getConvoMembers", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(ChatBskyModerationGetConvoMembers.Output.self, from: responseData, endpoint: "chat.bsky.moderation.getConvoMembers")
+            return (responseCode, decodedData)
         } else {
             // Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(

@@ -18,7 +18,7 @@ public enum AppBskyContactGetMatches {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let matches: [AppBskyActorDefs.ProfileView]
@@ -71,6 +71,19 @@ public enum AppBskyContactGetMatches {
             map.append(key: "matches", value: matchesValue)
 
             return map
+        }
+
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = AppBskyActorDefs.ProfileView
+
+        public static var parallelArrayKey: String {
+            "matches"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            matches = elements
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -134,16 +147,10 @@ public extension ATProtoClient.App.Bsky.Contact {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyContactGetMatches.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.contact.getMatches", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyContactGetMatches.Output.self, from: responseData, endpoint: "app.bsky.contact.getMatches")
+            return (responseCode, decodedData)
         } else {
             // Try to parse a declared structured error response
             if let atprotoError = ATProtoErrorParser.parse(

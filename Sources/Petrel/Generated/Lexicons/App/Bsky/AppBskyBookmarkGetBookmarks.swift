@@ -18,7 +18,7 @@ public enum AppBskyBookmarkGetBookmarks {
         }
     }
 
-    public struct Output: ATProtocolCodable {
+    public struct Output: ATProtocolCodable, XRPCParallelArrayDecodable {
         public let cursor: String?
 
         public let bookmarks: [AppBskyBookmarkDefs.BookmarkView]
@@ -73,6 +73,19 @@ public enum AppBskyBookmarkGetBookmarks {
             return map
         }
 
+        // MARK: - Parallel array decoding support (used only by XRPCResponseDecoding's opt-in parallel path)
+
+        public typealias ParallelArrayElement = AppBskyBookmarkDefs.BookmarkView
+
+        public static var parallelArrayKey: String {
+            "bookmarks"
+        }
+
+        public init(parallelArrayPrototype prototype: Output, parallelArrayElements elements: [ParallelArrayElement]) {
+            cursor = prototype.cursor
+            bookmarks = elements
+        }
+
         private enum CodingKeys: String, CodingKey {
             case cursor
             case bookmarks
@@ -120,16 +133,10 @@ public extension ATProtoClient.App.Bsky.Bookmark {
                 throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
             }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyBookmarkGetBookmarks.Output.self, from: responseData)
-
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.bookmark.getBookmarks", error)
-                return (responseCode, nil)
-            }
+            // A decode failure is logged and returned as a nil body (the response code is still returned);
+            // a caller cancelled while the request was in flight gets CancellationError instead of a decode.
+            let decodedData = try await XRPCResponseDecoding.decodeSuccessfulResponse(AppBskyBookmarkGetBookmarks.Output.self, from: responseData, endpoint: "app.bsky.bookmark.getBookmarks")
+            return (responseCode, decodedData)
         } else {
             // If we can't parse a structured error, return the response code
             // (maintains backward compatibility for endpoints without defined errors)
