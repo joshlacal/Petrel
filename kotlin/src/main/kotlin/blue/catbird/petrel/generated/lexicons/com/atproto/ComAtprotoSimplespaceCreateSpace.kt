@@ -225,8 +225,8 @@ object ComAtprotoSimplespaceCreateSpaceInputAppAccessUnionSerializer : kotlinx.s
 
 @Serializable
     data class ComAtprotoSimplespaceCreateSpaceInput(
-// The NSID of the space type, describing the modality of the space (e.g. app.bsky.group, app.bsky.personal).        @SerialName("type")
-        val type: NSID,// The space key. Used to differentiate multiple spaces of the same type under the same owner. Same syntax requirements as a record key. If not provided, one will be auto-generated (TID).        @SerialName("skey")
+// The NSID of the space type, describing the modality of the space (e.g. app.bsky.group, app.bsky.personal).        @SerialName("spaceType")
+        val spaceType: NSID,// The space key. Used to differentiate multiple spaces of the same type under the same owner. Same syntax requirements as a record key. If not provided, one will be auto-generated (TID).        @SerialName("skey")
         val skey: String? = null,// How the authority decides whether to authorize a user to read the space.        @SerialName("readPolicy")
         val readPolicy: ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion,// How the authority decides whether to track and forward a user's write notifications.        @SerialName("writePolicy")
         val writePolicy: ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion,// How the authority decides whether to authorize a requesting app.        @SerialName("appAccess")

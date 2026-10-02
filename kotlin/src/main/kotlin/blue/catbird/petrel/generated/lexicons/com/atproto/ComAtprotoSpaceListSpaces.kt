@@ -27,8 +27,8 @@ object ComAtprotoSpaceListSpacesDefs {
 
 @Serializable
     data class ComAtprotoSpaceListSpacesParameters(
-// Filter to spaces of this type.        @SerialName("type")
-        val type: NSID? = null,// Filter to spaces under this authority DID.        @SerialName("did")
+// Filter to spaces of this space type.        @SerialName("spaceType")
+        val spaceType: NSID? = null,// Filter to spaces under this authority DID.        @SerialName("did")
         val did: DID? = null,// The number of spaces to return.        @SerialName("limit")
         val limit: Int? = null,        @SerialName("cursor")
         val cursor: String? = null    )
