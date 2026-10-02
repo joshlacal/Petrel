@@ -3,6 +3,7 @@ package blue.catbird.petrel.client
 import blue.catbird.petrel.auth.gateway.ConfidentialGatewayStrategy
 import blue.catbird.petrel.auth.gateway.CurrentAccount
 import blue.catbird.petrel.auth.gateway.GatewayCallbackResult
+import blue.catbird.petrel.auth.gateway.GatewaySessionResponse
 import blue.catbird.petrel.auth.gateway.GatewaySessionStorage
 import io.ktor.client.HttpClient
 import java.util.Collections
@@ -109,3 +110,15 @@ suspend fun ATProtoClient.gatewayLogoutViaStrategy() {
 /** See [ConfidentialGatewayStrategy.tokensExist]. */
 suspend fun ATProtoClient.gatewayTokensExist(): Boolean =
     requireGateway().tokensExist()
+
+/** Set or get the callback invoked when the gateway invalidates the session (e.g. terminal 401). */
+var ATProtoClient.onSessionInvalidated: ((did: String) -> Unit)?
+    get() = gatewayStrategy?.onSessionInvalidated
+    set(value) {
+        gatewayStrategy?.onSessionInvalidated = value
+    }
+
+/** See [ConfidentialGatewayStrategy.checkSession]. */
+suspend fun ATProtoClient.gatewayCheckSession(): GatewaySessionResponse =
+    requireGateway().checkSession()
+
