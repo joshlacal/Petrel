@@ -1,5 +1,6 @@
 import Foundation
 import SwiftCBOR
+import Synchronization
 
 // Only the cases whose payload is large (`any ATProtocolValue` is 40 bytes,
 // ATProtoLink 32) or directly recursive are boxed. Scalar, string, bytes and
@@ -22,102 +23,483 @@ public enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
     
     public typealias DecoderFunction = @Sendable (Decoder) throws -> ATProtocolValueContainer
 
+    /// The registered Swift type's own throwing decode (see `TypeDecoderFactory.Entry.decodeTyped`).
+    typealias TypedDecoderFunction = @Sendable (Decoder) throws -> any ATProtocolValue
+
     // A factory for resolving decoders based on type string. Extensible so
     // overlay packages (extra lexicon namespaces generated against this core)
     // can register their own typed decoders at startup; unregistered types
-    // decode as .unknownType.
-    final class TypeDecoderFactory: @unchecked Sendable {
-        private var decoders: [String: DecoderFunction]
-        private let lock = NSLock()
+    // decode as .unknownType. A later registration replaces an earlier one for
+    // the same id, including a generated core id (an overlay may ship its own
+    // com.atproto.repo.applyWrites write types), so overlays always win.
+    final class TypeDecoderFactory: Sendable {
+        struct Entry: Sendable {
+            let decode: DecoderFunction
+            /// For a typed registration, the Swift type's own initializer with the error rethrown
+            /// after the debug log line. `decode` wraps the same initializer and renders the error
+            /// into a `.decodeError` string, which the JSON object paths never read: they only ask
+            /// whether the typed decode produced a value, so they call this and skip the rendering
+            /// (one failed typed decode otherwise costs more than a small record). Nil for closure
+            /// registrations, whose closure is the only decode there is.
+            let decodeTyped: TypedDecoderFunction?
+            /// True only while exactly one Swift type is known to claim this id: the
+            /// registered type, whose `typeIdentifier` equals the id. Typed-first fidelity
+            /// relies on it to compare a nested `$type` object's typed re-encoding with the
+            /// JSON directly instead of decoding that object through the registry again.
+            let typeIdentifierVerified: Bool
+            /// True for generated core ids, also after an overlay replaced the core decoder.
+            let isCoreID: Bool
+            /// The Swift type registered through a typed overload; nil for closure registrations.
+            let registeredType: ObjectIdentifier?
+
+            init(
+                decode: @escaping DecoderFunction,
+                decodeTyped: TypedDecoderFunction?,
+                typeIdentifierVerified: Bool,
+                isCoreID: Bool,
+                registeredType: ObjectIdentifier?
+            ) {
+                self.decode = decode
+                self.decodeTyped = decodeTyped
+                self.typeIdentifierVerified = typeIdentifierVerified
+                self.isCoreID = isCoreID
+                self.registeredType = registeredType
+            }
+
+            init(
+                decoders: (decode: DecoderFunction, decodeTyped: TypedDecoderFunction),
+                typeIdentifierVerified: Bool,
+                isCoreID: Bool,
+                registeredType: ObjectIdentifier?
+            ) {
+                self.init(
+                    decode: decoders.decode,
+                    decodeTyped: decoders.decodeTyped,
+                    typeIdentifierVerified: typeIdentifierVerified,
+                    isCoreID: isCoreID,
+                    registeredType: registeredType
+                )
+            }
+
+            /// The typed decode as the JSON object paths observe it: the value, or nil when the
+            /// registered decoder threw or returned anything but `.knownType`. Same outcomes and the
+            /// same debug log line as calling `decode` and matching on `.knownType`.
+            func knownTypeValue(from decoder: Decoder) -> ATProtocolValueContainer? {
+                if let decodeTyped {
+                    return (try? decodeTyped(decoder)).map { .knownType($0) }
+                }
+                guard let typedValue = try? decode(decoder), case .knownType = typedValue else {
+                    return nil
+                }
+                return typedValue
+            }
+        }
+
+        /// One table behind one lock. Overlays replace entries in place, so every lookup is one
+        /// uncontended lock plus one hash probe, with or without overlay registrations.
+        private let entries: Mutex<[String: Entry]>
 
         init() {
-            var decoders: [String: DecoderFunction] = [:]
-            decoders.reserveCapacity({{ type_cases | length }})
+            var entries: [String: Entry] = [:]
+            entries.reserveCapacity({{ type_cases | length }})
             {% for chunk in type_cases | batch(25) %}
-            Self.registerChunk{{ loop.index0 }}(into: &decoders)
+            Self.registerChunk{{ loop.index0 }}(into: &entries)
             {% endfor %}
-            self.decoders = decoders
+            self.entries = Mutex(entries)
+        }
+
+        /// Both decode closures of a typed registration. `label` names the type in the debug log
+        /// line and the `.decodeError` text (the Swift type name for generated core ids, the lexicon
+        /// id for overlay registrations).
+        static func typedDecoders<T: ATProtocolValue & Decodable>(
+            _: T.Type,
+            label: String
+        ) -> (decode: DecoderFunction, decodeTyped: TypedDecoderFunction) {
+            let decode: DecoderFunction = { decoder in
+                do {
+                    let decodedObject = try T(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding \(label): \(error)")
+                    return .decodeError("Error decoding \(label): \(error)")
+                }
+            }
+            let decodeTyped: TypedDecoderFunction = { decoder in
+                do {
+                    return try T(from: decoder)
+                } catch {
+                    LogManager.logDebug("Error decoding \(label): \(error)")
+                    throw error
+                }
+            }
+            return (decode, decodeTyped)
         }
 
         {% for chunk in type_cases | batch(25) %}
-        private static func registerChunk{{ loop.index0 }}(into decoders: inout [String: DecoderFunction]) {
+        private static func registerChunk{{ loop.index0 }}(into entries: inout [String: Entry]) {
             {% for type_key, swift_type in chunk %}
-            decoders["{{ type_key | escapeStringLiteral }}"] = { decoder in
-                do {
-                    let decodedObject = try {{ swift_type }}(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding {{ swift_type }}: \(error)")
-                    return .decodeError("Error decoding {{ swift_type }}: \(error)")
-                }
-            }
+            entries["{{ type_key | escapeStringLiteral }}"] = Entry(
+                decoders: typedDecoders({{ swift_type }}.self, label: "{{ swift_type }}"),
+                typeIdentifierVerified: {{ swift_type }}.typeIdentifier == "{{ type_key | escapeStringLiteral }}",
+                isCoreID: true,
+                registeredType: ObjectIdentifier({{ swift_type }}.self)
+            )
             {% endfor %}
         }
         {% endfor %}
 
-        func decoder(for type: String) -> DecoderFunction? {
-            lock.lock()
-            defer { lock.unlock() }
-            return decoders[type]
+        func entry(for type: String) -> Entry? {
+            entries.withLock { $0[type] }
         }
 
-        func register(_ type: String, _ decoderFunction: @escaping DecoderFunction) {
-            lock.lock()
-            defer { lock.unlock() }
-            decoders[type] = decoderFunction
+        func decoder(for type: String) -> DecoderFunction? {
+            entry(for: type)?.decode
+        }
+
+        func register(
+            _ type: String,
+            registeredType: ObjectIdentifier?,
+            typeIdentifierMatches: Bool,
+            decodeTyped: TypedDecoderFunction?,
+            _ decoderFunction: @escaping DecoderFunction
+        ) {
+            entries.withLock { entries in
+                let previous = entries[type]
+                let isCoreID = previous?.isCoreID ?? false
+                // A closure registration, an override of a core id, or a second Swift type
+                // claiming an already claimed id breaks the one-type-per-id invariant, and a
+                // broken id stays unverified for the rest of the process.
+                var verified = registeredType != nil && typeIdentifierMatches && !isCoreID
+                if verified, let previous {
+                    verified = previous.typeIdentifierVerified && previous.registeredType == registeredType
+                }
+                entries[type] = Entry(
+                    decode: decoderFunction,
+                    decodeTyped: decodeTyped,
+                    typeIdentifierVerified: verified,
+                    isCoreID: isCoreID,
+                    registeredType: registeredType
+                )
+            }
         }
     }
 
-    private static let decoderFactory = TypeDecoderFactory()
+    static let decoderFactory = TypeDecoderFactory()
 
     /// Registers a decoder for a lexicon type id (e.g. "blue.catbird.mlsChat.defs#convoView").
     /// Overlay packages call this once at startup for each of their generated types so
     /// values embedded in core responses decode as .knownType instead of .unknownType.
     public static func registerDecoder(forType type: String, _ decoderFunction: @escaping DecoderFunction) {
-        decoderFactory.register(type, decoderFunction)
+        decoderFactory.register(type, registeredType: nil, typeIdentifierMatches: false, decodeTyped: nil, decoderFunction)
     }
 
     /// Convenience registration: decodes `type` as the given ATProtocolValue conformer.
     public static func registerDecoder<T: ATProtocolValue & Decodable>(forType type: String, as valueType: T.Type) {
-        decoderFactory.register(type) { decoder in
-            do {
-                return .knownType(try T(from: decoder))
-            } catch {
-                LogManager.logDebug("Error decoding \(type): \(error)")
-                return .decodeError("Error decoding \(type): \(error)")
-            }
-        }
+        let decoders = TypeDecoderFactory.typedDecoders(T.self, label: type)
+        decoderFactory.register(
+            type,
+            registeredType: ObjectIdentifier(T.self),
+            typeIdentifierMatches: T.typeIdentifier == type,
+            decodeTyped: decoders.decodeTyped,
+            decoders.decode
+        )
     }
 
     public init(from decoder: Decoder) throws {
-        self = try ATProtocolValueContainer.decodeValue(from: decoder)
+        if Self.isStrictJSONDecoder(decoder) {
+            // Dynamic values reached through typed fields are almost always records/objects. Inside a
+            // typed-first record the caller is that record's typed decode, whose fields its legacy
+            // fallback may decode again, so they take the legacy (single-pass) object path.
+            self = try Self.decodeValue(
+                from: decoder,
+                strict: true,
+                hint: .object,
+                typedFirst: !TypedFirstScope.insideRecord
+            )
+        } else {
+            self = try Self.decodeValue(from: decoder, strict: false, hint: nil, typedFirst: false)
+        }
     }
 
-    private static func decodeValue(from decoder: Decoder) throws -> ATProtocolValueContainer {
+    // MARK: Strict-kind decoder detection
+
+    /// Identity of Foundation's JSON decoder implementation (swift-foundation's `JSONDecoderImpl`,
+    /// the same engine on Darwin and Linux), captured once by decoding a sentinel.
+    ///
+    /// Its value kinds are mutually exclusive: `decode(Bool)` requires a JSON bool, `decode(Int)`
+    /// a number, `decode(String)` a string, `unkeyedContainer()` an array, `container(keyedBy:)`
+    /// an object and `decodeNil()` a null; every kind mismatch throws `DecodingError.typeMismatch`.
+    /// For that decoder only, (a) probe order cannot change which probe succeeds or which
+    /// non-typeMismatch error surfaces, and (b) a successful exact-kind request proves what the
+    /// legacy probe chain would have produced. Every other decoder (the in-memory
+    /// `ATProtocolValueContainerDecoder`, property lists, third-party JSON decoders, a
+    /// `JSONDecoder` subclass that swaps the engine) keeps the legacy path byte for byte.
+    private static let strictJSONDecoderTypeID: ObjectIdentifier? = {
+        struct Sentinel: Decodable {
+            let id: ObjectIdentifier
+            init(from decoder: Decoder) throws {
+                id = ObjectIdentifier(type(of: decoder))
+            }
+        }
+        return try? JSONDecoder().decode(Sentinel.self, from: Data("0".utf8)).id
+    }()
+
+    /// Test-only override state. `armed` is set by the first override, so production decoding pays
+    /// one relaxed atomic load and never reads the task-local.
+    private enum LegacyDecodingOverride {
+        static let armed = Atomic<Bool>(false)
+        @TaskLocal static var active = false
+    }
+
+    /// Marks the extent of a typed-first record decode (typed decode, guided walk and legacy
+    /// fallback) for the current task. Nothing inside that extent is decoded typed-first: dynamic
+    /// values reached by the typed decode take the legacy object path, the walk's own raw decodes run
+    /// in legacy mode, and a registered object met inside the extent never starts a nested typed-first
+    /// record (see `decodeObjectValue(from:decoder:strict:typedFirst:)`). Typed-first descents
+    /// therefore never nest, which is what bounds the work on deep input.
+    private enum TypedFirstScope {
+        @TaskLocal static var insideRecord = false
+    }
+
+    @inline(__always)
+    static func isStrictJSONDecoder(_ decoder: Decoder) -> Bool {
+        guard let id = strictJSONDecoderTypeID, ObjectIdentifier(type(of: decoder)) == id else {
+            return false
+        }
+        return !(LegacyDecodingOverride.armed.load(ordering: .relaxed) && LegacyDecodingOverride.active)
+    }
+
+    /// Runs `body` with typed-first fidelity and probe-order hints disabled for the current task,
+    /// so a test can compare the unchanged legacy raw-first path with the default path on the
+    /// same `JSONDecoder` instance in the same process.
+    @_spi(Testing)
+    public static func withLegacyDynamicDecoding<R>(_ body: () throws -> R) rethrows -> R {
+        LegacyDecodingOverride.armed.store(true, ordering: .relaxed)
+        return try LegacyDecodingOverride.$active.withValue(true, operation: body)
+    }
+
+    // MARK: Probe-order hints (strict decoders only)
+
+    enum RawKind: UInt8, Sendable {
+        case bool, int, string, array, object
+    }
+
+    private protocol RawKindHint {
+        static var kind: RawKind? { get }
+    }
+
+    private enum NoHint: RawKindHint {
+        static var kind: RawKind? { nil }
+    }
+
+    private enum BoolHint: RawKindHint {
+        static var kind: RawKind? { .bool }
+    }
+
+    private enum IntHint: RawKindHint {
+        static var kind: RawKind? { .int }
+    }
+
+    private enum StringHint: RawKindHint {
+        static var kind: RawKind? { .string }
+    }
+
+    private enum ArrayHint: RawKindHint {
+        static var kind: RawKind? { .array }
+    }
+
+    private enum ObjectHint: RawKindHint {
+        static var kind: RawKind? { .object }
+    }
+
+    /// Whether a strict raw decode may run typed-first on the objects it reaches: only a decode that
+    /// is not nested in a typed-first record (`TypedFirstScope`). Every raw decode inside a typed-first
+    /// record (the typed decode's dynamic fields, the walk's raw-only and legacy-subtree fields, the
+    /// fallback's raw pass) uses the legacy object path, so a subtree costs at most a constant number
+    /// of legacy passes and nesting cannot compound repeated work. The mode carries this decision
+    /// through unregistered wrapper objects and arrays outside any record, where the task-local is
+    /// not yet bound.
+    private protocol RawDecodeMode {
+        static var typedFirst: Bool { get }
+    }
+
+    private enum TypedFirstMode: RawDecodeMode {
+        static var typedFirst: Bool { true }
+    }
+
+    private enum LegacyMode: RawDecodeMode {
+        static var typedFirst: Bool { false }
+    }
+
+    /// Raw-recursion entry used only under a strict decoder. The phantom parameters carry the hint
+    /// and the mode through Foundation's `decode(_:forKey:)` with no runtime state. Foundation
+    /// special-cases neither this type nor `ATProtocolValueContainer`, so coding paths and errors are
+    /// unchanged.
+    private struct StrictRawValue<Hint: RawKindHint, Mode: RawDecodeMode>: Decodable {
+        let value: ATProtocolValueContainer
+
+        init(from decoder: Decoder) throws {
+            value = try ATProtocolValueContainer.decodeValue(
+                from: decoder,
+                strict: true,
+                hint: Hint.kind,
+                typedFirst: Mode.typedFirst
+            )
+        }
+    }
+
+    private static func decodeStrictRaw(
+        _ container: KeyedDecodingContainer<DynamicCodingKeys>,
+        forKey key: DynamicCodingKeys,
+        hint: RawKind?,
+        typedFirst: Bool
+    ) throws -> ATProtocolValueContainer {
+        if typedFirst {
+            return try decodeStrictRaw(container, forKey: key, hint: hint, mode: TypedFirstMode.self)
+        }
+        return try decodeStrictRaw(container, forKey: key, hint: hint, mode: LegacyMode.self)
+    }
+
+    private static func decodeStrictRaw<Mode: RawDecodeMode>(
+        _ container: KeyedDecodingContainer<DynamicCodingKeys>,
+        forKey key: DynamicCodingKeys,
+        hint: RawKind?,
+        mode _: Mode.Type
+    ) throws -> ATProtocolValueContainer {
+        switch hint {
+        case nil: return try container.decode(StrictRawValue<NoHint, Mode>.self, forKey: key).value
+        case .bool?: return try container.decode(StrictRawValue<BoolHint, Mode>.self, forKey: key).value
+        case .int?: return try container.decode(StrictRawValue<IntHint, Mode>.self, forKey: key).value
+        case .string?: return try container.decode(StrictRawValue<StringHint, Mode>.self, forKey: key).value
+        case .array?: return try container.decode(StrictRawValue<ArrayHint, Mode>.self, forKey: key).value
+        case .object?: return try container.decode(StrictRawValue<ObjectHint, Mode>.self, forKey: key).value
+        }
+    }
+
+    private static func decodeStrictRaw(
+        _ container: inout UnkeyedDecodingContainer,
+        hint: RawKind?,
+        typedFirst: Bool
+    ) throws -> ATProtocolValueContainer {
+        if typedFirst {
+            return try decodeStrictRaw(&container, hint: hint, mode: TypedFirstMode.self)
+        }
+        return try decodeStrictRaw(&container, hint: hint, mode: LegacyMode.self)
+    }
+
+    private static func decodeStrictRaw<Mode: RawDecodeMode>(
+        _ container: inout UnkeyedDecodingContainer,
+        hint: RawKind?,
+        mode _: Mode.Type
+    ) throws -> ATProtocolValueContainer {
+        switch hint {
+        case nil: return try container.decode(StrictRawValue<NoHint, Mode>.self).value
+        case .bool?: return try container.decode(StrictRawValue<BoolHint, Mode>.self).value
+        case .int?: return try container.decode(StrictRawValue<IntHint, Mode>.self).value
+        case .string?: return try container.decode(StrictRawValue<StringHint, Mode>.self).value
+        case .array?: return try container.decode(StrictRawValue<ArrayHint, Mode>.self).value
+        case .object?: return try container.decode(StrictRawValue<ObjectHint, Mode>.self).value
+        }
+    }
+
+    @inline(__always)
+    private static func rawKind(of value: ATProtocolValueContainer) -> RawKind? {
+        switch value {
+        case .bool: return .bool
+        case .number: return .int
+        case .string: return .string
+        case .array: return .array
+        case .object, .link, .bytes, .knownType, .unknownType: return .object
+        case .null, .bigNumber, .decodeError: return nil
+        }
+    }
+
+    /// The legacy probe chain: null, Bool, Int, String, array, then object. Only a strict decoder
+    /// passes a `hint`; the hinted kind is tried first and skipped when the legacy order runs
+    /// afterwards, so a wrong hint costs at most one extra typeMismatch. Under a strict decoder only
+    /// the probe matching the JSON kind can succeed or throw anything but typeMismatch, so the
+    /// order never changes the value or the error. Non-strict decoders pass `strict: false` and
+    /// `hint: nil` and run the legacy chain unchanged. `typedFirst` (strict only, see
+    /// `RawDecodeMode`) says whether objects reached by this decode may run typed-first.
+    private static func decodeValue(
+        from decoder: Decoder,
+        strict: Bool,
+        hint: RawKind?,
+        typedFirst: Bool
+    ) throws -> ATProtocolValueContainer {
         let container = try decoder.singleValueContainer()
 
         if container.decodeNil() {
             return .null
         }
-        if let boolValue = try decodeIfTypeMatches(Bool.self, from: container) {
+        if let hint,
+           let hintedValue = try decodeHintedValue(hint, from: decoder, container: container, typedFirst: typedFirst)
+        {
+            return hintedValue
+        }
+        if hint != .bool, let boolValue = try decodeIfTypeMatches(Bool.self, from: container) {
             return .bool(boolValue)
         }
-        if let intValue = try decodeSignedInteger(from: container) {
+        if hint != .int, let intValue = try decodeSignedInteger(from: container) {
             return .number(intValue)
         }
-        if let stringValue = try decodeIfTypeMatches(String.self, from: container) {
+        if hint != .string, let stringValue = try decodeIfTypeMatches(String.self, from: container) {
             return .string(stringValue)
         }
 
-        do {
-            var arrayContainer = try decoder.unkeyedContainer()
-            return .array(try decodeAny(from: &arrayContainer))
-        } catch DecodingError.typeMismatch(_, _) {
-            // Continue to the keyed-object shape below.
+        if hint != .array {
+            do {
+                var arrayContainer = try decoder.unkeyedContainer()
+                return .array(try decodeAny(from: &arrayContainer, strict: strict, typedFirst: typedFirst))
+            } catch DecodingError.typeMismatch(_, _) {
+                // Continue to the keyed-object shape below.
+            }
         }
 
         let keyedContainer = try decoder.container(keyedBy: DynamicCodingKeys.self)
-        return try decodeObjectValue(from: keyedContainer, decoder: decoder)
+        return try decodeObjectValue(from: keyedContainer, decoder: decoder, strict: strict, typedFirst: typedFirst)
+    }
+
+    /// One hinted probe with exactly the error handling of the corresponding legacy probe.
+    private static func decodeHintedValue(
+        _ hint: RawKind,
+        from decoder: Decoder,
+        container: SingleValueDecodingContainer,
+        typedFirst: Bool
+    ) throws -> ATProtocolValueContainer? {
+        switch hint {
+        case .bool:
+            if let boolValue = try decodeIfTypeMatches(Bool.self, from: container) {
+                return .bool(boolValue)
+            }
+        case .int:
+            if let intValue = try decodeSignedInteger(from: container) {
+                return .number(intValue)
+            }
+        case .string:
+            if let stringValue = try decodeIfTypeMatches(String.self, from: container) {
+                return .string(stringValue)
+            }
+        case .array:
+            // The legacy array probe also swallows a typeMismatch thrown while decoding the
+            // elements and then falls through to the keyed probe; keep exactly that.
+            do {
+                var arrayContainer = try decoder.unkeyedContainer()
+                return .array(try decodeAny(from: &arrayContainer, strict: true, typedFirst: typedFirst))
+            } catch DecodingError.typeMismatch(_, _) {
+                return nil
+            }
+        case .object:
+            let keyedContainer: KeyedDecodingContainer<DynamicCodingKeys>
+            do {
+                keyedContainer = try decoder.container(keyedBy: DynamicCodingKeys.self)
+            } catch DecodingError.typeMismatch(_, _) {
+                return nil
+            }
+            // As with the legacy final keyed probe, errors from the object itself propagate.
+            return try decodeObjectValue(from: keyedContainer, decoder: decoder, strict: true, typedFirst: typedFirst)
+        }
+        return nil
     }
 
     private static func decodeIfTypeMatches<T: Decodable>(
@@ -159,16 +541,117 @@ public enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    /// Decodes a JSON object. Under a strict decoder in typed-first mode, an object whose `$type` is
+    /// registered is decoded typed-first; everything else takes the legacy raw-first path. Neither
+    /// order nor mode changes the outcome (value, classification or error).
+    ///
+    /// Work bound: a typed-first record is only ever started outside any typed-first record
+    /// (`TypedFirstScope`). Inside one, every subtree (the typed decode's dynamic fields, the walk's
+    /// raw-only and legacy-subtree fields, the fallback's raw pass) is decoded the legacy way, a
+    /// single pass with the legacy cost, and the fallback reuses the walk's values or rethrows their
+    /// error. Each subtree of a typed-first record is therefore decoded at most once by the typed
+    /// decode, once by the walk and once by the fallback, each a legacy pass, and because typed-first
+    /// descents never nest, deeper records cannot multiply each other's work.
     private static func decodeObjectValue(
         from container: KeyedDecodingContainer<DynamicCodingKeys>,
-        decoder: Decoder
+        decoder: Decoder,
+        strict: Bool,
+        typedFirst: Bool
     ) throws -> ATProtocolValueContainer {
         let keys = container.allKeys
         if let specialObject = try decodeSpecialObject(from: container, keys: keys, decoder: decoder) {
             return specialObject
         }
 
-        let rawObject = try decodeAny(from: container, keys: keys)
+        // `typedFirst` is never set inside a typed-first record (see `RawDecodeMode`); the task-local
+        // check makes that a hard boundary rather than a property of the mode plumbing.
+        if strict, typedFirst, !TypedFirstScope.insideRecord,
+           let typeKey = keys.first(where: { $0.stringValue == "$type" }),
+           let typeValue = try? container.decode(String.self, forKey: typeKey),
+           let entry = decoderFactory.entry(for: typeValue)
+        {
+            return try TypedFirstScope.$insideRecord.withValue(true) {
+                try decodeTypedFirstRecord(
+                    container: container,
+                    keys: keys,
+                    typeValue: typeValue,
+                    entry: entry,
+                    decoder: decoder
+                )
+            }
+        }
+
+        // No typed decode runs before this raw pass (no `$type`, a `$type` that is not a string, or no
+        // registered decoder), so it decodes each field once and the fields keep the caller's mode.
+        return try decodeLegacyObject(
+            from: container,
+            keys: keys,
+            decoder: decoder,
+            strict: strict,
+            fieldsTypedFirst: strict && typedFirst,
+            attempt: nil,
+            reuse: [:]
+        )
+    }
+
+    /// Typed decode, guided walk, and on fallback the legacy path. The fallback's raw pass runs in
+    /// legacy mode and reuses the values the walk already decoded for the record's own fields.
+    private static func decodeTypedFirstRecord(
+        container: KeyedDecodingContainer<DynamicCodingKeys>,
+        keys: [DynamicCodingKeys],
+        typeValue: String,
+        entry: TypeDecoderFactory.Entry,
+        decoder: Decoder
+    ) throws -> ATProtocolValueContainer {
+        var rawValues: [String: ATProtocolValueContainer] = [:]
+        let attempt: TypedFirstAttempt
+        switch typedFirst(
+            container: container,
+            keys: keys,
+            typeValue: typeValue,
+            entry: entry,
+            decoder: decoder,
+            rawValues: &rawValues
+        ) {
+        case let .accepted(typedValue):
+            return typedValue
+        case let .rawError(error):
+            // The legacy raw pass throws this same error (see `walkRecord`). Rethrown unchanged.
+            throw error
+        case let .fallback(previous):
+            attempt = previous
+        }
+        return try decodeLegacyObject(
+            from: container,
+            keys: keys,
+            decoder: decoder,
+            strict: true,
+            fieldsTypedFirst: false,
+            attempt: attempt,
+            reuse: rawValues
+        )
+    }
+
+    /// The legacy raw-first path, unchanged in outcome. After a typed-first attempt it reuses the
+    /// typed value, so the registered decoder and toCBORValue still run once for this object, and it
+    /// reuses `reuse`, the walk's raw values for some fields, decoded by the very call this raw pass
+    /// would make for them.
+    private static func decodeLegacyObject(
+        from container: KeyedDecodingContainer<DynamicCodingKeys>,
+        keys: [DynamicCodingKeys],
+        decoder: Decoder,
+        strict: Bool,
+        fieldsTypedFirst: Bool,
+        attempt: TypedFirstAttempt?,
+        reuse: [String: ATProtocolValueContainer]
+    ) throws -> ATProtocolValueContainer {
+        let rawObject = try decodeAny(
+            from: container,
+            keys: keys,
+            strict: strict,
+            typedFirst: fieldsTypedFirst,
+            reuse: reuse
+        )
         guard let typeKey = keys.first(where: { $0.stringValue == "$type" }) else {
             return rawObject
         }
@@ -181,23 +664,355 @@ public enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
         }
 
         let rawFallback = ATProtocolValueContainer.unknownType(typeValue, rawObject)
-        guard let decoderFunction = decoderFactory.decoder(for: typeValue) else {
-            return rawFallback
+        if let attempt, attempt.typeValue == typeValue {
+            switch attempt.result {
+            case .unusable:
+                return rawFallback
+            case let .unproven(typedValue, typedContainer):
+                return isSpecTolerantMatch(typed: typedContainer, raw: rawObject) ? typedValue : rawFallback
+            }
         }
-
-        let typedValue: ATProtocolValueContainer
-        do {
-            typedValue = try decoderFunction(decoder)
-        } catch {
-            return rawFallback
-        }
-        guard case .knownType = typedValue else {
+        guard let entry = decoderFactory.entry(for: typeValue),
+              let typedValue = entry.knownTypeValue(from: decoder)
+        else {
             return rawFallback
         }
         if !isSpecTolerantMatch(typed: typedValue, raw: rawObject) {
             return rawFallback
         }
         return typedValue
+    }
+
+    // MARK: Typed-first fidelity (strict decoders only)
+
+    /// What a typed-first attempt already computed, for the legacy path to reuse.
+    private struct TypedFirstAttempt {
+        enum Result {
+            /// The registered decoder threw, did not return `.knownType`, or `toCBORValue` threw;
+            /// the legacy path returns the raw fallback for all three.
+            case unusable
+            /// The typed value and its CBOR view, still to be compared with the raw object.
+            case unproven(ATProtocolValueContainer, ATProtocolValueContainer)
+        }
+
+        let typeValue: String
+        let result: Result
+    }
+
+    private enum TypedFirstOutcome {
+        case accepted(ATProtocolValueContainer)
+        /// The legacy path would throw exactly this error.
+        case rawError(any Error)
+        case fallback(TypedFirstAttempt)
+    }
+
+    /// Decodes the registered type first, then proves with one exact-kind walk of the same JSON that
+    /// the legacy raw decode would not throw and that the legacy spec-tolerant comparison would
+    /// accept the typed value. Anything not proven returns `.fallback`, and the caller runs the
+    /// legacy path. Errors from the proof's own exact-kind requests only decide that the proof
+    /// failed; the legacy path re-derives those itself. The one error passed on is `.rawError`: the
+    /// error of a raw decode the legacy raw pass makes identically, at a point it is proven to reach.
+    /// Nothing is caught and remapped, including Foundation's internal errors.
+    private static func typedFirst(
+        container: KeyedDecodingContainer<DynamicCodingKeys>,
+        keys: [DynamicCodingKeys],
+        typeValue: String,
+        entry: TypeDecoderFactory.Entry,
+        decoder: Decoder,
+        rawValues: inout [String: ATProtocolValueContainer]
+    ) -> TypedFirstOutcome {
+        guard let typedValue = entry.knownTypeValue(from: decoder),
+              case let .knownType(value) = typedValue,
+              let cborValue = try? value.toCBORValue()
+        else {
+            return .fallback(TypedFirstAttempt(typeValue: typeValue, result: .unusable))
+        }
+        let typedContainer = containerFromCBORValue(cborValue)
+        let unproven = TypedFirstOutcome.fallback(
+            TypedFirstAttempt(typeValue: typeValue, result: .unproven(typedValue, typedContainer))
+        )
+        guard case let .object(typedObject) = typedContainer else {
+            return unproven
+        }
+        switch walkRecord(typedObject, container: container, keys: keys, rawValues: &rawValues) {
+        case .matched:
+            return .accepted(typedValue)
+        case .unproven:
+            return unproven
+        case let .rawError(error):
+            return .rawError(error)
+        }
+    }
+
+    private enum RecordWalk {
+        case matched
+        case unproven
+        case rawError(any Error)
+    }
+
+    /// The guided walk over the record's own keys, in `keys` order (the order the legacy raw pass
+    /// uses). Nested objects are checked by `guidedObjectMatches`.
+    ///
+    /// For a raw-only key or a legacy-subtree key the walk makes exactly the call the legacy raw pass
+    /// makes for that key (`decodeNil`, then the strict raw decode), in legacy mode. The value goes
+    /// to `rawValues`, and the fallback's raw pass reuses it instead of decoding the subtree again.
+    /// If that call throws, every earlier key has been proven not to throw in the legacy raw pass
+    /// (each was matched, which proves its raw decode succeeds, or raw-decoded successfully), so the
+    /// legacy path would throw this same error from this same call: it is returned as `.rawError`
+    /// instead of running the fallback.
+    ///
+    /// Legacy mode matters when such a key holds records: the typed decode may already have paid a
+    /// legacy pass over the same subtree and then dropped it (an optional field whose unknown union
+    /// member failed to decode degrades to nil, so its key is raw-only here). A typed-first decode of
+    /// that subtree would start a nested record that repeats the pass at every level below, so the
+    /// work would grow with the square of the depth; a legacy pass costs the subtree once.
+    private static func walkRecord(
+        _ typedObject: [String: ATProtocolValueContainer],
+        container: KeyedDecodingContainer<DynamicCodingKeys>,
+        keys: [DynamicCodingKeys],
+        rawValues: inout [String: ATProtocolValueContainer]
+    ) -> RecordWalk {
+        var matchedTypedKeys = 0
+        for key in keys {
+            let name = key.stringValue
+            guard let typedValue = typedObject[name] else {
+                // Raw-only field (unknown/future field, degraded optional): the comparator ignores it,
+                // but the legacy raw decode still evaluates it and may throw.
+                do {
+                    rawValues[name] = try container.decodeNil(forKey: key)
+                        ? .null
+                        : decodeStrictRaw(container, forKey: key, hint: nil, typedFirst: false)
+                } catch {
+                    return .rawError(error)
+                }
+                continue
+            }
+            matchedTypedKeys += 1
+            guard case let .object(expected) = typedValue else {
+                do {
+                    guard try guidedValueMatches(typedValue, container: container, key: key) else {
+                        return .unproven
+                    }
+                } catch {
+                    return .unproven
+                }
+                continue
+            }
+            let plan: NestedObjectPlan
+            do {
+                let nested = try container.nestedContainer(keyedBy: DynamicCodingKeys.self, forKey: key)
+                plan = try nestedObjectPlan(expected, container: nested)
+                if case let .guided(nestedKeys) = plan {
+                    guard try guidedObjectMatches(expected, container: nested, keys: nestedKeys) else {
+                        return .unproven
+                    }
+                    continue
+                }
+            } catch {
+                return .unproven
+            }
+            guard case .legacySubtree = plan else {
+                return .unproven
+            }
+            // Exact local fallback: the legacy raw decode of this field and the legacy comparator.
+            let raw: ATProtocolValueContainer
+            do {
+                raw = try decodeStrictRaw(container, forKey: key, hint: .object, typedFirst: false)
+            } catch {
+                return .rawError(error)
+            }
+            rawValues[name] = raw
+            guard isSpecTolerantContainerMatch(typed: typedValue, raw: raw) else {
+                return .unproven
+            }
+        }
+        return typedOnlyKeysTolerated(typedObject, container: container, matchedTypedKeys: matchedTypedKeys)
+            ? .matched
+            : .unproven
+    }
+
+    /// True only if every key's legacy raw decode would not throw and the legacy
+    /// `isSpecTolerantContainerMatch(typed: .object(typedObject), raw: rawObject)` would hold.
+    /// Used below the record's own keys. Its raw decodes run in legacy mode: the record's fallback
+    /// decodes the enclosing field again, so a typed-first decode here could be repeated.
+    private static func guidedObjectMatches(
+        _ typedObject: [String: ATProtocolValueContainer],
+        container: KeyedDecodingContainer<DynamicCodingKeys>,
+        keys: [DynamicCodingKeys]
+    ) throws -> Bool {
+        var matchedTypedKeys = 0
+        for key in keys {
+            if let typedValue = typedObject[key.stringValue] {
+                matchedTypedKeys += 1
+                guard try guidedValueMatches(typedValue, container: container, key: key) else {
+                    return false
+                }
+            } else {
+                // Raw-only field (unknown/future field, degraded optional): the comparator ignores
+                // it, but the legacy raw decode still evaluates it and may throw, so evaluate it the
+                // same way and discard the value.
+                if try container.decodeNil(forKey: key) {
+                    continue
+                }
+                _ = try decodeStrictRaw(container, forKey: key, hint: nil, typedFirst: false)
+            }
+        }
+        return typedOnlyKeysTolerated(typedObject, container: container, matchedTypedKeys: matchedTypedKeys)
+    }
+
+    /// Typed-only keys: the comparator tolerates only a `$type` framing key and explicit nulls.
+    private static func typedOnlyKeysTolerated(
+        _ typedObject: [String: ATProtocolValueContainer],
+        container: KeyedDecodingContainer<DynamicCodingKeys>,
+        matchedTypedKeys: Int
+    ) -> Bool {
+        if matchedTypedKeys == typedObject.count {
+            return true
+        }
+        for (name, typedValue) in typedObject {
+            guard let key = DynamicCodingKeys(stringValue: name) else {
+                return false
+            }
+            if container.contains(key) {
+                continue
+            }
+            if name == "$type" {
+                continue
+            }
+            if case .null = typedValue {
+                continue
+            }
+            return false
+        }
+        return true
+    }
+
+    private static func guidedValueMatches(
+        _ typedValue: ATProtocolValueContainer,
+        container: KeyedDecodingContainer<DynamicCodingKeys>,
+        key: DynamicCodingKeys
+    ) throws -> Bool {
+        switch typedValue {
+        case .null:
+            return try container.decodeNil(forKey: key)
+        case let .string(expected):
+            return try container.decode(String.self, forKey: key) == expected
+        case let .number(expected):
+            return try container.decode(Int.self, forKey: key) == expected
+        case let .bool(expected):
+            return try container.decode(Bool.self, forKey: key) == expected
+        case let .array(expected):
+            var nested = try container.nestedUnkeyedContainer(forKey: key)
+            return try guidedArrayMatches(expected, container: &nested)
+        case let .object(expected):
+            let nested = try container.nestedContainer(keyedBy: DynamicCodingKeys.self, forKey: key)
+            switch try nestedObjectPlan(expected, container: nested) {
+            case .reject:
+                return false
+            case let .guided(nestedKeys):
+                return try guidedObjectMatches(expected, container: nested, keys: nestedKeys)
+            case .legacySubtree:
+                // Exact local fallback: the legacy raw decode of this subtree and the legacy comparator.
+                // Legacy mode, as in `guidedObjectMatches`.
+                let raw = try decodeStrictRaw(container, forKey: key, hint: .object, typedFirst: false)
+                return isSpecTolerantContainerMatch(typed: typedValue, raw: raw)
+            }
+        case let .link(expected):
+            let nested = try container.nestedContainer(keyedBy: DynamicCodingKeys.self, forKey: key)
+            let nestedKeys = nested.allKeys
+            guard nestedKeys.count == 1, nestedKeys[0].stringValue == "$link" else {
+                return false
+            }
+            return try container.decode(ATProtoLink.self, forKey: key).cid == expected.cid
+        case let .bytes(expected):
+            let nested = try container.nestedContainer(keyedBy: DynamicCodingKeys.self, forKey: key)
+            let nestedKeys = nested.allKeys
+            guard nestedKeys.count == 1, nestedKeys[0].stringValue == "$bytes" else {
+                return false
+            }
+            return try container.decode(Bytes.self, forKey: key).data == expected.data
+        case .bigNumber, .knownType, .unknownType, .decodeError:
+            return false
+        }
+    }
+
+    private static func guidedArrayMatches(
+        _ expected: [ATProtocolValueContainer],
+        container: inout UnkeyedDecodingContainer
+    ) throws -> Bool {
+        guard container.count == expected.count else {
+            return false
+        }
+        for typedValue in expected {
+            switch typedValue {
+            case .null:
+                guard try container.decodeNil() else { return false }
+            case let .string(value):
+                guard try container.decode(String.self) == value else { return false }
+            case let .number(value):
+                guard try container.decode(Int.self) == value else { return false }
+            case let .bool(value):
+                guard try container.decode(Bool.self) == value else { return false }
+            case let .array(value):
+                var nested = try container.nestedUnkeyedContainer()
+                guard try guidedArrayMatches(value, container: &nested) else { return false }
+            case let .object(value):
+                let nested = try container.nestedContainer(keyedBy: DynamicCodingKeys.self)
+                // An array element cannot be re-read once consumed, so an element that needs the
+                // legacy comparator sends the whole record down the legacy path.
+                guard case let .guided(nestedKeys) = try nestedObjectPlan(value, container: nested),
+                      try guidedObjectMatches(value, container: nested, keys: nestedKeys)
+                else { return false }
+            case let .link(value):
+                let elementDecoder = try container.superDecoder()
+                let nestedKeys = try elementDecoder.container(keyedBy: DynamicCodingKeys.self).allKeys
+                guard nestedKeys.count == 1, nestedKeys[0].stringValue == "$link",
+                      try ATProtoLink(from: elementDecoder).cid == value.cid
+                else { return false }
+            case let .bytes(value):
+                let elementDecoder = try container.superDecoder()
+                let nestedKeys = try elementDecoder.container(keyedBy: DynamicCodingKeys.self).allKeys
+                guard nestedKeys.count == 1, nestedKeys[0].stringValue == "$bytes",
+                      try Bytes(from: elementDecoder).data == value.data
+                else { return false }
+            case .bigNumber, .knownType, .unknownType, .decodeError:
+                return false
+            }
+        }
+        return container.isAtEnd
+    }
+
+    private enum NestedObjectPlan {
+        /// An exact special object (`$link`/`$bytes`) never matches a typed object.
+        case reject
+        /// Compare the typed sub-object with the JSON directly.
+        case guided([DynamicCodingKeys])
+        /// Decode the subtree the legacy way and run the legacy comparator on it.
+        case legacySubtree
+    }
+
+    /// Mirrors the legacy raw decode of a nested object. A nested registered `$type` is compared
+    /// directly only when the typed view carries the same discriminator and the registry entry is
+    /// verified, which makes the parent's typed sub-value the registry type's own re-encoding.
+    private static func nestedObjectPlan(
+        _ expected: [String: ATProtocolValueContainer],
+        container: KeyedDecodingContainer<DynamicCodingKeys>
+    ) throws -> NestedObjectPlan {
+        let keys = container.allKeys
+        if keys.count == 1, keys[0].stringValue == "$link" || keys[0].stringValue == "$bytes" {
+            return .reject
+        }
+        if let typeKey = keys.first(where: { $0.stringValue == "$type" }) {
+            guard let nestedType = try? container.decode(String.self, forKey: typeKey) else {
+                return .legacySubtree
+            }
+            if let entry = decoderFactory.entry(for: nestedType) {
+                guard entry.typeIdentifierVerified, case .string(nestedType)? = expected["$type"] else {
+                    return .legacySubtree
+                }
+            }
+        }
+        return .guided(keys)
     }
 
     private var containsKnownType: Bool {
@@ -751,12 +1566,28 @@ public enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
         }
     }
 
-    private static func decodeAny(from container: KeyedDecodingContainer<DynamicCodingKeys>, keys: [DynamicCodingKeys]) throws -> ATProtocolValueContainer {
+    private static func decodeAny(
+        from container: KeyedDecodingContainer<DynamicCodingKeys>,
+        keys: [DynamicCodingKeys],
+        strict: Bool,
+        typedFirst: Bool,
+        reuse: [String: ATProtocolValueContainer]
+    ) throws -> ATProtocolValueContainer {
         var dictionary = [String: ATProtocolValueContainer]()
         dictionary.reserveCapacity(keys.count)
         for key in keys {
-            if try container.decodeNil(forKey: key) {
+            if !reuse.isEmpty, let value = reuse[key.stringValue] {
+                // Already decoded by the typed-first walk with exactly the calls below.
+                dictionary[key.stringValue] = value
+            } else if try container.decodeNil(forKey: key) {
                 dictionary[key.stringValue] = .null
+            } else if strict {
+                dictionary[key.stringValue] = try decodeStrictRaw(
+                    container,
+                    forKey: key,
+                    hint: nil,
+                    typedFirst: typedFirst
+                )
             } else {
                 dictionary[key.stringValue] = try container.decode(
                     ATProtocolValueContainer.self,
@@ -767,7 +1598,11 @@ public enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
         return .object(dictionary)
     }
 
-    private static func decodeAny(from unkeyedContainer: inout UnkeyedDecodingContainer) throws -> [ATProtocolValueContainer] {
+    private static func decodeAny(
+        from unkeyedContainer: inout UnkeyedDecodingContainer,
+        strict: Bool,
+        typedFirst: Bool
+    ) throws -> [ATProtocolValueContainer] {
         var array = [ATProtocolValueContainer]()
         if let count = unkeyedContainer.count {
             array.reserveCapacity(count)
@@ -775,6 +1610,15 @@ public enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
         while !unkeyedContainer.isAtEnd {
             if try unkeyedContainer.decodeNil() {
                 array.append(.null)
+            } else if strict {
+                // Predict an element's kind once the two previous elements agree.
+                var hint: RawKind?
+                if array.count >= 2, let previous = rawKind(of: array[array.count - 1]),
+                   previous == rawKind(of: array[array.count - 2])
+                {
+                    hint = previous
+                }
+                array.append(try decodeStrictRaw(&unkeyedContainer, hint: hint, typedFirst: typedFirst))
             } else {
                 array.append(try unkeyedContainer.decode(ATProtocolValueContainer.self))
             }

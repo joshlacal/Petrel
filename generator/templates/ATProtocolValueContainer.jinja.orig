@@ -726,17 +726,28 @@ public enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    /// 24 bytes (String + Int with an `Int.min` "no int" sentinel) instead of 25
+    /// (String + `Int?`), so the key fits the 3-word inline buffer of `any CodingKey`
+    /// and Foundation's coding-path nodes and `allKeys` arrays do not box it.
+    /// `init?(intValue: Int.min)` is the one input that cannot be represented and
+    /// returns nil; JSON and in-memory keyed containers only build string keys.
     struct DynamicCodingKeys: CodingKey {
-        var stringValue: String
-        var intValue: Int?
+        let stringValue: String
+        private let rawIntValue: Int
+
+        var intValue: Int? {
+            rawIntValue == .min ? nil : rawIntValue
+        }
 
         init?(stringValue: String) {
             self.stringValue = stringValue
+            rawIntValue = .min
         }
 
         init?(intValue: Int) {
-            self.intValue = intValue
-            self.stringValue = String(intValue)
+            guard intValue != .min else { return nil }
+            rawIntValue = intValue
+            stringValue = String(intValue)
         }
     }
 
