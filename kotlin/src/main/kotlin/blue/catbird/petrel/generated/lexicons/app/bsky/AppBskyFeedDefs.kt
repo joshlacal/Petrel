@@ -44,44 +44,99 @@ object AppBskyFeedDefsPostViewEmbedUnionSerializer : kotlinx.serialization.KSeri
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsPostViewEmbedUnion")
 
+    private val TYPE_View = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.images#view")
+    private val TYPE_AppBskyEmbedVideoView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video#view")
+    private val TYPE_AppBskyEmbedGalleryView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#view")
+    private val TYPE_AppBskyEmbedExternalView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
+    private val TYPE_AppBskyEmbedRecordView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#view")
+    private val TYPE_AppBskyEmbedRecordWithMediaView = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.recordWithMedia#view")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsPostViewEmbedUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyFeedDefsPostViewEmbedUnion.View -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedImagesView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.images#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedImagesView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_View
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_View)
+                }
+                obj
             }
             is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedVideoView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedVideoView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.video#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedVideoView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedVideoView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedVideoView)
+                }
+                obj
             }
             is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedGalleryView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedGalleryView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.gallery#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedGalleryView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedGalleryView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedGalleryView)
+                }
+                obj
             }
             is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedExternalView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternalView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternalView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedExternalView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedExternalView)
+                }
+                obj
             }
             is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedRecordView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedRecordView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.record#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedRecordView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedRecordView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedRecordView)
+                }
+                obj
             }
             is AppBskyFeedDefsPostViewEmbedUnion.AppBskyEmbedRecordWithMediaView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyEmbedRecordWithMediaView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.recordWithMedia#view")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedRecordWithMediaView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_AppBskyEmbedRecordWithMediaView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_AppBskyEmbedRecordWithMediaView)
+                }
+                obj
             }
             is AppBskyFeedDefsPostViewEmbedUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -96,10 +151,14 @@ object AppBskyFeedDefsPostViewEmbedUnionSerializer : kotlinx.serialization.KSeri
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsPostViewEmbedUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyFeedDefsPostViewEmbedUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyFeedDefsPostViewEmbedUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyFeedDefsPostViewEmbedUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.embed.images#view" -> AppBskyFeedDefsPostViewEmbedUnion.View(
@@ -141,20 +200,39 @@ object AppBskyFeedDefsFeedViewPostReasonUnionSerializer : kotlinx.serialization.
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsFeedViewPostReasonUnion")
 
+    private val TYPE_ReasonRepost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#reasonRepost")
+    private val TYPE_ReasonPin = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#reasonPin")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsFeedViewPostReasonUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyFeedDefsFeedViewPostReasonUnion.ReasonRepost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsReasonRepost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#reasonRepost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsReasonRepost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ReasonRepost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ReasonRepost)
+                }
+                obj
             }
             is AppBskyFeedDefsFeedViewPostReasonUnion.ReasonPin -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsReasonPin.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#reasonPin")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsReasonPin.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ReasonPin
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ReasonPin)
+                }
+                obj
             }
             is AppBskyFeedDefsFeedViewPostReasonUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -169,10 +247,14 @@ object AppBskyFeedDefsFeedViewPostReasonUnionSerializer : kotlinx.serialization.
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsFeedViewPostReasonUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyFeedDefsFeedViewPostReasonUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyFeedDefsFeedViewPostReasonUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyFeedDefsFeedViewPostReasonUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.defs#reasonRepost" -> AppBskyFeedDefsFeedViewPostReasonUnion.ReasonRepost(
@@ -205,26 +287,54 @@ object AppBskyFeedDefsReplyRefRootUnionSerializer : kotlinx.serialization.KSeria
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsReplyRefRootUnion")
 
+    private val TYPE_PostView = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#postView")
+    private val TYPE_NotFoundPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+    private val TYPE_BlockedPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsReplyRefRootUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyFeedDefsReplyRefRootUnion.PostView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsPostView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#postView")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsPostView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_PostView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_PostView)
+                }
+                obj
             }
             is AppBskyFeedDefsReplyRefRootUnion.NotFoundPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsNotFoundPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_NotFoundPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_NotFoundPost)
+                }
+                obj
             }
             is AppBskyFeedDefsReplyRefRootUnion.BlockedPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsBlockedPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_BlockedPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_BlockedPost)
+                }
+                obj
             }
             is AppBskyFeedDefsReplyRefRootUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -239,10 +349,14 @@ object AppBskyFeedDefsReplyRefRootUnionSerializer : kotlinx.serialization.KSeria
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsReplyRefRootUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyFeedDefsReplyRefRootUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyFeedDefsReplyRefRootUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyFeedDefsReplyRefRootUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.defs#postView" -> AppBskyFeedDefsReplyRefRootUnion.PostView(
@@ -278,26 +392,54 @@ object AppBskyFeedDefsReplyRefParentUnionSerializer : kotlinx.serialization.KSer
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsReplyRefParentUnion")
 
+    private val TYPE_PostView = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#postView")
+    private val TYPE_NotFoundPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+    private val TYPE_BlockedPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsReplyRefParentUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyFeedDefsReplyRefParentUnion.PostView -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsPostView.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#postView")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsPostView.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_PostView
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_PostView)
+                }
+                obj
             }
             is AppBskyFeedDefsReplyRefParentUnion.NotFoundPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsNotFoundPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_NotFoundPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_NotFoundPost)
+                }
+                obj
             }
             is AppBskyFeedDefsReplyRefParentUnion.BlockedPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsBlockedPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_BlockedPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_BlockedPost)
+                }
+                obj
             }
             is AppBskyFeedDefsReplyRefParentUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -312,10 +454,14 @@ object AppBskyFeedDefsReplyRefParentUnionSerializer : kotlinx.serialization.KSer
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsReplyRefParentUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyFeedDefsReplyRefParentUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyFeedDefsReplyRefParentUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyFeedDefsReplyRefParentUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.defs#postView" -> AppBskyFeedDefsReplyRefParentUnion.PostView(
@@ -351,26 +497,54 @@ object AppBskyFeedDefsThreadViewPostParentUnionSerializer : kotlinx.serializatio
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsThreadViewPostParentUnion")
 
+    private val TYPE_ThreadViewPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#threadViewPost")
+    private val TYPE_NotFoundPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+    private val TYPE_BlockedPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsThreadViewPostParentUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyFeedDefsThreadViewPostParentUnion.ThreadViewPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsThreadViewPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#threadViewPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsThreadViewPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ThreadViewPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ThreadViewPost)
+                }
+                obj
             }
             is AppBskyFeedDefsThreadViewPostParentUnion.NotFoundPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsNotFoundPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_NotFoundPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_NotFoundPost)
+                }
+                obj
             }
             is AppBskyFeedDefsThreadViewPostParentUnion.BlockedPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsBlockedPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_BlockedPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_BlockedPost)
+                }
+                obj
             }
             is AppBskyFeedDefsThreadViewPostParentUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -385,10 +559,14 @@ object AppBskyFeedDefsThreadViewPostParentUnionSerializer : kotlinx.serializatio
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsThreadViewPostParentUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyFeedDefsThreadViewPostParentUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyFeedDefsThreadViewPostParentUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyFeedDefsThreadViewPostParentUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.defs#threadViewPost" -> AppBskyFeedDefsThreadViewPostParentUnion.ThreadViewPost(
@@ -424,26 +602,54 @@ object AppBskyFeedDefsThreadViewPostRepliesUnionSerializer : kotlinx.serializati
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsThreadViewPostRepliesUnion")
 
+    private val TYPE_ThreadViewPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#threadViewPost")
+    private val TYPE_NotFoundPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
+    private val TYPE_BlockedPost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsThreadViewPostRepliesUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyFeedDefsThreadViewPostRepliesUnion.ThreadViewPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsThreadViewPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#threadViewPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsThreadViewPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ThreadViewPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ThreadViewPost)
+                }
+                obj
             }
             is AppBskyFeedDefsThreadViewPostRepliesUnion.NotFoundPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsNotFoundPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#notFoundPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsNotFoundPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_NotFoundPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_NotFoundPost)
+                }
+                obj
             }
             is AppBskyFeedDefsThreadViewPostRepliesUnion.BlockedPost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsBlockedPost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#blockedPost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsBlockedPost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_BlockedPost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_BlockedPost)
+                }
+                obj
             }
             is AppBskyFeedDefsThreadViewPostRepliesUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -458,10 +664,14 @@ object AppBskyFeedDefsThreadViewPostRepliesUnionSerializer : kotlinx.serializati
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsThreadViewPostRepliesUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyFeedDefsThreadViewPostRepliesUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyFeedDefsThreadViewPostRepliesUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyFeedDefsThreadViewPostRepliesUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.defs#threadViewPost" -> AppBskyFeedDefsThreadViewPostRepliesUnion.ThreadViewPost(
@@ -494,20 +704,39 @@ object AppBskyFeedDefsSkeletonFeedPostReasonUnionSerializer : kotlinx.serializat
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyFeedDefsSkeletonFeedPostReasonUnion")
 
+    private val TYPE_SkeletonReasonRepost = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#skeletonReasonRepost")
+    private val TYPE_SkeletonReasonPin = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#skeletonReasonPin")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyFeedDefsSkeletonFeedPostReasonUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyFeedDefsSkeletonFeedPostReasonUnion.SkeletonReasonRepost -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsSkeletonReasonRepost.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#skeletonReasonRepost")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsSkeletonReasonRepost.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SkeletonReasonRepost
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SkeletonReasonRepost)
+                }
+                obj
             }
             is AppBskyFeedDefsSkeletonFeedPostReasonUnion.SkeletonReasonPin -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedDefsSkeletonReasonPin.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.defs#skeletonReasonPin")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedDefsSkeletonReasonPin.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SkeletonReasonPin
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SkeletonReasonPin)
+                }
+                obj
             }
             is AppBskyFeedDefsSkeletonFeedPostReasonUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -522,10 +751,14 @@ object AppBskyFeedDefsSkeletonFeedPostReasonUnionSerializer : kotlinx.serializat
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyFeedDefsSkeletonFeedPostReasonUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyFeedDefsSkeletonFeedPostReasonUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyFeedDefsSkeletonFeedPostReasonUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyFeedDefsSkeletonFeedPostReasonUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.defs#skeletonReasonRepost" -> AppBskyFeedDefsSkeletonFeedPostReasonUnion.SkeletonReasonRepost(

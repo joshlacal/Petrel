@@ -1,12 +1,30 @@
+import kotlinx.benchmark.gradle.JvmBenchmarkTarget
+
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
+    kotlin("plugin.allopen") version "2.0.21"
     id("org.jetbrains.kotlin.plugin.compose")
+    id("org.jetbrains.kotlinx.benchmark") version "0.4.13"
     `maven-publish`
 }
 
 group = "blue.catbird"
 version = providers.gradleProperty("version").orNull?.takeIf { it != "unspecified" } ?: "0.1.0"
+
+// JMH requires classes annotated with @State to be non-final
+allOpen {
+    annotation("org.openjdk.jmh.annotations.State")
+}
+
+// Dedicated source set for benchmarks to avoid leaking into published jars
+sourceSets {
+    create("benchmark")
+}
+
+tasks.withType<ProcessResources> {
+    duplicatesStrategy = DuplicatesStrategy.INCLUDE
+}
 
 dependencies {
     // Kotlin standard library
@@ -34,10 +52,16 @@ dependencies {
     testImplementation(kotlin("test"))
     testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
     testImplementation("io.ktor:ktor-client-mock:3.0.2")
+
+    // Benchmark runtime
+    "benchmarkImplementation"("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.13")
 }
 
 kotlin {
     jvmToolchain(17)
+    // Allows benchmarks to access all internal models, functions, and serializers from main
+    target.compilations.getByName("benchmark")
+        .associateWith(target.compilations.getByName("main"))
 }
 
 java {
@@ -92,4 +116,42 @@ if (providers.gradleProperty("signingKey").isPresent) {
         )
         sign(extensions.getByType<PublishingExtension>().publications["maven"])
     }
+}
+
+benchmark {
+    targets {
+        register("benchmark") {
+            this as JvmBenchmarkTarget
+            jmhVersion = "1.37"
+        }
+    }
+    configurations {
+        named("main") {
+            warmups = 2
+            iterations = 3
+            iterationTime = 1
+            iterationTimeUnit = "s"
+            reportFormat = "text"
+        }
+        register("smoke") {
+            warmups = 1
+            iterations = 1
+            iterationTime = 500
+            iterationTimeUnit = "ms"
+            reportFormat = "text"
+        }
+    }
+}
+
+// Custom task to execute JMH with GC profiling to capture B/op
+tasks.register<JavaExec>("benchmarkGc") {
+    group = "benchmark"
+    description = "Executes benchmarks with JMH GC profiler to measure heap allocations (B/op)"
+    dependsOn("benchmarkBenchmarkJar")
+    mainClass.set("org.openjdk.jmh.Main")
+    classpath(fileTree(layout.buildDirectory.dir("benchmarks")) {
+        include("**/*-JMH.jar")
+    })
+    val filter = providers.gradleProperty("benchmarkFilter").orNull ?: ".*"
+    args("-prof", "gc", "-f", "1", "-wi", "2", "-i", "3", filter)
 }

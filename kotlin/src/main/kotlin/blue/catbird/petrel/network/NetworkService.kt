@@ -11,13 +11,19 @@ import io.ktor.client.statement.*
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.utils.io.ByteReadChannel
+import io.ktor.utils.io.jvm.javaio.toInputStream
 import io.ktor.utils.io.readAvailable
+import java.io.BufferedInputStream
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.InflaterInputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.ExperimentalSerializationApi
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.decodeFromStream
 import kotlinx.serialization.serializer
 
 data class ATProtoResponse<T>(
@@ -80,8 +86,104 @@ class ResponseSizeExceededException(message: String) : NetworkSecurityException(
 
 class CleartextNotPermittedException(message: String) : NetworkSecurityException(message)
 
+private class BoundedCountingInputStream(
+    private val delegate: InputStream,
+    private val maxBytes: Long,
+) : InputStream() {
+    var bytesRead: Long = 0L
+        private set
+
+    override fun read(): Int {
+        val b = delegate.read()
+        if (b != -1) {
+            bytesRead++
+            if (bytesRead > maxBytes) {
+                throw ResponseSizeExceededException("Response payload exceeded limit of $maxBytes bytes")
+            }
+        }
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val n = delegate.read(b, off, len)
+        if (n > 0) {
+            bytesRead += n
+            if (bytesRead > maxBytes) {
+                throw ResponseSizeExceededException("Response payload exceeded limit of $maxBytes bytes")
+            }
+        }
+        return n
+    }
+
+    override fun skip(n: Long): Long {
+        val skipped = delegate.skip(n)
+        if (skipped > 0) {
+            bytesRead += skipped
+            if (bytesRead > maxBytes) {
+                throw ResponseSizeExceededException("Response payload exceeded limit of $maxBytes bytes")
+            }
+        }
+        return skipped
+    }
+
+    override fun available(): Int = delegate.available()
+    override fun close() = delegate.close()
+}
+
+private class DecompressLimitingInputStream(
+    private val delegate: InputStream,
+    private val wireStream: BoundedCountingInputStream,
+    private val maxDecodedBytes: Long,
+    private val maxRatio: Double,
+) : InputStream() {
+    var decodedBytes: Long = 0L
+        private set
+
+    private fun checkLimits(added: Long) {
+        decodedBytes += added
+        if (decodedBytes > maxDecodedBytes) {
+            throw ResponseSizeExceededException(
+                "Decoded response ($decodedBytes bytes) exceeded limit ($maxDecodedBytes bytes)"
+            )
+        }
+        val wireRead = wireStream.bytesRead
+        if (wireRead > 0 && decodedBytes > 64 * 1024L && decodedBytes > (wireRead * maxRatio)) {
+            throw ResponseSizeExceededException(
+                "Decompressed response exceeded compression ratio limit of ${maxRatio}x"
+            )
+        }
+    }
+
+    override fun read(): Int {
+        val b = delegate.read()
+        if (b != -1) {
+            checkLimits(1L)
+        }
+        return b
+    }
+
+    override fun read(b: ByteArray, off: Int, len: Int): Int {
+        val n = delegate.read(b, off, len)
+        if (n > 0) {
+            checkLimits(n.toLong())
+        }
+        return n
+    }
+
+    override fun skip(n: Long): Long {
+        val skipped = delegate.skip(n)
+        if (skipped > 0) {
+            checkLimits(skipped)
+        }
+        return skipped
+    }
+
+    override fun available(): Int = delegate.available()
+    override fun close() = delegate.close()
+}
+
 val DEFAULT_JSON: Json = Json {
-    prettyPrint = true
+    prettyPrint = false
     isLenient = true
     ignoreUnknownKeys = true
 }
@@ -271,22 +373,14 @@ open class NetworkService(
                             )
                         }
 
-                        val contentEncoding = response.headers[HttpHeaders.ContentEncoding]
-                        val rawBytes = readBoundedBytes(
-                            channel = response.bodyAsChannel(),
-                            maxBytes = responseLimits.maxWireBytes,
-                            truncate = false
-                        )
-
-                        val decodedBytes = decompressIfNeeded(
-                            rawBytes = rawBytes,
-                            contentEncoding = contentEncoding,
-                            maxDecodedBytes = responseLimits.maxDecodedBytes,
-                            maxRatio = responseLimits.maxCompressionRatio
-                        )
-
-                        val data = deserializeData<T>(decodedBytes, typeInfo)
-                        ATProtoResponse(statusCode, data)
+                        if (typeInfo.type == Unit::class) {
+                            ATProtoResponse(statusCode, Unit as T)
+                        } else {
+                            val data = withContext(Dispatchers.IO) {
+                                deserializeResponse<T>(response, typeInfo)
+                            }
+                            ATProtoResponse(statusCode, data)
+                        }
                     } catch (e: Exception) {
                         System.err.println("[NetworkService] Processing failed for $endpoint: ${e.message}")
                         ATProtoResponse(statusCode, null)
@@ -345,31 +439,80 @@ open class NetworkService(
     }
 
     @Suppress("UNCHECKED_CAST")
-    private fun <T> deserializeData(
-        bytes: ByteArray,
-        typeInfo: io.ktor.util.reflect.TypeInfo
+    @OptIn(ExperimentalSerializationApi::class)
+    private suspend fun <T> deserializeResponse(
+        response: HttpResponse,
+        typeInfo: io.ktor.util.reflect.TypeInfo,
     ): T? {
-        if (typeInfo.type == Unit::class) {
-            return Unit as T
+        val countingWireStream = BoundedCountingInputStream(
+            delegate = response.bodyAsChannel().toInputStream(),
+            maxBytes = responseLimits.maxWireBytes
+        )
+        val bufferedWireStream = BufferedInputStream(countingWireStream, 8192)
+
+        val contentEncoding = response.headers[HttpHeaders.ContentEncoding]?.lowercase()?.trim()
+        val (decompressedStream, isCompressed) = when (contentEncoding) {
+            "gzip", "x-gzip" -> {
+                bufferedWireStream.mark(512)
+                try {
+                    GZIPInputStream(bufferedWireStream) to true
+                } catch (_: Exception) {
+                    bufferedWireStream.reset()
+                    bufferedWireStream to false
+                }
+            }
+            "deflate" -> {
+                bufferedWireStream.mark(512)
+                try {
+                    InflaterInputStream(bufferedWireStream) to true
+                } catch (_: Exception) {
+                    bufferedWireStream.reset()
+                    bufferedWireStream to false
+                }
+            }
+            else -> bufferedWireStream to false
         }
-        if (typeInfo.type == ByteArray::class) {
-            return bytes as T
+
+        val decodedStream: InputStream = if (isCompressed) {
+            DecompressLimitingInputStream(
+                delegate = decompressedStream,
+                wireStream = countingWireStream,
+                maxDecodedBytes = responseLimits.maxDecodedBytes,
+                maxRatio = responseLimits.maxCompressionRatio
+            )
+        } else {
+            decompressedStream
         }
-        val text = bytes.decodeToString()
-        if (typeInfo.type == String::class) {
-            return text as T
-        }
-        if (text.isEmpty()) {
-            return null
-        }
-        return try {
-            val serializer = typeInfo.kotlinType?.let {
-                json.serializersModule.serializer(it)
-            } ?: kotlinx.serialization.serializer(typeInfo.type.java)
-            json.decodeFromString(serializer, text) as T
-        } catch (e: Exception) {
-            System.err.println("[NetworkService] Deserialization failed: ${e.message}")
-            null
+
+        val bufferedStream = if (decodedStream is BufferedInputStream) decodedStream else BufferedInputStream(decodedStream, 8192)
+
+        return bufferedStream.use { stream ->
+            if (typeInfo.type == ByteArray::class) {
+                val bytes = readAllBounded(stream, responseLimits.maxDecodedBytes)
+                return@use bytes as T
+            }
+            if (typeInfo.type == String::class) {
+                val bytes = readAllBounded(stream, responseLimits.maxDecodedBytes)
+                val text = bytes.decodeToString()
+                return@use text as T
+            }
+
+            stream.mark(1)
+            val firstByte = stream.read()
+            if (firstByte == -1) {
+                return@use null
+            }
+            stream.reset()
+
+            try {
+                val serializer = typeInfo.kotlinType?.let {
+                    json.serializersModule.serializer(it)
+                } ?: kotlinx.serialization.serializer(typeInfo.type.java)
+                json.decodeFromStream(serializer, stream) as T
+            } catch (e: Exception) {
+                System.err.println("[NetworkService] Deserialization failed: ${e.message}")
+                null
+            }
         }
     }
 
@@ -405,55 +548,18 @@ open class NetworkService(
         return baos.toByteArray()
     }
 
-    private fun decompressIfNeeded(
-        rawBytes: ByteArray,
-        contentEncoding: String?,
-        maxDecodedBytes: Long,
-        maxRatio: Double
-    ): ByteArray {
-        if (contentEncoding == null || contentEncoding.equals("identity", ignoreCase = true) || rawBytes.isEmpty()) {
-            return rawBytes
-        }
-
-        val stream: InputStream = when (contentEncoding.lowercase().trim()) {
-            "gzip", "x-gzip" -> {
-                try {
-                    GZIPInputStream(ByteArrayInputStream(rawBytes))
-                } catch (_: Exception) {
-                    return rawBytes
-                }
-            }
-            "deflate" -> {
-                try {
-                    InflaterInputStream(ByteArrayInputStream(rawBytes))
-                } catch (_: Exception) {
-                    return rawBytes
-                }
-            }
-            else -> return rawBytes
-        }
-
+    private fun readAllBounded(stream: InputStream, maxBytes: Long): ByteArray {
         val baos = ByteArrayOutputStream()
         val buffer = ByteArray(8192)
-        var decodedCount = 0L
-
-        stream.use { s ->
-            while (true) {
-                val read = s.read(buffer)
-                if (read < 0) break
-                decodedCount += read
-                if (decodedCount > maxDecodedBytes) {
-                    throw ResponseSizeExceededException(
-                        "Decoded response ($decodedCount bytes) exceeded limit ($maxDecodedBytes bytes)"
-                    )
-                }
-                if (rawBytes.isNotEmpty() && decodedCount > rawBytes.size * maxRatio && decodedCount > 64 * 1024) {
-                    throw ResponseSizeExceededException(
-                        "Decompressed response exceeded compression ratio limit of ${maxRatio}x"
-                    )
-                }
-                baos.write(buffer, 0, read)
+        var total = 0L
+        while (true) {
+            val read = stream.read(buffer)
+            if (read < 0) break
+            total += read
+            if (total > maxBytes) {
+                throw ResponseSizeExceededException("Decoded response ($total bytes) exceeded limit ($maxBytes bytes)")
             }
+            baos.write(buffer, 0, read)
         }
         return baos.toByteArray()
     }

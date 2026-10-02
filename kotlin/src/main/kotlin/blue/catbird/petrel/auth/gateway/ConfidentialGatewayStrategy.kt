@@ -159,6 +159,9 @@ class ConfidentialGatewayStrategy(
         isLenient = true
     }
 
+    /** Optional listener invoked when the gateway invalidates the session (e.g. terminal 401). */
+    var onSessionInvalidated: ((did: String) -> Unit)? = null
+
     // --------------------------------------------------------------------
     // AuthStrategy surface
     // --------------------------------------------------------------------
@@ -292,6 +295,16 @@ class ConfidentialGatewayStrategy(
         networkService.authenticatedDID = did
         networkService.authorizationHeader = "Bearer $sessionId"
         sessionId
+    }
+
+    /**
+     * Query `/auth/session` on the gateway using the currently stored session id.
+     * Throws [GatewayException.SessionExpired] if the session is dead on the server (401),
+     * or [GatewayException.MissingSession] if no session is stored locally.
+     */
+    suspend fun checkSession(): GatewaySessionResponse {
+        val sessionId = currentSessionId()
+        return fetchSessionFromGateway(sessionId)
     }
 
     // --------------------------------------------------------------------
@@ -474,10 +487,10 @@ class ConfidentialGatewayStrategy(
     }
 
     private suspend fun clearCurrentGatewaySession() = mutex.withLock {
+        val did = runCatching { currentAccount.getCurrentDid() }
+            .onFailure { logCleanupFailure("read current account during 401 handling", it) }
+            .getOrNull()
         try {
-            val did = runCatching { currentAccount.getCurrentDid() }
-                .onFailure { logCleanupFailure("read current account during 401 handling", it) }
-                .getOrNull()
             if (did == null) {
                 logger.warning("No current account available while clearing gateway session")
             } else {
@@ -487,6 +500,9 @@ class ConfidentialGatewayStrategy(
         } finally {
             networkService.authenticatedDID = null
             networkService.authorizationHeader = null
+            if (did != null) {
+                runCatching { onSessionInvalidated?.invoke(did) }
+            }
         }
     }
 

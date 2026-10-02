@@ -9,6 +9,9 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.serializer
 
+@PublishedApi
+internal val QUERY_JSON: Json = Json { encodeDefaults = false }
+
 /**
  * Extension function to convert any serializable object to an ordered list
  * of query-parameter pairs.
@@ -23,8 +26,7 @@ import kotlinx.serialization.serializer
  */
 inline fun <reified T : Any> T.toQueryItems(): List<Pair<String, String>> {
     return try {
-        val json = Json { encodeDefaults = false }
-        val jsonElement = json.encodeToJsonElement(serializer<T>(), this)
+        val jsonElement = QUERY_JSON.encodeToJsonElement(serializer<T>(), this)
 
         if (jsonElement is JsonObject) {
             buildList {

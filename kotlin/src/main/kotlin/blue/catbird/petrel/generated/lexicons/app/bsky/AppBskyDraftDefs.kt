@@ -29,14 +29,24 @@ object AppBskyDraftDefsDraftPostgateEmbeddingRulesUnionSerializer : kotlinx.seri
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion")
 
+    private val TYPE_DisableRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.postgate#disableRule")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.DisableRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedPostgateDisableRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.postgate#disableRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedPostgateDisableRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DisableRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DisableRule)
+                }
+                obj
             }
             is AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -51,10 +61,14 @@ object AppBskyDraftDefsDraftPostgateEmbeddingRulesUnionSerializer : kotlinx.seri
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.postgate#disableRule" -> AppBskyDraftDefsDraftPostgateEmbeddingRulesUnion.DisableRule(
@@ -87,32 +101,69 @@ object AppBskyDraftDefsDraftThreadgateAllowUnionSerializer : kotlinx.serializati
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftThreadgateAllowUnion")
 
+    private val TYPE_MentionRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#mentionRule")
+    private val TYPE_FollowerRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followerRule")
+    private val TYPE_FollowingRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followingRule")
+    private val TYPE_ListRule = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#listRule")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftThreadgateAllowUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyDraftDefsDraftThreadgateAllowUnion.MentionRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedThreadgateMentionRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#mentionRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedThreadgateMentionRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_MentionRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_MentionRule)
+                }
+                obj
             }
             is AppBskyDraftDefsDraftThreadgateAllowUnion.FollowerRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedThreadgateFollowerRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followerRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedThreadgateFollowerRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_FollowerRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_FollowerRule)
+                }
+                obj
             }
             is AppBskyDraftDefsDraftThreadgateAllowUnion.FollowingRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedThreadgateFollowingRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#followingRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedThreadgateFollowingRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_FollowingRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_FollowingRule)
+                }
+                obj
             }
             is AppBskyDraftDefsDraftThreadgateAllowUnion.ListRule -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyFeedThreadgateListRule.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.feed.threadgate#listRule")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyFeedThreadgateListRule.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ListRule
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ListRule)
+                }
+                obj
             }
             is AppBskyDraftDefsDraftThreadgateAllowUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -127,10 +178,14 @@ object AppBskyDraftDefsDraftThreadgateAllowUnionSerializer : kotlinx.serializati
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftThreadgateAllowUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyDraftDefsDraftThreadgateAllowUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyDraftDefsDraftThreadgateAllowUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyDraftDefsDraftThreadgateAllowUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.feed.threadgate#mentionRule" -> AppBskyDraftDefsDraftThreadgateAllowUnion.MentionRule(
@@ -163,14 +218,24 @@ object AppBskyDraftDefsDraftPostLabelsUnionSerializer : kotlinx.serialization.KS
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftPostLabelsUnion")
 
+    private val TYPE_SelfLabels = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftPostLabelsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyDraftDefsDraftPostLabelsUnion.SelfLabels -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.label.defs#selfLabels")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoLabelDefsSelfLabels.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_SelfLabels
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_SelfLabels)
+                }
+                obj
             }
             is AppBskyDraftDefsDraftPostLabelsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -185,10 +250,14 @@ object AppBskyDraftDefsDraftPostLabelsUnionSerializer : kotlinx.serialization.KS
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftPostLabelsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyDraftDefsDraftPostLabelsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyDraftDefsDraftPostLabelsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyDraftDefsDraftPostLabelsUnion.Unexpected(element)
 
         return when (type) {
             "com.atproto.label.defs#selfLabels" -> AppBskyDraftDefsDraftPostLabelsUnion.SelfLabels(
@@ -212,14 +281,24 @@ object AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnionSerializ
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion")
 
+    private val TYPE_DraftEmbedImage = kotlinx.serialization.json.JsonPrimitive("app.bsky.draft.defs#draftEmbedImage")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.DraftEmbedImage -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyDraftDefsDraftEmbedImage.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.draft.defs#draftEmbedImage")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyDraftDefsDraftEmbedImage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DraftEmbedImage
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DraftEmbedImage)
+                }
+                obj
             }
             is AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -234,10 +313,14 @@ object AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnionSerializ
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.draft.defs#draftEmbedImage" -> AppBskyDraftDefsDraftEmbedGalleryItemsDraftEmbedGalleryItemsUnion.DraftEmbedImage(
@@ -261,14 +344,24 @@ object AppBskyDraftDefsDraftEmbedGalleryItemsUnionSerializer : kotlinx.serializa
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyDraftDefsDraftEmbedGalleryItemsUnion")
 
+    private val TYPE_DraftEmbedImage = kotlinx.serialization.json.JsonPrimitive("app.bsky.draft.defs#draftEmbedImage")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyDraftDefsDraftEmbedGalleryItemsUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is AppBskyDraftDefsDraftEmbedGalleryItemsUnion.DraftEmbedImage -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.AppBskyDraftDefsDraftEmbedImage.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("app.bsky.draft.defs#draftEmbedImage")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyDraftDefsDraftEmbedImage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_DraftEmbedImage
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_DraftEmbedImage)
+                }
+                obj
             }
             is AppBskyDraftDefsDraftEmbedGalleryItemsUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -283,10 +376,14 @@ object AppBskyDraftDefsDraftEmbedGalleryItemsUnionSerializer : kotlinx.serializa
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyDraftDefsDraftEmbedGalleryItemsUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyDraftDefsDraftEmbedGalleryItemsUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyDraftDefsDraftEmbedGalleryItemsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyDraftDefsDraftEmbedGalleryItemsUnion.Unexpected(element)
 
         return when (type) {
             "app.bsky.draft.defs#draftEmbedImage" -> AppBskyDraftDefsDraftEmbedGalleryItemsUnion.DraftEmbedImage(

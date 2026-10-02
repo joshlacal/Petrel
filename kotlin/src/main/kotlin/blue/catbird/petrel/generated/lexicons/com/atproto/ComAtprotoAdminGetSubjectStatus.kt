@@ -35,26 +35,54 @@ object ComAtprotoAdminGetSubjectStatusOutputSubjectUnionSerializer : kotlinx.ser
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoAdminGetSubjectStatusOutputSubjectUnion")
 
+    private val TYPE_RepoRef = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoRef")
+    private val TYPE_StrongRef = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.strongRef")
+    private val TYPE_RepoBlobRef = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoBlobRef")
+
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoAdminGetSubjectStatusOutputSubjectUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.RepoRef -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoRef.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoRef")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoRef.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_RepoRef
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_RepoRef)
+                }
+                obj
             }
             is ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.StrongRef -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoRepoStrongRef.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.repo.strongRef")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoRepoStrongRef.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_StrongRef
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_StrongRef)
+                }
+                obj
             }
             is ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.RepoBlobRef -> {
-                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoBlobRef.serializer(), value.value)
-                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
-                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.admin.defs#repoBlobRef")
-                })
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.ComAtprotoAdminDefsRepoBlobRef.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_RepoBlobRef
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_RepoBlobRef)
+                }
+                obj
             }
             is ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -69,10 +97,14 @@ object ComAtprotoAdminGetSubjectStatusOutputSubjectUnionSerializer : kotlinx.ser
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoAdminGetSubjectStatusOutputSubjectUnion {
-        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("ComAtprotoAdminGetSubjectStatusOutputSubjectUnion can only be deserialized from JSON")
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element.jsonObject
-        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.Unexpected(element)
 
         return when (type) {
             "com.atproto.admin.defs#repoRef" -> ComAtprotoAdminGetSubjectStatusOutputSubjectUnion.RepoRef(
