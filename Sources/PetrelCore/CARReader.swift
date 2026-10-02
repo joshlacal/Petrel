@@ -126,13 +126,15 @@ public class CARReader {
         let headerData = data[offset ..< (offset + headerLength)]
         offset += headerLength
 
+        // One copy shared by the preflight scan and SwiftCBOR (previously Data + Array + Array).
+        let headerBytes = [UInt8](headerData)
         do {
-            try DAGCBOR.decodeCBORPreflight(Data(headerData))
+            try DAGCBOR.decodeCBORPreflight(bytes: headerBytes[...])
         } catch {
             throw CARReaderError.invalidHeader("CBOR preflight failed for header: \(error.localizedDescription)")
         }
 
-        guard let cbor = try? CBOR.decode([UInt8](headerData)) else {
+        guard let cbor = try? CBOR.decode(headerBytes) else {
             throw CARReaderError.invalidHeader("Failed to decode CBOR header")
         }
 
@@ -288,13 +290,14 @@ public class CARReader {
 
         let blockData = data[location.dataOffset ..< (location.dataOffset + location.dataLength)]
 
+        let blockBytes = [UInt8](blockData)
         do {
-            try DAGCBOR.decodeCBORPreflight(Data(blockData))
+            try DAGCBOR.decodeCBORPreflight(bytes: blockBytes[...])
         } catch {
             throw CARReaderError.decodingFailed("CBOR preflight failed for block \(cidBytes.hexEncodedString()): \(error.localizedDescription)")
         }
 
-        guard let cbor = try? CBOR.decode([UInt8](blockData)) else {
+        guard let cbor = try? CBOR.decode(blockBytes) else {
             throw CARReaderError.decodingFailed("Failed to decode CBOR for block \(cidBytes.hexEncodedString())")
         }
 

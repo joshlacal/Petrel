@@ -122,12 +122,14 @@ public enum CARRepository {
         guard !data.isEmpty else {
             throw CARReaderError.decodingFailed("Empty CBOR data")
         }
+        // One copy of the block, shared by the preflight scan and SwiftCBOR.
+        let bytes = [UInt8](data)
         do {
-            try DAGCBOR.decodeCBORPreflight(data)
+            try DAGCBOR.decodeCBORPreflight(bytes: bytes[...])
         } catch {
             throw CARReaderError.decodingFailed("CBOR preflight failed: \(error.localizedDescription)")
         }
-        guard let cborItem = try? CBOR.decode([UInt8](data)) else {
+        guard let cborItem = try? CBOR.decode(bytes) else {
             throw CARReaderError.decodingFailed("Failed to parse CBOR")
         }
         let container = try ATProtocolValueContainer.fromCBOR(

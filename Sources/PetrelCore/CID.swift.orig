@@ -698,42 +698,20 @@ public class DAGCBOR {
         guard !data.isEmpty else {
             throw DAGCBORError.decodingFailed("Cannot decode empty data")
         }
-        try decodeCBORPreflight(bytes: [UInt8](data)[...], limits: limits, allowTrailingBytes: allowTrailingBytes)
-    }
-
-    /// Same scan over bytes the caller already holds, so callers that go on to hand the same
-    /// buffer to SwiftCBOR copy the payload once instead of once per stage. The slice may start
-    /// at any index (a frame decoder scans the payload in place after its header).
-    package static func decodeCBORPreflight(
-        bytes: ArraySlice<UInt8>,
-        limits: PreflightLimits = .standard,
-        allowTrailingBytes: Bool = false
-    ) throws {
-        guard !bytes.isEmpty else {
-            throw DAGCBORError.decodingFailed("Cannot decode empty data")
-        }
-        var scanner = PreflightScanner(bytes: bytes, limits: limits)
+        var scanner = PreflightScanner(bytes: Array(data), limits: limits)
         try scanner.scanItem(depth: 0)
         if !allowTrailingBytes {
-            guard scanner.offset == scanner.bytes.endIndex else {
+            guard scanner.offset == scanner.bytes.count else {
                 throw DAGCBORError.unconsumedTrailingBytes
             }
         }
     }
 
-    /// Bounds are the slice's own indices: `offset` is an absolute index into `bytes` and every
-    /// remaining-length check is against `endIndex`, so a non-zero `startIndex` scans in place.
     private struct PreflightScanner {
-        let bytes: ArraySlice<UInt8>
-        var offset: Int
+        let bytes: [UInt8]
+        var offset = 0
         var nodeCount = 0
         let limits: PreflightLimits
-
-        init(bytes: ArraySlice<UInt8>, limits: PreflightLimits) {
-            self.bytes = bytes
-            offset = bytes.startIndex
-            self.limits = limits
-        }
 
         mutating func scanItem(depth: Int) throws {
             guard depth <= limits.maximumDepth else {
@@ -743,7 +721,7 @@ public class DAGCBOR {
             guard nodeCount <= limits.maximumNodes else {
                 throw DAGCBORError.nodeLimitExceeded
             }
-            guard offset < bytes.endIndex else {
+            guard offset < bytes.count else {
                 throw DAGCBORError.decodingFailed("Unexpected end of CBOR bytes")
             }
 
@@ -757,13 +735,13 @@ public class DAGCBOR {
                 _ = try readArgument(major: 1)
             case 2: // byte string
                 let length = try readLength(major: 2)
-                guard bytes.endIndex - offset >= length else {
+                guard bytes.count - offset >= length else {
                     throw DAGCBORError.invalidLength
                 }
                 offset += length
             case 3: // text string
                 let length = try readLength(major: 3)
-                guard bytes.endIndex - offset >= length else {
+                guard bytes.count - offset >= length else {
                     throw DAGCBORError.invalidLength
                 }
                 let textBytes = bytes[offset ..< (offset + length)]
@@ -774,7 +752,7 @@ public class DAGCBOR {
             case 4: // array
                 let count = try readLength(major: 4)
                 guard count <= limits.maximumContainerElements,
-                      count <= bytes.endIndex - offset else {
+                      count <= bytes.count - offset else {
                     throw DAGCBORError.invalidLength
                 }
                 for _ in 0 ..< count {
@@ -783,14 +761,12 @@ public class DAGCBOR {
             case 5: // map
                 let count = try readLength(major: 5)
                 guard count <= limits.maximumContainerElements,
-                      count <= (bytes.endIndex - offset) / 2 else {
+                      count <= (bytes.count - offset) / 2 else {
                     throw DAGCBORError.invalidLength
                 }
-                // Keys are compared as views into `bytes` (header included, as before); no
-                // per-key array is allocated.
-                var previousKey: ArraySlice<UInt8>?
+                var previousKey: [UInt8]?
                 for _ in 0 ..< count {
-                    guard offset < bytes.endIndex else {
+                    guard offset < bytes.count else {
                         throw DAGCBORError.decodingFailed("Unexpected end of CBOR map key")
                     }
                     let keyMajor = bytes[offset] >> 5
@@ -799,10 +775,10 @@ public class DAGCBOR {
                     }
                     let keyStart = offset
                     let keyLength = try readLength(major: 3)
-                    guard bytes.endIndex - offset >= keyLength else {
+                    guard bytes.count - offset >= keyLength else {
                         throw DAGCBORError.invalidLength
                     }
-                    let rawKey = bytes[keyStart ..< (offset + keyLength)]
+                    let rawKey = Array(bytes[keyStart ..< (offset + keyLength)])
                     offset += keyLength
 
                     if let prev = previousKey {
@@ -828,11 +804,11 @@ public class DAGCBOR {
                     throw DAGCBORError.unsupportedType("Unsupported CBOR tag \(tag)")
                 }
                 // Tag 42 payload must be byte string starting with 0x00
-                guard offset < bytes.endIndex, (bytes[offset] >> 5) == 2 else {
+                guard offset < bytes.count, (bytes[offset] >> 5) == 2 else {
                     throw DAGCBORError.invalidCIDEncoding("Tag 42 must contain byte string")
                 }
                 let length = try readLength(major: 2)
-                guard bytes.endIndex - offset >= length else {
+                guard bytes.count - offset >= length else {
                     throw DAGCBORError.invalidLength
                 }
                 guard length > 1, bytes[offset] == 0x00 else {
@@ -854,7 +830,7 @@ public class DAGCBOR {
         }
 
         private mutating func readArgument(major: UInt8) throws -> UInt64 {
-            guard offset < bytes.endIndex else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+            guard offset < bytes.count else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
             let info = bytes[offset] & 0x1f
             guard (bytes[offset] >> 5) == major else {
                 throw DAGCBORError.decodingFailed("Unexpected major type")
@@ -864,26 +840,26 @@ public class DAGCBOR {
             case 0 ..< 24:
                 return UInt64(info)
             case 24:
-                guard offset < bytes.endIndex else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+                guard offset < bytes.count else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
                 let val = bytes[offset]
                 guard val >= 24 else { throw DAGCBORError.decodingFailed("Non-canonical integer") }
                 offset += 1
                 return UInt64(val)
             case 25:
-                guard bytes.endIndex - offset >= 2 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+                guard bytes.count - offset >= 2 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
                 let val = (UInt16(bytes[offset]) << 8) | UInt16(bytes[offset + 1])
                 guard val > UInt16(UInt8.max) else { throw DAGCBORError.decodingFailed("Non-canonical integer") }
                 offset += 2
                 return UInt64(val)
             case 26:
-                guard bytes.endIndex - offset >= 4 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+                guard bytes.count - offset >= 4 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
                 var val: UInt32 = 0
                 for i in 0 ..< 4 { val = (val << 8) | UInt32(bytes[offset + i]) }
                 guard val > UInt32(UInt16.max) else { throw DAGCBORError.decodingFailed("Non-canonical integer") }
                 offset += 4
                 return UInt64(val)
             case 27:
-                guard bytes.endIndex - offset >= 8 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
+                guard bytes.count - offset >= 8 else { throw DAGCBORError.decodingFailed("Unexpected EOF") }
                 var val: UInt64 = 0
                 for i in 0 ..< 8 { val = (val << 8) | UInt64(bytes[offset + i]) }
                 guard val > UInt64(UInt32.max) else { throw DAGCBORError.decodingFailed("Non-canonical integer") }
@@ -909,13 +885,8 @@ public class DAGCBOR {
 /// Might need customization if direct CBOR -> Struct mapping is required.
 public extension DAGCBORDecodable where Self: Decodable {
     static func decodedFromDAGCBOR(_ data: Data) throws -> Self {
-        guard !data.isEmpty else {
-            throw DAGCBORError.decodingFailed("Cannot decode empty data")
-        }
-        // One copy shared by the preflight scan and SwiftCBOR (previously one copy each).
-        let bytes = [UInt8](data)
-        try DAGCBOR.decodeCBORPreflight(bytes: bytes[...])
-        guard let cborItem = try? CBOR.decode(bytes) else {
+        try DAGCBOR.decodeCBORPreflight(data)
+        guard let cborItem = try? CBOR.decode([UInt8](data)) else {
             throw DAGCBORError.decodingFailed("Failed to decode CBOR data")
         }
         let intermediateValue = try DAGCBOR.decodeCBORItem(cborItem)
@@ -1070,84 +1041,8 @@ extension CBOR {
 }
 
 public extension Data {
-    /// Dumps data as a formatted hex string for debugging.
-    ///
-    /// Byte-for-byte identical to the original `String(format:)`-and-concatenation
-    /// implementation (kept below as `legacyHexDump()`), but written into one
-    /// preallocated UTF-8 buffer: each 16-byte row is exactly 79 bytes. It runs on
-    /// `ATProtocolValueContainer.decodedFromDAGCBOR`'s failure path, where the
-    /// message embeds a dump of the entire input, so a hostile or corrupt block
-    /// previously cost ~2,000 instructions and ~0.9 allocations per input byte
-    /// (now ~41 instructions per byte and one allocation).
+    /// Dumps data as a formatted hex string for debugging
     func hexDump() -> String {
-        // Slices keep the original implementation (and its absolute-index behaviour) exactly.
-        guard startIndex == 0 else { return legacyHexDump() }
-        let header = "Hex dump (\(count) bytes):\n"
-        let rows = (count + 15) / 16
-        // "oooooooo: " (10) + 16 x "hh " (48) + mid gap (1) + " |" (2) + 16 ASCII + "|\n" (2)
-        let capacity = header.utf8.count + rows * 79
-        return String(unsafeUninitializedCapacity: capacity) { buffer in
-            var i = 0
-            for byte in header.utf8 {
-                buffer[i] = byte
-                i += 1
-            }
-            withUnsafeBytes { (raw: UnsafeRawBufferPointer) in
-                let digits: StaticString = "0123456789abcdef"
-                digits.withUTF8Buffer { hex in
-                    var offset = 0
-                    while offset < raw.count {
-                        // `String(format: "%08x", offset)` reads the low 32 bits of the Int vararg.
-                        let shown = UInt32(truncatingIfNeeded: offset)
-                        var shift: UInt32 = 28
-                        while true {
-                            buffer[i] = hex[Int((shown >> shift) & 0xF)]
-                            i += 1
-                            if shift == 0 { break }
-                            shift -= 4
-                        }
-                        buffer[i] = 0x3A // ":"
-                        buffer[i + 1] = 0x20
-                        i += 2
-                        var ascii = i + 49 + 2
-                        for column in 0 ..< 16 {
-                            let index = offset + column
-                            if index < raw.count {
-                                let byte = raw[index]
-                                buffer[i] = hex[Int(byte >> 4)]
-                                buffer[i + 1] = hex[Int(byte & 0x0F)]
-                                buffer[i + 2] = 0x20
-                                buffer[ascii] = (0x20 ... 0x7E).contains(byte) ? byte : 0x2E // "."
-                            } else {
-                                buffer[i] = 0x20
-                                buffer[i + 1] = 0x20
-                                buffer[i + 2] = 0x20
-                                buffer[ascii] = 0x20
-                            }
-                            i += 3
-                            ascii += 1
-                            if column == 7 {
-                                buffer[i] = 0x20
-                                i += 1
-                            }
-                        }
-                        buffer[i] = 0x20
-                        buffer[i + 1] = 0x7C // "|"
-                        i += 2 + 16
-                        buffer[i] = 0x7C
-                        buffer[i + 1] = 0x0A
-                        i += 2
-                        offset += 16
-                    }
-                }
-            }
-            return i
-        }
-    }
-
-    /// The original implementation. Still used for slices whose `startIndex` is not zero,
-    /// where it indexes `self` with absolute indices starting at 0.
-    internal func legacyHexDump() -> String {
         let hexChars = Array("0123456789abcdef")
         var result = ""
         result += "Hex dump (\(count) bytes):\n"
