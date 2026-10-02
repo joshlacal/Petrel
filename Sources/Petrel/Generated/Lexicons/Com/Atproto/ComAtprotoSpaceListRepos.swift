@@ -9,15 +9,17 @@ public enum ComAtprotoSpaceListRepos {
     public struct Repo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.listRepos#repo"
         public let did: DID
-        public let rev: TID
+        public let repoRev: TID
         public let hash: Bytes
+        public let spaceRev: TID
 
         public init(
-            did: DID, rev: TID, hash: Bytes
+            did: DID, repoRev: TID, hash: Bytes, spaceRev: TID
         ) {
             self.did = did
-            self.rev = rev
+            self.repoRev = repoRev
             self.hash = hash
+            self.spaceRev = spaceRev
         }
 
         public init(from decoder: Decoder) throws {
@@ -29,9 +31,9 @@ public enum ComAtprotoSpaceListRepos {
                 throw error
             }
             do {
-                rev = try container.decode(TID.self, forKey: .rev)
+                repoRev = try container.decode(TID.self, forKey: .repoRev)
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                LogManager.logError("Decoding error for required property 'repoRev': \(error)")
                 throw error
             }
             do {
@@ -40,20 +42,28 @@ public enum ComAtprotoSpaceListRepos {
                 LogManager.logError("Decoding error for required property 'hash': \(error)")
                 throw error
             }
+            do {
+                spaceRev = try container.decode(TID.self, forKey: .spaceRev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'spaceRev': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
-            try container.encode(rev, forKey: .rev)
+            try container.encode(repoRev, forKey: .repoRev)
             try container.encode(hash, forKey: .hash)
+            try container.encode(spaceRev, forKey: .spaceRev)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
-            hasher.combine(rev)
+            hasher.combine(repoRev)
             hasher.combine(hash)
+            hasher.combine(spaceRev)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -61,10 +71,13 @@ public enum ComAtprotoSpaceListRepos {
             if did != other.did {
                 return false
             }
-            if rev != other.rev {
+            if repoRev != other.repoRev {
                 return false
             }
             if hash != other.hash {
+                return false
+            }
+            if spaceRev != other.spaceRev {
                 return false
             }
             return true
@@ -79,18 +92,21 @@ public enum ComAtprotoSpaceListRepos {
             map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-            let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            let repoRevValue = try repoRev.toCBORValue()
+            map = map.adding(key: "repoRev", value: repoRevValue)
             let hashValue = try hash.toCBORValue()
             map = map.adding(key: "hash", value: hashValue)
+            let spaceRevValue = try spaceRev.toCBORValue()
+            map = map.adding(key: "spaceRev", value: spaceRevValue)
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case did
-            case rev
+            case repoRev
             case hash
+            case spaceRev
         }
     }
 
@@ -111,24 +127,26 @@ public enum ComAtprotoSpaceListRepos {
     }
 
     public struct Output: ATProtocolCodable {
-        public let cursor: String?
-
         public let repos: [Repo]
+
+        public let cursor: String?
 
         /// Standard public initializer
         public init(
-            cursor: String? = nil,
+            repos: [Repo],
 
-            repos: [Repo]
+            cursor: String? = nil
 
         ) {
-            self.cursor = cursor
-
             self.repos = repos
+
+            self.cursor = cursor
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+
+            repos = try container.decode([Repo].self, forKey: .repos)
 
             do {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
@@ -137,21 +155,22 @@ public enum ComAtprotoSpaceListRepos {
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
-            repos = try container.decode([Repo].self, forKey: .repos)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
+            try container.encode(repos, forKey: .repos)
+
             // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
-            try container.encode(repos, forKey: .repos)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
+
+            let reposValue = try repos.toCBORValue()
+            map = map.adding(key: "repos", value: reposValue)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
@@ -159,15 +178,12 @@ public enum ComAtprotoSpaceListRepos {
                 map = map.adding(key: "cursor", value: cursorValue)
             }
 
-            let reposValue = try repos.toCBORValue()
-            map = map.adding(key: "repos", value: reposValue)
-
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
-            case cursor
             case repos
+            case cursor
         }
     }
 
@@ -207,7 +223,7 @@ public enum ComAtprotoSpaceListRepos {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - listRepos
 
-    /// List the known repos that hold data in a space (the writer set), with each repo's current rev and commit hash. Served by the space host. This is the sync boundary, not an access-control list: it enumerates only writers, never readers. The set is what the authority claims from write notifications and is not itself authoritative; a repo's host is the source of truth.
+    /// List the known repos that hold data in a space (the writer set), with each repo's current repoRev and commit hash. Served by the space host. This is the sync boundary, not an access-control list: it enumerates only writers, never readers. The set is what the authority claims from write notifications and is not itself authoritative; a repo's host is the source of truth.
     ///
     /// - Parameter input: The input parameters for the request
     ///

@@ -8,31 +8,65 @@ public enum ComAtprotoSpaceNotifyWrite {
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let repo: DID
-        public let rev: TID
+        public let repoRev: TID
         public let hash: Bytes
+        public let spaceRev: TID?
+        public let prevSpaceRev: TID?
 
         /// Standard public initializer
-        public init(space: SpaceRef, repo: DID, rev: TID, hash: Bytes) {
+        public init(space: SpaceRef, repo: DID, repoRev: TID, hash: Bytes, spaceRev: TID? = nil, prevSpaceRev: TID? = nil) {
             self.space = space
             self.repo = repo
-            self.rev = rev
+            self.repoRev = repoRev
             self.hash = hash
+            self.spaceRev = spaceRev
+            self.prevSpaceRev = prevSpaceRev
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             space = try container.decode(SpaceRef.self, forKey: .space)
             repo = try container.decode(DID.self, forKey: .repo)
-            rev = try container.decode(TID.self, forKey: .rev)
+            repoRev = try container.decode(TID.self, forKey: .repoRev)
             hash = try container.decode(Bytes.self, forKey: .hash)
+            if container.contains(.spaceRev) {
+                guard try !container.decodeNil(forKey: .spaceRev) else {
+                    throw DecodingError.valueNotFound(
+                        TID.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'spaceRev' must not be null"
+                        )
+                    )
+                }
+                spaceRev = try container.decode(TID.self, forKey: .spaceRev)
+            } else {
+                spaceRev = nil
+            }
+            if container.contains(.prevSpaceRev) {
+                guard try !container.decodeNil(forKey: .prevSpaceRev) else {
+                    throw DecodingError.valueNotFound(
+                        TID.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'prevSpaceRev' must not be null"
+                        )
+                    )
+                }
+                prevSpaceRev = try container.decode(TID.self, forKey: .prevSpaceRev)
+            } else {
+                prevSpaceRev = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(space, forKey: .space)
             try container.encode(repo, forKey: .repo)
-            try container.encode(rev, forKey: .rev)
+            try container.encode(repoRev, forKey: .repoRev)
             try container.encode(hash, forKey: .hash)
+            try container.encodeIfPresent(spaceRev, forKey: .spaceRev)
+            try container.encodeIfPresent(prevSpaceRev, forKey: .prevSpaceRev)
         }
 
         public func toCBORValue() throws -> Any {
@@ -41,18 +75,41 @@ public enum ComAtprotoSpaceNotifyWrite {
             map = map.adding(key: "space", value: spaceValue)
             let repoValue = try repo.toCBORValue()
             map = map.adding(key: "repo", value: repoValue)
-            let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            let repoRevValue = try repoRev.toCBORValue()
+            map = map.adding(key: "repoRev", value: repoRevValue)
             let hashValue = try hash.toCBORValue()
             map = map.adding(key: "hash", value: hashValue)
+            if let value = spaceRev {
+                let spaceRevValue = try value.toCBORValue()
+                map = map.adding(key: "spaceRev", value: spaceRevValue)
+            }
+            if let value = prevSpaceRev {
+                let prevSpaceRevValue = try value.toCBORValue()
+                map = map.adding(key: "prevSpaceRev", value: prevSpaceRevValue)
+            }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case space
             case repo
-            case rev
+            case repoRev
             case hash
+            case spaceRev
+            case prevSpaceRev
+        }
+    }
+
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case spaceNotFound = "SpaceNotFound"
+        /// The repo revision exceeds the permitted clock skew.
+        case futureRev = "FutureRev"
+        public var description: String {
+            return rawValue
+        }
+
+        public var errorName: String {
+            return rawValue
         }
     }
 
@@ -67,7 +124,7 @@ public enum ComAtprotoSpaceNotifyWrite {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.notifyWrite", kind: "procedure",
         inputEncoding: "application/json", outputEncoding: nil,
-        declaredErrors: []
+        declaredErrors: ["SpaceNotFound", "FutureRev"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -81,7 +138,7 @@ public enum ComAtprotoSpaceNotifyWrite {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - notifyWrite
 
-    // Notify that a repo in a space has advanced to a new revision. Sent by a repo host to the space host, and forwarded to registered syncers. Best-effort. Authenticated with service auth.
+    // Notify that a repo in a space has advanced. Repo hosts reliably deliver their latest state to the space host, which sequences updates and forwards them to registered syncers with reasonable-effort delivery. Authenticated with service auth.
     //
     // - Parameter input: The input parameters for the request
 
@@ -117,6 +174,14 @@ public extension ATProtoClient.Com.Atproto.Space {
         let responseCode = response.statusCode
 
         if !(200 ... 299).contains(responseCode) {
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoSpaceNotifyWrite.Error.self
+            ) {
+                throw atprotoError
+            }
+
             if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
                 throw genericError
             }
