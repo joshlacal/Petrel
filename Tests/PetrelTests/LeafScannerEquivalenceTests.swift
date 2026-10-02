@@ -19,6 +19,28 @@ import Testing
 /// official atproto syntax vectors and the fixture corpus).
 @Suite("Leaf scanner equivalence")
 struct LeafScannerEquivalenceTests {
+    @Test("Lazy leaf properties retain the legacy reflection surface")
+    func lazyLeafReflection() throws {
+        let did = try DID(didString: "did:example:authority:one:two")
+        let didChildren = Array(Mirror(reflecting: did).children)
+        #expect(didChildren.map(\.label) == ["method", "authority", "segments", "originalString"])
+        #expect(didChildren[0].value as? String == "example")
+        #expect(didChildren[1].value as? String == "authority")
+        #expect(didChildren[2].value as? [String] == ["one", "two"])
+        #expect(didChildren[3].value as? String == did.description)
+
+        var language = LanguageCodeContainer(languageCode: "pt-BR")
+        let languageChildren = Array(Mirror(reflecting: language).children)
+        #expect(languageChildren.map(\.label) == ["lang", "wireTag"])
+        #expect(languageChildren[0].value as? Locale.Language == Locale.Language(identifier: "pt-BR"))
+        #expect(languageChildren[1].value as? String == "pt-BR")
+        language.lang = Locale.Language(identifier: "fr-CA")
+        let changedChildren = Array(Mirror(reflecting: language).children)
+        #expect(changedChildren[0].value as? Locale.Language == language.lang)
+        #expect(Mirror(reflecting: changedChildren[1].value).displayStyle == .optional)
+        #expect(Mirror(reflecting: changedChildren[1].value).children.isEmpty)
+    }
+
     // MARK: Helpers
 
     /// Production outcome for an identifier string, as the legacy validators expose it.

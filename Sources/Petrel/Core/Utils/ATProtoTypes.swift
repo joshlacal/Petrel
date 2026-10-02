@@ -756,7 +756,7 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
+        var map = OrderedCBORMap(minimumCapacity: 5)
         if isLegacyFormat, let cid {
             map.append(key: "cid", value: cid)
             map.append(key: "mimeType", value: mimeType)
@@ -894,12 +894,23 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
 // MARK: - DID Identifier
 
-public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
+public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible, CustomReflectable {
     /// The validated DID exactly as given. Every other field is a deterministic
     /// function of it, so it is the only stored property: `method`, `authority` and
     /// `segments` are derived on access (no split or allocation while decoding), and
     /// equality and hashing compare this string.
     private let originalString: String
+
+    /// Keep the reflection surface of the former stored components. Dynamic
+    /// value text representations inspect these children when presenting DIDs.
+    public var customMirror: Mirror {
+        Mirror(self, children: [
+            "method": method,
+            "authority": authority,
+            "segments": segments,
+            "originalString": originalString,
+        ], displayStyle: .struct)
+    }
 
     /// The DID method (`plc` in `did:plc:abc`). Derived on access.
     public var method: String {

@@ -13,7 +13,7 @@ public extension Locale.Language {
     }
 }
 
-public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Sendable {
+public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Sendable, CustomReflectable {
     public func toCBORValue() throws -> Any {
         return languageTag
     }
@@ -53,6 +53,12 @@ public struct LanguageCodeContainer: Codable, ATProtocolCodable, Hashable, Senda
     /// `ATProtocolValueContainer`'s lossless-decode guard, which then demotes the
     /// whole record to `.unknownType` and makes renderers tombstone it.
     private var wireTag: String?
+
+    /// Preserve the original stored-property view even though language parsing
+    /// is now deferred until it is requested.
+    public var customMirror: Mirror {
+        Mirror(self, children: ["lang": lang, "wireTag": wireTag as Any], displayStyle: .struct)
+    }
 
     /// The BCP-47 tag for this language, preserving region/script subtags when known.
     public var languageTag: String {
