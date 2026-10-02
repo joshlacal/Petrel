@@ -18,6 +18,13 @@ void bench_malloc_counting(int enable);
 uint64_t bench_malloc_count(void);
 uint64_t bench_malloc_bytes(void);
 uint64_t bench_instructions(void);
+/* DAG-CBOR lane counters: same malloc_logger hook as above (shared counters), plus a free count. */
+void bench_mcount_install(void);
+void bench_mcount_uninstall(void);
+void bench_mcount_reset(void);
+uint64_t bench_mcount_allocs(void);
+uint64_t bench_mcount_frees(void);
+uint64_t bench_mcount_bytes(void);
 #ifdef __cplusplus
 }
 #endif

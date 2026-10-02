@@ -7,7 +7,7 @@ import Glibc
 #if canImport(FoundationEssentials)
 import FoundationEssentials
 #endif
-import Petrel
+@_spi(XRPCDecodeExperimental) import Petrel
 import PetrelCore
 import SimdUTF
 import CBenchMetrics
@@ -34,6 +34,13 @@ enum Strategy: String, CaseIterable, Sendable {
     case foundationFresh, foundationReuse, foundationLocked, foundationEssentials
     case zippy = "zippyCompat"
     case simdCodable, simdDirect, foundationSpecialized
+    /// The generated endpoints' decode entry (`XRPCResponseDecoding.decode`, general overload):
+    /// fresh JSONDecoder plus cancellation check, configuration read and signpost interval.
+    case foundationEntry
+    /// The entry's parallel-array overload with parallel decoding enabled (thresholds and chunking
+    /// from --parallel-* options; library defaults otherwise).
+    case foundationParallel
+    var isAsync: Bool { self == .foundationEntry || self == .foundationParallel }
     static var available: [Strategy] {
         var cases = allCases
         #if !canImport(ZippyJSON)
@@ -70,8 +77,60 @@ final class Context {
             throw BenchError.message("ZippyJSON requires Darwin Objective-C")
             #endif
         case .simdCodable, .simdDirect: return try SIMDModelDecoder().decode(type, from: data)
+        case .foundationEntry, .foundationParallel:
+            throw BenchError.message("\(strategy.rawValue) is async; use decodeAsync")
         }
     }
+    /// Async decode for probe types: async strategies go through the generated-endpoint entry point
+    /// (general overload); every other strategy uses the synchronous path above.
+    nonisolated(nonsending) func decodeAsync<T: Decodable & Sendable>(_ type: T.Type, _ data: Data) async throws -> T {
+        guard strategy.isAsync else { return try decode(type, data) }
+        return try await entryDecode(type, data, endpoint: "bench.probe")
+    }
+}
+/// Calls the general (non-parallel) overload of the generated endpoints' decode entry. Because `T` is
+/// only `Decodable & Sendable` here, overload resolution can never pick the parallel overload.
+@inline(never) func entryDecode<T: Decodable & Sendable>(_ type: T.Type, _ data: Data, endpoint: String) async throws -> T {
+    try await XRPCResponseDecoding.decode(type, from: data, endpoint: endpoint)
+}
+/// Decodes a fixture through the generated endpoints' decode entry. `.foundationParallel` uses the
+/// concrete output types, so the parallel-array overload is selected for eligible outputs.
+// `nonisolated(nonsending)`: runs on the caller's executor, so the non-Sendable Context is never sent.
+// The entry point itself is `@concurrent`, so the decode still runs on the global concurrent executor.
+@inline(never) nonisolated(nonsending) func decodeAsync(_ fixture: Fixture, _ context: Context) async throws -> Model {
+    switch context.strategy {
+    case .foundationEntry:
+        switch fixture.entry.modelKind {
+        case "profile": return try await entryDecode(AppBskyActorGetProfile.Output.self, fixture.data, endpoint: "app.bsky.actor.getProfile")
+        case "search": return try await entryDecode(AppBskyActorSearchActors.Output.self, fixture.data, endpoint: "app.bsky.actor.searchActors")
+        case "timeline": return try await entryDecode(AppBskyFeedGetTimeline.Output.self, fixture.data, endpoint: "app.bsky.feed.getTimeline")
+        case "records": return try await entryDecode(ComAtprotoRepoListRecords.Output.self, fixture.data, endpoint: "com.atproto.repo.listRecords")
+        default: throw BenchError.message("Unknown model kind \(fixture.entry.modelKind)")
+        }
+    case .foundationParallel:
+        switch fixture.entry.modelKind {
+        case "profile": return try await XRPCResponseDecoding.decode(AppBskyActorGetProfile.Output.self, from: fixture.data, endpoint: "app.bsky.actor.getProfile")
+        case "search": return try await XRPCResponseDecoding.decode(AppBskyActorSearchActors.Output.self, from: fixture.data, endpoint: "app.bsky.actor.searchActors")
+        case "timeline": return try await XRPCResponseDecoding.decode(AppBskyFeedGetTimeline.Output.self, from: fixture.data, endpoint: "app.bsky.feed.getTimeline")
+        case "records": return try await XRPCResponseDecoding.decode(ComAtprotoRepoListRecords.Output.self, from: fixture.data, endpoint: "com.atproto.repo.listRecords")
+        default: throw BenchError.message("Unknown model kind \(fixture.entry.modelKind)")
+        }
+    default:
+        return try decode(fixture, context)
+    }
+}
+/// Parallel configuration from the command line (library defaults when an option is absent).
+func parallelConfiguration(_ option: (String, String) -> String) -> XRPCResponseDecoding.Configuration {
+    var configuration = XRPCResponseDecoding.Configuration(parallelArrayDecoding: true)
+    if let value = Int(option("--parallel-min-bytes", "")) { configuration.parallelMinimumBytes = value }
+    if let value = Int(option("--parallel-min-elements", "")) { configuration.parallelMinimumElements = value }
+    if let value = Int(option("--parallel-chunks", "")) { configuration.parallelChunkCount = value }
+    if let value = Int(option("--parallel-workers", "")) { configuration.parallelMaximumWorkers = value }
+    return configuration
+}
+func parallelStatisticsLine() -> String {
+    let s = XRPCResponseDecoding.statistics()
+    return "PARALLEL-STATS parallelDecodes=\(s.parallelDecodes) belowThreshold=\(s.belowThreshold) splitterDeclined=\(s.splitterDeclined) fallbacksAfterFailure=\(s.fallbacksAfterFailure)"
 }
 enum BenchError: Error { case message(String) }
 typealias Model = any Encodable & Sendable
@@ -152,6 +211,12 @@ struct Memory: Codable {
     let strategies = Strategy.available.filter { option("--strategy","").isEmpty || $0.rawValue == option("--strategy","") }
     guard !fixtures.isEmpty, !strategies.isEmpty else { throw BenchError.message("Empty fixture or strategy selection") }
     let iterations = Int(option("--iterations","80"))!
+    // Only the foundationParallel strategy calls the parallel overload; every other strategy is unaffected.
+    XRPCResponseDecoding.configuration = parallelConfiguration(option)
+    if strategies.contains(.foundationParallel) {
+        let c = XRPCResponseDecoding.configuration
+        progress("ENV parallel minBytes=\(c.parallelMinimumBytes) minElements=\(c.parallelMinimumElements) chunks=\(c.parallelChunkCount.map(String.init) ?? "auto") workers=\(c.parallelMaximumWorkers.map(String.init) ?? "auto") activeProcessors=\(ProcessInfo.processInfo.activeProcessorCount)")
+    }
     #if canImport(FoundationEssentials)
     let sameDecoder = ObjectIdentifier(Foundation.JSONDecoder.self) == ObjectIdentifier(FoundationEssentials.JSONDecoder.self)
     progress("ENV Foundation decoder identity equal=\(sameDecoder) type=\(String(reflecting:JSONDecoder.self))")
@@ -168,7 +233,7 @@ struct Memory: Codable {
     #endif
     switch mode {
     case "correctness":
-        let checks = try validateCorpus(fixtures); try save(checks,out+"/corpus-validation.json")
+        let checks = try await validateCorpus(fixtures); try save(checks,out+"/corpus-validation.json")
         var rows: [Correctness] = []
         for f in fixtures {
             let baseline: Data
@@ -176,7 +241,7 @@ struct Memory: Codable {
             catch { rows.append(.init(fixture:f.entry.id,strategy:"foundationFresh",status:"BASELINE_FAIL",detail:String(describing:error))); continue }
             for s in strategies {
                 do {
-                    let value = try canonical(decode(f,Context(s)))
+                    let value = try canonical(await decodeAsync(f,Context(s)))
                     rows.append(.init(fixture:f.entry.id,strategy:s.rawValue,status:value == baseline ? "equal" : "DIFFERENT",detail:"canonical Petrel re-encoding, \(value.count) bytes"))
                 } catch { rows.append(.init(fixture:f.entry.id,strategy:s.rawValue,status:"ERROR",detail:String(describing:error))) }
             }
@@ -187,14 +252,15 @@ struct Memory: Codable {
             let c = try directRecordCoverage(f.data); coverage[f.entry.id] = "\(c.eligible) / \(c.total) top-level post records eligible"
         }
         try save(coverage,out+"/direct-coverage.json")
-        try malformed(strategies,out,corpus:fixtures)
+        try await malformed(strategies,out,corpus:fixtures)
         for r in rows { progress("\(r.fixture) \(r.strategy) \(r.status) \(r.detail)") }
+        if strategies.contains(.foundationParallel) { progress(parallelStatisticsLine()) }
     case "structure":
         var rows: [Correctness] = []
         for f in fixtures {
             for s in strategies {
                 do {
-                    let checks = try validateCorpus([f],strategy:s)
+                    let checks = try await validateCorpus([f],strategy:s)
                     rows.append(.init(fixture:f.entry.id,strategy:s.rawValue,status:"passed",detail:checks.joined(separator:"; ")))
                 } catch {
                     rows.append(.init(fixture:f.entry.id,strategy:s.rawValue,status:"ERROR",detail:String(describing:error)))
@@ -209,19 +275,20 @@ struct Memory: Codable {
         // --no-validate writes outputs even when corpus expectations fail (used to diff a
         // library whose typed/unknown classification legitimately differs on a fixture).
         if !args.contains("--no-validate") {
-            let checks = try validateCorpus(fixtures); try save(checks,out+"/corpus-validation.json")
+            let checks = try await validateCorpus(fixtures); try save(checks,out+"/corpus-validation.json")
         }
         for f in fixtures {
             for s in strategies {
-                let encoded = try canonical(decode(f,Context(s)))
+                let encoded = try canonical(await decodeAsync(f,Context(s)))
                 try encoded.write(to:URL(fileURLWithPath:out+"/\(f.entry.id)-\(s.rawValue).json"),options:.atomic)
             }
         }
+        if strategies.contains(.foundationParallel) { progress(parallelStatisticsLine()) }
     case "cold", "memory":
         let f = fixtures[0]; let s = strategies[0]; let c = Context(s)
         let r0 = bench_peak_rss(), b0 = bench_live_bytes(), n0 = bench_live_blocks()
         let cpu0 = bench_cpu_ns(), t0 = DispatchTime.now().uptimeNanoseconds
-        let value = try decode(f,c)
+        let value = try await decodeAsync(f,c)
         let t1 = DispatchTime.now().uptimeNanoseconds, cpu1 = bench_cpu_ns()
         let b1 = bench_live_bytes(), n1 = bench_live_blocks(), r1 = bench_peak_rss()
         let encoded = try canonical(value)
@@ -235,7 +302,7 @@ struct Memory: Codable {
         let deadline = DispatchTime.now().uptimeNanoseconds + UInt64(seconds*1e9)
         var count = 0, size = 0
         while DispatchTime.now().uptimeNanoseconds < deadline {
-            let result = try decode(f,c)
+            let result = try await decodeAsync(f,c)
             withExtendedLifetime(result) { count += 1 }
             if count == 1 { size = try canonical(result).count }
         }
@@ -245,10 +312,10 @@ struct Memory: Codable {
         for f in fixtures {
           for s in strategies where s != .foundationEssentials {
             do {
-                guard try canonical(decode(f,Context(s))) == canonical(decode(f,Context(.foundationFresh))) else { progress("SKIP incorrect concurrent \(f.entry.id) \(s)"); continue }
+                guard try await canonical(decodeAsync(f,Context(s))) == canonical(decode(f,Context(.foundationFresh))) else { progress("SKIP incorrect concurrent \(f.entry.id) \(s)"); continue }
             } catch { progress("SKIP concurrent \(f.entry.id) \(s): \(error)"); continue }
             for workers in [1,2,4,8] where option("--workers","").isEmpty || workers == Int(option("--workers", "0")) {
-              let c = Context(s); for _ in 0..<3 { _ = try decode(f,c) }
+              let c = Context(s); for _ in 0..<3 { _ = try await decodeAsync(f,c) }
               let start = DispatchTime.now().uptimeNanoseconds, cpu0 = bench_cpu_ns()
               let samples = try await withThrowingTaskGroup(of:[Sample].self) { group in
                 for worker in 0..<workers {
@@ -257,7 +324,7 @@ struct Memory: Codable {
                     times.reserveCapacity(iterations)
                     for i in 0..<iterations {
                       let t0 = DispatchTime.now().uptimeNanoseconds
-                      let model = try decode(f,local)
+                      let model = try await decodeAsync(f,local)
                       let t1 = DispatchTime.now().uptimeNanoseconds
                       withExtendedLifetime(model) {}
                       times.append(Sample(fixture:f.entry.id,strategy:s.rawValue,iteration:worker*iterations+i,wallNS:t1-t0,cpuNS:0))
@@ -276,6 +343,9 @@ struct Memory: Codable {
             }
           }
         }
+    case "parallelgate": try await parallelGate(fixtures,out,mutations:Int(option("--mutations","200"))!,instructionRounds:Int(option("--instruction-rounds","5"))!)
+    case "dagcbor-generate", "dagcbor", "dagcbor-reenc", "dagcbor-tf", "dagcbor-profile", "dagcbor-counts":
+        try await dagcborMain(mode: mode, args: args, fixtureDir: fixtureDir, out: out)
     case "encode": try encodeMode(fixtures,iterations,out)
     case "micro": try micro(fixtures,iterations,out)
     case "transport": try transportCopyExperiment(fixtures,iterations,out)
@@ -288,17 +358,17 @@ struct Memory: Codable {
             var eligible: [Context] = []
             for c in contexts {
                 do {
-                    let canonicalValue = try canonical(decode(f,c))
+                    let canonicalValue = try canonical(await decodeAsync(f,c))
                     if reference == nil { reference = canonicalValue }
                     if canonicalValue != reference { progress("SKIP incorrect \(f.entry.id) \(c.strategy)"); continue }
-                    for _ in 0..<5 { _ = try decode(f,c) }
+                    for _ in 0..<5 { _ = try await decodeAsync(f,c) }
                     eligible.append(c)
                 } catch { progress("SKIP \(f.entry.id) \(c.strategy) \(error)") }
             }
             for iteration in 0..<iterations {
                 for c in eligible.shuffled(using:&rng) {
                     let cpu0 = bench_cpu_ns(), t0 = DispatchTime.now().uptimeNanoseconds
-                    let model = try decode(f,c)
+                    let model = try await decodeAsync(f,c)
                     let t1 = DispatchTime.now().uptimeNanoseconds, cpu1 = bench_cpu_ns()
                     withExtendedLifetime(model) {}
                     samples.append(Sample(fixture:f.entry.id,strategy:c.strategy.rawValue,iteration:iteration,wallNS:t1-t0,cpuNS:cpu1-cpu0))

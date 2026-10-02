@@ -77,3 +77,22 @@ To regenerate analysis tables and profile attribution:
 python3 summarize_results.py
 python3 parse_profiles.py
 ```
+
+## Decode entry and opt-in parallel array decode (lane parallel-decode)
+
+Generated endpoints decode through `XRPCResponseDecoding.decode` (a `@concurrent` entry with a
+cancellation check and an `XRPCDecode` signpost). Two strategies exercise it; `foundationFresh` is unchanged:
+
+- `foundationEntry`: the entry's general overload (exactly what every generated endpoint now runs by default).
+- `foundationParallel`: the entry's parallel-array overload with parallel decoding enabled. Eligible outputs
+  (`timeline`, `search`, `records` here) split their top-level array and decode elements on several tasks;
+  others fall through to the plain decode. Tuning (library defaults when omitted):
+  `--parallel-min-bytes N` (65536), `--parallel-min-elements N` (8), `--parallel-chunks N` (4 x workers),
+  `--parallel-workers N` (active processor count). `run`, `concurrency`, `memory`, `cold`, `profile`,
+  `canonical`, `structure` and `correctness` all accept both strategies; `run` reports process CPU time
+  (all threads) next to wall time.
+
+`--mode parallelgate [--mutations N] [--instruction-rounds N]` is a correctness gate, not a benchmark:
+chunk/worker sweep (canonical bytes vs a sequential decode, parallel path must run), named malformed variants
+plus deterministic random mutations (accepted values and full error reflections must match the sequential
+decoder; run with `SWIFT_DETERMINISTIC_HASHING=1`), cancellation behaviour, and instructions retired per decode.

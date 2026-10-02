@@ -1,0 +1,237 @@
+[
+  {
+    "hex" : "",
+    "name" : "empty",
+    "note" : "empty input"
+  },
+  {
+    "hex" : "05",
+    "name" : "scalar_root_uint",
+    "note" : "root is a scalar"
+  },
+  {
+    "hex" : "6161",
+    "name" : "scalar_root_text",
+    "note" : "root is a text string"
+  },
+  {
+    "hex" : "82a0a16161f5",
+    "name" : "root_array",
+    "note" : "root array of maps"
+  },
+  {
+    "hex" : "a16161fb3ff8000000000000",
+    "name" : "float64_value",
+    "note" : "float value"
+  },
+  {
+    "hex" : "a16161f93c00",
+    "name" : "float16_value",
+    "note" : "half float value"
+  },
+  {
+    "hex" : "a1616e1b8000000000000000",
+    "name" : "uint_above_int_max",
+    "note" : "2^63: throws in decodedFromDAGCBOR, stringified in CARRepository"
+  },
+  {
+    "hex" : "a1616e1bffffffffffffffff",
+    "name" : "uint_max",
+    "note" : "2^64-1"
+  },
+  {
+    "hex" : "a1616e3bffffffffffffffff",
+    "name" : "negint_below_int64_min",
+    "note" : "-2^64"
+  },
+  {
+    "hex" : "a1616e3b7fffffffffffffff",
+    "name" : "negint_int64_min",
+    "note" : "-2^63"
+  },
+  {
+    "hex" : "a16178d82b4100",
+    "name" : "tag43",
+    "note" : "unsupported tag"
+  },
+  {
+    "hex" : "a16178d82a582401711220000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "name" : "tag42_no_prefix",
+    "note" : "tag 42 payload without 0x00 prefix"
+  },
+  {
+    "hex" : "a16178d82a4400010203",
+    "name" : "tag42_bad_cid",
+    "note" : "tag 42 with invalid CID bytes"
+  },
+  {
+    "hex" : "a16178d82a6161",
+    "name" : "tag42_text",
+    "note" : "tag 42 wrapping text"
+  },
+  {
+    "hex" : "a16178d82a58250001711220000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+    "name" : "tag42_valid",
+    "note" : "valid tag 42 link"
+  },
+  {
+    "hex" : "a1016161",
+    "name" : "int_map_key",
+    "note" : "integer map key"
+  },
+  {
+    "hex" : "a165246c696e6b05",
+    "name" : "link_non_string",
+    "note" : "{$link: 5}"
+  },
+  {
+    "hex" : "a165246c696e6b676e6f7461636964",
+    "name" : "link_bad_cid_short",
+    "note" : "{$link: notacid}"
+  },
+  {
+    "hex" : "a165246c696e6b7562616679212121216e6f7462617365333221212121",
+    "name" : "link_bad_cid_base32",
+    "note" : "{$link: b... invalid base32}"
+  },
+  {
+    "hex" : "a165246c696e6ba2637461676178652474797065781b6170702e62736b792e72696368746578742e666163657423746167",
+    "name" : "link_with_typed_value",
+    "note" : "{$link: {typed object}} (resolution must not change the string check)"
+  },
+  {
+    "hex" : "a16624627974657363212121",
+    "name" : "bytes_bad_base64",
+    "note" : "{$bytes: !!!}"
+  },
+  {
+    "hex" : "a166246279746573f5",
+    "name" : "bytes_non_string",
+    "note" : "{$bytes: true}"
+  },
+  {
+    "hex" : "a166246279746573644141482f",
+    "name" : "bytes_valid",
+    "note" : "{$bytes: AAH\/}"
+  },
+  {
+    "hex" : "a2616101652474797065a2637461676178652474797065781b6170702e62736b792e72696368746578742e666163657423746167",
+    "name" : "type_typed_value",
+    "note" : "{$type: {typed object}, a: 1}"
+  },
+  {
+    "hex" : "a2616201616102",
+    "name" : "noncanonical_key_order",
+    "note" : "{b:1,a:2} accepted by decodedFromDAGCBOR, rejected by preflight"
+  },
+  {
+    "hex" : "a2616101616102",
+    "name" : "duplicate_keys",
+    "note" : "{a:1,a:2} last wins in SwiftCBOR"
+  },
+  {
+    "hex" : "bf616101ff",
+    "name" : "indefinite_map",
+    "note" : "indefinite-length map"
+  },
+  {
+    "hex" : "a161619f0102ff",
+    "name" : "indefinite_array_in_map",
+    "note" : "indefinite-length array"
+  },
+  {
+    "hex" : "a161617f626162626364ff",
+    "name" : "indefinite_text_in_map",
+    "note" : "indefinite-length text"
+  },
+  {
+    "hex" : "a1616162c0af",
+    "name" : "invalid_utf8_text",
+    "note" : "invalid UTF-8 text value"
+  },
+  {
+    "hex" : "a162c0af01",
+    "name" : "invalid_utf8_key",
+    "note" : "invalid UTF-8 map key"
+  },
+  {
+    "hex" : "a16161f7",
+    "name" : "undefined_value",
+    "note" : "undefined"
+  },
+  {
+    "hex" : "a16161f0",
+    "name" : "simple_value",
+    "note" : "simple(16)"
+  },
+  {
+    "hex" : "a16164c11a5f5e1000",
+    "name" : "tag1_date_uint",
+    "note" : "tag 1 epoch date"
+  },
+  {
+    "hex" : "a16164c16161",
+    "name" : "tag1_date_text",
+    "note" : "tag 1 wrapping text (SwiftCBOR throws)"
+  },
+  {
+    "hex" : "1c",
+    "name" : "reserved_info",
+    "note" : "reserved additional info"
+  },
+  {
+    "hex" : "a3616101",
+    "name" : "truncated_map",
+    "note" : "map claims 3 pairs, has 1"
+  },
+  {
+    "hex" : "a161610100",
+    "name" : "trailing_bytes",
+    "note" : "valid map followed by trailing bytes"
+  },
+  {
+    "hex" : "a1652474797065a0",
+    "name" : "type_non_string",
+    "note" : "{$type: {}}"
+  },
+  {
+    "hex" : "a26178016524747970656a6578616d706c652e7861",
+    "name" : "type_unregistered",
+    "note" : "{$type: example.xa, x: 1}"
+  },
+  {
+    "hex" : "a2647465787405652474797065726170702e62736b792e666565642e706f7374",
+    "name" : "type_registered_bad",
+    "note" : "{$type: app.bsky.feed.post, text: 5}"
+  },
+  {
+    "hex" : "a464746578746178652474797065726170702e62736b792e666565642e706f7374666675747572651b8000000000000000696372656174656441747818323032362d30312d30315430303a30303a30302e3030305a",
+    "name" : "post_extra_bigint",
+    "note" : "known post with an unknown field holding 2^63"
+  },
+  {
+    "hex" : "a464746578746178652474797065726170702e62736b792e666565642e706f737466667574757265fb3fe0000000000000696372656174656441747818323032362d30312d30315430303a30303a30302e3030305a",
+    "name" : "post_extra_float",
+    "note" : "known post with an unknown float field"
+  },
+  {
+    "hex" : "a3696372656174656441747818323032362d30312d30315430303a30303a30302e3030305a64746578746178652474797065726170702e62736b792e666565642e706f7374",
+    "name" : "post_noncanonical",
+    "note" : "known post with non-canonical key order"
+  },
+  {
+    "hex" : "a26161fb3ff80000000000006162d82b4100",
+    "name" : "two_errors_float_and_tag",
+    "note" : "two bad entries: which error wins follows dictionary iteration"
+  },
+  {
+    "hex" : "a161618181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818181818101",
+    "name" : "deep_array_100",
+    "note" : "depth 101 (rejected by preflight)"
+  },
+  {
+    "hex" : "a16161a1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616ba1616b01",
+    "name" : "deep_map_70",
+    "note" : "nested maps depth 71"
+  }
+]

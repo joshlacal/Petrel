@@ -8,10 +8,10 @@
 #include <atomic>
 typedef void(bench_malloc_logger_t)(uint32_t type, uintptr_t arg1, uintptr_t arg2, uintptr_t arg3, uintptr_t result, uint32_t num_hot_frames_to_skip);
 extern "C" bench_malloc_logger_t *malloc_logger;
-static std::atomic<uint64_t> g_bench_allocs{0}, g_bench_alloc_bytes{0};
+static std::atomic<uint64_t> g_bench_allocs{0}, g_bench_alloc_bytes{0}, g_bench_frees{0};
 /* libmalloc stack_logging flags: 2 = allocate, 4 = deallocate, 8 = has zone (arg1 = zone). */
 static void bench_count_malloc(uint32_t type, uintptr_t a1, uintptr_t a2, uintptr_t a3, uintptr_t, uint32_t) {
- if (!(type & 2)) return;
+ if (!(type & 2)) { if (type & 4) g_bench_frees.fetch_add(1, std::memory_order_relaxed); return; }
  g_bench_allocs.fetch_add(1, std::memory_order_relaxed);
  uintptr_t size = (type & 4) ? a3 : ((type & 8) ? a2 : a1); /* realloc logs (zone, old ptr, new size) */
  g_bench_alloc_bytes.fetch_add(size, std::memory_order_relaxed);
@@ -71,6 +71,24 @@ uint64_t bench_instructions(void) {
  struct rusage_info_v4 ri;
  if (proc_pid_rusage(getpid(), RUSAGE_INFO_V4, (rusage_info_t *)&ri) != 0) return 0;
  return ri.ri_instructions;
+#else
+ return 0;
+#endif
+}
+
+// ---- DAG-CBOR lane counters: thin API over the shared malloc_logger hook above ----
+void bench_mcount_install(void) { bench_malloc_counting(1); }
+void bench_mcount_uninstall(void) { bench_malloc_counting(0); }
+void bench_mcount_reset(void) {
+#ifdef __APPLE__
+ g_bench_allocs.store(0, std::memory_order_relaxed); g_bench_frees.store(0, std::memory_order_relaxed); g_bench_alloc_bytes.store(0, std::memory_order_relaxed);
+#endif
+}
+uint64_t bench_mcount_allocs(void) { return bench_malloc_count(); }
+uint64_t bench_mcount_bytes(void) { return bench_malloc_bytes(); }
+uint64_t bench_mcount_frees(void) {
+#ifdef __APPLE__
+ return g_bench_frees.load(std::memory_order_relaxed);
 #else
  return 0;
 #endif

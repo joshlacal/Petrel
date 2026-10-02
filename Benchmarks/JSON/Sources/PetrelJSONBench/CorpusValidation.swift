@@ -3,7 +3,7 @@ import Petrel
 
 /// Runs outside measured regions. Petrel intentionally tolerates failed optional
 /// decodes, so decoding success alone is insufficient to validate fixture shape.
-func validateCorpus(_ fixtures: [Fixture], strategy: Strategy = .foundationFresh) throws -> [String] {
+func validateCorpus(_ fixtures: [Fixture], strategy: Strategy = .foundationFresh) async throws -> [String] {
     let context = Context(strategy)
     var checks: [String] = []
     for fixture in fixtures {
@@ -11,14 +11,14 @@ func validateCorpus(_ fixtures: [Fixture], strategy: Strategy = .foundationFresh
         let root = try JSONSerialization.jsonObject(with: fixture.data) as! [String: Any]
         switch fixture.entry.modelKind {
         case "profile":
-            let model = try decode(fixture, context) as! AppBskyActorGetProfile.Output
+            let model = try await decodeAsync(fixture, context) as! AppBskyActorGetProfile.Output
             try corpusRequire(model.displayName == root["displayName"] as? String, "\(name): displayName")
             try corpusRequire(model.avatar != nil && model.banner != nil && model.website != nil, "\(name): profile URLs")
             try corpusRequire(model.createdAt != nil && model.indexedAt != nil, "\(name): profile dates")
             try corpusRequire(model.pinnedPost != nil && model.associated?.chat != nil && model.viewer?.following != nil, "\(name): nested profile fields")
             checks.append("\(name): detailed profile, URLs, dates, pinned post, associated chat and viewer decoded")
         case "search":
-            let model = try decode(fixture, context) as! AppBskyActorSearchActors.Output
+            let model = try await decodeAsync(fixture, context) as! AppBskyActorSearchActors.Output
             let actors = root["actors"] as! [[String: Any]]
             try corpusRequire(model.actors.count == 50 && model.actors.count == actors.count, "\(name): actor count")
             for (index, actor) in model.actors.enumerated() {
@@ -27,7 +27,7 @@ func validateCorpus(_ fixtures: [Fixture], strategy: Strategy = .foundationFresh
             }
             checks.append("\(name): 50 actors including Unicode names; nested fields and dates retained")
         case "timeline":
-            let model = try decode(fixture, context) as! AppBskyFeedGetTimeline.Output
+            let model = try await decodeAsync(fixture, context) as! AppBskyFeedGetTimeline.Output
             if fixture.entry.validator == "fidelity-edge" {
                 checks.append(try validateFidelityEdge(fixture, model, root))
                 continue
@@ -74,7 +74,7 @@ func validateCorpus(_ fixtures: [Fixture], strategy: Strategy = .foundationFresh
             try corpusRequire(unknown == (name == "difficult-feed" ? 20 : 0), "\(name): expected unknown record count")
             checks.append("\(name): \(expected) feed entries, \(known) typed records, \(unknown) unknown records, \(embeds) embeds, \(replies) replies, \(reasons) reasons; facets, quote records, labels and optional fields retained")
         case "records":
-            let model = try decode(fixture, context) as! ComAtprotoRepoListRecords.Output
+            let model = try await decodeAsync(fixture, context) as! ComAtprotoRepoListRecords.Output
             try corpusRequire(model.records.count == 32, "\(name): record count")
             var bytes = 0
             for record in model.records {

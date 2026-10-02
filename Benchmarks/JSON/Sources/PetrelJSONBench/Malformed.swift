@@ -1,7 +1,7 @@
 import Foundation
-import Petrel
+@_spi(XRPCDecodeExperimental) import Petrel
 
-func malformed(_ strategies: [Strategy], _ out: String, corpus: [Fixture]) throws {
+func malformed(_ strategies: [Strategy], _ out: String, corpus: [Fixture]) async throws {
  struct Case { let name: String; let data: Data; let kind: Int }
  var cases: [Case] = []
  func add(_ name: String, _ text: String, _ kind: Int = 0) { cases.append(Case(name:name,data:Data(text.utf8),kind:kind)) }
@@ -52,9 +52,9 @@ func malformed(_ strategies: [Strategy], _ out: String, corpus: [Fixture]) throw
        let context = Context(s)
        let value: Model
        switch c.kind {
-       case 1: value = try context.decode(RequiredProbe.self,c.data)
-       case 2: value = try context.decode(DynamicProbe.self,c.data)
-       default: value = try context.decode(Probe.self,c.data)
+       case 1: value = try await context.decodeAsync(RequiredProbe.self,c.data)
+       case 2: value = try await context.decodeAsync(DynamicProbe.self,c.data)
+       default: value = try await context.decodeAsync(Probe.self,c.data)
        }
        do {
          let output = try canonical(value)
@@ -99,7 +99,8 @@ func malformed(_ strategies: [Strategy], _ out: String, corpus: [Fixture]) throw
          let result: AppBskyFeedGetTimeline.Output
          if s == .simdDirect { result = try directTimeline(bytes) }
          else if s == .foundationSpecialized { result = try directFoundationTimeline(bytes) }
-         else { result = try Context(s).decode(AppBskyFeedGetTimeline.Output.self,bytes) }
+         else if s == .foundationParallel { result = try await XRPCResponseDecoding.decode(AppBskyFeedGetTimeline.Output.self,from:bytes,endpoint:"app.bsky.feed.getTimeline") }
+         else { result = try await Context(s).decodeAsync(AppBskyFeedGetTimeline.Output.self,bytes) }
          let value = try canonical(result)
          rows.append(.init(fixture:name,strategy:s.rawValue,status:"accepted",detail:String(data:value,encoding:.utf8)!))
        } catch { rows.append(.init(fixture:name,strategy:s.rawValue,status:"rejected",detail:String(describing:error))) }
