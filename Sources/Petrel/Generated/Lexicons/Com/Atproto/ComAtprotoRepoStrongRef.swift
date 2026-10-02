@@ -14,9 +14,14 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-        cid = try container.decode(CID.self, forKey: .cid)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        uri = try container.decode(ATProtocolURI.self, forKey: "uri")
+        cid = try container.decode(CID.self, forKey: "cid")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -32,25 +37,25 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if uri != other.uri {
+        return self == other
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        if lhs.uri != rhs.uri {
             return false
         }
-        if cid != other.cid {
+        if lhs.cid != rhs.cid {
             return false
         }
         return true
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
+        var map = OrderedCBORMap(minimumCapacity: 2)
         let uriValue = try uri.toCBORValue()
-        map = map.adding(key: "uri", value: uriValue)
+        map.append(key: "uri", value: uriValue)
         let cidValue = try cid.toCBORValue()
-        map = map.adding(key: "cid", value: cidValue)
+        map.append(key: "cid", value: cidValue)
         return map
     }
 

@@ -53,7 +53,7 @@ public enum ComAtprotoSyncGetHostStatus {
                 seq = try container.decodeIfPresent(Int.self, forKey: .seq)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'seq' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("seq", error)
                 seq = nil
             }
 
@@ -61,7 +61,7 @@ public enum ComAtprotoSyncGetHostStatus {
                 accountCount = try container.decodeIfPresent(Int.self, forKey: .accountCount)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'accountCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("accountCount", error)
                 accountCount = nil
             }
 
@@ -69,7 +69,7 @@ public enum ComAtprotoSyncGetHostStatus {
                 status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: .status)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("status", error)
                 status = nil
             }
         }
@@ -90,27 +90,27 @@ public enum ComAtprotoSyncGetHostStatus {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
 
             let hostnameValue = try hostname.toCBORValue()
-            map = map.adding(key: "hostname", value: hostnameValue)
+            map.append(key: "hostname", value: hostnameValue)
 
             if let value = seq {
                 // Encode optional property even if it's an empty array for CBOR
                 let seqValue = try value.toCBORValue()
-                map = map.adding(key: "seq", value: seqValue)
+                map.append(key: "seq", value: seqValue)
             }
 
             if let value = accountCount {
                 // Encode optional property even if it's an empty array for CBOR
                 let accountCountValue = try value.toCBORValue()
-                map = map.adding(key: "accountCount", value: accountCountValue)
+                map.append(key: "accountCount", value: accountCountValue)
             }
 
             if let value = status {
                 // Encode optional property even if it's an empty array for CBOR
                 let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
+                map.append(key: "status", value: statusValue)
             }
 
             return map
@@ -183,7 +183,7 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.getHostStatus: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.sync.getHostStatus", error)
                 return (responseCode, nil)
             }
         } else {

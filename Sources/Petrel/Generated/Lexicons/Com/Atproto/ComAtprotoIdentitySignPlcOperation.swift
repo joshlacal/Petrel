@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoIdentitySignPlcOperation {
     public static let typeIdentifier = "com.atproto.identity.signPlcOperation"
+
     public struct Input: ATProtocolCodable {
         public let token: String?
         public let rotationKeys: [String]?
@@ -24,8 +25,8 @@ public enum ComAtprotoIdentitySignPlcOperation {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             token = try container.decodeIfPresent(String.self, forKey: .token)
-            rotationKeys = try container.decodeIfPresent([String].self, forKey: .rotationKeys)
-            alsoKnownAs = try container.decodeIfPresent([String].self, forKey: .alsoKnownAs)
+            rotationKeys = try container.decodeIfPresent(_LexiconStringArray.self, forKey: .rotationKeys)?.values
+            alsoKnownAs = try container.decodeIfPresent(_LexiconStringArray.self, forKey: .alsoKnownAs)?.values
             verificationMethods = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .verificationMethods)
             services = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .services)
         }
@@ -40,26 +41,26 @@ public enum ComAtprotoIdentitySignPlcOperation {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 5)
             if let value = token {
                 let tokenValue = try value.toCBORValue()
-                map = map.adding(key: "token", value: tokenValue)
+                map.append(key: "token", value: tokenValue)
             }
             if let value = rotationKeys {
                 let rotationKeysValue = try value.toCBORValue()
-                map = map.adding(key: "rotationKeys", value: rotationKeysValue)
+                map.append(key: "rotationKeys", value: rotationKeysValue)
             }
             if let value = alsoKnownAs {
                 let alsoKnownAsValue = try value.toCBORValue()
-                map = map.adding(key: "alsoKnownAs", value: alsoKnownAsValue)
+                map.append(key: "alsoKnownAs", value: alsoKnownAsValue)
             }
             if let value = verificationMethods {
                 let verificationMethodsValue = try value.toCBORValue()
-                map = map.adding(key: "verificationMethods", value: verificationMethodsValue)
+                map.append(key: "verificationMethods", value: verificationMethodsValue)
             }
             if let value = services {
                 let servicesValue = try value.toCBORValue()
-                map = map.adding(key: "services", value: servicesValue)
+                map.append(key: "services", value: servicesValue)
             }
             return map
         }
@@ -97,10 +98,10 @@ public enum ComAtprotoIdentitySignPlcOperation {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let operationValue = try operation.toCBORValue()
-            map = map.adding(key: "operation", value: operationValue)
+            map.append(key: "operation", value: operationValue)
 
             return map
         }
@@ -170,7 +171,7 @@ public extension ATProtoClient.Com.Atproto.Identity {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.identity.signPlcOperation: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.identity.signPlcOperation", error)
                 return (responseCode, nil)
             }
         } else {

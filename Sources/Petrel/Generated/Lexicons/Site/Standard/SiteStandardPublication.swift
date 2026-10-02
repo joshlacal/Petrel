@@ -24,44 +24,49 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
         do {
-            basicTheme = try container.decodeIfPresent(SiteStandardThemeBasic.self, forKey: .basicTheme)
+            basicTheme = try container.decodeIfPresent(SiteStandardThemeBasic.self, forKey: "basicTheme")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'basicTheme' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("basicTheme", error)
             basicTheme = nil
         }
         do {
-            description = try container.decodeIfPresent(String.self, forKey: .description)
+            description = try container.decodeIfPresent(String.self, forKey: "description")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("description", error)
             description = nil
         }
         do {
-            icon = try container.decodeIfPresent(Blob.self, forKey: .icon)
+            icon = try container.decodeIfPresent(Blob.self, forKey: "icon")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'icon' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("icon", error)
             icon = nil
         }
         do {
-            labels = try container.decodeIfPresent(SiteStandardPublicationLabelsUnion.self, forKey: .labels)
+            labels = try container.decodeIfPresent(SiteStandardPublicationLabelsUnion.self, forKey: "labels")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
             labels = nil
         }
-        name = try container.decode(String.self, forKey: .name)
+        name = try container.decode(String.self, forKey: "name")
         do {
-            preferences = try container.decodeIfPresent(Preferences.self, forKey: .preferences)
+            preferences = try container.decodeIfPresent(Preferences.self, forKey: "preferences")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'preferences' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("preferences", error)
             preferences = nil
         }
-        url = try container.decode(URI.self, forKey: .url)
+        url = try container.decode(URI.self, forKey: "url")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -77,33 +82,33 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.basicTheme != rhs.basicTheme {
+            return false
+        }
+        if lhs.description != rhs.description {
+            return false
+        }
+        if lhs.icon != rhs.icon {
+            return false
+        }
+        if lhs.labels != rhs.labels {
+            return false
+        }
+        if lhs.name != rhs.name {
+            return false
+        }
+        if lhs.preferences != rhs.preferences {
+            return false
+        }
+        if lhs.url != rhs.url {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if basicTheme != other.basicTheme {
-            return false
-        }
-        if description != other.description {
-            return false
-        }
-        if icon != other.icon {
-            return false
-        }
-        if labels != other.labels {
-            return false
-        }
-        if name != other.name {
-            return false
-        }
-        if preferences != other.preferences {
-            return false
-        }
-        if url != other.url {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -137,32 +142,32 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 8)
+        map.append(key: "$type", value: Self.typeIdentifier)
         if let value = basicTheme {
             let basicThemeValue = try value.toCBORValue()
-            map = map.adding(key: "basicTheme", value: basicThemeValue)
+            map.append(key: "basicTheme", value: basicThemeValue)
         }
         if let value = description {
             let descriptionValue = try value.toCBORValue()
-            map = map.adding(key: "description", value: descriptionValue)
+            map.append(key: "description", value: descriptionValue)
         }
         if let value = icon {
             let iconValue = try value.toCBORValue()
-            map = map.adding(key: "icon", value: iconValue)
+            map.append(key: "icon", value: iconValue)
         }
         if let value = labels {
             let labelsValue = try value.toCBORValue()
-            map = map.adding(key: "labels", value: labelsValue)
+            map.append(key: "labels", value: labelsValue)
         }
         let nameValue = try name.toCBORValue()
-        map = map.adding(key: "name", value: nameValue)
+        map.append(key: "name", value: nameValue)
         if let value = preferences {
             let preferencesValue = try value.toCBORValue()
-            map = map.adding(key: "preferences", value: preferencesValue)
+            map.append(key: "preferences", value: preferencesValue)
         }
         let urlValue = try url.toCBORValue()
-        map = map.adding(key: "url", value: urlValue)
+        map.append(key: "url", value: urlValue)
         return map
     }
 
@@ -188,13 +193,18 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                showInDiscover = try container.decodeIfPresent(Bool.self, forKey: .showInDiscover)
+                showInDiscover = try container.decodeIfPresent(Bool.self, forKey: "showInDiscover")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'showInDiscover' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("showInDiscover", error)
                 showInDiscover = nil
             }
         }
@@ -215,22 +225,22 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if showInDiscover != other.showInDiscover {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.showInDiscover != rhs.showInDiscover {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             if let value = showInDiscover {
                 let showInDiscoverValue = try value.toCBORValue()
-                map = map.adding(key: "showInDiscover", value: showInDiscoverValue)
+                map.append(key: "showInDiscover", value: showInDiscoverValue)
             }
             return map
         }
@@ -249,12 +259,14 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.label.defs#selfLabels":
-                let value = try ComAtprotoLabelDefs.SelfLabels(from: decoder)
+                let value = try ComAtprotoLabelDefs.SelfLabels(_lexiconContainer: container)
                 self = .comAtprotoLabelDefsSelfLabels(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -297,7 +309,7 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -308,29 +320,15 @@ public struct SiteStandardPublication: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.label.defs#selfLabels",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

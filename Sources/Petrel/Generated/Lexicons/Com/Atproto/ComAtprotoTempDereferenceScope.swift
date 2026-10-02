@@ -39,10 +39,10 @@ public enum ComAtprotoTempDereferenceScope {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let scopeValue = try scope.toCBORValue()
-            map = map.adding(key: "scope", value: scopeValue)
+            map.append(key: "scope", value: scopeValue)
 
             return map
         }
@@ -112,7 +112,7 @@ public extension ATProtoClient.Com.Atproto.Temp {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.temp.dereferenceScope: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.temp.dereferenceScope", error)
                 return (responseCode, nil)
             }
         } else {

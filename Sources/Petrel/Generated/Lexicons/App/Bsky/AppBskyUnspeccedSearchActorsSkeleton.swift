@@ -57,7 +57,7 @@ public enum AppBskyUnspeccedSearchActorsSkeleton {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -65,7 +65,7 @@ public enum AppBskyUnspeccedSearchActorsSkeleton {
                 hitsTotal = try container.decodeIfPresent(Int.self, forKey: .hitsTotal)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'hitsTotal' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("hitsTotal", error)
                 hitsTotal = nil
             }
 
@@ -85,22 +85,22 @@ public enum AppBskyUnspeccedSearchActorsSkeleton {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             if let value = hitsTotal {
                 // Encode optional property even if it's an empty array for CBOR
                 let hitsTotalValue = try value.toCBORValue()
-                map = map.adding(key: "hitsTotal", value: hitsTotalValue)
+                map.append(key: "hitsTotal", value: hitsTotalValue)
             }
 
             let actorsValue = try actors.toCBORValue()
-            map = map.adding(key: "actors", value: actorsValue)
+            map.append(key: "actors", value: actorsValue)
 
             return map
         }
@@ -171,7 +171,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.searchActorsSkeleton: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.searchActorsSkeleton", error)
                 return (responseCode, nil)
             }
         } else {

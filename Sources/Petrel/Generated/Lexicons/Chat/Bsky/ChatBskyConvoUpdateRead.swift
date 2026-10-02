@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyConvoUpdateRead {
     public static let typeIdentifier = "chat.bsky.convo.updateRead"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
         public let messageId: String?
@@ -28,12 +29,12 @@ public enum ChatBskyConvoUpdateRead {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             if let value = messageId {
                 let messageIdValue = try value.toCBORValue()
-                map = map.adding(key: "messageId", value: messageIdValue)
+                map.append(key: "messageId", value: messageIdValue)
             }
             return map
         }
@@ -68,10 +69,10 @@ public enum ChatBskyConvoUpdateRead {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let convoValue = try convo.toCBORValue()
-            map = map.adding(key: "convo", value: convoValue)
+            map.append(key: "convo", value: convoValue)
 
             return map
         }
@@ -152,7 +153,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.updateRead: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.updateRead", error)
                 return (responseCode, nil)
             }
         } else {

@@ -42,10 +42,10 @@ public enum AppBskyLabelerGetServices {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let viewsValue = try views.toCBORValue()
-            map = map.adding(key: "views", value: viewsValue)
+            map.append(key: "views", value: viewsValue)
 
             return map
         }
@@ -68,15 +68,17 @@ public enum AppBskyLabelerGetServices {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.labeler.defs#labelerView":
-                let value = try AppBskyLabelerDefs.LabelerView(from: decoder)
+                let value = try AppBskyLabelerDefs.LabelerView(_lexiconContainer: container)
                 self = .appBskyLabelerDefsLabelerView(value)
             case "app.bsky.labeler.defs#labelerViewDetailed":
-                let value = try AppBskyLabelerDefs.LabelerViewDetailed(from: decoder)
+                let value = try AppBskyLabelerDefs.LabelerViewDetailed(_lexiconContainer: container)
                 self = .appBskyLabelerDefsLabelerViewDetailed(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -130,7 +132,7 @@ public enum AppBskyLabelerGetServices {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -141,46 +143,20 @@ public enum AppBskyLabelerGetServices {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyLabelerDefsLabelerView(value):
-                map = map.adding(key: "$type", value: "app.bsky.labeler.defs#labelerView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.labeler.defs#labelerView",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyLabelerDefsLabelerViewDetailed(value):
-                map = map.adding(key: "$type", value: "app.bsky.labeler.defs#labelerViewDetailed")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.labeler.defs#labelerViewDetailed",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -235,7 +211,7 @@ public extension ATProtoClient.App.Bsky.Labeler {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.labeler.getServices: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.labeler.getServices", error)
                 return (responseCode, nil)
             }
         } else {

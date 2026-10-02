@@ -35,71 +35,76 @@ public enum AppBskyNotificationListNotifications {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                author = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .author)
+                author = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: "author")
             } catch {
-                LogManager.logError("Decoding error for required property 'author': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("author", error)
                 throw error
             }
             do {
-                reason = try container.decode(String.self, forKey: .reason)
+                reason = try container.decode(String.self, forKey: "reason")
             } catch {
-                LogManager.logError("Decoding error for required property 'reason': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("reason", error)
                 throw error
             }
             do {
-                reasonSubject = try container.decodeIfPresent(ATProtocolURI.self, forKey: .reasonSubject)
+                reasonSubject = try container.decodeIfPresent(ATProtocolURI.self, forKey: "reasonSubject")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'reasonSubject' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("reasonSubject", error)
                 reasonSubject = nil
             }
             do {
-                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+                record = try container.decode(ATProtocolValueContainer.self, forKey: "record")
             } catch {
-                LogManager.logError("Decoding error for required property 'record': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("record", error)
                 throw error
             }
             do {
-                starterPack = try container.decodeIfPresent(AppBskyGraphDefs.StarterPackViewBasic.self, forKey: .starterPack)
+                starterPack = try container.decodeIfPresent(AppBskyGraphDefs.StarterPackViewBasic.self, forKey: "starterPack")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'starterPack' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("starterPack", error)
                 starterPack = nil
             }
             do {
-                isRead = try container.decode(Bool.self, forKey: .isRead)
+                isRead = try container.decode(Bool.self, forKey: "isRead")
             } catch {
-                LogManager.logError("Decoding error for required property 'isRead': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("isRead", error)
                 throw error
             }
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: "indexedAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("indexedAt", error)
                 throw error
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: "labels")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
                 labels = nil
             }
         }
@@ -146,71 +151,71 @@ public enum AppBskyNotificationListNotifications {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if author != other.author {
+            if lhs.author != rhs.author {
                 return false
             }
-            if reason != other.reason {
+            if lhs.reason != rhs.reason {
                 return false
             }
-            if reasonSubject != other.reasonSubject {
+            if lhs.reasonSubject != rhs.reasonSubject {
                 return false
             }
-            if record != other.record {
+            if lhs.record != rhs.record {
                 return false
             }
-            if starterPack != other.starterPack {
+            if lhs.starterPack != rhs.starterPack {
                 return false
             }
-            if isRead != other.isRead {
+            if lhs.isRead != rhs.isRead {
                 return false
             }
-            if indexedAt != other.indexedAt {
+            if lhs.indexedAt != rhs.indexedAt {
                 return false
             }
-            if labels != other.labels {
+            if lhs.labels != rhs.labels {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 11)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             let authorValue = try author.toCBORValue()
-            map = map.adding(key: "author", value: authorValue)
+            map.append(key: "author", value: authorValue)
             let reasonValue = try reason.toCBORValue()
-            map = map.adding(key: "reason", value: reasonValue)
+            map.append(key: "reason", value: reasonValue)
             if let value = reasonSubject {
                 let reasonSubjectValue = try value.toCBORValue()
-                map = map.adding(key: "reasonSubject", value: reasonSubjectValue)
+                map.append(key: "reasonSubject", value: reasonSubjectValue)
             }
             let recordValue = try record.toCBORValue()
-            map = map.adding(key: "record", value: recordValue)
+            map.append(key: "record", value: recordValue)
             if let value = starterPack {
                 let starterPackValue = try value.toCBORValue()
-                map = map.adding(key: "starterPack", value: starterPackValue)
+                map.append(key: "starterPack", value: starterPackValue)
             }
             let isReadValue = try isRead.toCBORValue()
-            map = map.adding(key: "isRead", value: isReadValue)
+            map.append(key: "isRead", value: isReadValue)
             let indexedAtValue = try indexedAt.toCBORValue()
-            map = map.adding(key: "indexedAt", value: indexedAtValue)
+            map.append(key: "indexedAt", value: indexedAtValue)
             if let value = labels {
                 let labelsValue = try value.toCBORValue()
-                map = map.adding(key: "labels", value: labelsValue)
+                map.append(key: "labels", value: labelsValue)
             }
             return map
         }
@@ -288,7 +293,7 @@ public enum AppBskyNotificationListNotifications {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -298,7 +303,7 @@ public enum AppBskyNotificationListNotifications {
                 priority = try container.decodeIfPresent(Bool.self, forKey: .priority)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'priority' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("priority", error)
                 priority = nil
             }
 
@@ -306,7 +311,7 @@ public enum AppBskyNotificationListNotifications {
                 seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'seenAt' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("seenAt", error)
                 seenAt = nil
             }
         }
@@ -327,27 +332,27 @@ public enum AppBskyNotificationListNotifications {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let notificationsValue = try notifications.toCBORValue()
-            map = map.adding(key: "notifications", value: notificationsValue)
+            map.append(key: "notifications", value: notificationsValue)
 
             if let value = priority {
                 // Encode optional property even if it's an empty array for CBOR
                 let priorityValue = try value.toCBORValue()
-                map = map.adding(key: "priority", value: priorityValue)
+                map.append(key: "priority", value: priorityValue)
             }
 
             if let value = seenAt {
                 // Encode optional property even if it's an empty array for CBOR
                 let seenAtValue = try value.toCBORValue()
-                map = map.adding(key: "seenAt", value: seenAtValue)
+                map.append(key: "seenAt", value: seenAtValue)
             }
 
             return map
@@ -409,7 +414,7 @@ public extension ATProtoClient.App.Bsky.Notification {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.notification.listNotifications: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.notification.listNotifications", error)
                 return (responseCode, nil)
             }
         } else {

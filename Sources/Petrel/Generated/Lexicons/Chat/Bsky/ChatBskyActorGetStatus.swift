@@ -50,16 +50,16 @@ public enum ChatBskyActorGetStatus {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let chatDisabledValue = try chatDisabled.toCBORValue()
-            map = map.adding(key: "chatDisabled", value: chatDisabledValue)
+            map.append(key: "chatDisabled", value: chatDisabledValue)
 
             let canCreateGroupsValue = try canCreateGroups.toCBORValue()
-            map = map.adding(key: "canCreateGroups", value: canCreateGroupsValue)
+            map.append(key: "canCreateGroups", value: canCreateGroupsValue)
 
             let groupMemberLimitValue = try groupMemberLimit.toCBORValue()
-            map = map.adding(key: "groupMemberLimit", value: groupMemberLimitValue)
+            map.append(key: "groupMemberLimit", value: groupMemberLimitValue)
 
             return map
         }
@@ -117,7 +117,7 @@ public extension ATProtoClient.Chat.Bsky.Actor {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.actor.getStatus: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.actor.getStatus", error)
                 return (responseCode, nil)
             }
         } else {

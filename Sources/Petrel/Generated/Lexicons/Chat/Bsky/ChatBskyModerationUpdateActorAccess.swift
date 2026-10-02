@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyModerationUpdateActorAccess {
     public static let typeIdentifier = "chat.bsky.moderation.updateActorAccess"
+
     public struct Input: ATProtocolCodable {
         public let actor: DID
         public let allowAccess: Bool
@@ -32,14 +33,14 @@ public enum ChatBskyModerationUpdateActorAccess {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
             let actorValue = try actor.toCBORValue()
-            map = map.adding(key: "actor", value: actorValue)
+            map.append(key: "actor", value: actorValue)
             let allowAccessValue = try allowAccess.toCBORValue()
-            map = map.adding(key: "allowAccess", value: allowAccessValue)
+            map.append(key: "allowAccess", value: allowAccessValue)
             if let value = ref {
                 let refValue = try value.toCBORValue()
-                map = map.adding(key: "ref", value: refValue)
+                map.append(key: "ref", value: refValue)
             }
             return map
         }

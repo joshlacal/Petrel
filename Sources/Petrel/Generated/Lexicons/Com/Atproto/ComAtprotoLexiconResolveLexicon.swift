@@ -59,16 +59,16 @@ public enum ComAtprotoLexiconResolveLexicon {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
 
             let schemaValue = try schema.toCBORValue()
-            map = map.adding(key: "schema", value: schemaValue)
+            map.append(key: "schema", value: schemaValue)
 
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
 
             return map
         }
@@ -140,7 +140,7 @@ public extension ATProtoClient.Com.Atproto.Lexicon {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.lexicon.resolveLexicon: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.lexicon.resolveLexicon", error)
                 return (responseCode, nil)
             }
         } else {

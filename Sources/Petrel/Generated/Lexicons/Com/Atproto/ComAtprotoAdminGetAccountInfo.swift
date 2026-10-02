@@ -65,7 +65,7 @@ public extension ATProtoClient.Com.Atproto.Admin {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.admin.getAccountInfo: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.admin.getAccountInfo", error)
                 return (responseCode, nil)
             }
         } else {

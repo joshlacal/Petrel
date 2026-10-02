@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupEnableJoinLink {
     public static let typeIdentifier = "chat.bsky.group.enableJoinLink"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
 
@@ -24,9 +25,9 @@ public enum ChatBskyGroupEnableJoinLink {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -59,10 +60,10 @@ public enum ChatBskyGroupEnableJoinLink {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let joinLinkValue = try joinLink.toCBORValue()
-            map = map.adding(key: "joinLink", value: joinLinkValue)
+            map.append(key: "joinLink", value: joinLinkValue)
 
             return map
         }
@@ -146,7 +147,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.enableJoinLink: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.enableJoinLink", error)
                 return (responseCode, nil)
             }
         } else {

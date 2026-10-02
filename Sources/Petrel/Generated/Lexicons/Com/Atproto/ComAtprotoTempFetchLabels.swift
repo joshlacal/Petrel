@@ -42,10 +42,10 @@ public enum ComAtprotoTempFetchLabels {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let labelsValue = try labels.toCBORValue()
-            map = map.adding(key: "labels", value: labelsValue)
+            map.append(key: "labels", value: labelsValue)
 
             return map
         }
@@ -103,7 +103,7 @@ public extension ATProtoClient.Com.Atproto.Temp {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.temp.fetchLabels: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.temp.fetchLabels", error)
                 return (responseCode, nil)
             }
         } else {

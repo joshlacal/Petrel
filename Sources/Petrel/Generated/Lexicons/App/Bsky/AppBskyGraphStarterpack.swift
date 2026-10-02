@@ -22,31 +22,36 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        name = try container.decode(String.self, forKey: .name)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        name = try container.decode(String.self, forKey: "name")
         do {
-            description = try container.decodeIfPresent(String.self, forKey: .description)
+            description = try container.decodeIfPresent(String.self, forKey: "description")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("description", error)
             description = nil
         }
         do {
-            descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
+            descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: "descriptionFacets")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'descriptionFacets' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("descriptionFacets", error)
             descriptionFacets = nil
         }
-        list = try container.decode(ATProtocolURI.self, forKey: .list)
+        list = try container.decode(ATProtocolURI.self, forKey: "list")
         do {
-            feeds = try container.decodeIfPresent([FeedItem].self, forKey: .feeds)
+            feeds = try container.decodeIfPresent([FeedItem].self, forKey: "feeds")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'feeds' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("feeds", error)
             feeds = nil
         }
-        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -61,30 +66,30 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.name != rhs.name {
+            return false
+        }
+        if lhs.description != rhs.description {
+            return false
+        }
+        if lhs.descriptionFacets != rhs.descriptionFacets {
+            return false
+        }
+        if lhs.list != rhs.list {
+            return false
+        }
+        if lhs.feeds != rhs.feeds {
+            return false
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if name != other.name {
-            return false
-        }
-        if description != other.description {
-            return false
-        }
-        if descriptionFacets != other.descriptionFacets {
-            return false
-        }
-        if list != other.list {
-            return false
-        }
-        if feeds != other.feeds {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -109,26 +114,26 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 7)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let nameValue = try name.toCBORValue()
-        map = map.adding(key: "name", value: nameValue)
+        map.append(key: "name", value: nameValue)
         if let value = description {
             let descriptionValue = try value.toCBORValue()
-            map = map.adding(key: "description", value: descriptionValue)
+            map.append(key: "description", value: descriptionValue)
         }
         if let value = descriptionFacets {
             let descriptionFacetsValue = try value.toCBORValue()
-            map = map.adding(key: "descriptionFacets", value: descriptionFacetsValue)
+            map.append(key: "descriptionFacets", value: descriptionFacetsValue)
         }
         let listValue = try list.toCBORValue()
-        map = map.adding(key: "list", value: listValue)
+        map.append(key: "list", value: listValue)
         if let value = feeds {
             let feedsValue = try value.toCBORValue()
-            map = map.adding(key: "feeds", value: feedsValue)
+            map.append(key: "feeds", value: feedsValue)
         }
         let createdAtValue = try createdAt.toCBORValue()
-        map = map.adding(key: "createdAt", value: createdAtValue)
+        map.append(key: "createdAt", value: createdAtValue)
         return map
     }
 
@@ -153,11 +158,16 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
         }
@@ -174,21 +184,21 @@ public struct AppBskyGraphStarterpack: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             return map
         }
 

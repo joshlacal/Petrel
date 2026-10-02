@@ -39,10 +39,10 @@ public enum AppBskyActorGetProfiles {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let profilesValue = try profiles.toCBORValue()
-            map = map.adding(key: "profiles", value: profilesValue)
+            map.append(key: "profiles", value: profilesValue)
 
             return map
         }
@@ -100,7 +100,7 @@ public extension ATProtoClient.App.Bsky.Actor {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.actor.getProfiles: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.actor.getProfiles", error)
                 return (responseCode, nil)
             }
         } else {

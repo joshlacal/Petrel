@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoServerReserveSigningKey {
     public static let typeIdentifier = "com.atproto.server.reserveSigningKey"
+
     public struct Input: ATProtocolCodable {
         public let did: DID?
 
@@ -24,10 +25,10 @@ public enum ComAtprotoServerReserveSigningKey {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             if let value = did {
                 let didValue = try value.toCBORValue()
-                map = map.adding(key: "did", value: didValue)
+                map.append(key: "did", value: didValue)
             }
             return map
         }
@@ -61,10 +62,10 @@ public enum ComAtprotoServerReserveSigningKey {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let signingKeyValue = try signingKey.toCBORValue()
-            map = map.adding(key: "signingKey", value: signingKeyValue)
+            map.append(key: "signingKey", value: signingKeyValue)
 
             return map
         }
@@ -134,7 +135,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.reserveSigningKey: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.reserveSigningKey", error)
                 return (responseCode, nil)
             }
         } else {

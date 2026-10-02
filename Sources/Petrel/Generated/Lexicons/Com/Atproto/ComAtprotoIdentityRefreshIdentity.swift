@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoIdentityRefreshIdentity {
     public static let typeIdentifier = "com.atproto.identity.refreshIdentity"
+
     public struct Input: ATProtocolCodable {
         public let identifier: ATIdentifier
 
@@ -24,9 +25,9 @@ public enum ComAtprotoIdentityRefreshIdentity {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let identifierValue = try identifier.toCBORValue()
-            map = map.adding(key: "identifier", value: identifierValue)
+            map.append(key: "identifier", value: identifierValue)
             return map
         }
 
@@ -113,7 +114,7 @@ public extension ATProtoClient.Com.Atproto.Identity {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.identity.refreshIdentity: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.identity.refreshIdentity", error)
                 return (responseCode, nil)
             }
         } else {

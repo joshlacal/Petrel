@@ -14,13 +14,18 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        allowIncoming = try container.decode(String.self, forKey: .allowIncoming)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        allowIncoming = try container.decode(String.self, forKey: "allowIncoming")
         do {
-            allowGroupInvites = try container.decodeIfPresent(String.self, forKey: .allowGroupInvites)
+            allowGroupInvites = try container.decodeIfPresent(String.self, forKey: "allowGroupInvites")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'allowGroupInvites' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("allowGroupInvites", error)
             allowGroupInvites = nil
         }
     }
@@ -33,18 +38,18 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.allowIncoming != rhs.allowIncoming {
+            return false
+        }
+        if lhs.allowGroupInvites != rhs.allowGroupInvites {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if allowIncoming != other.allowIncoming {
-            return false
-        }
-        if allowGroupInvites != other.allowGroupInvites {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -57,13 +62,13 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 3)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let allowIncomingValue = try allowIncoming.toCBORValue()
-        map = map.adding(key: "allowIncoming", value: allowIncomingValue)
+        map.append(key: "allowIncoming", value: allowIncomingValue)
         if let value = allowGroupInvites {
             let allowGroupInvitesValue = try value.toCBORValue()
-            map = map.adding(key: "allowGroupInvites", value: allowGroupInvitesValue)
+            map.append(key: "allowGroupInvites", value: allowGroupInvitesValue)
         }
         return map
     }

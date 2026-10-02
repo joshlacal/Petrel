@@ -21,23 +21,28 @@ public enum AppBskyFeedGetLikes {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: "indexedAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("indexedAt", error)
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("createdAt", error)
                 throw error
             }
             do {
-                actor = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .actor)
+                actor = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: "actor")
             } catch {
-                LogManager.logError("Decoding error for required property 'actor': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("actor", error)
                 throw error
             }
         }
@@ -58,31 +63,31 @@ public enum AppBskyFeedGetLikes {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if indexedAt != other.indexedAt {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.indexedAt != rhs.indexedAt {
                 return false
             }
-            if createdAt != other.createdAt {
+            if lhs.createdAt != rhs.createdAt {
                 return false
             }
-            if actor != other.actor {
+            if lhs.actor != rhs.actor {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let indexedAtValue = try indexedAt.toCBORValue()
-            map = map.adding(key: "indexedAt", value: indexedAtValue)
+            map.append(key: "indexedAt", value: indexedAtValue)
             let createdAtValue = try createdAt.toCBORValue()
-            map = map.adding(key: "createdAt", value: createdAtValue)
+            map.append(key: "createdAt", value: createdAtValue)
             let actorValue = try actor.toCBORValue()
-            map = map.adding(key: "actor", value: actorValue)
+            map.append(key: "actor", value: actorValue)
             return map
         }
 
@@ -151,7 +156,7 @@ public enum AppBskyFeedGetLikes {
                 cid = try container.decodeIfPresent(CID.self, forKey: .cid)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cid", error)
                 cid = nil
             }
 
@@ -159,7 +164,7 @@ public enum AppBskyFeedGetLikes {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -181,25 +186,25 @@ public enum AppBskyFeedGetLikes {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
 
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
 
             if let value = cid {
                 // Encode optional property even if it's an empty array for CBOR
                 let cidValue = try value.toCBORValue()
-                map = map.adding(key: "cid", value: cidValue)
+                map.append(key: "cid", value: cidValue)
             }
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let likesValue = try likes.toCBORValue()
-            map = map.adding(key: "likes", value: likesValue)
+            map.append(key: "likes", value: likesValue)
 
             return map
         }
@@ -260,7 +265,7 @@ public extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.getLikes: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.feed.getLikes", error)
                 return (responseCode, nil)
             }
         } else {

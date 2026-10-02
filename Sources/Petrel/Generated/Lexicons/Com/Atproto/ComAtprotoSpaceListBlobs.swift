@@ -51,7 +51,7 @@ public enum ComAtprotoSpaceListBlobs {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -68,16 +68,16 @@ public enum ComAtprotoSpaceListBlobs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let cidsValue = try cids.toCBORValue()
-            map = map.adding(key: "cids", value: cidsValue)
+            map.append(key: "cids", value: cidsValue)
 
             return map
         }
@@ -172,7 +172,7 @@ public extension ATProtoClient.Com.Atproto.Space {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.listBlobs: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.space.listBlobs", error)
                 return (responseCode, nil)
             }
         } else {

@@ -15,6 +15,12 @@ public enum ComAtprotoTempCheckHandleAvailability {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -27,12 +33,12 @@ public enum ComAtprotoTempCheckHandleAvailability {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -52,11 +58,16 @@ public enum ComAtprotoTempCheckHandleAvailability {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                suggestions = try container.decode([Suggestion].self, forKey: .suggestions)
+                suggestions = try container.decode([Suggestion].self, forKey: "suggestions")
             } catch {
-                LogManager.logError("Decoding error for required property 'suggestions': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("suggestions", error)
                 throw error
             }
         }
@@ -73,21 +84,21 @@ public enum ComAtprotoTempCheckHandleAvailability {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if suggestions != other.suggestions {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.suggestions != rhs.suggestions {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let suggestionsValue = try suggestions.toCBORValue()
-            map = map.adding(key: "suggestions", value: suggestionsValue)
+            map.append(key: "suggestions", value: suggestionsValue)
             return map
         }
 
@@ -110,17 +121,22 @@ public enum ComAtprotoTempCheckHandleAvailability {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                handle = try container.decode(Handle.self, forKey: .handle)
+                handle = try container.decode(Handle.self, forKey: "handle")
             } catch {
-                LogManager.logError("Decoding error for required property 'handle': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("handle", error)
                 throw error
             }
             do {
-                method = try container.decode(String.self, forKey: .method)
+                method = try container.decode(String.self, forKey: "method")
             } catch {
-                LogManager.logError("Decoding error for required property 'method': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("method", error)
                 throw error
             }
         }
@@ -139,26 +155,26 @@ public enum ComAtprotoTempCheckHandleAvailability {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if handle != other.handle {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.handle != rhs.handle {
                 return false
             }
-            if method != other.method {
+            if lhs.method != rhs.method {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let handleValue = try handle.toCBORValue()
-            map = map.adding(key: "handle", value: handleValue)
+            map.append(key: "handle", value: handleValue)
             let methodValue = try method.toCBORValue()
-            map = map.adding(key: "method", value: methodValue)
+            map.append(key: "method", value: methodValue)
             return map
         }
 
@@ -219,13 +235,13 @@ public enum ComAtprotoTempCheckHandleAvailability {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let handleValue = try handle.toCBORValue()
-            map = map.adding(key: "handle", value: handleValue)
+            map.append(key: "handle", value: handleValue)
 
             let resultValue = try result.toCBORValue()
-            map = map.adding(key: "result", value: resultValue)
+            map.append(key: "result", value: resultValue)
 
             return map
         }
@@ -261,15 +277,17 @@ public enum ComAtprotoTempCheckHandleAvailability {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.temp.checkHandleAvailability#resultAvailable":
-                let value = try ComAtprotoTempCheckHandleAvailability.ResultAvailable(from: decoder)
+                let value = try ComAtprotoTempCheckHandleAvailability.ResultAvailable(_lexiconContainer: container)
                 self = .comAtprotoTempCheckHandleAvailabilityResultAvailable(value)
             case "com.atproto.temp.checkHandleAvailability#resultUnavailable":
-                let value = try ComAtprotoTempCheckHandleAvailability.ResultUnavailable(from: decoder)
+                let value = try ComAtprotoTempCheckHandleAvailability.ResultUnavailable(_lexiconContainer: container)
                 self = .comAtprotoTempCheckHandleAvailabilityResultUnavailable(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -323,7 +341,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -334,46 +352,20 @@ public enum ComAtprotoTempCheckHandleAvailability {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoTempCheckHandleAvailabilityResultAvailable(value):
-                map = map.adding(key: "$type", value: "com.atproto.temp.checkHandleAvailability#resultAvailable")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.temp.checkHandleAvailability#resultAvailable",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoTempCheckHandleAvailabilityResultUnavailable(value):
-                map = map.adding(key: "$type", value: "com.atproto.temp.checkHandleAvailability#resultUnavailable")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.temp.checkHandleAvailability#resultUnavailable",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -428,7 +420,7 @@ public extension ATProtoClient.Com.Atproto.Temp {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.temp.checkHandleAvailability: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.temp.checkHandleAvailability", error)
                 return (responseCode, nil)
             }
         } else {

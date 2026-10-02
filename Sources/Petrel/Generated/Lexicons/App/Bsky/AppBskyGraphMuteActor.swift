@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyGraphMuteActor {
     public static let typeIdentifier = "app.bsky.graph.muteActor"
+
     public struct Input: ATProtocolCodable {
         public let actor: ATIdentifier
         public let onlyReposts: Bool?
@@ -32,16 +33,16 @@ public enum AppBskyGraphMuteActor {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
             let actorValue = try actor.toCBORValue()
-            map = map.adding(key: "actor", value: actorValue)
+            map.append(key: "actor", value: actorValue)
             if let value = onlyReposts {
                 let onlyRepostsValue = try value.toCBORValue()
-                map = map.adding(key: "onlyReposts", value: onlyRepostsValue)
+                map.append(key: "onlyReposts", value: onlyRepostsValue)
             }
             if let value = onlyQuoteposts {
                 let onlyQuotepostsValue = try value.toCBORValue()
-                map = map.adding(key: "onlyQuoteposts", value: onlyQuotepostsValue)
+                map.append(key: "onlyQuoteposts", value: onlyQuotepostsValue)
             }
             return map
         }

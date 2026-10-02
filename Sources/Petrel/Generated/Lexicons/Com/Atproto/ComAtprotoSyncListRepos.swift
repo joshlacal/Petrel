@@ -25,39 +25,44 @@ public enum ComAtprotoSyncListRepos {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                head = try container.decode(CID.self, forKey: .head)
+                head = try container.decode(CID.self, forKey: "head")
             } catch {
-                LogManager.logError("Decoding error for required property 'head': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("head", error)
                 throw error
             }
             do {
-                rev = try container.decode(TID.self, forKey: .rev)
+                rev = try container.decode(TID.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                active = try container.decodeIfPresent(Bool.self, forKey: .active)
+                active = try container.decodeIfPresent(Bool.self, forKey: "active")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'active' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("active", error)
                 active = nil
             }
             do {
-                status = try container.decodeIfPresent(String.self, forKey: .status)
+                status = try container.decodeIfPresent(String.self, forKey: "status")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("status", error)
                 status = nil
             }
         }
@@ -90,44 +95,44 @@ public enum ComAtprotoSyncListRepos {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
-            if head != other.head {
+            if lhs.head != rhs.head {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if active != other.active {
+            if lhs.active != rhs.active {
                 return false
             }
-            if status != other.status {
+            if lhs.status != rhs.status {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 6)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let headValue = try head.toCBORValue()
-            map = map.adding(key: "head", value: headValue)
+            map.append(key: "head", value: headValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             if let value = active {
                 let activeValue = try value.toCBORValue()
-                map = map.adding(key: "active", value: activeValue)
+                map.append(key: "active", value: activeValue)
             }
             if let value = status {
                 let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
+                map.append(key: "status", value: statusValue)
             }
             return map
         }
@@ -179,7 +184,7 @@ public enum ComAtprotoSyncListRepos {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -196,16 +201,16 @@ public enum ComAtprotoSyncListRepos {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let reposValue = try repos.toCBORValue()
-            map = map.adding(key: "repos", value: reposValue)
+            map.append(key: "repos", value: reposValue)
 
             return map
         }
@@ -264,7 +269,7 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.listRepos: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.sync.listRepos", error)
                 return (responseCode, nil)
             }
         } else {

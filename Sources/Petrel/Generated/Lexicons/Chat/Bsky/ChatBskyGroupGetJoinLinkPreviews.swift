@@ -39,10 +39,10 @@ public enum ChatBskyGroupGetJoinLinkPreviews {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let joinLinkPreviewsValue = try joinLinkPreviews.toCBORValue()
-            map = map.adding(key: "joinLinkPreviews", value: joinLinkPreviewsValue)
+            map.append(key: "joinLinkPreviews", value: joinLinkPreviewsValue)
 
             return map
         }
@@ -70,18 +70,20 @@ public enum ChatBskyGroupGetJoinLinkPreviews {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.group.defs#joinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(_lexiconContainer: container)
                 self = .chatBskyGroupDefsJoinLinkPreviewView(value)
             case "chat.bsky.group.defs#disabledJoinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(_lexiconContainer: container)
                 self = .chatBskyGroupDefsDisabledJoinLinkPreviewView(value)
             case "chat.bsky.group.defs#invalidJoinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(_lexiconContainer: container)
                 self = .chatBskyGroupDefsInvalidJoinLinkPreviewView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -146,7 +148,7 @@ public enum ChatBskyGroupGetJoinLinkPreviews {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -157,63 +159,25 @@ public enum ChatBskyGroupGetJoinLinkPreviews {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyGroupDefsJoinLinkPreviewView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.group.defs#joinLinkPreviewView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.group.defs#joinLinkPreviewView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyGroupDefsDisabledJoinLinkPreviewView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.group.defs#disabledJoinLinkPreviewView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.group.defs#disabledJoinLinkPreviewView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyGroupDefsInvalidJoinLinkPreviewView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.group.defs#invalidJoinLinkPreviewView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.group.defs#invalidJoinLinkPreviewView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -268,7 +232,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.getJoinLinkPreviews: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.getJoinLinkPreviews", error)
                 return (responseCode, nil)
             }
         } else {

@@ -39,10 +39,10 @@ public enum AppBskyGraphGetStarterPacks {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let starterPacksValue = try starterPacks.toCBORValue()
-            map = map.adding(key: "starterPacks", value: starterPacksValue)
+            map.append(key: "starterPacks", value: starterPacksValue)
 
             return map
         }
@@ -100,7 +100,7 @@ public extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.graph.getStarterPacks: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.graph.getStarterPacks", error)
                 return (responseCode, nil)
             }
         } else {

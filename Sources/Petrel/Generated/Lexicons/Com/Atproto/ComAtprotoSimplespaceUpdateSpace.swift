@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSimplespaceUpdateSpace {
     public static let typeIdentifier = "com.atproto.simplespace.updateSpace"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let readPolicy: InputReadPolicyUnion?
@@ -75,20 +76,20 @@ public enum ComAtprotoSimplespaceUpdateSpace {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             if let value = readPolicy {
                 let readPolicyValue = try value.toCBORValue()
-                map = map.adding(key: "readPolicy", value: readPolicyValue)
+                map.append(key: "readPolicy", value: readPolicyValue)
             }
             if let value = writePolicy {
                 let writePolicyValue = try value.toCBORValue()
-                map = map.adding(key: "writePolicy", value: writePolicyValue)
+                map.append(key: "writePolicy", value: writePolicyValue)
             }
             if let value = appAccess {
                 let appAccessValue = try value.toCBORValue()
-                map = map.adding(key: "appAccess", value: appAccessValue)
+                map.append(key: "appAccess", value: appAccessValue)
             }
             return map
         }
@@ -156,18 +157,20 @@ public enum ComAtprotoSimplespaceUpdateSpace {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.simplespace.defs#publicPolicy":
-                let value = try ComAtprotoSimplespaceDefs.PublicPolicy(from: decoder)
+                let value = try ComAtprotoSimplespaceDefs.PublicPolicy(_lexiconContainer: container)
                 self = .comAtprotoSimplespaceDefsPublicPolicy(value)
             case "com.atproto.simplespace.defs#memberListPolicy":
-                let value = try ComAtprotoSimplespaceDefs.MemberListPolicy(from: decoder)
+                let value = try ComAtprotoSimplespaceDefs.MemberListPolicy(_lexiconContainer: container)
                 self = .comAtprotoSimplespaceDefsMemberListPolicy(value)
             case "com.atproto.simplespace.defs#managingAppPolicy":
-                let value = try ComAtprotoSimplespaceDefs.ManagingAppPolicy(from: decoder)
+                let value = try ComAtprotoSimplespaceDefs.ManagingAppPolicy(_lexiconContainer: container)
                 self = .comAtprotoSimplespaceDefsManagingAppPolicy(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -232,7 +235,7 @@ public enum ComAtprotoSimplespaceUpdateSpace {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -243,63 +246,25 @@ public enum ComAtprotoSimplespaceUpdateSpace {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoSimplespaceDefsPublicPolicy(value):
-                map = map.adding(key: "$type", value: "com.atproto.simplespace.defs#publicPolicy")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.simplespace.defs#publicPolicy",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoSimplespaceDefsMemberListPolicy(value):
-                map = map.adding(key: "$type", value: "com.atproto.simplespace.defs#memberListPolicy")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.simplespace.defs#memberListPolicy",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoSimplespaceDefsManagingAppPolicy(value):
-                map = map.adding(key: "$type", value: "com.atproto.simplespace.defs#managingAppPolicy")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.simplespace.defs#managingAppPolicy",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -324,18 +289,20 @@ public enum ComAtprotoSimplespaceUpdateSpace {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.simplespace.defs#publicPolicy":
-                let value = try ComAtprotoSimplespaceDefs.PublicPolicy(from: decoder)
+                let value = try ComAtprotoSimplespaceDefs.PublicPolicy(_lexiconContainer: container)
                 self = .comAtprotoSimplespaceDefsPublicPolicy(value)
             case "com.atproto.simplespace.defs#memberListPolicy":
-                let value = try ComAtprotoSimplespaceDefs.MemberListPolicy(from: decoder)
+                let value = try ComAtprotoSimplespaceDefs.MemberListPolicy(_lexiconContainer: container)
                 self = .comAtprotoSimplespaceDefsMemberListPolicy(value)
             case "com.atproto.simplespace.defs#managingAppPolicy":
-                let value = try ComAtprotoSimplespaceDefs.ManagingAppPolicy(from: decoder)
+                let value = try ComAtprotoSimplespaceDefs.ManagingAppPolicy(_lexiconContainer: container)
                 self = .comAtprotoSimplespaceDefsManagingAppPolicy(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -400,7 +367,7 @@ public enum ComAtprotoSimplespaceUpdateSpace {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -411,63 +378,25 @@ public enum ComAtprotoSimplespaceUpdateSpace {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoSimplespaceDefsPublicPolicy(value):
-                map = map.adding(key: "$type", value: "com.atproto.simplespace.defs#publicPolicy")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.simplespace.defs#publicPolicy",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoSimplespaceDefsMemberListPolicy(value):
-                map = map.adding(key: "$type", value: "com.atproto.simplespace.defs#memberListPolicy")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.simplespace.defs#memberListPolicy",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoSimplespaceDefsManagingAppPolicy(value):
-                map = map.adding(key: "$type", value: "com.atproto.simplespace.defs#managingAppPolicy")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.simplespace.defs#managingAppPolicy",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -487,15 +416,17 @@ public enum ComAtprotoSimplespaceUpdateSpace {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.simplespace.defs#open":
-                let value = try ComAtprotoSimplespaceDefs.Open(from: decoder)
+                let value = try ComAtprotoSimplespaceDefs.Open(_lexiconContainer: container)
                 self = .comAtprotoSimplespaceDefsOpen(value)
             case "com.atproto.simplespace.defs#allowList":
-                let value = try ComAtprotoSimplespaceDefs.AllowList(from: decoder)
+                let value = try ComAtprotoSimplespaceDefs.AllowList(_lexiconContainer: container)
                 self = .comAtprotoSimplespaceDefsAllowList(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -549,7 +480,7 @@ public enum ComAtprotoSimplespaceUpdateSpace {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -560,46 +491,20 @@ public enum ComAtprotoSimplespaceUpdateSpace {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoSimplespaceDefsOpen(value):
-                map = map.adding(key: "$type", value: "com.atproto.simplespace.defs#open")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.simplespace.defs#open",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoSimplespaceDefsAllowList(value):
-                map = map.adding(key: "$type", value: "com.atproto.simplespace.defs#allowList")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.simplespace.defs#allowList",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

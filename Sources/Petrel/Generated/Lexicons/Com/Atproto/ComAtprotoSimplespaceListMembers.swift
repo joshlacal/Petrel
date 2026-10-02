@@ -21,23 +21,28 @@ public enum ComAtprotoSimplespaceListMembers {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                read = try container.decode(Bool.self, forKey: .read)
+                read = try container.decode(Bool.self, forKey: "read")
             } catch {
-                LogManager.logError("Decoding error for required property 'read': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("read", error)
                 throw error
             }
             do {
-                write = try container.decode(Bool.self, forKey: .write)
+                write = try container.decode(Bool.self, forKey: "write")
             } catch {
-                LogManager.logError("Decoding error for required property 'write': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("write", error)
                 throw error
             }
         }
@@ -58,31 +63,31 @@ public enum ComAtprotoSimplespaceListMembers {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
-            if read != other.read {
+            if lhs.read != rhs.read {
                 return false
             }
-            if write != other.write {
+            if lhs.write != rhs.write {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let readValue = try read.toCBORValue()
-            map = map.adding(key: "read", value: readValue)
+            map.append(key: "read", value: readValue)
             let writeValue = try write.toCBORValue()
-            map = map.adding(key: "write", value: writeValue)
+            map.append(key: "write", value: writeValue)
             return map
         }
 
@@ -134,7 +139,7 @@ public enum ComAtprotoSimplespaceListMembers {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -151,16 +156,16 @@ public enum ComAtprotoSimplespaceListMembers {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let membersValue = try members.toCBORValue()
-            map = map.adding(key: "members", value: membersValue)
+            map.append(key: "members", value: membersValue)
 
             return map
         }
@@ -251,7 +256,7 @@ public extension ATProtoClient.Com.Atproto.Simplespace {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.simplespace.listMembers: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.simplespace.listMembers", error)
                 return (responseCode, nil)
             }
         } else {

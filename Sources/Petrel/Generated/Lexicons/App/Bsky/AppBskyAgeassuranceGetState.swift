@@ -52,13 +52,13 @@ public enum AppBskyAgeassuranceGetState {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let stateValue = try state.toCBORValue()
-            map = map.adding(key: "state", value: stateValue)
+            map.append(key: "state", value: stateValue)
 
             let metadataValue = try metadata.toCBORValue()
-            map = map.adding(key: "metadata", value: metadataValue)
+            map.append(key: "metadata", value: metadataValue)
 
             return map
         }
@@ -117,7 +117,7 @@ public extension ATProtoClient.App.Bsky.Ageassurance {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.ageassurance.getState: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.ageassurance.getState", error)
                 return (responseCode, nil)
             }
         } else {

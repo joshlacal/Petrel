@@ -19,19 +19,24 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                starterPack = try container.decode(AppBskyGraphDefs.StarterPackView.self, forKey: .starterPack)
+                starterPack = try container.decode(AppBskyGraphDefs.StarterPackView.self, forKey: "starterPack")
             } catch {
-                LogManager.logError("Decoding error for required property 'starterPack': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("starterPack", error)
                 throw error
             }
             do {
-                listItem = try container.decodeIfPresent(AppBskyGraphDefs.ListItemView.self, forKey: .listItem)
+                listItem = try container.decodeIfPresent(AppBskyGraphDefs.ListItemView.self, forKey: "listItem")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'listItem' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("listItem", error)
                 listItem = nil
             }
         }
@@ -54,27 +59,27 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if starterPack != other.starterPack {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.starterPack != rhs.starterPack {
                 return false
             }
-            if listItem != other.listItem {
+            if lhs.listItem != rhs.listItem {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let starterPackValue = try starterPack.toCBORValue()
-            map = map.adding(key: "starterPack", value: starterPackValue)
+            map.append(key: "starterPack", value: starterPackValue)
             if let value = listItem {
                 let listItemValue = try value.toCBORValue()
-                map = map.adding(key: "listItem", value: listItemValue)
+                map.append(key: "listItem", value: listItemValue)
             }
             return map
         }
@@ -126,7 +131,7 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -143,16 +148,16 @@ public enum AppBskyGraphGetStarterPacksWithMembership {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let starterPacksWithMembershipValue = try starterPacksWithMembership.toCBORValue()
-            map = map.adding(key: "starterPacksWithMembership", value: starterPacksWithMembershipValue)
+            map.append(key: "starterPacksWithMembership", value: starterPacksWithMembershipValue)
 
             return map
         }
@@ -211,7 +216,7 @@ public extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.graph.getStarterPacksWithMembership: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.graph.getStarterPacksWithMembership", error)
                 return (responseCode, nil)
             }
         } else {

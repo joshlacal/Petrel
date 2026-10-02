@@ -19,17 +19,22 @@ public enum ComAtprotoServerCreateInviteCodes {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                account = try container.decode(String.self, forKey: .account)
+                account = try container.decode(String.self, forKey: "account")
             } catch {
-                LogManager.logError("Decoding error for required property 'account': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("account", error)
                 throw error
             }
             do {
-                codes = try container.decode([String].self, forKey: .codes)
+                codes = try container.decode(_LexiconStringArray.self, forKey: "codes").values
             } catch {
-                LogManager.logError("Decoding error for required property 'codes': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("codes", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum ComAtprotoServerCreateInviteCodes {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if account != other.account {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.account != rhs.account {
                 return false
             }
-            if codes != other.codes {
+            if lhs.codes != rhs.codes {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let accountValue = try account.toCBORValue()
-            map = map.adding(key: "account", value: accountValue)
+            map.append(key: "account", value: accountValue)
             let codesValue = try codes.toCBORValue()
-            map = map.adding(key: "codes", value: codesValue)
+            map.append(key: "codes", value: codesValue)
             return map
         }
 
@@ -105,14 +110,14 @@ public enum ComAtprotoServerCreateInviteCodes {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
             let codeCountValue = try codeCount.toCBORValue()
-            map = map.adding(key: "codeCount", value: codeCountValue)
+            map.append(key: "codeCount", value: codeCountValue)
             let useCountValue = try useCount.toCBORValue()
-            map = map.adding(key: "useCount", value: useCountValue)
+            map.append(key: "useCount", value: useCountValue)
             if let value = forAccounts {
                 let forAccountsValue = try value.toCBORValue()
-                map = map.adding(key: "forAccounts", value: forAccountsValue)
+                map.append(key: "forAccounts", value: forAccountsValue)
             }
             return map
         }
@@ -148,10 +153,10 @@ public enum ComAtprotoServerCreateInviteCodes {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let codesValue = try codes.toCBORValue()
-            map = map.adding(key: "codes", value: codesValue)
+            map.append(key: "codes", value: codesValue)
 
             return map
         }
@@ -221,7 +226,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.createInviteCodes: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.createInviteCodes", error)
                 return (responseCode, nil)
             }
         } else {

@@ -19,21 +19,26 @@ public enum ComAtprotoServerDescribeServer {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                privacyPolicy = try container.decodeIfPresent(URI.self, forKey: .privacyPolicy)
+                privacyPolicy = try container.decodeIfPresent(URI.self, forKey: "privacyPolicy")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'privacyPolicy' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("privacyPolicy", error)
                 privacyPolicy = nil
             }
             do {
-                termsOfService = try container.decodeIfPresent(URI.self, forKey: .termsOfService)
+                termsOfService = try container.decodeIfPresent(URI.self, forKey: "termsOfService")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'termsOfService' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("termsOfService", error)
                 termsOfService = nil
             }
         }
@@ -60,29 +65,29 @@ public enum ComAtprotoServerDescribeServer {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if privacyPolicy != other.privacyPolicy {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.privacyPolicy != rhs.privacyPolicy {
                 return false
             }
-            if termsOfService != other.termsOfService {
+            if lhs.termsOfService != rhs.termsOfService {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             if let value = privacyPolicy {
                 let privacyPolicyValue = try value.toCBORValue()
-                map = map.adding(key: "privacyPolicy", value: privacyPolicyValue)
+                map.append(key: "privacyPolicy", value: privacyPolicyValue)
             }
             if let value = termsOfService {
                 let termsOfServiceValue = try value.toCBORValue()
-                map = map.adding(key: "termsOfService", value: termsOfServiceValue)
+                map.append(key: "termsOfService", value: termsOfServiceValue)
             }
             return map
         }
@@ -105,13 +110,18 @@ public enum ComAtprotoServerDescribeServer {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                email = try container.decodeIfPresent(String.self, forKey: .email)
+                email = try container.decodeIfPresent(String.self, forKey: "email")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("email", error)
                 email = nil
             }
         }
@@ -132,22 +142,22 @@ public enum ComAtprotoServerDescribeServer {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if email != other.email {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.email != rhs.email {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             if let value = email {
                 let emailValue = try value.toCBORValue()
-                map = map.adding(key: "email", value: emailValue)
+                map.append(key: "email", value: emailValue)
             }
             return map
         }
@@ -212,7 +222,7 @@ public enum ComAtprotoServerDescribeServer {
                 inviteCodeRequired = try container.decodeIfPresent(Bool.self, forKey: .inviteCodeRequired)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'inviteCodeRequired' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("inviteCodeRequired", error)
                 inviteCodeRequired = nil
             }
 
@@ -220,7 +230,7 @@ public enum ComAtprotoServerDescribeServer {
                 phoneVerificationRequired = try container.decodeIfPresent(Bool.self, forKey: .phoneVerificationRequired)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'phoneVerificationRequired' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("phoneVerificationRequired", error)
                 phoneVerificationRequired = nil
             }
 
@@ -228,17 +238,17 @@ public enum ComAtprotoServerDescribeServer {
                 blobUploadLimit = try container.decodeIfPresent(Int.self, forKey: .blobUploadLimit)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'blobUploadLimit' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("blobUploadLimit", error)
                 blobUploadLimit = nil
             }
 
-            availableUserDomains = try container.decode([String].self, forKey: .availableUserDomains)
+            availableUserDomains = try container.decode(_LexiconStringArray.self, forKey: .availableUserDomains).values
 
             do {
                 links = try container.decodeIfPresent(Links.self, forKey: .links)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("links", error)
                 links = nil
             }
 
@@ -246,7 +256,7 @@ public enum ComAtprotoServerDescribeServer {
                 contact = try container.decodeIfPresent(Contact.self, forKey: .contact)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'contact' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("contact", error)
                 contact = nil
             }
 
@@ -277,43 +287,43 @@ public enum ComAtprotoServerDescribeServer {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 7)
 
             if let value = inviteCodeRequired {
                 // Encode optional property even if it's an empty array for CBOR
                 let inviteCodeRequiredValue = try value.toCBORValue()
-                map = map.adding(key: "inviteCodeRequired", value: inviteCodeRequiredValue)
+                map.append(key: "inviteCodeRequired", value: inviteCodeRequiredValue)
             }
 
             if let value = phoneVerificationRequired {
                 // Encode optional property even if it's an empty array for CBOR
                 let phoneVerificationRequiredValue = try value.toCBORValue()
-                map = map.adding(key: "phoneVerificationRequired", value: phoneVerificationRequiredValue)
+                map.append(key: "phoneVerificationRequired", value: phoneVerificationRequiredValue)
             }
 
             if let value = blobUploadLimit {
                 // Encode optional property even if it's an empty array for CBOR
                 let blobUploadLimitValue = try value.toCBORValue()
-                map = map.adding(key: "blobUploadLimit", value: blobUploadLimitValue)
+                map.append(key: "blobUploadLimit", value: blobUploadLimitValue)
             }
 
             let availableUserDomainsValue = try availableUserDomains.toCBORValue()
-            map = map.adding(key: "availableUserDomains", value: availableUserDomainsValue)
+            map.append(key: "availableUserDomains", value: availableUserDomainsValue)
 
             if let value = links {
                 // Encode optional property even if it's an empty array for CBOR
                 let linksValue = try value.toCBORValue()
-                map = map.adding(key: "links", value: linksValue)
+                map.append(key: "links", value: linksValue)
             }
 
             if let value = contact {
                 // Encode optional property even if it's an empty array for CBOR
                 let contactValue = try value.toCBORValue()
-                map = map.adding(key: "contact", value: contactValue)
+                map.append(key: "contact", value: contactValue)
             }
 
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
 
             return map
         }
@@ -375,7 +385,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.describeServer: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.describeServer", error)
                 return (responseCode, nil)
             }
         } else {

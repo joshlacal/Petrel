@@ -49,13 +49,13 @@ public enum ComAtprotoSyncGetLatestCommit {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
 
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
 
             return map
         }
@@ -128,7 +128,7 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.getLatestCommit: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.sync.getLatestCommit", error)
                 return (responseCode, nil)
             }
         } else {

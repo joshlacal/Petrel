@@ -25,35 +25,40 @@ public enum ChatBskyGroupDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                code = try container.decode(String.self, forKey: .code)
+                code = try container.decode(String.self, forKey: "code")
             } catch {
-                LogManager.logError("Decoding error for required property 'code': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("code", error)
                 throw error
             }
             do {
-                enabledStatus = try container.decode(LinkEnabledStatus.self, forKey: .enabledStatus)
+                enabledStatus = try container.decode(LinkEnabledStatus.self, forKey: "enabledStatus")
             } catch {
-                LogManager.logError("Decoding error for required property 'enabledStatus': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("enabledStatus", error)
                 throw error
             }
             do {
-                requireApproval = try container.decode(Bool.self, forKey: .requireApproval)
+                requireApproval = try container.decode(Bool.self, forKey: "requireApproval")
             } catch {
-                LogManager.logError("Decoding error for required property 'requireApproval': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("requireApproval", error)
                 throw error
             }
             do {
-                joinRule = try container.decode(JoinRule.self, forKey: .joinRule)
+                joinRule = try container.decode(JoinRule.self, forKey: "joinRule")
             } catch {
-                LogManager.logError("Decoding error for required property 'joinRule': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("joinRule", error)
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("createdAt", error)
                 throw error
             }
         }
@@ -78,41 +83,41 @@ public enum ChatBskyGroupDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if code != other.code {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.code != rhs.code {
                 return false
             }
-            if enabledStatus != other.enabledStatus {
+            if lhs.enabledStatus != rhs.enabledStatus {
                 return false
             }
-            if requireApproval != other.requireApproval {
+            if lhs.requireApproval != rhs.requireApproval {
                 return false
             }
-            if joinRule != other.joinRule {
+            if lhs.joinRule != rhs.joinRule {
                 return false
             }
-            if createdAt != other.createdAt {
+            if lhs.createdAt != rhs.createdAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 6)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let codeValue = try code.toCBORValue()
-            map = map.adding(key: "code", value: codeValue)
+            map.append(key: "code", value: codeValue)
             let enabledStatusValue = try enabledStatus.toCBORValue()
-            map = map.adding(key: "enabledStatus", value: enabledStatusValue)
+            map.append(key: "enabledStatus", value: enabledStatusValue)
             let requireApprovalValue = try requireApproval.toCBORValue()
-            map = map.adding(key: "requireApproval", value: requireApprovalValue)
+            map.append(key: "requireApproval", value: requireApprovalValue)
             let joinRuleValue = try joinRule.toCBORValue()
-            map = map.adding(key: "joinRule", value: joinRuleValue)
+            map.append(key: "joinRule", value: joinRuleValue)
             let createdAtValue = try createdAt.toCBORValue()
-            map = map.adding(key: "createdAt", value: createdAtValue)
+            map.append(key: "createdAt", value: createdAtValue)
             return map
         }
 
@@ -155,69 +160,74 @@ public enum ChatBskyGroupDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                code = try container.decode(String.self, forKey: .code)
+                code = try container.decode(String.self, forKey: "code")
             } catch {
-                LogManager.logError("Decoding error for required property 'code': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("code", error)
                 throw error
             }
             do {
-                name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: "name")
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("name", error)
                 throw error
             }
             do {
-                owner = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .owner)
+                owner = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: "owner")
             } catch {
-                LogManager.logError("Decoding error for required property 'owner': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("owner", error)
                 throw error
             }
             do {
-                memberCount = try container.decode(Int.self, forKey: .memberCount)
+                memberCount = try container.decode(Int.self, forKey: "memberCount")
             } catch {
-                LogManager.logError("Decoding error for required property 'memberCount': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("memberCount", error)
                 throw error
             }
             do {
-                memberLimit = try container.decode(Int.self, forKey: .memberLimit)
+                memberLimit = try container.decode(Int.self, forKey: "memberLimit")
             } catch {
-                LogManager.logError("Decoding error for required property 'memberLimit': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("memberLimit", error)
                 throw error
             }
             do {
-                requireApproval = try container.decode(Bool.self, forKey: .requireApproval)
+                requireApproval = try container.decode(Bool.self, forKey: "requireApproval")
             } catch {
-                LogManager.logError("Decoding error for required property 'requireApproval': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("requireApproval", error)
                 throw error
             }
             do {
-                joinRule = try container.decode(JoinRule.self, forKey: .joinRule)
+                joinRule = try container.decode(JoinRule.self, forKey: "joinRule")
             } catch {
-                LogManager.logError("Decoding error for required property 'joinRule': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("joinRule", error)
                 throw error
             }
             do {
-                convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+                convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: "convo")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'convo' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("convo", error)
                 convo = nil
             }
             do {
-                viewer = try container.decodeIfPresent(JoinLinkViewerState.self, forKey: .viewer)
+                viewer = try container.decodeIfPresent(JoinLinkViewerState.self, forKey: "viewer")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("viewer", error)
                 viewer = nil
             }
         }
@@ -260,69 +270,69 @@ public enum ChatBskyGroupDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if convoId != other.convoId {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if code != other.code {
+            if lhs.code != rhs.code {
                 return false
             }
-            if name != other.name {
+            if lhs.name != rhs.name {
                 return false
             }
-            if owner != other.owner {
+            if lhs.owner != rhs.owner {
                 return false
             }
-            if memberCount != other.memberCount {
+            if lhs.memberCount != rhs.memberCount {
                 return false
             }
-            if memberLimit != other.memberLimit {
+            if lhs.memberLimit != rhs.memberLimit {
                 return false
             }
-            if requireApproval != other.requireApproval {
+            if lhs.requireApproval != rhs.requireApproval {
                 return false
             }
-            if joinRule != other.joinRule {
+            if lhs.joinRule != rhs.joinRule {
                 return false
             }
-            if convo != other.convo {
+            if lhs.convo != rhs.convo {
                 return false
             }
-            if viewer != other.viewer {
+            if lhs.viewer != rhs.viewer {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 11)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let codeValue = try code.toCBORValue()
-            map = map.adding(key: "code", value: codeValue)
+            map.append(key: "code", value: codeValue)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             let ownerValue = try owner.toCBORValue()
-            map = map.adding(key: "owner", value: ownerValue)
+            map.append(key: "owner", value: ownerValue)
             let memberCountValue = try memberCount.toCBORValue()
-            map = map.adding(key: "memberCount", value: memberCountValue)
+            map.append(key: "memberCount", value: memberCountValue)
             let memberLimitValue = try memberLimit.toCBORValue()
-            map = map.adding(key: "memberLimit", value: memberLimitValue)
+            map.append(key: "memberLimit", value: memberLimitValue)
             let requireApprovalValue = try requireApproval.toCBORValue()
-            map = map.adding(key: "requireApproval", value: requireApprovalValue)
+            map.append(key: "requireApproval", value: requireApprovalValue)
             let joinRuleValue = try joinRule.toCBORValue()
-            map = map.adding(key: "joinRule", value: joinRuleValue)
+            map.append(key: "joinRule", value: joinRuleValue)
             if let value = convo {
                 let convoValue = try value.toCBORValue()
-                map = map.adding(key: "convo", value: convoValue)
+                map.append(key: "convo", value: convoValue)
             }
             if let value = viewer {
                 let viewerValue = try value.toCBORValue()
-                map = map.adding(key: "viewer", value: viewerValue)
+                map.append(key: "viewer", value: viewerValue)
             }
             return map
         }
@@ -353,11 +363,16 @@ public enum ChatBskyGroupDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                code = try container.decode(String.self, forKey: .code)
+                code = try container.decode(String.self, forKey: "code")
             } catch {
-                LogManager.logError("Decoding error for required property 'code': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("code", error)
                 throw error
             }
         }
@@ -374,21 +389,21 @@ public enum ChatBskyGroupDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if code != other.code {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.code != rhs.code {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let codeValue = try code.toCBORValue()
-            map = map.adding(key: "code", value: codeValue)
+            map.append(key: "code", value: codeValue)
             return map
         }
 
@@ -409,11 +424,16 @@ public enum ChatBskyGroupDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                code = try container.decode(String.self, forKey: .code)
+                code = try container.decode(String.self, forKey: "code")
             } catch {
-                LogManager.logError("Decoding error for required property 'code': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("code", error)
                 throw error
             }
         }
@@ -430,21 +450,21 @@ public enum ChatBskyGroupDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if code != other.code {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.code != rhs.code {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let codeValue = try code.toCBORValue()
-            map = map.adding(key: "code", value: codeValue)
+            map.append(key: "code", value: codeValue)
             return map
         }
 
@@ -465,13 +485,18 @@ public enum ChatBskyGroupDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .requestedAt)
+                requestedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: "requestedAt")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'requestedAt' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("requestedAt", error)
                 requestedAt = nil
             }
         }
@@ -492,22 +517,22 @@ public enum ChatBskyGroupDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if requestedAt != other.requestedAt {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.requestedAt != rhs.requestedAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             if let value = requestedAt {
                 let requestedAtValue = try value.toCBORValue()
-                map = map.adding(key: "requestedAt", value: requestedAtValue)
+                map.append(key: "requestedAt", value: requestedAtValue)
             }
             return map
         }
@@ -533,23 +558,28 @@ public enum ChatBskyGroupDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                requestedBy = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .requestedBy)
+                requestedBy = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: "requestedBy")
             } catch {
-                LogManager.logError("Decoding error for required property 'requestedBy': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("requestedBy", error)
                 throw error
             }
             do {
-                requestedAt = try container.decode(ATProtocolDate.self, forKey: .requestedAt)
+                requestedAt = try container.decode(ATProtocolDate.self, forKey: "requestedAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'requestedAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("requestedAt", error)
                 throw error
             }
         }
@@ -570,31 +600,31 @@ public enum ChatBskyGroupDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if convoId != other.convoId {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if requestedBy != other.requestedBy {
+            if lhs.requestedBy != rhs.requestedBy {
                 return false
             }
-            if requestedAt != other.requestedAt {
+            if lhs.requestedAt != rhs.requestedAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let requestedByValue = try requestedBy.toCBORValue()
-            map = map.adding(key: "requestedBy", value: requestedByValue)
+            map.append(key: "requestedBy", value: requestedByValue)
             let requestedAtValue = try requestedAt.toCBORValue()
-            map = map.adding(key: "requestedAt", value: requestedAtValue)
+            map.append(key: "requestedAt", value: requestedAtValue)
             return map
         }
 
@@ -627,41 +657,46 @@ public enum ChatBskyGroupDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: "name")
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("name", error)
                 throw error
             }
             do {
-                owner = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .owner)
+                owner = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: "owner")
             } catch {
-                LogManager.logError("Decoding error for required property 'owner': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("owner", error)
                 throw error
             }
             do {
-                memberCount = try container.decode(Int.self, forKey: .memberCount)
+                memberCount = try container.decode(Int.self, forKey: "memberCount")
             } catch {
-                LogManager.logError("Decoding error for required property 'memberCount': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("memberCount", error)
                 throw error
             }
             do {
-                memberLimit = try container.decode(Int.self, forKey: .memberLimit)
+                memberLimit = try container.decode(Int.self, forKey: "memberLimit")
             } catch {
-                LogManager.logError("Decoding error for required property 'memberLimit': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("memberLimit", error)
                 throw error
             }
             do {
-                viewer = try container.decode(JoinLinkViewerState.self, forKey: .viewer)
+                viewer = try container.decode(JoinLinkViewerState.self, forKey: "viewer")
             } catch {
-                LogManager.logError("Decoding error for required property 'viewer': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("viewer", error)
                 throw error
             }
         }
@@ -688,46 +723,46 @@ public enum ChatBskyGroupDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if convoId != other.convoId {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if name != other.name {
+            if lhs.name != rhs.name {
                 return false
             }
-            if owner != other.owner {
+            if lhs.owner != rhs.owner {
                 return false
             }
-            if memberCount != other.memberCount {
+            if lhs.memberCount != rhs.memberCount {
                 return false
             }
-            if memberLimit != other.memberLimit {
+            if lhs.memberLimit != rhs.memberLimit {
                 return false
             }
-            if viewer != other.viewer {
+            if lhs.viewer != rhs.viewer {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 7)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             let ownerValue = try owner.toCBORValue()
-            map = map.adding(key: "owner", value: ownerValue)
+            map.append(key: "owner", value: ownerValue)
             let memberCountValue = try memberCount.toCBORValue()
-            map = map.adding(key: "memberCount", value: memberCountValue)
+            map.append(key: "memberCount", value: memberCountValue)
             let memberLimitValue = try memberLimit.toCBORValue()
-            map = map.adding(key: "memberLimit", value: memberLimitValue)
+            map.append(key: "memberLimit", value: memberLimitValue)
             let viewerValue = try viewer.toCBORValue()
-            map = map.adding(key: "viewer", value: viewerValue)
+            map.append(key: "viewer", value: viewerValue)
             return map
         }
 

@@ -48,10 +48,10 @@ public enum ComAtprotoSimplespaceCheckUserAccess {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let authorizedValue = try authorized.toCBORValue()
-            map = map.adding(key: "authorized", value: authorizedValue)
+            map.append(key: "authorized", value: authorizedValue)
 
             return map
         }
@@ -130,7 +130,7 @@ public extension ATProtoClient.Com.Atproto.Simplespace {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.simplespace.checkUserAccess: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.simplespace.checkUserAccess", error)
                 return (responseCode, nil)
             }
         } else {

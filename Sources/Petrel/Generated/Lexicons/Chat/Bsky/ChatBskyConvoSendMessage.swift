@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyConvoSendMessage {
     public static let typeIdentifier = "chat.bsky.convo.sendMessage"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
         public let message: ChatBskyConvoDefs.MessageInput
@@ -28,11 +29,11 @@ public enum ChatBskyConvoSendMessage {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -117,7 +118,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.sendMessage: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.sendMessage", error)
                 return (responseCode, nil)
             }
         } else {

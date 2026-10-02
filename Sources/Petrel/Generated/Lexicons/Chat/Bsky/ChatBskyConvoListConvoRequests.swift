@@ -42,7 +42,7 @@ public enum ChatBskyConvoListConvoRequests {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -59,16 +59,16 @@ public enum ChatBskyConvoListConvoRequests {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let requestsValue = try requests.toCBORValue()
-            map = map.adding(key: "requests", value: requestsValue)
+            map.append(key: "requests", value: requestsValue)
 
             return map
         }
@@ -92,15 +92,17 @@ public enum ChatBskyConvoListConvoRequests {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#convoView":
-                let value = try ChatBskyConvoDefs.ConvoView(from: decoder)
+                let value = try ChatBskyConvoDefs.ConvoView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsConvoView(value)
             case "chat.bsky.group.defs#joinRequestConvoView":
-                let value = try ChatBskyGroupDefs.JoinRequestConvoView(from: decoder)
+                let value = try ChatBskyGroupDefs.JoinRequestConvoView(_lexiconContainer: container)
                 self = .chatBskyGroupDefsJoinRequestConvoView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -154,7 +156,7 @@ public enum ChatBskyConvoListConvoRequests {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -165,46 +167,20 @@ public enum ChatBskyConvoListConvoRequests {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsConvoView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#convoView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#convoView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyGroupDefsJoinRequestConvoView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.group.defs#joinRequestConvoView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.group.defs#joinRequestConvoView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -259,7 +235,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.listConvoRequests: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.listConvoRequests", error)
                 return (responseCode, nil)
             }
         } else {

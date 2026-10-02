@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyGraphUnmuteActorList {
     public static let typeIdentifier = "app.bsky.graph.unmuteActorList"
+
     public struct Input: ATProtocolCodable {
         public let list: ATProtocolURI
 
@@ -24,9 +25,9 @@ public enum AppBskyGraphUnmuteActorList {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let listValue = try list.toCBORValue()
-            map = map.adding(key: "list", value: listValue)
+            map.append(key: "list", value: listValue)
             return map
         }
 

@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyAgeassuranceGetConfig {
     public static let typeIdentifier = "app.bsky.ageassurance.getConfig"
+
     public typealias Output = AppBskyAgeassuranceDefs.Config
 }
 
@@ -53,7 +54,7 @@ public extension ATProtoClient.App.Bsky.Ageassurance {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.ageassurance.getConfig: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.ageassurance.getConfig", error)
                 return (responseCode, nil)
             }
         } else {

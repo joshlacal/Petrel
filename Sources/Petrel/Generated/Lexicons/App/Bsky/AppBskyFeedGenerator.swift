@@ -28,52 +28,57 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        did = try container.decode(DID.self, forKey: .did)
-        displayName = try container.decode(String.self, forKey: .displayName)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        did = try container.decode(DID.self, forKey: "did")
+        displayName = try container.decode(String.self, forKey: "displayName")
         do {
-            description = try container.decodeIfPresent(String.self, forKey: .description)
+            description = try container.decodeIfPresent(String.self, forKey: "description")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("description", error)
             description = nil
         }
         do {
-            descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
+            descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: "descriptionFacets")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'descriptionFacets' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("descriptionFacets", error)
             descriptionFacets = nil
         }
         do {
-            avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar)
+            avatar = try container.decodeIfPresent(Blob.self, forKey: "avatar")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("avatar", error)
             avatar = nil
         }
         do {
-            acceptsInteractions = try container.decodeIfPresent(Bool.self, forKey: .acceptsInteractions)
+            acceptsInteractions = try container.decodeIfPresent(Bool.self, forKey: "acceptsInteractions")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'acceptsInteractions' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("acceptsInteractions", error)
             acceptsInteractions = nil
         }
         do {
-            labels = try container.decodeIfPresent(AppBskyFeedGeneratorLabelsUnion.self, forKey: .labels)
+            labels = try container.decodeIfPresent(AppBskyFeedGeneratorLabelsUnion.self, forKey: "labels")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
             labels = nil
         }
         do {
-            contentMode = try container.decodeIfPresent(String.self, forKey: .contentMode)
+            contentMode = try container.decodeIfPresent(String.self, forKey: "contentMode")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'contentMode' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("contentMode", error)
             contentMode = nil
         }
-        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -91,39 +96,39 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.did != rhs.did {
+            return false
+        }
+        if lhs.displayName != rhs.displayName {
+            return false
+        }
+        if lhs.description != rhs.description {
+            return false
+        }
+        if lhs.descriptionFacets != rhs.descriptionFacets {
+            return false
+        }
+        if lhs.avatar != rhs.avatar {
+            return false
+        }
+        if lhs.acceptsInteractions != rhs.acceptsInteractions {
+            return false
+        }
+        if lhs.labels != rhs.labels {
+            return false
+        }
+        if lhs.contentMode != rhs.contentMode {
+            return false
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if did != other.did {
-            return false
-        }
-        if displayName != other.displayName {
-            return false
-        }
-        if description != other.description {
-            return false
-        }
-        if descriptionFacets != other.descriptionFacets {
-            return false
-        }
-        if avatar != other.avatar {
-            return false
-        }
-        if acceptsInteractions != other.acceptsInteractions {
-            return false
-        }
-        if labels != other.labels {
-            return false
-        }
-        if contentMode != other.contentMode {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -163,38 +168,38 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 10)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let didValue = try did.toCBORValue()
-        map = map.adding(key: "did", value: didValue)
+        map.append(key: "did", value: didValue)
         let displayNameValue = try displayName.toCBORValue()
-        map = map.adding(key: "displayName", value: displayNameValue)
+        map.append(key: "displayName", value: displayNameValue)
         if let value = description {
             let descriptionValue = try value.toCBORValue()
-            map = map.adding(key: "description", value: descriptionValue)
+            map.append(key: "description", value: descriptionValue)
         }
         if let value = descriptionFacets {
             let descriptionFacetsValue = try value.toCBORValue()
-            map = map.adding(key: "descriptionFacets", value: descriptionFacetsValue)
+            map.append(key: "descriptionFacets", value: descriptionFacetsValue)
         }
         if let value = avatar {
             let avatarValue = try value.toCBORValue()
-            map = map.adding(key: "avatar", value: avatarValue)
+            map.append(key: "avatar", value: avatarValue)
         }
         if let value = acceptsInteractions {
             let acceptsInteractionsValue = try value.toCBORValue()
-            map = map.adding(key: "acceptsInteractions", value: acceptsInteractionsValue)
+            map.append(key: "acceptsInteractions", value: acceptsInteractionsValue)
         }
         if let value = labels {
             let labelsValue = try value.toCBORValue()
-            map = map.adding(key: "labels", value: labelsValue)
+            map.append(key: "labels", value: labelsValue)
         }
         if let value = contentMode {
             let contentModeValue = try value.toCBORValue()
-            map = map.adding(key: "contentMode", value: contentModeValue)
+            map.append(key: "contentMode", value: contentModeValue)
         }
         let createdAtValue = try createdAt.toCBORValue()
-        map = map.adding(key: "createdAt", value: createdAtValue)
+        map.append(key: "createdAt", value: createdAtValue)
         return map
     }
 
@@ -219,12 +224,14 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.label.defs#selfLabels":
-                let value = try ComAtprotoLabelDefs.SelfLabels(from: decoder)
+                let value = try ComAtprotoLabelDefs.SelfLabels(_lexiconContainer: container)
                 self = .comAtprotoLabelDefsSelfLabels(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -267,7 +274,7 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -278,29 +285,15 @@ public struct AppBskyFeedGenerator: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.label.defs#selfLabels",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

@@ -59,16 +59,16 @@ public enum AppBskyFeedGetFeedGenerator {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let viewValue = try view.toCBORValue()
-            map = map.adding(key: "view", value: viewValue)
+            map.append(key: "view", value: viewValue)
 
             let isOnlineValue = try isOnline.toCBORValue()
-            map = map.adding(key: "isOnline", value: isOnlineValue)
+            map.append(key: "isOnline", value: isOnlineValue)
 
             let isValidValue = try isValid.toCBORValue()
-            map = map.adding(key: "isValid", value: isValidValue)
+            map.append(key: "isValid", value: isValidValue)
 
             return map
         }
@@ -128,7 +128,7 @@ public extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.getFeedGenerator: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.feed.getFeedGenerator", error)
                 return (responseCode, nil)
             }
         } else {

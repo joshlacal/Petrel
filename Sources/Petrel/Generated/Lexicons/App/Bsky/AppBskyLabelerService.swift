@@ -22,35 +22,40 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: .policies)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: "policies")
         do {
-            labels = try container.decodeIfPresent(AppBskyLabelerServiceLabelsUnion.self, forKey: .labels)
+            labels = try container.decodeIfPresent(AppBskyLabelerServiceLabelsUnion.self, forKey: "labels")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
             labels = nil
         }
-        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
         do {
-            reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
+            reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: "reasonTypes")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'reasonTypes' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("reasonTypes", error)
             reasonTypes = nil
         }
         do {
-            subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
+            subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: "subjectTypes")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'subjectTypes' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("subjectTypes", error)
             subjectTypes = nil
         }
         do {
-            subjectCollections = try container.decodeIfPresent([NSID].self, forKey: .subjectCollections)
+            subjectCollections = try container.decodeIfPresent([NSID].self, forKey: "subjectCollections")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'subjectCollections' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("subjectCollections", error)
             subjectCollections = nil
         }
     }
@@ -67,30 +72,30 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.policies != rhs.policies {
+            return false
+        }
+        if lhs.labels != rhs.labels {
+            return false
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return false
+        }
+        if lhs.reasonTypes != rhs.reasonTypes {
+            return false
+        }
+        if lhs.subjectTypes != rhs.subjectTypes {
+            return false
+        }
+        if lhs.subjectCollections != rhs.subjectCollections {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if policies != other.policies {
-            return false
-        }
-        if labels != other.labels {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        if reasonTypes != other.reasonTypes {
-            return false
-        }
-        if subjectTypes != other.subjectTypes {
-            return false
-        }
-        if subjectCollections != other.subjectCollections {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -119,27 +124,27 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 7)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let policiesValue = try policies.toCBORValue()
-        map = map.adding(key: "policies", value: policiesValue)
+        map.append(key: "policies", value: policiesValue)
         if let value = labels {
             let labelsValue = try value.toCBORValue()
-            map = map.adding(key: "labels", value: labelsValue)
+            map.append(key: "labels", value: labelsValue)
         }
         let createdAtValue = try createdAt.toCBORValue()
-        map = map.adding(key: "createdAt", value: createdAtValue)
+        map.append(key: "createdAt", value: createdAtValue)
         if let value = reasonTypes {
             let reasonTypesValue = try value.toCBORValue()
-            map = map.adding(key: "reasonTypes", value: reasonTypesValue)
+            map.append(key: "reasonTypes", value: reasonTypesValue)
         }
         if let value = subjectTypes {
             let subjectTypesValue = try value.toCBORValue()
-            map = map.adding(key: "subjectTypes", value: subjectTypesValue)
+            map.append(key: "subjectTypes", value: subjectTypesValue)
         }
         if let value = subjectCollections {
             let subjectCollectionsValue = try value.toCBORValue()
-            map = map.adding(key: "subjectCollections", value: subjectCollectionsValue)
+            map.append(key: "subjectCollections", value: subjectCollectionsValue)
         }
         return map
     }
@@ -162,12 +167,14 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.label.defs#selfLabels":
-                let value = try ComAtprotoLabelDefs.SelfLabels(from: decoder)
+                let value = try ComAtprotoLabelDefs.SelfLabels(_lexiconContainer: container)
                 self = .comAtprotoLabelDefsSelfLabels(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -210,7 +217,7 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -221,29 +228,15 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.label.defs#selfLabels",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

@@ -39,10 +39,10 @@ public enum ComAtprotoAdminGetAccountInfos {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let infosValue = try infos.toCBORValue()
-            map = map.adding(key: "infos", value: infosValue)
+            map.append(key: "infos", value: infosValue)
 
             return map
         }
@@ -100,7 +100,7 @@ public extension ATProtoClient.Com.Atproto.Admin {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.admin.getAccountInfos: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.admin.getAccountInfos", error)
                 return (responseCode, nil)
             }
         } else {

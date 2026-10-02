@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyContactImportContacts {
     public static let typeIdentifier = "app.bsky.contact.importContacts"
+
     public struct Input: ATProtocolCodable {
         public let token: String
         public let contacts: [String]
@@ -18,7 +19,7 @@ public enum AppBskyContactImportContacts {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             token = try container.decode(String.self, forKey: .token)
-            contacts = try container.decode([String].self, forKey: .contacts)
+            contacts = try container.decode(_LexiconStringArray.self, forKey: .contacts).values
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -28,11 +29,11 @@ public enum AppBskyContactImportContacts {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let tokenValue = try token.toCBORValue()
-            map = map.adding(key: "token", value: tokenValue)
+            map.append(key: "token", value: tokenValue)
             let contactsValue = try contacts.toCBORValue()
-            map = map.adding(key: "contacts", value: contactsValue)
+            map.append(key: "contacts", value: contactsValue)
             return map
         }
 
@@ -66,10 +67,10 @@ public enum AppBskyContactImportContacts {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let matchesAndContactIndexesValue = try matchesAndContactIndexes.toCBORValue()
-            map = map.adding(key: "matchesAndContactIndexes", value: matchesAndContactIndexesValue)
+            map.append(key: "matchesAndContactIndexes", value: matchesAndContactIndexesValue)
 
             return map
         }
@@ -154,7 +155,7 @@ public extension ATProtoClient.App.Bsky.Contact {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.contact.importContacts: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.contact.importContacts", error)
                 return (responseCode, nil)
             }
         } else {

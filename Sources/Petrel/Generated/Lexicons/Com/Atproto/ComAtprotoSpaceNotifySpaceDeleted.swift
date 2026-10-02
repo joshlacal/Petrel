@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSpaceNotifySpaceDeleted {
     public static let typeIdentifier = "com.atproto.space.notifySpaceDeleted"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
 
@@ -24,9 +25,9 @@ public enum ComAtprotoSpaceNotifySpaceDeleted {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             return map
         }
 

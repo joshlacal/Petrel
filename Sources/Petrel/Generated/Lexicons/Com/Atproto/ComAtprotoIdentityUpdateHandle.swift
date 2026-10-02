@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoIdentityUpdateHandle {
     public static let typeIdentifier = "com.atproto.identity.updateHandle"
+
     public struct Input: ATProtocolCodable {
         public let handle: Handle
 
@@ -24,9 +25,9 @@ public enum ComAtprotoIdentityUpdateHandle {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let handleValue = try handle.toCBORValue()
-            map = map.adding(key: "handle", value: handleValue)
+            map.append(key: "handle", value: handleValue)
             return map
         }
 

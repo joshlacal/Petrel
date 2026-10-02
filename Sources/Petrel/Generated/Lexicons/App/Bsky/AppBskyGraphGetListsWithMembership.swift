@@ -19,19 +19,24 @@ public enum AppBskyGraphGetListsWithMembership {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                list = try container.decode(AppBskyGraphDefs.ListView.self, forKey: .list)
+                list = try container.decode(AppBskyGraphDefs.ListView.self, forKey: "list")
             } catch {
-                LogManager.logError("Decoding error for required property 'list': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("list", error)
                 throw error
             }
             do {
-                listItem = try container.decodeIfPresent(AppBskyGraphDefs.ListItemView.self, forKey: .listItem)
+                listItem = try container.decodeIfPresent(AppBskyGraphDefs.ListItemView.self, forKey: "listItem")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'listItem' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("listItem", error)
                 listItem = nil
             }
         }
@@ -54,27 +59,27 @@ public enum AppBskyGraphGetListsWithMembership {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if list != other.list {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.list != rhs.list {
                 return false
             }
-            if listItem != other.listItem {
+            if lhs.listItem != rhs.listItem {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let listValue = try list.toCBORValue()
-            map = map.adding(key: "list", value: listValue)
+            map.append(key: "list", value: listValue)
             if let value = listItem {
                 let listItemValue = try value.toCBORValue()
-                map = map.adding(key: "listItem", value: listItemValue)
+                map.append(key: "listItem", value: listItemValue)
             }
             return map
         }
@@ -129,7 +134,7 @@ public enum AppBskyGraphGetListsWithMembership {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -146,16 +151,16 @@ public enum AppBskyGraphGetListsWithMembership {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let listsWithMembershipValue = try listsWithMembership.toCBORValue()
-            map = map.adding(key: "listsWithMembership", value: listsWithMembershipValue)
+            map.append(key: "listsWithMembership", value: listsWithMembershipValue)
 
             return map
         }
@@ -214,7 +219,7 @@ public extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.graph.getListsWithMembership: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.graph.getListsWithMembership", error)
                 return (responseCode, nil)
             }
         } else {

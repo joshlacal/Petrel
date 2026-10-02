@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoRepoDeleteRecord {
     public static let typeIdentifier = "com.atproto.repo.deleteRecord"
+
     public struct Input: ATProtocolCodable {
         public let repo: ATIdentifier
         public let collection: NSID
@@ -40,20 +41,20 @@ public enum ComAtprotoRepoDeleteRecord {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 5)
             let repoValue = try repo.toCBORValue()
-            map = map.adding(key: "repo", value: repoValue)
+            map.append(key: "repo", value: repoValue)
             let collectionValue = try collection.toCBORValue()
-            map = map.adding(key: "collection", value: collectionValue)
+            map.append(key: "collection", value: collectionValue)
             let rkeyValue = try rkey.toCBORValue()
-            map = map.adding(key: "rkey", value: rkeyValue)
+            map.append(key: "rkey", value: rkeyValue)
             if let value = swapRecord {
                 let swapRecordValue = try value.toCBORValue()
-                map = map.adding(key: "swapRecord", value: swapRecordValue)
+                map.append(key: "swapRecord", value: swapRecordValue)
             }
             if let value = swapCommit {
                 let swapCommitValue = try value.toCBORValue()
-                map = map.adding(key: "swapCommit", value: swapCommitValue)
+                map.append(key: "swapCommit", value: swapCommitValue)
             }
             return map
         }
@@ -85,7 +86,7 @@ public enum ComAtprotoRepoDeleteRecord {
                 commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("commit", error)
                 commit = nil
             }
         }
@@ -98,12 +99,12 @@ public enum ComAtprotoRepoDeleteRecord {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             if let value = commit {
                 // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
-                map = map.adding(key: "commit", value: commitValue)
+                map.append(key: "commit", value: commitValue)
             }
 
             return map
@@ -185,7 +186,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.repo.deleteRecord: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.repo.deleteRecord", error)
                 return (responseCode, nil)
             }
         } else {

@@ -56,7 +56,7 @@ public enum ComAtprotoRepoGetRecord {
                 cid = try container.decodeIfPresent(CID.self, forKey: .cid)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cid", error)
                 cid = nil
             }
 
@@ -75,19 +75,19 @@ public enum ComAtprotoRepoGetRecord {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
 
             if let value = cid {
                 // Encode optional property even if it's an empty array for CBOR
                 let cidValue = try value.toCBORValue()
-                map = map.adding(key: "cid", value: cidValue)
+                map.append(key: "cid", value: cidValue)
             }
 
             let valueValue = try value.toCBORValue()
-            map = map.adding(key: "value", value: valueValue)
+            map.append(key: "value", value: valueValue)
 
             return map
         }
@@ -158,7 +158,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.repo.getRecord: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.repo.getRecord", error)
                 return (responseCode, nil)
             }
         } else {

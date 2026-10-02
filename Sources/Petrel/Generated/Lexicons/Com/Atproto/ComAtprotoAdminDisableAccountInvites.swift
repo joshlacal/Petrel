@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoAdminDisableAccountInvites {
     public static let typeIdentifier = "com.atproto.admin.disableAccountInvites"
+
     public struct Input: ATProtocolCodable {
         public let account: DID
         public let note: String?
@@ -28,12 +29,12 @@ public enum ComAtprotoAdminDisableAccountInvites {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let accountValue = try account.toCBORValue()
-            map = map.adding(key: "account", value: accountValue)
+            map.append(key: "account", value: accountValue)
             if let value = note {
                 let noteValue = try value.toCBORValue()
-                map = map.adding(key: "note", value: noteValue)
+                map.append(key: "note", value: noteValue)
             }
             return map
         }

@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyVideoUploadVideo {
     public static let typeIdentifier = "app.bsky.video.uploadVideo"
+
     public struct Input: ATProtocolCodable {
         public let data: Data
 
@@ -24,9 +25,9 @@ public enum AppBskyVideoUploadVideo {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let dataValue = try data.toCBORValue()
-            map = map.adding(key: "data", value: dataValue)
+            map.append(key: "data", value: dataValue)
             return map
         }
 
@@ -59,10 +60,10 @@ public enum AppBskyVideoUploadVideo {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let jobStatusValue = try jobStatus.toCBORValue()
-            map = map.adding(key: "jobStatus", value: jobStatusValue)
+            map.append(key: "jobStatus", value: jobStatusValue)
 
             return map
         }
@@ -132,7 +133,7 @@ public extension ATProtoClient.App.Bsky.Video {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.uploadVideo: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.video.uploadVideo", error)
                 return (responseCode, nil)
             }
         } else {

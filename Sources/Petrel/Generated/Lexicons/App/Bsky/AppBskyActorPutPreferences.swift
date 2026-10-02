@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyActorPutPreferences {
     public static let typeIdentifier = "app.bsky.actor.putPreferences"
+
     public struct Input: ATProtocolCodable {
         public let preferences: AppBskyActorDefs.Preferences
 
@@ -24,9 +25,9 @@ public enum AppBskyActorPutPreferences {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let preferencesValue = try preferences.toCBORValue()
-            map = map.adding(key: "preferences", value: preferencesValue)
+            map.append(key: "preferences", value: preferencesValue)
             return map
         }
 

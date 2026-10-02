@@ -110,34 +110,34 @@ public enum ComAtprotoServerCheckAccountStatus {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 9)
 
             let activatedValue = try activated.toCBORValue()
-            map = map.adding(key: "activated", value: activatedValue)
+            map.append(key: "activated", value: activatedValue)
 
             let validDidValue = try validDid.toCBORValue()
-            map = map.adding(key: "validDid", value: validDidValue)
+            map.append(key: "validDid", value: validDidValue)
 
             let repoCommitValue = try repoCommit.toCBORValue()
-            map = map.adding(key: "repoCommit", value: repoCommitValue)
+            map.append(key: "repoCommit", value: repoCommitValue)
 
             let repoRevValue = try repoRev.toCBORValue()
-            map = map.adding(key: "repoRev", value: repoRevValue)
+            map.append(key: "repoRev", value: repoRevValue)
 
             let repoBlocksValue = try repoBlocks.toCBORValue()
-            map = map.adding(key: "repoBlocks", value: repoBlocksValue)
+            map.append(key: "repoBlocks", value: repoBlocksValue)
 
             let indexedRecordsValue = try indexedRecords.toCBORValue()
-            map = map.adding(key: "indexedRecords", value: indexedRecordsValue)
+            map.append(key: "indexedRecords", value: indexedRecordsValue)
 
             let privateStateValuesValue = try privateStateValues.toCBORValue()
-            map = map.adding(key: "privateStateValues", value: privateStateValuesValue)
+            map.append(key: "privateStateValues", value: privateStateValuesValue)
 
             let expectedBlobsValue = try expectedBlobs.toCBORValue()
-            map = map.adding(key: "expectedBlobs", value: expectedBlobsValue)
+            map.append(key: "expectedBlobs", value: expectedBlobsValue)
 
             let importedBlobsValue = try importedBlobs.toCBORValue()
-            map = map.adding(key: "importedBlobs", value: importedBlobsValue)
+            map.append(key: "importedBlobs", value: importedBlobsValue)
 
             return map
         }
@@ -201,7 +201,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.checkAccountStatus: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.checkAccountStatus", error)
                 return (responseCode, nil)
             }
         } else {

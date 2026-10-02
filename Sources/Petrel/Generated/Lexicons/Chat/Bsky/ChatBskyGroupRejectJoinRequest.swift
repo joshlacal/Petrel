@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupRejectJoinRequest {
     public static let typeIdentifier = "chat.bsky.group.rejectJoinRequest"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
         public let member: DID
@@ -28,11 +29,11 @@ public enum ChatBskyGroupRejectJoinRequest {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             return map
         }
 
@@ -136,7 +137,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.rejectJoinRequest: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.rejectJoinRequest", error)
                 return (responseCode, nil)
             }
         } else {

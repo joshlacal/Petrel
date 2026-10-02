@@ -19,17 +19,22 @@ public enum ChatBskyConvoSendMessageBatch {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(ChatBskyConvoDefs.MessageInput.self, forKey: .message)
+                message = try container.decode(ChatBskyConvoDefs.MessageInput.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum ChatBskyConvoSendMessageBatch {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if convoId != other.convoId {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -97,9 +102,9 @@ public enum ChatBskyConvoSendMessageBatch {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let itemsValue = try items.toCBORValue()
-            map = map.adding(key: "items", value: itemsValue)
+            map.append(key: "items", value: itemsValue)
             return map
         }
 
@@ -132,10 +137,10 @@ public enum ChatBskyConvoSendMessageBatch {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let itemsValue = try items.toCBORValue()
-            map = map.adding(key: "items", value: itemsValue)
+            map.append(key: "items", value: itemsValue)
 
             return map
         }
@@ -218,7 +223,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.sendMessageBatch: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.sendMessageBatch", error)
                 return (responseCode, nil)
             }
         } else {

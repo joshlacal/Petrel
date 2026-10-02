@@ -18,11 +18,16 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        accent = try container.decode(SiteStandardThemeBasicAccentUnion.self, forKey: .accent)
-        accentForeground = try container.decode(SiteStandardThemeBasicAccentForegroundUnion.self, forKey: .accentForeground)
-        background = try container.decode(SiteStandardThemeBasicBackgroundUnion.self, forKey: .background)
-        foreground = try container.decode(SiteStandardThemeBasicForegroundUnion.self, forKey: .foreground)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        accent = try container.decode(SiteStandardThemeBasicAccentUnion.self, forKey: "accent")
+        accentForeground = try container.decode(SiteStandardThemeBasicAccentForegroundUnion.self, forKey: "accentForeground")
+        background = try container.decode(SiteStandardThemeBasicBackgroundUnion.self, forKey: "background")
+        foreground = try container.decode(SiteStandardThemeBasicForegroundUnion.self, forKey: "foreground")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -35,24 +40,24 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.accent != rhs.accent {
+            return false
+        }
+        if lhs.accentForeground != rhs.accentForeground {
+            return false
+        }
+        if lhs.background != rhs.background {
+            return false
+        }
+        if lhs.foreground != rhs.foreground {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if accent != other.accent {
-            return false
-        }
-        if accentForeground != other.accentForeground {
-            return false
-        }
-        if background != other.background {
-            return false
-        }
-        if foreground != other.foreground {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -63,16 +68,16 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 5)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let accentValue = try accent.toCBORValue()
-        map = map.adding(key: "accent", value: accentValue)
+        map.append(key: "accent", value: accentValue)
         let accentForegroundValue = try accentForeground.toCBORValue()
-        map = map.adding(key: "accentForeground", value: accentForegroundValue)
+        map.append(key: "accentForeground", value: accentForegroundValue)
         let backgroundValue = try background.toCBORValue()
-        map = map.adding(key: "background", value: backgroundValue)
+        map.append(key: "background", value: backgroundValue)
         let foregroundValue = try foreground.toCBORValue()
-        map = map.adding(key: "foreground", value: foregroundValue)
+        map.append(key: "foreground", value: foregroundValue)
         return map
     }
 
@@ -92,12 +97,14 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "site.standard.theme.color#rgb":
-                let value = try SiteStandardThemeColor.Rgb(from: decoder)
+                let value = try SiteStandardThemeColor.Rgb(_lexiconContainer: container)
                 self = .siteStandardThemeColorRgb(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -140,7 +147,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -151,29 +158,15 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .siteStandardThemeColorRgb(value):
-                map = map.adding(key: "$type", value: "site.standard.theme.color#rgb")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "site.standard.theme.color#rgb",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -188,12 +181,14 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "site.standard.theme.color#rgb":
-                let value = try SiteStandardThemeColor.Rgb(from: decoder)
+                let value = try SiteStandardThemeColor.Rgb(_lexiconContainer: container)
                 self = .siteStandardThemeColorRgb(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -236,7 +231,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -247,29 +242,15 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .siteStandardThemeColorRgb(value):
-                map = map.adding(key: "$type", value: "site.standard.theme.color#rgb")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "site.standard.theme.color#rgb",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -284,12 +265,14 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "site.standard.theme.color#rgb":
-                let value = try SiteStandardThemeColor.Rgb(from: decoder)
+                let value = try SiteStandardThemeColor.Rgb(_lexiconContainer: container)
                 self = .siteStandardThemeColorRgb(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -332,7 +315,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -343,29 +326,15 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .siteStandardThemeColorRgb(value):
-                map = map.adding(key: "$type", value: "site.standard.theme.color#rgb")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "site.standard.theme.color#rgb",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -380,12 +349,14 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "site.standard.theme.color#rgb":
-                let value = try SiteStandardThemeColor.Rgb(from: decoder)
+                let value = try SiteStandardThemeColor.Rgb(_lexiconContainer: container)
                 self = .siteStandardThemeColorRgb(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -428,7 +399,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -439,29 +410,15 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .siteStandardThemeColorRgb(value):
-                map = map.adding(key: "$type", value: "site.standard.theme.color#rgb")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "site.standard.theme.color#rgb",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

@@ -19,17 +19,22 @@ public enum ComAtprotoLabelSubscribeLabels {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: "seq")
             } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("seq", error)
                 throw error
             }
             do {
-                labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: "labels")
             } catch {
-                LogManager.logError("Decoding error for required property 'labels': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("labels", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum ComAtprotoLabelSubscribeLabels {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if seq != other.seq {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.seq != rhs.seq {
                 return false
             }
-            if labels != other.labels {
+            if lhs.labels != rhs.labels {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
-            map = map.adding(key: "seq", value: seqValue)
+            map.append(key: "seq", value: seqValue)
             let labelsValue = try labels.toCBORValue()
-            map = map.adding(key: "labels", value: labelsValue)
+            map.append(key: "labels", value: labelsValue)
             return map
         }
 
@@ -91,19 +96,24 @@ public enum ComAtprotoLabelSubscribeLabels {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: "name")
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("name", error)
                 throw error
             }
             do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
+                message = try container.decodeIfPresent(String.self, forKey: "message")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("message", error)
                 message = nil
             }
         }
@@ -126,27 +136,27 @@ public enum ComAtprotoLabelSubscribeLabels {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if name != other.name {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.name != rhs.name {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             if let value = message {
                 let messageValue = try value.toCBORValue()
-                map = map.adding(key: "message", value: messageValue)
+                map.append(key: "message", value: messageValue)
             }
             return map
         }

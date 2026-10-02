@@ -42,7 +42,7 @@ public enum AppBskyGraphGetRelationships {
                 actor = try container.decodeIfPresent(DID.self, forKey: .actor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'actor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("actor", error)
                 actor = nil
             }
 
@@ -59,16 +59,16 @@ public enum AppBskyGraphGetRelationships {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = actor {
                 // Encode optional property even if it's an empty array for CBOR
                 let actorValue = try value.toCBORValue()
-                map = map.adding(key: "actor", value: actorValue)
+                map.append(key: "actor", value: actorValue)
             }
 
             let relationshipsValue = try relationships.toCBORValue()
-            map = map.adding(key: "relationships", value: relationshipsValue)
+            map.append(key: "relationships", value: relationshipsValue)
 
             return map
         }
@@ -104,15 +104,17 @@ public enum AppBskyGraphGetRelationships {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.graph.defs#relationship":
-                let value = try AppBskyGraphDefs.Relationship(from: decoder)
+                let value = try AppBskyGraphDefs.Relationship(_lexiconContainer: container)
                 self = .appBskyGraphDefsRelationship(value)
             case "app.bsky.graph.defs#notFoundActor":
-                let value = try AppBskyGraphDefs.NotFoundActor(from: decoder)
+                let value = try AppBskyGraphDefs.NotFoundActor(_lexiconContainer: container)
                 self = .appBskyGraphDefsNotFoundActor(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -166,7 +168,7 @@ public enum AppBskyGraphGetRelationships {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -177,46 +179,20 @@ public enum AppBskyGraphGetRelationships {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyGraphDefsRelationship(value):
-                map = map.adding(key: "$type", value: "app.bsky.graph.defs#relationship")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.graph.defs#relationship",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyGraphDefsNotFoundActor(value):
-                map = map.adding(key: "$type", value: "app.bsky.graph.defs#notFoundActor")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.graph.defs#notFoundActor",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -271,7 +247,7 @@ public extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.graph.getRelationships: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.graph.getRelationships", error)
                 return (responseCode, nil)
             }
         } else {

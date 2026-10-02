@@ -19,17 +19,22 @@ public enum ComAtprotoRepoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                rev = try container.decode(TID.self, forKey: .rev)
+                rev = try container.decode(TID.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum ComAtprotoRepoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if cid != other.cid {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             return map
         }
 

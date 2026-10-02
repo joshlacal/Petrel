@@ -19,17 +19,22 @@ public enum AppBskyUnspeccedGetConfig {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                domains = try container.decode([String].self, forKey: .domains)
+                domains = try container.decode(_LexiconStringArray.self, forKey: "domains").values
             } catch {
-                LogManager.logError("Decoding error for required property 'domains': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("domains", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum AppBskyUnspeccedGetConfig {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
-            if domains != other.domains {
+            if lhs.domains != rhs.domains {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let domainsValue = try domains.toCBORValue()
-            map = map.adding(key: "domains", value: domainsValue)
+            map.append(key: "domains", value: domainsValue)
             return map
         }
 
@@ -102,7 +107,7 @@ public enum AppBskyUnspeccedGetConfig {
                 checkEmailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .checkEmailConfirmed)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'checkEmailConfirmed' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("checkEmailConfirmed", error)
                 checkEmailConfirmed = nil
             }
 
@@ -110,7 +115,7 @@ public enum AppBskyUnspeccedGetConfig {
                 liveNow = try container.decodeIfPresent([LiveNowConfig].self, forKey: .liveNow)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'liveNow' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("liveNow", error)
                 liveNow = nil
             }
         }
@@ -126,18 +131,18 @@ public enum AppBskyUnspeccedGetConfig {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = checkEmailConfirmed {
                 // Encode optional property even if it's an empty array for CBOR
                 let checkEmailConfirmedValue = try value.toCBORValue()
-                map = map.adding(key: "checkEmailConfirmed", value: checkEmailConfirmedValue)
+                map.append(key: "checkEmailConfirmed", value: checkEmailConfirmedValue)
             }
 
             if let value = liveNow {
                 // Encode optional property even if it's an empty array for CBOR
                 let liveNowValue = try value.toCBORValue()
-                map = map.adding(key: "liveNow", value: liveNowValue)
+                map.append(key: "liveNow", value: liveNowValue)
             }
 
             return map
@@ -195,7 +200,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getConfig: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getConfig", error)
                 return (responseCode, nil)
             }
         } else {

@@ -27,7 +27,7 @@ public enum AppBskyContactGetSyncStatus {
                 syncStatus = try container.decodeIfPresent(AppBskyContactDefs.SyncStatus.self, forKey: .syncStatus)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'syncStatus' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("syncStatus", error)
                 syncStatus = nil
             }
         }
@@ -40,12 +40,12 @@ public enum AppBskyContactGetSyncStatus {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             if let value = syncStatus {
                 // Encode optional property even if it's an empty array for CBOR
                 let syncStatusValue = try value.toCBORValue()
-                map = map.adding(key: "syncStatus", value: syncStatusValue)
+                map.append(key: "syncStatus", value: syncStatusValue)
             }
 
             return map
@@ -116,7 +116,7 @@ public extension ATProtoClient.App.Bsky.Contact {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.contact.getSyncStatus: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.contact.getSyncStatus", error)
                 return (responseCode, nil)
             }
         } else {

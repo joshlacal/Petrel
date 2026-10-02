@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyConvoAddReaction {
     public static let typeIdentifier = "chat.bsky.convo.addReaction"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
         public let messageId: String
@@ -32,13 +33,13 @@ public enum ChatBskyConvoAddReaction {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageIdValue = try messageId.toCBORValue()
-            map = map.adding(key: "messageId", value: messageIdValue)
+            map.append(key: "messageId", value: messageIdValue)
             let valueValue = try value.toCBORValue()
-            map = map.adding(key: "value", value: valueValue)
+            map.append(key: "value", value: valueValue)
             return map
         }
 
@@ -73,10 +74,10 @@ public enum ChatBskyConvoAddReaction {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
 
             return map
         }
@@ -165,7 +166,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.addReaction: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.addReaction", error)
                 return (responseCode, nil)
             }
         } else {

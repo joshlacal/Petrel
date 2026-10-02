@@ -50,7 +50,7 @@ public enum AppBskyUnspeccedGetSuggestedOnboardingUsers {
                 recId = try container.decodeIfPresent(String.self, forKey: .recId)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'recId' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("recId", error)
                 recId = nil
             }
 
@@ -58,7 +58,7 @@ public enum AppBskyUnspeccedGetSuggestedOnboardingUsers {
                 recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("recIdStr", error)
                 recIdStr = nil
             }
         }
@@ -76,21 +76,21 @@ public enum AppBskyUnspeccedGetSuggestedOnboardingUsers {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let actorsValue = try actors.toCBORValue()
-            map = map.adding(key: "actors", value: actorsValue)
+            map.append(key: "actors", value: actorsValue)
 
             if let value = recId {
                 // Encode optional property even if it's an empty array for CBOR
                 let recIdValue = try value.toCBORValue()
-                map = map.adding(key: "recId", value: recIdValue)
+                map.append(key: "recId", value: recIdValue)
             }
 
             if let value = recIdStr {
                 // Encode optional property even if it's an empty array for CBOR
                 let recIdStrValue = try value.toCBORValue()
-                map = map.adding(key: "recIdStr", value: recIdStrValue)
+                map.append(key: "recIdStr", value: recIdStrValue)
             }
 
             return map
@@ -151,7 +151,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getSuggestedOnboardingUsers: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getSuggestedOnboardingUsers", error)
                 return (responseCode, nil)
             }
         } else {

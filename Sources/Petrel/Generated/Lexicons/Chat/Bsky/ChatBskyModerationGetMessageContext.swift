@@ -51,10 +51,10 @@ public enum ChatBskyModerationGetMessageContext {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let messagesValue = try messages.toCBORValue()
-            map = map.adding(key: "messages", value: messagesValue)
+            map.append(key: "messages", value: messagesValue)
 
             return map
         }
@@ -77,15 +77,17 @@ public enum ChatBskyModerationGetMessageContext {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#systemMessageView":
-                let value = try ChatBskyConvoDefs.SystemMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -139,7 +141,7 @@ public enum ChatBskyModerationGetMessageContext {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -150,46 +152,20 @@ public enum ChatBskyModerationGetMessageContext {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -244,7 +220,7 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.moderation.getMessageContext: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.moderation.getMessageContext", error)
                 return (responseCode, nil)
             }
         } else {

@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoServerCreateAccount {
     public static let typeIdentifier = "com.atproto.server.createAccount"
+
     public struct Input: ATProtocolCodable {
         public let email: String?
         public let handle: Handle
@@ -56,40 +57,40 @@ public enum ComAtprotoServerCreateAccount {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 9)
             if let value = email {
                 let emailValue = try value.toCBORValue()
-                map = map.adding(key: "email", value: emailValue)
+                map.append(key: "email", value: emailValue)
             }
             let handleValue = try handle.toCBORValue()
-            map = map.adding(key: "handle", value: handleValue)
+            map.append(key: "handle", value: handleValue)
             if let value = did {
                 let didValue = try value.toCBORValue()
-                map = map.adding(key: "did", value: didValue)
+                map.append(key: "did", value: didValue)
             }
             if let value = inviteCode {
                 let inviteCodeValue = try value.toCBORValue()
-                map = map.adding(key: "inviteCode", value: inviteCodeValue)
+                map.append(key: "inviteCode", value: inviteCodeValue)
             }
             if let value = verificationCode {
                 let verificationCodeValue = try value.toCBORValue()
-                map = map.adding(key: "verificationCode", value: verificationCodeValue)
+                map.append(key: "verificationCode", value: verificationCodeValue)
             }
             if let value = verificationPhone {
                 let verificationPhoneValue = try value.toCBORValue()
-                map = map.adding(key: "verificationPhone", value: verificationPhoneValue)
+                map.append(key: "verificationPhone", value: verificationPhoneValue)
             }
             if let value = password {
                 let passwordValue = try value.toCBORValue()
-                map = map.adding(key: "password", value: passwordValue)
+                map.append(key: "password", value: passwordValue)
             }
             if let value = recoveryKey {
                 let recoveryKeyValue = try value.toCBORValue()
-                map = map.adding(key: "recoveryKey", value: recoveryKeyValue)
+                map.append(key: "recoveryKey", value: recoveryKeyValue)
             }
             if let value = plcOp {
                 let plcOpValue = try value.toCBORValue()
-                map = map.adding(key: "plcOp", value: plcOpValue)
+                map.append(key: "plcOp", value: plcOpValue)
             }
             return map
         }
@@ -157,7 +158,7 @@ public enum ComAtprotoServerCreateAccount {
                 didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'didDoc' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("didDoc", error)
                 didDoc = nil
             }
         }
@@ -178,24 +179,24 @@ public enum ComAtprotoServerCreateAccount {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 5)
 
             let accessJwtValue = try accessJwt.toCBORValue()
-            map = map.adding(key: "accessJwt", value: accessJwtValue)
+            map.append(key: "accessJwt", value: accessJwtValue)
 
             let refreshJwtValue = try refreshJwt.toCBORValue()
-            map = map.adding(key: "refreshJwt", value: refreshJwtValue)
+            map.append(key: "refreshJwt", value: refreshJwtValue)
 
             let handleValue = try handle.toCBORValue()
-            map = map.adding(key: "handle", value: handleValue)
+            map.append(key: "handle", value: handleValue)
 
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
 
             if let value = didDoc {
                 // Encode optional property even if it's an empty array for CBOR
                 let didDocValue = try value.toCBORValue()
-                map = map.adding(key: "didDoc", value: didDocValue)
+                map.append(key: "didDoc", value: didDocValue)
             }
 
             return map
@@ -287,7 +288,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.createAccount: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.createAccount", error)
                 return (responseCode, nil)
             }
         } else {

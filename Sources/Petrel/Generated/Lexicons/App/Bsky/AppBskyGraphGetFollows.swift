@@ -56,7 +56,7 @@ public enum AppBskyGraphGetFollows {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -75,19 +75,19 @@ public enum AppBskyGraphGetFollows {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let followsValue = try follows.toCBORValue()
-            map = map.adding(key: "follows", value: followsValue)
+            map.append(key: "follows", value: followsValue)
 
             return map
         }
@@ -147,7 +147,7 @@ public extension ATProtoClient.App.Bsky.Graph {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.graph.getFollows: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.graph.getFollows", error)
                 return (responseCode, nil)
             }
         } else {

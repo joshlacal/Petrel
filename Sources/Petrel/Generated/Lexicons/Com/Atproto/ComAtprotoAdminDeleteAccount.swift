@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoAdminDeleteAccount {
     public static let typeIdentifier = "com.atproto.admin.deleteAccount"
+
     public struct Input: ATProtocolCodable {
         public let did: DID
 
@@ -24,9 +25,9 @@ public enum ComAtprotoAdminDeleteAccount {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             return map
         }
 

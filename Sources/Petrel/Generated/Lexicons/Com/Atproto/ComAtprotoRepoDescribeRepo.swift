@@ -79,22 +79,22 @@ public enum ComAtprotoRepoDescribeRepo {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 5)
 
             let handleValue = try handle.toCBORValue()
-            map = map.adding(key: "handle", value: handleValue)
+            map.append(key: "handle", value: handleValue)
 
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
 
             let didDocValue = try didDoc.toCBORValue()
-            map = map.adding(key: "didDoc", value: didDocValue)
+            map.append(key: "didDoc", value: didDocValue)
 
             let collectionsValue = try collections.toCBORValue()
-            map = map.adding(key: "collections", value: collectionsValue)
+            map.append(key: "collections", value: collectionsValue)
 
             let handleIsCorrectValue = try handleIsCorrect.toCBORValue()
-            map = map.adding(key: "handleIsCorrect", value: handleIsCorrectValue)
+            map.append(key: "handleIsCorrect", value: handleIsCorrectValue)
 
             return map
         }
@@ -156,7 +156,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.repo.describeRepo: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.repo.describeRepo", error)
                 return (responseCode, nil)
             }
         } else {

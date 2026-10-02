@@ -48,7 +48,7 @@ public enum AppBskyEmbedGetEmbedExternalView {
                 view = try container.decodeIfPresent(AppBskyEmbedExternal.View.self, forKey: .view)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'view' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("view", error)
                 view = nil
             }
 
@@ -56,7 +56,7 @@ public enum AppBskyEmbedGetEmbedExternalView {
                 associatedRefs = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .associatedRefs)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'associatedRefs' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("associatedRefs", error)
                 associatedRefs = nil
             }
 
@@ -64,7 +64,7 @@ public enum AppBskyEmbedGetEmbedExternalView {
                 associatedRecords = try container.decodeIfPresent([ATProtocolValueContainer].self, forKey: .associatedRecords)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'associatedRecords' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("associatedRecords", error)
                 associatedRecords = nil
             }
         }
@@ -83,24 +83,24 @@ public enum AppBskyEmbedGetEmbedExternalView {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             if let value = view {
                 // Encode optional property even if it's an empty array for CBOR
                 let viewValue = try value.toCBORValue()
-                map = map.adding(key: "view", value: viewValue)
+                map.append(key: "view", value: viewValue)
             }
 
             if let value = associatedRefs {
                 // Encode optional property even if it's an empty array for CBOR
                 let associatedRefsValue = try value.toCBORValue()
-                map = map.adding(key: "associatedRefs", value: associatedRefsValue)
+                map.append(key: "associatedRefs", value: associatedRefsValue)
             }
 
             if let value = associatedRecords {
                 // Encode optional property even if it's an empty array for CBOR
                 let associatedRecordsValue = try value.toCBORValue()
-                map = map.adding(key: "associatedRecords", value: associatedRecordsValue)
+                map.append(key: "associatedRecords", value: associatedRecordsValue)
             }
 
             return map
@@ -161,7 +161,7 @@ public extension ATProtoClient.App.Bsky.Embed {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.embed.getEmbedExternalView: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.embed.getEmbedExternalView", error)
                 return (responseCode, nil)
             }
         } else {

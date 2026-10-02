@@ -38,7 +38,7 @@ public enum ComAtprotoTempCheckSignupQueue {
                 placeInQueue = try container.decodeIfPresent(Int.self, forKey: .placeInQueue)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'placeInQueue' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("placeInQueue", error)
                 placeInQueue = nil
             }
 
@@ -46,7 +46,7 @@ public enum ComAtprotoTempCheckSignupQueue {
                 estimatedTimeMs = try container.decodeIfPresent(Int.self, forKey: .estimatedTimeMs)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'estimatedTimeMs' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("estimatedTimeMs", error)
                 estimatedTimeMs = nil
             }
         }
@@ -64,21 +64,21 @@ public enum ComAtprotoTempCheckSignupQueue {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let activatedValue = try activated.toCBORValue()
-            map = map.adding(key: "activated", value: activatedValue)
+            map.append(key: "activated", value: activatedValue)
 
             if let value = placeInQueue {
                 // Encode optional property even if it's an empty array for CBOR
                 let placeInQueueValue = try value.toCBORValue()
-                map = map.adding(key: "placeInQueue", value: placeInQueueValue)
+                map.append(key: "placeInQueue", value: placeInQueueValue)
             }
 
             if let value = estimatedTimeMs {
                 // Encode optional property even if it's an empty array for CBOR
                 let estimatedTimeMsValue = try value.toCBORValue()
-                map = map.adding(key: "estimatedTimeMs", value: estimatedTimeMsValue)
+                map.append(key: "estimatedTimeMs", value: estimatedTimeMsValue)
             }
 
             return map
@@ -137,7 +137,7 @@ public extension ATProtoClient.Com.Atproto.Temp {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.temp.checkSignupQueue: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.temp.checkSignupQueue", error)
                 return (responseCode, nil)
             }
         } else {

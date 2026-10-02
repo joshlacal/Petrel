@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyDraftDeleteDraft {
     public static let typeIdentifier = "app.bsky.draft.deleteDraft"
+
     public struct Input: ATProtocolCodable {
         public let id: TID
 
@@ -24,9 +25,9 @@ public enum AppBskyDraftDeleteDraft {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
+            map.append(key: "id", value: idValue)
             return map
         }
 

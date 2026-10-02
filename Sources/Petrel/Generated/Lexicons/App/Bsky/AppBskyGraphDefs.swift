@@ -33,69 +33,74 @@ public enum AppBskyGraphDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: "name")
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("name", error)
                 throw error
             }
             do {
-                purpose = try container.decode(ListPurpose.self, forKey: .purpose)
+                purpose = try container.decode(ListPurpose.self, forKey: "purpose")
             } catch {
-                LogManager.logError("Decoding error for required property 'purpose': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("purpose", error)
                 throw error
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                avatar = try container.decodeIfPresent(URI.self, forKey: "avatar")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("avatar", error)
                 avatar = nil
             }
             do {
-                listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
+                listItemCount = try container.decodeIfPresent(Int.self, forKey: "listItemCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'listItemCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("listItemCount", error)
                 listItemCount = nil
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: "labels")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
                 labels = nil
             }
             do {
-                viewer = try container.decodeIfPresent(ListViewerState.self, forKey: .viewer)
+                viewer = try container.decodeIfPresent(ListViewerState.self, forKey: "viewer")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("viewer", error)
                 viewer = nil
             }
             do {
-                indexedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: "indexedAt")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'indexedAt' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("indexedAt", error)
                 indexedAt = nil
             }
         }
@@ -148,70 +153,70 @@ public enum AppBskyGraphDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if name != other.name {
+            if lhs.name != rhs.name {
                 return false
             }
-            if purpose != other.purpose {
+            if lhs.purpose != rhs.purpose {
                 return false
             }
-            if avatar != other.avatar {
+            if lhs.avatar != rhs.avatar {
                 return false
             }
-            if listItemCount != other.listItemCount {
+            if lhs.listItemCount != rhs.listItemCount {
                 return false
             }
-            if labels != other.labels {
+            if lhs.labels != rhs.labels {
                 return false
             }
-            if viewer != other.viewer {
+            if lhs.viewer != rhs.viewer {
                 return false
             }
-            if indexedAt != other.indexedAt {
+            if lhs.indexedAt != rhs.indexedAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 10)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             let purposeValue = try purpose.toCBORValue()
-            map = map.adding(key: "purpose", value: purposeValue)
+            map.append(key: "purpose", value: purposeValue)
             if let value = avatar {
                 let avatarValue = try value.toCBORValue()
-                map = map.adding(key: "avatar", value: avatarValue)
+                map.append(key: "avatar", value: avatarValue)
             }
             if let value = listItemCount {
                 let listItemCountValue = try value.toCBORValue()
-                map = map.adding(key: "listItemCount", value: listItemCountValue)
+                map.append(key: "listItemCount", value: listItemCountValue)
             }
             if let value = labels {
                 let labelsValue = try value.toCBORValue()
-                map = map.adding(key: "labels", value: labelsValue)
+                map.append(key: "labels", value: labelsValue)
             }
             if let value = viewer {
                 let viewerValue = try value.toCBORValue()
-                map = map.adding(key: "viewer", value: viewerValue)
+                map.append(key: "viewer", value: viewerValue)
             }
             if let value = indexedAt {
                 let indexedAtValue = try value.toCBORValue()
-                map = map.adding(key: "indexedAt", value: indexedAtValue)
+                map.append(key: "indexedAt", value: indexedAtValue)
             }
             return map
         }
@@ -263,89 +268,94 @@ public enum AppBskyGraphDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
+                creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: "creator")
             } catch {
-                LogManager.logError("Decoding error for required property 'creator': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("creator", error)
                 throw error
             }
             do {
-                name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: "name")
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("name", error)
                 throw error
             }
             do {
-                purpose = try container.decode(ListPurpose.self, forKey: .purpose)
+                purpose = try container.decode(ListPurpose.self, forKey: "purpose")
             } catch {
-                LogManager.logError("Decoding error for required property 'purpose': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("purpose", error)
                 throw error
             }
             do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
+                description = try container.decodeIfPresent(String.self, forKey: "description")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("description", error)
                 description = nil
             }
             do {
-                descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
+                descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: "descriptionFacets")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'descriptionFacets' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("descriptionFacets", error)
                 descriptionFacets = nil
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                avatar = try container.decodeIfPresent(URI.self, forKey: "avatar")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("avatar", error)
                 avatar = nil
             }
             do {
-                listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
+                listItemCount = try container.decodeIfPresent(Int.self, forKey: "listItemCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'listItemCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("listItemCount", error)
                 listItemCount = nil
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: "labels")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
                 labels = nil
             }
             do {
-                viewer = try container.decodeIfPresent(ListViewerState.self, forKey: .viewer)
+                viewer = try container.decodeIfPresent(ListViewerState.self, forKey: "viewer")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("viewer", error)
                 viewer = nil
             }
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: "indexedAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("indexedAt", error)
                 throw error
             }
         }
@@ -408,88 +418,88 @@ public enum AppBskyGraphDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if creator != other.creator {
+            if lhs.creator != rhs.creator {
                 return false
             }
-            if name != other.name {
+            if lhs.name != rhs.name {
                 return false
             }
-            if purpose != other.purpose {
+            if lhs.purpose != rhs.purpose {
                 return false
             }
-            if description != other.description {
+            if lhs.description != rhs.description {
                 return false
             }
-            if descriptionFacets != other.descriptionFacets {
+            if lhs.descriptionFacets != rhs.descriptionFacets {
                 return false
             }
-            if avatar != other.avatar {
+            if lhs.avatar != rhs.avatar {
                 return false
             }
-            if listItemCount != other.listItemCount {
+            if lhs.listItemCount != rhs.listItemCount {
                 return false
             }
-            if labels != other.labels {
+            if lhs.labels != rhs.labels {
                 return false
             }
-            if viewer != other.viewer {
+            if lhs.viewer != rhs.viewer {
                 return false
             }
-            if indexedAt != other.indexedAt {
+            if lhs.indexedAt != rhs.indexedAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 13)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             let creatorValue = try creator.toCBORValue()
-            map = map.adding(key: "creator", value: creatorValue)
+            map.append(key: "creator", value: creatorValue)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             let purposeValue = try purpose.toCBORValue()
-            map = map.adding(key: "purpose", value: purposeValue)
+            map.append(key: "purpose", value: purposeValue)
             if let value = description {
                 let descriptionValue = try value.toCBORValue()
-                map = map.adding(key: "description", value: descriptionValue)
+                map.append(key: "description", value: descriptionValue)
             }
             if let value = descriptionFacets {
                 let descriptionFacetsValue = try value.toCBORValue()
-                map = map.adding(key: "descriptionFacets", value: descriptionFacetsValue)
+                map.append(key: "descriptionFacets", value: descriptionFacetsValue)
             }
             if let value = avatar {
                 let avatarValue = try value.toCBORValue()
-                map = map.adding(key: "avatar", value: avatarValue)
+                map.append(key: "avatar", value: avatarValue)
             }
             if let value = listItemCount {
                 let listItemCountValue = try value.toCBORValue()
-                map = map.adding(key: "listItemCount", value: listItemCountValue)
+                map.append(key: "listItemCount", value: listItemCountValue)
             }
             if let value = labels {
                 let labelsValue = try value.toCBORValue()
-                map = map.adding(key: "labels", value: labelsValue)
+                map.append(key: "labels", value: labelsValue)
             }
             if let value = viewer {
                 let viewerValue = try value.toCBORValue()
-                map = map.adding(key: "viewer", value: viewerValue)
+                map.append(key: "viewer", value: viewerValue)
             }
             let indexedAtValue = try indexedAt.toCBORValue()
-            map = map.adding(key: "indexedAt", value: indexedAtValue)
+            map.append(key: "indexedAt", value: indexedAtValue)
             return map
         }
 
@@ -523,17 +533,22 @@ public enum AppBskyGraphDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                subject = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .subject)
+                subject = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: "subject")
             } catch {
-                LogManager.logError("Decoding error for required property 'subject': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("subject", error)
                 throw error
             }
         }
@@ -552,26 +567,26 @@ public enum AppBskyGraphDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if subject != other.subject {
+            if lhs.subject != rhs.subject {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
             return map
         }
 
@@ -613,83 +628,88 @@ public enum AppBskyGraphDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+                record = try container.decode(ATProtocolValueContainer.self, forKey: "record")
             } catch {
-                LogManager.logError("Decoding error for required property 'record': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("record", error)
                 throw error
             }
             do {
-                creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .creator)
+                creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: "creator")
             } catch {
-                LogManager.logError("Decoding error for required property 'creator': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("creator", error)
                 throw error
             }
             do {
-                list = try container.decodeIfPresent(ListViewBasic.self, forKey: .list)
+                list = try container.decodeIfPresent(ListViewBasic.self, forKey: "list")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'list' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("list", error)
                 list = nil
             }
             do {
-                listItemsSample = try container.decodeIfPresent([ListItemView].self, forKey: .listItemsSample)
+                listItemsSample = try container.decodeIfPresent([ListItemView].self, forKey: "listItemsSample")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'listItemsSample' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("listItemsSample", error)
                 listItemsSample = nil
             }
             do {
-                feeds = try container.decodeIfPresent([AppBskyFeedDefs.GeneratorView].self, forKey: .feeds)
+                feeds = try container.decodeIfPresent([AppBskyFeedDefs.GeneratorView].self, forKey: "feeds")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'feeds' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("feeds", error)
                 feeds = nil
             }
             do {
-                joinedWeekCount = try container.decodeIfPresent(Int.self, forKey: .joinedWeekCount)
+                joinedWeekCount = try container.decodeIfPresent(Int.self, forKey: "joinedWeekCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'joinedWeekCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("joinedWeekCount", error)
                 joinedWeekCount = nil
             }
             do {
-                joinedAllTimeCount = try container.decodeIfPresent(Int.self, forKey: .joinedAllTimeCount)
+                joinedAllTimeCount = try container.decodeIfPresent(Int.self, forKey: "joinedAllTimeCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'joinedAllTimeCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("joinedAllTimeCount", error)
                 joinedAllTimeCount = nil
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: "labels")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
                 labels = nil
             }
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: "indexedAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("indexedAt", error)
                 throw error
             }
         }
@@ -750,83 +770,83 @@ public enum AppBskyGraphDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if record != other.record {
+            if lhs.record != rhs.record {
                 return false
             }
-            if creator != other.creator {
+            if lhs.creator != rhs.creator {
                 return false
             }
-            if list != other.list {
+            if lhs.list != rhs.list {
                 return false
             }
-            if listItemsSample != other.listItemsSample {
+            if lhs.listItemsSample != rhs.listItemsSample {
                 return false
             }
-            if feeds != other.feeds {
+            if lhs.feeds != rhs.feeds {
                 return false
             }
-            if joinedWeekCount != other.joinedWeekCount {
+            if lhs.joinedWeekCount != rhs.joinedWeekCount {
                 return false
             }
-            if joinedAllTimeCount != other.joinedAllTimeCount {
+            if lhs.joinedAllTimeCount != rhs.joinedAllTimeCount {
                 return false
             }
-            if labels != other.labels {
+            if lhs.labels != rhs.labels {
                 return false
             }
-            if indexedAt != other.indexedAt {
+            if lhs.indexedAt != rhs.indexedAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 12)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             let recordValue = try record.toCBORValue()
-            map = map.adding(key: "record", value: recordValue)
+            map.append(key: "record", value: recordValue)
             let creatorValue = try creator.toCBORValue()
-            map = map.adding(key: "creator", value: creatorValue)
+            map.append(key: "creator", value: creatorValue)
             if let value = list {
                 let listValue = try value.toCBORValue()
-                map = map.adding(key: "list", value: listValue)
+                map.append(key: "list", value: listValue)
             }
             if let value = listItemsSample {
                 let listItemsSampleValue = try value.toCBORValue()
-                map = map.adding(key: "listItemsSample", value: listItemsSampleValue)
+                map.append(key: "listItemsSample", value: listItemsSampleValue)
             }
             if let value = feeds {
                 let feedsValue = try value.toCBORValue()
-                map = map.adding(key: "feeds", value: feedsValue)
+                map.append(key: "feeds", value: feedsValue)
             }
             if let value = joinedWeekCount {
                 let joinedWeekCountValue = try value.toCBORValue()
-                map = map.adding(key: "joinedWeekCount", value: joinedWeekCountValue)
+                map.append(key: "joinedWeekCount", value: joinedWeekCountValue)
             }
             if let value = joinedAllTimeCount {
                 let joinedAllTimeCountValue = try value.toCBORValue()
-                map = map.adding(key: "joinedAllTimeCount", value: joinedAllTimeCountValue)
+                map.append(key: "joinedAllTimeCount", value: joinedAllTimeCountValue)
             }
             if let value = labels {
                 let labelsValue = try value.toCBORValue()
-                map = map.adding(key: "labels", value: labelsValue)
+                map.append(key: "labels", value: labelsValue)
             }
             let indexedAtValue = try indexedAt.toCBORValue()
-            map = map.adding(key: "indexedAt", value: indexedAtValue)
+            map.append(key: "indexedAt", value: indexedAtValue)
             return map
         }
 
@@ -873,67 +893,72 @@ public enum AppBskyGraphDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+                record = try container.decode(ATProtocolValueContainer.self, forKey: "record")
             } catch {
-                LogManager.logError("Decoding error for required property 'record': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("record", error)
                 throw error
             }
             do {
-                creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .creator)
+                creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: "creator")
             } catch {
-                LogManager.logError("Decoding error for required property 'creator': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("creator", error)
                 throw error
             }
             do {
-                listItemCount = try container.decodeIfPresent(Int.self, forKey: .listItemCount)
+                listItemCount = try container.decodeIfPresent(Int.self, forKey: "listItemCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'listItemCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("listItemCount", error)
                 listItemCount = nil
             }
             do {
-                joinedWeekCount = try container.decodeIfPresent(Int.self, forKey: .joinedWeekCount)
+                joinedWeekCount = try container.decodeIfPresent(Int.self, forKey: "joinedWeekCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'joinedWeekCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("joinedWeekCount", error)
                 joinedWeekCount = nil
             }
             do {
-                joinedAllTimeCount = try container.decodeIfPresent(Int.self, forKey: .joinedAllTimeCount)
+                joinedAllTimeCount = try container.decodeIfPresent(Int.self, forKey: "joinedAllTimeCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'joinedAllTimeCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("joinedAllTimeCount", error)
                 joinedAllTimeCount = nil
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: "labels")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
                 labels = nil
             }
             do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+                indexedAt = try container.decode(ATProtocolDate.self, forKey: "indexedAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("indexedAt", error)
                 throw error
             }
         }
@@ -982,69 +1007,69 @@ public enum AppBskyGraphDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if record != other.record {
+            if lhs.record != rhs.record {
                 return false
             }
-            if creator != other.creator {
+            if lhs.creator != rhs.creator {
                 return false
             }
-            if listItemCount != other.listItemCount {
+            if lhs.listItemCount != rhs.listItemCount {
                 return false
             }
-            if joinedWeekCount != other.joinedWeekCount {
+            if lhs.joinedWeekCount != rhs.joinedWeekCount {
                 return false
             }
-            if joinedAllTimeCount != other.joinedAllTimeCount {
+            if lhs.joinedAllTimeCount != rhs.joinedAllTimeCount {
                 return false
             }
-            if labels != other.labels {
+            if lhs.labels != rhs.labels {
                 return false
             }
-            if indexedAt != other.indexedAt {
+            if lhs.indexedAt != rhs.indexedAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 10)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             let recordValue = try record.toCBORValue()
-            map = map.adding(key: "record", value: recordValue)
+            map.append(key: "record", value: recordValue)
             let creatorValue = try creator.toCBORValue()
-            map = map.adding(key: "creator", value: creatorValue)
+            map.append(key: "creator", value: creatorValue)
             if let value = listItemCount {
                 let listItemCountValue = try value.toCBORValue()
-                map = map.adding(key: "listItemCount", value: listItemCountValue)
+                map.append(key: "listItemCount", value: listItemCountValue)
             }
             if let value = joinedWeekCount {
                 let joinedWeekCountValue = try value.toCBORValue()
-                map = map.adding(key: "joinedWeekCount", value: joinedWeekCountValue)
+                map.append(key: "joinedWeekCount", value: joinedWeekCountValue)
             }
             if let value = joinedAllTimeCount {
                 let joinedAllTimeCountValue = try value.toCBORValue()
-                map = map.adding(key: "joinedAllTimeCount", value: joinedAllTimeCountValue)
+                map.append(key: "joinedAllTimeCount", value: joinedAllTimeCountValue)
             }
             if let value = labels {
                 let labelsValue = try value.toCBORValue()
-                map = map.adding(key: "labels", value: labelsValue)
+                map.append(key: "labels", value: labelsValue)
             }
             let indexedAtValue = try indexedAt.toCBORValue()
-            map = map.adding(key: "indexedAt", value: indexedAtValue)
+            map.append(key: "indexedAt", value: indexedAtValue)
             return map
         }
 
@@ -1075,21 +1100,26 @@ public enum AppBskyGraphDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                muted = try container.decodeIfPresent(Bool.self, forKey: .muted)
+                muted = try container.decodeIfPresent(Bool.self, forKey: "muted")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'muted' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("muted", error)
                 muted = nil
             }
             do {
-                blocked = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blocked)
+                blocked = try container.decodeIfPresent(ATProtocolURI.self, forKey: "blocked")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'blocked' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("blocked", error)
                 blocked = nil
             }
         }
@@ -1116,29 +1146,29 @@ public enum AppBskyGraphDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if muted != other.muted {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.muted != rhs.muted {
                 return false
             }
-            if blocked != other.blocked {
+            if lhs.blocked != rhs.blocked {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             if let value = muted {
                 let mutedValue = try value.toCBORValue()
-                map = map.adding(key: "muted", value: mutedValue)
+                map.append(key: "muted", value: mutedValue)
             }
             if let value = blocked {
                 let blockedValue = try value.toCBORValue()
-                map = map.adding(key: "blocked", value: blockedValue)
+                map.append(key: "blocked", value: blockedValue)
             }
             return map
         }
@@ -1163,17 +1193,22 @@ public enum AppBskyGraphDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                actor = try container.decode(ATIdentifier.self, forKey: .actor)
+                actor = try container.decode(ATIdentifier.self, forKey: "actor")
             } catch {
-                LogManager.logError("Decoding error for required property 'actor': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("actor", error)
                 throw error
             }
             do {
-                notFound = try container.decode(Bool.self, forKey: .notFound)
+                notFound = try container.decode(Bool.self, forKey: "notFound")
             } catch {
-                LogManager.logError("Decoding error for required property 'notFound': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("notFound", error)
                 throw error
             }
         }
@@ -1192,26 +1227,26 @@ public enum AppBskyGraphDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if actor != other.actor {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.actor != rhs.actor {
                 return false
             }
-            if notFound != other.notFound {
+            if lhs.notFound != rhs.notFound {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let actorValue = try actor.toCBORValue()
-            map = map.adding(key: "actor", value: actorValue)
+            map.append(key: "actor", value: actorValue)
             let notFoundValue = try notFound.toCBORValue()
-            map = map.adding(key: "notFound", value: notFoundValue)
+            map.append(key: "notFound", value: notFoundValue)
             return map
         }
 
@@ -1245,59 +1280,64 @@ public enum AppBskyGraphDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                following = try container.decodeIfPresent(ATProtocolURI.self, forKey: .following)
+                following = try container.decodeIfPresent(ATProtocolURI.self, forKey: "following")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'following' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("following", error)
                 following = nil
             }
             do {
-                followedBy = try container.decodeIfPresent(ATProtocolURI.self, forKey: .followedBy)
+                followedBy = try container.decodeIfPresent(ATProtocolURI.self, forKey: "followedBy")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'followedBy' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("followedBy", error)
                 followedBy = nil
             }
             do {
-                blocking = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blocking)
+                blocking = try container.decodeIfPresent(ATProtocolURI.self, forKey: "blocking")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'blocking' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("blocking", error)
                 blocking = nil
             }
             do {
-                blockedBy = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blockedBy)
+                blockedBy = try container.decodeIfPresent(ATProtocolURI.self, forKey: "blockedBy")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'blockedBy' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("blockedBy", error)
                 blockedBy = nil
             }
             do {
-                blockingByList = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blockingByList)
+                blockingByList = try container.decodeIfPresent(ATProtocolURI.self, forKey: "blockingByList")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'blockingByList' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("blockingByList", error)
                 blockingByList = nil
             }
             do {
-                blockedByList = try container.decodeIfPresent(ATProtocolURI.self, forKey: .blockedByList)
+                blockedByList = try container.decodeIfPresent(ATProtocolURI.self, forKey: "blockedByList")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'blockedByList' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("blockedByList", error)
                 blockedByList = nil
             }
         }
@@ -1350,62 +1390,62 @@ public enum AppBskyGraphDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
-            if following != other.following {
+            if lhs.following != rhs.following {
                 return false
             }
-            if followedBy != other.followedBy {
+            if lhs.followedBy != rhs.followedBy {
                 return false
             }
-            if blocking != other.blocking {
+            if lhs.blocking != rhs.blocking {
                 return false
             }
-            if blockedBy != other.blockedBy {
+            if lhs.blockedBy != rhs.blockedBy {
                 return false
             }
-            if blockingByList != other.blockingByList {
+            if lhs.blockingByList != rhs.blockingByList {
                 return false
             }
-            if blockedByList != other.blockedByList {
+            if lhs.blockedByList != rhs.blockedByList {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 8)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             if let value = following {
                 let followingValue = try value.toCBORValue()
-                map = map.adding(key: "following", value: followingValue)
+                map.append(key: "following", value: followingValue)
             }
             if let value = followedBy {
                 let followedByValue = try value.toCBORValue()
-                map = map.adding(key: "followedBy", value: followedByValue)
+                map.append(key: "followedBy", value: followedByValue)
             }
             if let value = blocking {
                 let blockingValue = try value.toCBORValue()
-                map = map.adding(key: "blocking", value: blockingValue)
+                map.append(key: "blocking", value: blockingValue)
             }
             if let value = blockedBy {
                 let blockedByValue = try value.toCBORValue()
-                map = map.adding(key: "blockedBy", value: blockedByValue)
+                map.append(key: "blockedBy", value: blockedByValue)
             }
             if let value = blockingByList {
                 let blockingByListValue = try value.toCBORValue()
-                map = map.adding(key: "blockingByList", value: blockingByListValue)
+                map.append(key: "blockingByList", value: blockingByListValue)
             }
             if let value = blockedByList {
                 let blockedByListValue = try value.toCBORValue()
-                map = map.adding(key: "blockedByList", value: blockedByListValue)
+                map.append(key: "blockedByList", value: blockedByListValue)
             }
             return map
         }

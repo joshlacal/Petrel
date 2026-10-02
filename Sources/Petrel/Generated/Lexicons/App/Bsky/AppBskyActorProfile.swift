@@ -30,75 +30,80 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
         do {
-            displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+            displayName = try container.decodeIfPresent(String.self, forKey: "displayName")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'displayName' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("displayName", error)
             displayName = nil
         }
         do {
-            description = try container.decodeIfPresent(String.self, forKey: .description)
+            description = try container.decodeIfPresent(String.self, forKey: "description")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("description", error)
             description = nil
         }
         do {
-            pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
+            pronouns = try container.decodeIfPresent(String.self, forKey: "pronouns")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'pronouns' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("pronouns", error)
             pronouns = nil
         }
         do {
-            website = try container.decodeIfPresent(URI.self, forKey: .website)
+            website = try container.decodeIfPresent(URI.self, forKey: "website")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'website' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("website", error)
             website = nil
         }
         do {
-            avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar)
+            avatar = try container.decodeIfPresent(Blob.self, forKey: "avatar")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("avatar", error)
             avatar = nil
         }
         do {
-            banner = try container.decodeIfPresent(Blob.self, forKey: .banner)
+            banner = try container.decodeIfPresent(Blob.self, forKey: "banner")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'banner' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("banner", error)
             banner = nil
         }
         do {
-            labels = try container.decodeIfPresent(AppBskyActorProfileLabelsUnion.self, forKey: .labels)
+            labels = try container.decodeIfPresent(AppBskyActorProfileLabelsUnion.self, forKey: "labels")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("labels", error)
             labels = nil
         }
         do {
-            joinedViaStarterPack = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .joinedViaStarterPack)
+            joinedViaStarterPack = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: "joinedViaStarterPack")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'joinedViaStarterPack' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("joinedViaStarterPack", error)
             joinedViaStarterPack = nil
         }
         do {
-            pinnedPost = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .pinnedPost)
+            pinnedPost = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: "pinnedPost")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'pinnedPost' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("pinnedPost", error)
             pinnedPost = nil
         }
         do {
-            createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+            createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: "createdAt")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("createdAt", error)
             createdAt = nil
         }
     }
@@ -119,42 +124,42 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.displayName != rhs.displayName {
+            return false
+        }
+        if lhs.description != rhs.description {
+            return false
+        }
+        if lhs.pronouns != rhs.pronouns {
+            return false
+        }
+        if lhs.website != rhs.website {
+            return false
+        }
+        if lhs.avatar != rhs.avatar {
+            return false
+        }
+        if lhs.banner != rhs.banner {
+            return false
+        }
+        if lhs.labels != rhs.labels {
+            return false
+        }
+        if lhs.joinedViaStarterPack != rhs.joinedViaStarterPack {
+            return false
+        }
+        if lhs.pinnedPost != rhs.pinnedPost {
+            return false
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if displayName != other.displayName {
-            return false
-        }
-        if description != other.description {
-            return false
-        }
-        if pronouns != other.pronouns {
-            return false
-        }
-        if website != other.website {
-            return false
-        }
-        if avatar != other.avatar {
-            return false
-        }
-        if banner != other.banner {
-            return false
-        }
-        if labels != other.labels {
-            return false
-        }
-        if joinedViaStarterPack != other.joinedViaStarterPack {
-            return false
-        }
-        if pinnedPost != other.pinnedPost {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -211,47 +216,47 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 11)
+        map.append(key: "$type", value: Self.typeIdentifier)
         if let value = displayName {
             let displayNameValue = try value.toCBORValue()
-            map = map.adding(key: "displayName", value: displayNameValue)
+            map.append(key: "displayName", value: displayNameValue)
         }
         if let value = description {
             let descriptionValue = try value.toCBORValue()
-            map = map.adding(key: "description", value: descriptionValue)
+            map.append(key: "description", value: descriptionValue)
         }
         if let value = pronouns {
             let pronounsValue = try value.toCBORValue()
-            map = map.adding(key: "pronouns", value: pronounsValue)
+            map.append(key: "pronouns", value: pronounsValue)
         }
         if let value = website {
             let websiteValue = try value.toCBORValue()
-            map = map.adding(key: "website", value: websiteValue)
+            map.append(key: "website", value: websiteValue)
         }
         if let value = avatar {
             let avatarValue = try value.toCBORValue()
-            map = map.adding(key: "avatar", value: avatarValue)
+            map.append(key: "avatar", value: avatarValue)
         }
         if let value = banner {
             let bannerValue = try value.toCBORValue()
-            map = map.adding(key: "banner", value: bannerValue)
+            map.append(key: "banner", value: bannerValue)
         }
         if let value = labels {
             let labelsValue = try value.toCBORValue()
-            map = map.adding(key: "labels", value: labelsValue)
+            map.append(key: "labels", value: labelsValue)
         }
         if let value = joinedViaStarterPack {
             let joinedViaStarterPackValue = try value.toCBORValue()
-            map = map.adding(key: "joinedViaStarterPack", value: joinedViaStarterPackValue)
+            map.append(key: "joinedViaStarterPack", value: joinedViaStarterPackValue)
         }
         if let value = pinnedPost {
             let pinnedPostValue = try value.toCBORValue()
-            map = map.adding(key: "pinnedPost", value: pinnedPostValue)
+            map.append(key: "pinnedPost", value: pinnedPostValue)
         }
         if let value = createdAt {
             let createdAtValue = try value.toCBORValue()
-            map = map.adding(key: "createdAt", value: createdAtValue)
+            map.append(key: "createdAt", value: createdAtValue)
         }
         return map
     }
@@ -278,12 +283,14 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.label.defs#selfLabels":
-                let value = try ComAtprotoLabelDefs.SelfLabels(from: decoder)
+                let value = try ComAtprotoLabelDefs.SelfLabels(_lexiconContainer: container)
                 self = .comAtprotoLabelDefsSelfLabels(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -326,7 +333,7 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -337,29 +344,15 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoLabelDefsSelfLabels(value):
-                map = map.adding(key: "$type", value: "com.atproto.label.defs#selfLabels")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.label.defs#selfLabels",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

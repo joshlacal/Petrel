@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSpaceRegisterNotify {
     public static let typeIdentifier = "com.atproto.space.registerNotify"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let service: String
@@ -28,11 +29,11 @@ public enum ComAtprotoSpaceRegisterNotify {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             let serviceValue = try service.toCBORValue()
-            map = map.adding(key: "service", value: serviceValue)
+            map.append(key: "service", value: serviceValue)
             return map
         }
 
@@ -66,10 +67,10 @@ public enum ComAtprotoSpaceRegisterNotify {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let expiresAtValue = try expiresAt.toCBORValue()
-            map = map.adding(key: "expiresAt", value: expiresAtValue)
+            map.append(key: "expiresAt", value: expiresAtValue)
 
             return map
         }
@@ -173,7 +174,7 @@ public extension ATProtoClient.Com.Atproto.Space {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.registerNotify: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.space.registerNotify", error)
                 return (responseCode, nil)
             }
         } else {

@@ -16,10 +16,15 @@ public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        subject = try container.decode(DID.self, forKey: .subject)
-        list = try container.decode(ATProtocolURI.self, forKey: .list)
-        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        subject = try container.decode(DID.self, forKey: "subject")
+        list = try container.decode(ATProtocolURI.self, forKey: "list")
+        createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -31,21 +36,21 @@ public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.subject != rhs.subject {
+            return false
+        }
+        if lhs.list != rhs.list {
+            return false
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if subject != other.subject {
-            return false
-        }
-        if list != other.list {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -55,14 +60,14 @@ public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 4)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let subjectValue = try subject.toCBORValue()
-        map = map.adding(key: "subject", value: subjectValue)
+        map.append(key: "subject", value: subjectValue)
         let listValue = try list.toCBORValue()
-        map = map.adding(key: "list", value: listValue)
+        map.append(key: "list", value: listValue)
         let createdAtValue = try createdAt.toCBORValue()
-        map = map.adding(key: "createdAt", value: createdAtValue)
+        map.append(key: "createdAt", value: createdAtValue)
         return map
     }
 

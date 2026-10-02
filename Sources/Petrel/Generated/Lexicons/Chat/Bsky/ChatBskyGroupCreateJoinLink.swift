@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupCreateJoinLink {
     public static let typeIdentifier = "chat.bsky.group.createJoinLink"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
         public let requireApproval: Bool?
@@ -32,15 +33,15 @@ public enum ChatBskyGroupCreateJoinLink {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             if let value = requireApproval {
                 let requireApprovalValue = try value.toCBORValue()
-                map = map.adding(key: "requireApproval", value: requireApprovalValue)
+                map.append(key: "requireApproval", value: requireApprovalValue)
             }
             let joinRuleValue = try joinRule.toCBORValue()
-            map = map.adding(key: "joinRule", value: joinRuleValue)
+            map.append(key: "joinRule", value: joinRuleValue)
             return map
         }
 
@@ -75,10 +76,10 @@ public enum ChatBskyGroupCreateJoinLink {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let joinLinkValue = try joinLink.toCBORValue()
-            map = map.adding(key: "joinLink", value: joinLinkValue)
+            map.append(key: "joinLink", value: joinLinkValue)
 
             return map
         }
@@ -161,7 +162,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.createJoinLink: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.createJoinLink", error)
                 return (responseCode, nil)
             }
         } else {

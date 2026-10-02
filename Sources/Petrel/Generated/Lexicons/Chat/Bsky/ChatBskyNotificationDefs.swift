@@ -19,17 +19,22 @@ public enum ChatBskyNotificationDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                chat = try container.decode(ChatPreference.self, forKey: .chat)
+                chat = try container.decode(ChatPreference.self, forKey: "chat")
             } catch {
-                LogManager.logError("Decoding error for required property 'chat': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("chat", error)
                 throw error
             }
             do {
-                chatRequest = try container.decode(ChatPreference.self, forKey: .chatRequest)
+                chatRequest = try container.decode(ChatPreference.self, forKey: "chatRequest")
             } catch {
-                LogManager.logError("Decoding error for required property 'chatRequest': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("chatRequest", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum ChatBskyNotificationDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if chat != other.chat {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.chat != rhs.chat {
                 return false
             }
-            if chatRequest != other.chatRequest {
+            if lhs.chatRequest != rhs.chatRequest {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let chatValue = try chat.toCBORValue()
-            map = map.adding(key: "chat", value: chatValue)
+            map.append(key: "chat", value: chatValue)
             let chatRequestValue = try chatRequest.toCBORValue()
-            map = map.adding(key: "chatRequest", value: chatRequestValue)
+            map.append(key: "chatRequest", value: chatRequestValue)
             return map
         }
 
@@ -91,17 +96,22 @@ public enum ChatBskyNotificationDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                include = try container.decode(String.self, forKey: .include)
+                include = try container.decode(String.self, forKey: "include")
             } catch {
-                LogManager.logError("Decoding error for required property 'include': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("include", error)
                 throw error
             }
             do {
-                push = try container.decode(Bool.self, forKey: .push)
+                push = try container.decode(Bool.self, forKey: "push")
             } catch {
-                LogManager.logError("Decoding error for required property 'push': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("push", error)
                 throw error
             }
         }
@@ -120,26 +130,26 @@ public enum ChatBskyNotificationDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if include != other.include {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.include != rhs.include {
                 return false
             }
-            if push != other.push {
+            if lhs.push != rhs.push {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let includeValue = try include.toCBORValue()
-            map = map.adding(key: "include", value: includeValue)
+            map.append(key: "include", value: includeValue)
             let pushValue = try push.toCBORValue()
-            map = map.adding(key: "push", value: pushValue)
+            map.append(key: "push", value: pushValue)
             return map
         }
 

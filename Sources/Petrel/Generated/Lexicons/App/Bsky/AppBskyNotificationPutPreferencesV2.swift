@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyNotificationPutPreferencesV2 {
     public static let typeIdentifier = "app.bsky.notification.putPreferencesV2"
+
     public struct Input: ATProtocolCodable {
         public let chat: AppBskyNotificationDefs.ChatPreference?
         public let follow: AppBskyNotificationDefs.FilterablePreference?
@@ -72,58 +73,58 @@ public enum AppBskyNotificationPutPreferencesV2 {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 13)
             if let value = chat {
                 let chatValue = try value.toCBORValue()
-                map = map.adding(key: "chat", value: chatValue)
+                map.append(key: "chat", value: chatValue)
             }
             if let value = follow {
                 let followValue = try value.toCBORValue()
-                map = map.adding(key: "follow", value: followValue)
+                map.append(key: "follow", value: followValue)
             }
             if let value = like {
                 let likeValue = try value.toCBORValue()
-                map = map.adding(key: "like", value: likeValue)
+                map.append(key: "like", value: likeValue)
             }
             if let value = likeViaRepost {
                 let likeViaRepostValue = try value.toCBORValue()
-                map = map.adding(key: "likeViaRepost", value: likeViaRepostValue)
+                map.append(key: "likeViaRepost", value: likeViaRepostValue)
             }
             if let value = mention {
                 let mentionValue = try value.toCBORValue()
-                map = map.adding(key: "mention", value: mentionValue)
+                map.append(key: "mention", value: mentionValue)
             }
             if let value = quote {
                 let quoteValue = try value.toCBORValue()
-                map = map.adding(key: "quote", value: quoteValue)
+                map.append(key: "quote", value: quoteValue)
             }
             if let value = reply {
                 let replyValue = try value.toCBORValue()
-                map = map.adding(key: "reply", value: replyValue)
+                map.append(key: "reply", value: replyValue)
             }
             if let value = repost {
                 let repostValue = try value.toCBORValue()
-                map = map.adding(key: "repost", value: repostValue)
+                map.append(key: "repost", value: repostValue)
             }
             if let value = repostViaRepost {
                 let repostViaRepostValue = try value.toCBORValue()
-                map = map.adding(key: "repostViaRepost", value: repostViaRepostValue)
+                map.append(key: "repostViaRepost", value: repostViaRepostValue)
             }
             if let value = starterpackJoined {
                 let starterpackJoinedValue = try value.toCBORValue()
-                map = map.adding(key: "starterpackJoined", value: starterpackJoinedValue)
+                map.append(key: "starterpackJoined", value: starterpackJoinedValue)
             }
             if let value = subscribedPost {
                 let subscribedPostValue = try value.toCBORValue()
-                map = map.adding(key: "subscribedPost", value: subscribedPostValue)
+                map.append(key: "subscribedPost", value: subscribedPostValue)
             }
             if let value = unverified {
                 let unverifiedValue = try value.toCBORValue()
-                map = map.adding(key: "unverified", value: unverifiedValue)
+                map.append(key: "unverified", value: unverifiedValue)
             }
             if let value = verified {
                 let verifiedValue = try value.toCBORValue()
-                map = map.adding(key: "verified", value: verifiedValue)
+                map.append(key: "verified", value: verifiedValue)
             }
             return map
         }
@@ -169,10 +170,10 @@ public enum AppBskyNotificationPutPreferencesV2 {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let preferencesValue = try preferences.toCBORValue()
-            map = map.adding(key: "preferences", value: preferencesValue)
+            map.append(key: "preferences", value: preferencesValue)
 
             return map
         }
@@ -242,7 +243,7 @@ public extension ATProtoClient.App.Bsky.Notification {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.notification.putPreferencesV2: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.notification.putPreferencesV2", error)
                 return (responseCode, nil)
             }
         } else {

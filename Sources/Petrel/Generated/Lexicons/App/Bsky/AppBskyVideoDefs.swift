@@ -31,63 +31,68 @@ public enum AppBskyVideoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                jobId = try container.decode(String.self, forKey: .jobId)
+                jobId = try container.decode(String.self, forKey: "jobId")
             } catch {
-                LogManager.logError("Decoding error for required property 'jobId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("jobId", error)
                 throw error
             }
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                state = try container.decode(String.self, forKey: .state)
+                state = try container.decode(String.self, forKey: "state")
             } catch {
-                LogManager.logError("Decoding error for required property 'state': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("state", error)
                 throw error
             }
             do {
-                progress = try container.decodeIfPresent(Int.self, forKey: .progress)
+                progress = try container.decodeIfPresent(Int.self, forKey: "progress")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'progress' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("progress", error)
                 progress = nil
             }
             do {
-                blob = try container.decodeIfPresent(Blob.self, forKey: .blob)
+                blob = try container.decodeIfPresent(Blob.self, forKey: "blob")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'blob' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("blob", error)
                 blob = nil
             }
             do {
-                error = try container.decodeIfPresent(String.self, forKey: .error)
+                error = try container.decodeIfPresent(String.self, forKey: "error")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'error' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("error", error)
                 self.error = nil
             }
             do {
-                failureCode = try container.decodeIfPresent(String.self, forKey: .failureCode)
+                failureCode = try container.decodeIfPresent(String.self, forKey: "failureCode")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'failureCode' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("failureCode", error)
                 failureCode = nil
             }
             do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
+                message = try container.decodeIfPresent(String.self, forKey: "message")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("message", error)
                 message = nil
             }
         }
@@ -138,65 +143,65 @@ public enum AppBskyVideoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if jobId != other.jobId {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.jobId != rhs.jobId {
                 return false
             }
-            if did != other.did {
+            if lhs.did != rhs.did {
                 return false
             }
-            if state != other.state {
+            if lhs.state != rhs.state {
                 return false
             }
-            if progress != other.progress {
+            if lhs.progress != rhs.progress {
                 return false
             }
-            if blob != other.blob {
+            if lhs.blob != rhs.blob {
                 return false
             }
-            if error != other.error {
+            if lhs.error != rhs.error {
                 return false
             }
-            if failureCode != other.failureCode {
+            if lhs.failureCode != rhs.failureCode {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 9)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let jobIdValue = try jobId.toCBORValue()
-            map = map.adding(key: "jobId", value: jobIdValue)
+            map.append(key: "jobId", value: jobIdValue)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let stateValue = try state.toCBORValue()
-            map = map.adding(key: "state", value: stateValue)
+            map.append(key: "state", value: stateValue)
             if let value = progress {
                 let progressValue = try value.toCBORValue()
-                map = map.adding(key: "progress", value: progressValue)
+                map.append(key: "progress", value: progressValue)
             }
             if let value = blob {
                 let blobValue = try value.toCBORValue()
-                map = map.adding(key: "blob", value: blobValue)
+                map.append(key: "blob", value: blobValue)
             }
             if let value = error {
                 let errorValue = try value.toCBORValue()
-                map = map.adding(key: "error", value: errorValue)
+                map.append(key: "error", value: errorValue)
             }
             if let value = failureCode {
                 let failureCodeValue = try value.toCBORValue()
-                map = map.adding(key: "failureCode", value: failureCodeValue)
+                map.append(key: "failureCode", value: failureCodeValue)
             }
             if let value = message {
                 let messageValue = try value.toCBORValue()
-                map = map.adding(key: "message", value: messageValue)
+                map.append(key: "message", value: messageValue)
             }
             return map
         }

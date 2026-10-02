@@ -65,7 +65,7 @@ public extension ATProtoClient.App.Bsky.Actor {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.actor.getProfile: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.actor.getProfile", error)
                 return (responseCode, nil)
             }
         } else {

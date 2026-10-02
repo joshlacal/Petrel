@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoServerRequestPasswordReset {
     public static let typeIdentifier = "com.atproto.server.requestPasswordReset"
+
     public struct Input: ATProtocolCodable {
         public let email: String
 
@@ -24,9 +25,9 @@ public enum ComAtprotoServerRequestPasswordReset {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let emailValue = try email.toCBORValue()
-            map = map.adding(key: "email", value: emailValue)
+            map.append(key: "email", value: emailValue)
             return map
         }
 

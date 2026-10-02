@@ -42,10 +42,10 @@ public enum AppBskyUnspeccedGetSuggestedFeedsSkeleton {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let feedsValue = try feeds.toCBORValue()
-            map = map.adding(key: "feeds", value: feedsValue)
+            map.append(key: "feeds", value: feedsValue)
 
             return map
         }
@@ -103,7 +103,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getSuggestedFeedsSkeleton: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getSuggestedFeedsSkeleton", error)
                 return (responseCode, nil)
             }
         } else {

@@ -19,17 +19,22 @@ public enum ComAtprotoRepoListMissingBlobs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                recordUri = try container.decode(ATProtocolURI.self, forKey: .recordUri)
+                recordUri = try container.decode(ATProtocolURI.self, forKey: "recordUri")
             } catch {
-                LogManager.logError("Decoding error for required property 'recordUri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("recordUri", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum ComAtprotoRepoListMissingBlobs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if cid != other.cid {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if recordUri != other.recordUri {
+            if lhs.recordUri != rhs.recordUri {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             let recordUriValue = try recordUri.toCBORValue()
-            map = map.adding(key: "recordUri", value: recordUriValue)
+            map.append(key: "recordUri", value: recordUriValue)
             return map
         }
 
@@ -115,7 +120,7 @@ public enum ComAtprotoRepoListMissingBlobs {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -132,16 +137,16 @@ public enum ComAtprotoRepoListMissingBlobs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let blobsValue = try blobs.toCBORValue()
-            map = map.adding(key: "blobs", value: blobsValue)
+            map.append(key: "blobs", value: blobsValue)
 
             return map
         }
@@ -200,7 +205,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.repo.listMissingBlobs: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.repo.listMissingBlobs", error)
                 return (responseCode, nil)
             }
         } else {

@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupRemoveMembers {
     public static let typeIdentifier = "chat.bsky.group.removeMembers"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
         public let members: [DID]
@@ -28,11 +29,11 @@ public enum ChatBskyGroupRemoveMembers {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let membersValue = try members.toCBORValue()
-            map = map.adding(key: "members", value: membersValue)
+            map.append(key: "members", value: membersValue)
             return map
         }
 
@@ -66,10 +67,10 @@ public enum ChatBskyGroupRemoveMembers {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let convoValue = try convo.toCBORValue()
-            map = map.adding(key: "convo", value: convoValue)
+            map.append(key: "convo", value: convoValue)
 
             return map
         }
@@ -151,7 +152,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.removeMembers: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.removeMembers", error)
                 return (responseCode, nil)
             }
         } else {

@@ -12,8 +12,13 @@ public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        lexicon = try container.decode(Int.self, forKey: .lexicon)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        lexicon = try container.decode(Int.self, forKey: "lexicon")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -23,15 +28,15 @@ public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.lexicon != rhs.lexicon {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if lexicon != other.lexicon {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -39,10 +44,10 @@ public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 2)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let lexiconValue = try lexicon.toCBORValue()
-        map = map.adding(key: "lexicon", value: lexiconValue)
+        map.append(key: "lexicon", value: lexiconValue)
         return map
     }
 

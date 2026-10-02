@@ -12,8 +12,13 @@ public struct AppBskyActorContentVisibilityDeclaration: ATProtocolCodable, ATPro
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        hideFromAlgorithmicRecommendations = try container.decode(Bool.self, forKey: .hideFromAlgorithmicRecommendations)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        hideFromAlgorithmicRecommendations = try container.decode(Bool.self, forKey: "hideFromAlgorithmicRecommendations")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -23,15 +28,15 @@ public struct AppBskyActorContentVisibilityDeclaration: ATProtocolCodable, ATPro
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.hideFromAlgorithmicRecommendations != rhs.hideFromAlgorithmicRecommendations {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if hideFromAlgorithmicRecommendations != other.hideFromAlgorithmicRecommendations {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -39,10 +44,10 @@ public struct AppBskyActorContentVisibilityDeclaration: ATProtocolCodable, ATPro
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 2)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let hideFromAlgorithmicRecommendationsValue = try hideFromAlgorithmicRecommendations.toCBORValue()
-        map = map.adding(key: "hideFromAlgorithmicRecommendations", value: hideFromAlgorithmicRecommendationsValue)
+        map.append(key: "hideFromAlgorithmicRecommendations", value: hideFromAlgorithmicRecommendationsValue)
         return map
     }
 

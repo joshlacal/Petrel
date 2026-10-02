@@ -21,23 +21,28 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                tag = try container.decode(String.self, forKey: .tag)
+                tag = try container.decode(String.self, forKey: "tag")
             } catch {
-                LogManager.logError("Decoding error for required property 'tag': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("tag", error)
                 throw error
             }
             do {
-                subjectType = try container.decode(String.self, forKey: .subjectType)
+                subjectType = try container.decode(String.self, forKey: "subjectType")
             } catch {
-                LogManager.logError("Decoding error for required property 'subjectType': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("subjectType", error)
                 throw error
             }
             do {
-                subject = try container.decode(URI.self, forKey: .subject)
+                subject = try container.decode(URI.self, forKey: "subject")
             } catch {
-                LogManager.logError("Decoding error for required property 'subject': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("subject", error)
                 throw error
             }
         }
@@ -58,31 +63,31 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if tag != other.tag {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.tag != rhs.tag {
                 return false
             }
-            if subjectType != other.subjectType {
+            if lhs.subjectType != rhs.subjectType {
                 return false
             }
-            if subject != other.subject {
+            if lhs.subject != rhs.subject {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let tagValue = try tag.toCBORValue()
-            map = map.adding(key: "tag", value: tagValue)
+            map.append(key: "tag", value: tagValue)
             let subjectTypeValue = try subjectType.toCBORValue()
-            map = map.adding(key: "subjectType", value: subjectTypeValue)
+            map.append(key: "subjectType", value: subjectTypeValue)
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
             return map
         }
 
@@ -122,10 +127,10 @@ public enum AppBskyUnspeccedGetTaggedSuggestions {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let suggestionsValue = try suggestions.toCBORValue()
-            map = map.adding(key: "suggestions", value: suggestionsValue)
+            map.append(key: "suggestions", value: suggestionsValue)
 
             return map
         }
@@ -183,7 +188,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getTaggedSuggestions: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getTaggedSuggestions", error)
                 return (responseCode, nil)
             }
         } else {

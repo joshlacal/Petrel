@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSpaceNotifyWrite {
     public static let typeIdentifier = "com.atproto.space.notifyWrite"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let repo: DID
@@ -36,15 +37,15 @@ public enum ComAtprotoSpaceNotifyWrite {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             let repoValue = try repo.toCBORValue()
-            map = map.adding(key: "repo", value: repoValue)
+            map.append(key: "repo", value: repoValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let hashValue = try hash.toCBORValue()
-            map = map.adding(key: "hash", value: hashValue)
+            map.append(key: "hash", value: hashValue)
             return map
         }
 

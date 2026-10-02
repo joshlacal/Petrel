@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyUnspeccedInitAgeAssurance {
     public static let typeIdentifier = "app.bsky.unspecced.initAgeAssurance"
+
     public struct Input: ATProtocolCodable {
         public let email: String
         public let language: String
@@ -32,13 +33,13 @@ public enum AppBskyUnspeccedInitAgeAssurance {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
             let emailValue = try email.toCBORValue()
-            map = map.adding(key: "email", value: emailValue)
+            map.append(key: "email", value: emailValue)
             let languageValue = try language.toCBORValue()
-            map = map.adding(key: "language", value: languageValue)
+            map.append(key: "language", value: languageValue)
             let countryCodeValue = try countryCode.toCBORValue()
-            map = map.adding(key: "countryCode", value: countryCodeValue)
+            map.append(key: "countryCode", value: countryCodeValue)
             return map
         }
 
@@ -124,7 +125,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.initAgeAssurance: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.initAgeAssurance", error)
                 return (responseCode, nil)
             }
         } else {

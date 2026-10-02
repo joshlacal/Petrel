@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyVideoFinishUpload {
     public static let typeIdentifier = "app.bsky.video.finishUpload"
+
     public struct Input: ATProtocolCodable {
         public let jobId: String
 
@@ -24,9 +25,9 @@ public enum AppBskyVideoFinishUpload {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let jobIdValue = try jobId.toCBORValue()
-            map = map.adding(key: "jobId", value: jobIdValue)
+            map.append(key: "jobId", value: jobIdValue)
             return map
         }
 
@@ -69,13 +70,13 @@ public enum AppBskyVideoFinishUpload {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let completedJobIdValue = try completedJobId.toCBORValue()
-            map = map.adding(key: "completedJobId", value: completedJobIdValue)
+            map.append(key: "completedJobId", value: completedJobIdValue)
 
             let jobStatusValue = try jobStatus.toCBORValue()
-            map = map.adding(key: "jobStatus", value: jobStatusValue)
+            map.append(key: "jobStatus", value: jobStatusValue)
 
             return map
         }
@@ -172,7 +173,7 @@ public extension ATProtoClient.App.Bsky.Video {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.finishUpload: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.video.finishUpload", error)
                 return (responseCode, nil)
             }
         } else {

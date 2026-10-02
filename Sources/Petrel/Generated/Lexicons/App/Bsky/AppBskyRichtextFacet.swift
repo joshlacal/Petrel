@@ -14,9 +14,14 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        index = try container.decode(ByteSlice.self, forKey: .index)
-        features = try container.decode([AppBskyRichtextFacetFeaturesUnion].self, forKey: .features)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        index = try container.decode(ByteSlice.self, forKey: "index")
+        features = try container.decode([AppBskyRichtextFacetFeaturesUnion].self, forKey: "features")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -32,25 +37,25 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if index != other.index {
+        return self == other
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        if lhs.index != rhs.index {
             return false
         }
-        if features != other.features {
+        if lhs.features != rhs.features {
             return false
         }
         return true
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
+        var map = OrderedCBORMap(minimumCapacity: 2)
         let indexValue = try index.toCBORValue()
-        map = map.adding(key: "index", value: indexValue)
+        map.append(key: "index", value: indexValue)
         let featuresValue = try features.toCBORValue()
-        map = map.adding(key: "features", value: featuresValue)
+        map.append(key: "features", value: featuresValue)
         return map
     }
 
@@ -70,11 +75,16 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
         }
@@ -91,21 +101,21 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             return map
         }
 
@@ -126,11 +136,16 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(URI.self, forKey: .uri)
+                uri = try container.decode(URI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
         }
@@ -147,21 +162,21 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             return map
         }
 
@@ -182,11 +197,16 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                tag = try container.decode(String.self, forKey: .tag)
+                tag = try container.decode(String.self, forKey: "tag")
             } catch {
-                LogManager.logError("Decoding error for required property 'tag': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("tag", error)
                 throw error
             }
         }
@@ -203,21 +223,21 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if tag != other.tag {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.tag != rhs.tag {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let tagValue = try tag.toCBORValue()
-            map = map.adding(key: "tag", value: tagValue)
+            map.append(key: "tag", value: tagValue)
             return map
         }
 
@@ -240,17 +260,22 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                byteStart = try container.decode(Int.self, forKey: .byteStart)
+                byteStart = try container.decode(Int.self, forKey: "byteStart")
             } catch {
-                LogManager.logError("Decoding error for required property 'byteStart': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("byteStart", error)
                 throw error
             }
             do {
-                byteEnd = try container.decode(Int.self, forKey: .byteEnd)
+                byteEnd = try container.decode(Int.self, forKey: "byteEnd")
             } catch {
-                LogManager.logError("Decoding error for required property 'byteEnd': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("byteEnd", error)
                 throw error
             }
         }
@@ -269,26 +294,26 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if byteStart != other.byteStart {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.byteStart != rhs.byteStart {
                 return false
             }
-            if byteEnd != other.byteEnd {
+            if lhs.byteEnd != rhs.byteEnd {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let byteStartValue = try byteStart.toCBORValue()
-            map = map.adding(key: "byteStart", value: byteStartValue)
+            map.append(key: "byteStart", value: byteStartValue)
             let byteEndValue = try byteEnd.toCBORValue()
-            map = map.adding(key: "byteEnd", value: byteEndValue)
+            map.append(key: "byteEnd", value: byteEndValue)
             return map
         }
 
@@ -317,18 +342,20 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.richtext.facet#mention":
-                let value = try AppBskyRichtextFacet.Mention(from: decoder)
+                let value = try AppBskyRichtextFacet.Mention(_lexiconContainer: container)
                 self = .appBskyRichtextFacetMention(value)
             case "app.bsky.richtext.facet#link":
-                let value = try AppBskyRichtextFacet.Link(from: decoder)
+                let value = try AppBskyRichtextFacet.Link(_lexiconContainer: container)
                 self = .appBskyRichtextFacetLink(value)
             case "app.bsky.richtext.facet#tag":
-                let value = try AppBskyRichtextFacet.Tag(from: decoder)
+                let value = try AppBskyRichtextFacet.Tag(_lexiconContainer: container)
                 self = .appBskyRichtextFacetTag(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -393,7 +420,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -404,63 +431,25 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyRichtextFacetMention(value):
-                map = map.adding(key: "$type", value: "app.bsky.richtext.facet#mention")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.richtext.facet#mention",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyRichtextFacetLink(value):
-                map = map.adding(key: "$type", value: "app.bsky.richtext.facet#link")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.richtext.facet#link",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyRichtextFacetTag(value):
-                map = map.adding(key: "$type", value: "app.bsky.richtext.facet#tag")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.richtext.facet#tag",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -508,6 +497,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         public func toCBORValue() throws -> Any {
             // For union arrays, we need to encode each item while preserving its order
             var itemsArray = [Any]()
+            itemsArray.reserveCapacity(items.count)
 
             for item in items {
                 let itemValue = try item.toCBORValue()
@@ -536,8 +526,10 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "Mention":
@@ -620,62 +612,25 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             case type = "$type"
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-
             switch self {
             case let .mention(value):
-                map = map.adding(key: "$type", value: "Mention")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "Mention",
+                    payload: value.toCBORValue()
+                )
             case let .link(value):
-                map = map.adding(key: "$type", value: "Link")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "Link",
+                    payload: value.toCBORValue()
+                )
             case let .tag(value):
-                map = map.adding(key: "$type", value: "Tag")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "Tag",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

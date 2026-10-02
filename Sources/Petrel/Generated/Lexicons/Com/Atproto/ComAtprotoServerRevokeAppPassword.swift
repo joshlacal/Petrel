@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoServerRevokeAppPassword {
     public static let typeIdentifier = "com.atproto.server.revokeAppPassword"
+
     public struct Input: ATProtocolCodable {
         public let name: String
 
@@ -24,9 +25,9 @@ public enum ComAtprotoServerRevokeAppPassword {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             return map
         }
 

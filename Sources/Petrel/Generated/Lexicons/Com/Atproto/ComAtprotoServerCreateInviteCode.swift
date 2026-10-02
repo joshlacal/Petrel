@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoServerCreateInviteCode {
     public static let typeIdentifier = "com.atproto.server.createInviteCode"
+
     public struct Input: ATProtocolCodable {
         public let useCount: Int
         public let forAccount: DID?
@@ -28,12 +29,12 @@ public enum ComAtprotoServerCreateInviteCode {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let useCountValue = try useCount.toCBORValue()
-            map = map.adding(key: "useCount", value: useCountValue)
+            map.append(key: "useCount", value: useCountValue)
             if let value = forAccount {
                 let forAccountValue = try value.toCBORValue()
-                map = map.adding(key: "forAccount", value: forAccountValue)
+                map.append(key: "forAccount", value: forAccountValue)
             }
             return map
         }
@@ -68,10 +69,10 @@ public enum ComAtprotoServerCreateInviteCode {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let codeValue = try code.toCBORValue()
-            map = map.adding(key: "code", value: codeValue)
+            map.append(key: "code", value: codeValue)
 
             return map
         }
@@ -141,7 +142,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.createInviteCode: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.createInviteCode", error)
                 return (responseCode, nil)
             }
         } else {

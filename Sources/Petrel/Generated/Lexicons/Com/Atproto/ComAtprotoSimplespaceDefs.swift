@@ -15,6 +15,12 @@ public enum ComAtprotoSimplespaceDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -27,12 +33,12 @@ public enum ComAtprotoSimplespaceDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -50,6 +56,12 @@ public enum ComAtprotoSimplespaceDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -62,12 +74,12 @@ public enum ComAtprotoSimplespaceDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -87,11 +99,16 @@ public enum ComAtprotoSimplespaceDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                managingApp = try container.decode(String.self, forKey: .managingApp)
+                managingApp = try container.decode(String.self, forKey: "managingApp")
             } catch {
-                LogManager.logError("Decoding error for required property 'managingApp': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("managingApp", error)
                 throw error
             }
         }
@@ -108,21 +125,21 @@ public enum ComAtprotoSimplespaceDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if managingApp != other.managingApp {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.managingApp != rhs.managingApp {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let managingAppValue = try managingApp.toCBORValue()
-            map = map.adding(key: "managingApp", value: managingAppValue)
+            map.append(key: "managingApp", value: managingAppValue)
             return map
         }
 
@@ -141,6 +158,12 @@ public enum ComAtprotoSimplespaceDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -153,12 +176,12 @@ public enum ComAtprotoSimplespaceDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -178,11 +201,16 @@ public enum ComAtprotoSimplespaceDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                allowed = try container.decode([String].self, forKey: .allowed)
+                allowed = try container.decode(_LexiconStringArray.self, forKey: "allowed").values
             } catch {
-                LogManager.logError("Decoding error for required property 'allowed': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("allowed", error)
                 throw error
             }
         }
@@ -199,21 +227,21 @@ public enum ComAtprotoSimplespaceDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if allowed != other.allowed {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.allowed != rhs.allowed {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let allowedValue = try allowed.toCBORValue()
-            map = map.adding(key: "allowed", value: allowedValue)
+            map.append(key: "allowed", value: allowedValue)
             return map
         }
 

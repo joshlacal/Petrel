@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoAdminSendEmail {
     public static let typeIdentifier = "com.atproto.admin.sendEmail"
+
     public struct Input: ATProtocolCodable {
         public let recipientDid: DID
         public let content: String
@@ -40,20 +41,20 @@ public enum ComAtprotoAdminSendEmail {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 5)
             let recipientDidValue = try recipientDid.toCBORValue()
-            map = map.adding(key: "recipientDid", value: recipientDidValue)
+            map.append(key: "recipientDid", value: recipientDidValue)
             let contentValue = try content.toCBORValue()
-            map = map.adding(key: "content", value: contentValue)
+            map.append(key: "content", value: contentValue)
             if let value = subject {
                 let subjectValue = try value.toCBORValue()
-                map = map.adding(key: "subject", value: subjectValue)
+                map.append(key: "subject", value: subjectValue)
             }
             let senderDidValue = try senderDid.toCBORValue()
-            map = map.adding(key: "senderDid", value: senderDidValue)
+            map.append(key: "senderDid", value: senderDidValue)
             if let value = comment {
                 let commentValue = try value.toCBORValue()
-                map = map.adding(key: "comment", value: commentValue)
+                map.append(key: "comment", value: commentValue)
             }
             return map
         }
@@ -91,10 +92,10 @@ public enum ComAtprotoAdminSendEmail {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let sentValue = try sent.toCBORValue()
-            map = map.adding(key: "sent", value: sentValue)
+            map.append(key: "sent", value: sentValue)
 
             return map
         }
@@ -164,7 +165,7 @@ public extension ATProtoClient.Com.Atproto.Admin {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.admin.sendEmail: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.admin.sendEmail", error)
                 return (responseCode, nil)
             }
         } else {

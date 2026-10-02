@@ -19,17 +19,22 @@ public enum AppBskyEmbedDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                width = try container.decode(Int.self, forKey: .width)
+                width = try container.decode(Int.self, forKey: "width")
             } catch {
-                LogManager.logError("Decoding error for required property 'width': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("width", error)
                 throw error
             }
             do {
-                height = try container.decode(Int.self, forKey: .height)
+                height = try container.decode(Int.self, forKey: "height")
             } catch {
-                LogManager.logError("Decoding error for required property 'height': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("height", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum AppBskyEmbedDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if width != other.width {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.width != rhs.width {
                 return false
             }
-            if height != other.height {
+            if lhs.height != rhs.height {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let widthValue = try width.toCBORValue()
-            map = map.adding(key: "width", value: widthValue)
+            map.append(key: "width", value: widthValue)
             let heightValue = try height.toCBORValue()
-            map = map.adding(key: "height", value: heightValue)
+            map.append(key: "height", value: heightValue)
             return map
         }
 

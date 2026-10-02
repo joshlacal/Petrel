@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyFeedSendInteractions {
     public static let typeIdentifier = "app.bsky.feed.sendInteractions"
+
     public struct Input: ATProtocolCodable {
         public let feed: ATProtocolURI?
         public let interactions: [AppBskyFeedDefs.Interaction]
@@ -28,13 +29,13 @@ public enum AppBskyFeedSendInteractions {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             if let value = feed {
                 let feedValue = try value.toCBORValue()
-                map = map.adding(key: "feed", value: feedValue)
+                map.append(key: "feed", value: feedValue)
             }
             let interactionsValue = try interactions.toCBORValue()
-            map = map.adding(key: "interactions", value: interactionsValue)
+            map.append(key: "interactions", value: interactionsValue)
             return map
         }
 
@@ -126,7 +127,7 @@ public extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.sendInteractions: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.feed.sendInteractions", error)
                 return (responseCode, nil)
             }
         } else {

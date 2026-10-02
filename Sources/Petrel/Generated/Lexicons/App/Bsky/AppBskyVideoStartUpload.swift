@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyVideoStartUpload {
     public static let typeIdentifier = "app.bsky.video.startUpload"
+
     public struct Input: ATProtocolCodable {
         public let sizeBytes: Int
         public let mimeType: String
@@ -44,26 +45,26 @@ public enum AppBskyVideoStartUpload {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 6)
             let sizeBytesValue = try sizeBytes.toCBORValue()
-            map = map.adding(key: "sizeBytes", value: sizeBytesValue)
+            map.append(key: "sizeBytes", value: sizeBytesValue)
             let mimeTypeValue = try mimeType.toCBORValue()
-            map = map.adding(key: "mimeType", value: mimeTypeValue)
+            map.append(key: "mimeType", value: mimeTypeValue)
             if let value = name {
                 let nameValue = try value.toCBORValue()
-                map = map.adding(key: "name", value: nameValue)
+                map.append(key: "name", value: nameValue)
             }
             if let value = durationMs {
                 let durationMsValue = try value.toCBORValue()
-                map = map.adding(key: "durationMs", value: durationMsValue)
+                map.append(key: "durationMs", value: durationMsValue)
             }
             if let value = width {
                 let widthValue = try value.toCBORValue()
-                map = map.adding(key: "width", value: widthValue)
+                map.append(key: "width", value: widthValue)
             }
             if let value = height {
                 let heightValue = try value.toCBORValue()
-                map = map.adding(key: "height", value: heightValue)
+                map.append(key: "height", value: heightValue)
             }
             return map
         }
@@ -132,19 +133,19 @@ public enum AppBskyVideoStartUpload {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
 
             let jobIdValue = try jobId.toCBORValue()
-            map = map.adding(key: "jobId", value: jobIdValue)
+            map.append(key: "jobId", value: jobIdValue)
 
             let partSizeBytesValue = try partSizeBytes.toCBORValue()
-            map = map.adding(key: "partSizeBytes", value: partSizeBytesValue)
+            map.append(key: "partSizeBytes", value: partSizeBytesValue)
 
             let partCountValue = try partCount.toCBORValue()
-            map = map.adding(key: "partCount", value: partCountValue)
+            map.append(key: "partCount", value: partCountValue)
 
             let expiresAtValue = try expiresAt.toCBORValue()
-            map = map.adding(key: "expiresAt", value: expiresAtValue)
+            map.append(key: "expiresAt", value: expiresAtValue)
 
             return map
         }
@@ -243,7 +244,7 @@ public extension ATProtoClient.App.Bsky.Video {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.startUpload: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.video.startUpload", error)
                 return (responseCode, nil)
             }
         } else {

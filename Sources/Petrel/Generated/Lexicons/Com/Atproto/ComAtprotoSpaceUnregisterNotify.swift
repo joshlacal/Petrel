@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSpaceUnregisterNotify {
     public static let typeIdentifier = "com.atproto.space.unregisterNotify"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let service: String
@@ -28,11 +29,11 @@ public enum ComAtprotoSpaceUnregisterNotify {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             let serviceValue = try service.toCBORValue()
-            map = map.adding(key: "service", value: serviceValue)
+            map.append(key: "service", value: serviceValue)
             return map
         }
 

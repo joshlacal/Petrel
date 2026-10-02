@@ -17,11 +17,16 @@ public enum AppBskyFeedDescribeFeedGenerator {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
         }
@@ -38,21 +43,21 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             return map
         }
 
@@ -75,21 +80,26 @@ public enum AppBskyFeedDescribeFeedGenerator {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                privacyPolicy = try container.decodeIfPresent(String.self, forKey: .privacyPolicy)
+                privacyPolicy = try container.decodeIfPresent(String.self, forKey: "privacyPolicy")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'privacyPolicy' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("privacyPolicy", error)
                 privacyPolicy = nil
             }
             do {
-                termsOfService = try container.decodeIfPresent(String.self, forKey: .termsOfService)
+                termsOfService = try container.decodeIfPresent(String.self, forKey: "termsOfService")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'termsOfService' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("termsOfService", error)
                 termsOfService = nil
             }
         }
@@ -116,29 +126,29 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if privacyPolicy != other.privacyPolicy {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.privacyPolicy != rhs.privacyPolicy {
                 return false
             }
-            if termsOfService != other.termsOfService {
+            if lhs.termsOfService != rhs.termsOfService {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             if let value = privacyPolicy {
                 let privacyPolicyValue = try value.toCBORValue()
-                map = map.adding(key: "privacyPolicy", value: privacyPolicyValue)
+                map.append(key: "privacyPolicy", value: privacyPolicyValue)
             }
             if let value = termsOfService {
                 let termsOfServiceValue = try value.toCBORValue()
-                map = map.adding(key: "termsOfService", value: termsOfServiceValue)
+                map.append(key: "termsOfService", value: termsOfServiceValue)
             }
             return map
         }
@@ -184,7 +194,7 @@ public enum AppBskyFeedDescribeFeedGenerator {
                 links = try container.decodeIfPresent(Links.self, forKey: .links)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("links", error)
                 links = nil
             }
         }
@@ -201,18 +211,18 @@ public enum AppBskyFeedDescribeFeedGenerator {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
 
             let feedsValue = try feeds.toCBORValue()
-            map = map.adding(key: "feeds", value: feedsValue)
+            map.append(key: "feeds", value: feedsValue)
 
             if let value = links {
                 // Encode optional property even if it's an empty array for CBOR
                 let linksValue = try value.toCBORValue()
-                map = map.adding(key: "links", value: linksValue)
+                map.append(key: "links", value: linksValue)
             }
 
             return map
@@ -271,7 +281,7 @@ public extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.describeFeedGenerator: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.feed.describeFeedGenerator", error)
                 return (responseCode, nil)
             }
         } else {

@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyBookmarkDeleteBookmark {
     public static let typeIdentifier = "app.bsky.bookmark.deleteBookmark"
+
     public struct Input: ATProtocolCodable {
         public let uri: ATProtocolURI
 
@@ -24,9 +25,9 @@ public enum AppBskyBookmarkDeleteBookmark {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             return map
         }
 

@@ -39,10 +39,10 @@ public enum ChatBskyModerationGetConvos {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let convosValue = try convos.toCBORValue()
-            map = map.adding(key: "convos", value: convosValue)
+            map.append(key: "convos", value: convosValue)
 
             return map
         }
@@ -100,7 +100,7 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.moderation.getConvos: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.moderation.getConvos", error)
                 return (responseCode, nil)
             }
         } else {

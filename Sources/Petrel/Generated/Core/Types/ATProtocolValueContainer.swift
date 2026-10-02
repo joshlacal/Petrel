@@ -2,8 +2,13 @@
 import Foundation
 import SwiftCBOR
 
-public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
-    case knownType(any ATProtocolValue)
+/// Only the cases whose payload is large (`any ATProtocolValue` is 40 bytes,
+/// ATProtoLink 32) or directly recursive are boxed. Scalar, string, bytes and
+/// collection payloads are stored inline, so building a node no longer allocates
+/// a box: the enum is 17 bytes (stride 24), which still fits an existential's
+/// inline buffer.
+public enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValue {
+    indirect case knownType(any ATProtocolValue)
     case string(String)
     case number(Int)
     case bigNumber(String)
@@ -11,9 +16,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     case array([ATProtocolValueContainer])
     case bool(Bool)
     case null
-    case link(ATProtoLink)
+    indirect case link(ATProtoLink)
     case bytes(Bytes)
-    case unknownType(String, ATProtocolValueContainer)
+    indirect case unknownType(String, ATProtocolValueContainer)
     case decodeError(String)
 
     public typealias DecoderFunction = @Sendable (Decoder) throws -> ATProtocolValueContainer
@@ -3812,16 +3817,41 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     }
 
     public static func containerFromCBORValue(_ value: Any) -> ATProtocolValueContainer {
+        // Exact-metatype fast paths for the value types generated and core
+        // toCBORValue() implementations return. A value whose dynamic type is
+        // exactly one of these native Swift types cannot match any earlier case
+        // of the cast chain below (none of them casts to ATProtocolValueContainer,
+        // OrderedCBORMap, a dictionary or an array other than itself, String or
+        // Int), so each branch returns exactly what the chain returns while
+        // skipping its failed existential and collection casts. Bridged or
+        // wrapped values (NSString, NSNumber, NSArray, Optional, AnyHashable)
+        // have different dynamic types and still take the full chain, keeping
+        // its bridging precedence.
+        let valueType = type(of: value)
+        if valueType == String.self {
+            return .string(value as! String)
+        }
+        if valueType == OrderedCBORMap.self {
+            return containerFromOrderedCBORMap(value as! OrderedCBORMap)
+        }
+        if valueType == [Any].self {
+            return .array((value as! [Any]).map(containerFromCBORValue))
+        }
+        if valueType == Int.self {
+            return .number(value as! Int)
+        }
+        if valueType == CIDAsLink.self {
+            return containerFromCIDAsLink(value as! CIDAsLink)
+        }
+        if valueType == Bool.self {
+            return .bool(value as! Bool)
+        }
+
         switch value {
         case let container as ATProtocolValueContainer:
             return container
         case let map as OrderedCBORMap:
-            var dict = [String: ATProtocolValueContainer]()
-            dict.reserveCapacity(map.entries.count)
-            for entry in map.entries {
-                dict[entry.key] = containerFromCBORValue(entry.value)
-            }
-            return .object(dict)
+            return containerFromOrderedCBORMap(map)
         case let dictionary as [String: Any]:
             var dict = [String: ATProtocolValueContainer]()
             dict.reserveCapacity(dictionary.count)
@@ -3866,12 +3896,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         case let data as Data:
             return .bytes(Bytes(data: data))
         case let cidValue as CIDAsLink:
-            switch cidValue.representation {
-            case .link:
-                return .link(ATProtoLink(cid: cidValue.cid))
-            case .string:
-                return .string(cidValue.cid.string)
-            }
+            return containerFromCIDAsLink(cidValue)
         case let uri as ATProtocolURI:
             return .string(uri.uriString())
         case let val as any DAGCBOREncodable:
@@ -3881,6 +3906,24 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             return .null
         default:
             return .null
+        }
+    }
+
+    private static func containerFromOrderedCBORMap(_ map: OrderedCBORMap) -> ATProtocolValueContainer {
+        var dict = [String: ATProtocolValueContainer]()
+        dict.reserveCapacity(map.entries.count)
+        for entry in map.entries {
+            dict[entry.key] = containerFromCBORValue(entry.value)
+        }
+        return .object(dict)
+    }
+
+    private static func containerFromCIDAsLink(_ cidValue: CIDAsLink) -> ATProtocolValueContainer {
+        switch cidValue.representation {
+        case .link:
+            return .link(ATProtoLink(cid: cidValue.cid))
+        case .string:
+            return .string(cidValue.cid.string)
         }
     }
 
@@ -4090,14 +4133,24 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 return cborValue
             }
             if let map = cborValue as? OrderedCBORMap {
-                let typeEntries = map.entries.filter { $0.key == "$type" }
-                guard typeEntries.count <= 1 else {
+                // Locate the `$type` entries without materializing a filtered copy.
+                var existingTypeIndex: Int?
+                var hasDuplicateTypeEntries = false
+                for index in map.entries.indices where map.entries[index].key == "$type" {
+                    if existingTypeIndex == nil {
+                        existingTypeIndex = index
+                    } else {
+                        hasDuplicateTypeEntries = true
+                        break
+                    }
+                }
+                guard !hasDuplicateTypeEntries else {
                     throw DAGCBORError.encodingFailed(
                         "Typed value \(typeIdentifier) contains duplicate discriminators"
                     )
                 }
-                if let existingType = typeEntries.first {
-                    guard existingType.value as? String == typeIdentifier else {
+                if let existingTypeIndex {
+                    guard map.entries[existingTypeIndex].value as? String == typeIdentifier else {
                         throw DAGCBORError.encodingFailed(
                             "Typed value discriminator does not match \(typeIdentifier)"
                         )
@@ -4128,7 +4181,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         case let .bigNumber(string):
             return string
         case let .object(dict):
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: dict.count)
             // Sort keys to maintain consistent ordering
             let sortedKeys = dict.keys.sorted { a, b in
                 if a.utf8.count != b.utf8.count {
@@ -4140,7 +4193,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
             for key in sortedKeys {
                 if let value = dict[key] {
                     let cborValue = try value.toCBORValue()
-                    map = map.adding(key: key, value: cborValue)
+                    map.append(key: key, value: cborValue)
                 }
             }
             return map
@@ -4161,16 +4214,27 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         }
     }
 
+    /// 24 bytes (String + Int with an `Int.min` "no int" sentinel) instead of 25
+    /// (String + `Int?`), so the key fits the 3-word inline buffer of `any CodingKey`
+    /// and Foundation's coding-path nodes and `allKeys` arrays do not box it.
+    /// `init?(intValue: Int.min)` is the one input that cannot be represented and
+    /// returns nil; JSON and in-memory keyed containers only build string keys.
     struct DynamicCodingKeys: CodingKey {
-        var stringValue: String
-        var intValue: Int?
+        let stringValue: String
+        private let rawIntValue: Int
+
+        var intValue: Int? {
+            rawIntValue == .min ? nil : rawIntValue
+        }
 
         init?(stringValue: String) {
             self.stringValue = stringValue
+            rawIntValue = .min
         }
 
         init?(intValue: Int) {
-            self.intValue = intValue
+            guard intValue != .min else { return nil }
+            rawIntValue = intValue
             stringValue = String(intValue)
         }
     }

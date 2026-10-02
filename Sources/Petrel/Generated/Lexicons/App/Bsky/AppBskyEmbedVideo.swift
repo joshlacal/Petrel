@@ -20,12 +20,17 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        video = try container.decode(Blob.self, forKey: .video)
-        captions = try container.decodeIfPresent([Caption].self, forKey: .captions)
-        alt = try container.decodeIfPresent(String.self, forKey: .alt)
-        aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
-        presentation = try container.decodeIfPresent(String.self, forKey: .presentation)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        video = try container.decode(Blob.self, forKey: "video")
+        captions = try container.decodeIfPresent([Caption].self, forKey: "captions")
+        alt = try container.decodeIfPresent(String.self, forKey: "alt")
+        aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: "aspectRatio")
+        presentation = try container.decodeIfPresent(String.self, forKey: "presentation")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -63,47 +68,47 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if video != other.video {
+        return self == other
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        if lhs.video != rhs.video {
             return false
         }
-        if captions != other.captions {
+        if lhs.captions != rhs.captions {
             return false
         }
-        if alt != other.alt {
+        if lhs.alt != rhs.alt {
             return false
         }
-        if aspectRatio != other.aspectRatio {
+        if lhs.aspectRatio != rhs.aspectRatio {
             return false
         }
-        if presentation != other.presentation {
+        if lhs.presentation != rhs.presentation {
             return false
         }
         return true
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
+        var map = OrderedCBORMap(minimumCapacity: 5)
         let videoValue = try video.toCBORValue()
-        map = map.adding(key: "video", value: videoValue)
+        map.append(key: "video", value: videoValue)
         if let value = captions {
             let captionsValue = try value.toCBORValue()
-            map = map.adding(key: "captions", value: captionsValue)
+            map.append(key: "captions", value: captionsValue)
         }
         if let value = alt {
             let altValue = try value.toCBORValue()
-            map = map.adding(key: "alt", value: altValue)
+            map.append(key: "alt", value: altValue)
         }
         if let value = aspectRatio {
             let aspectRatioValue = try value.toCBORValue()
-            map = map.adding(key: "aspectRatio", value: aspectRatioValue)
+            map.append(key: "aspectRatio", value: aspectRatioValue)
         }
         if let value = presentation {
             let presentationValue = try value.toCBORValue()
-            map = map.adding(key: "presentation", value: presentationValue)
+            map.append(key: "presentation", value: presentationValue)
         }
         return map
     }
@@ -129,17 +134,22 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
+                lang = try container.decode(LanguageCodeContainer.self, forKey: "lang")
             } catch {
-                LogManager.logError("Decoding error for required property 'lang': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("lang", error)
                 throw error
             }
             do {
-                file = try container.decode(Blob.self, forKey: .file)
+                file = try container.decode(Blob.self, forKey: "file")
             } catch {
-                LogManager.logError("Decoding error for required property 'file': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("file", error)
                 throw error
             }
         }
@@ -158,26 +168,26 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if lang != other.lang {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.lang != rhs.lang {
                 return false
             }
-            if file != other.file {
+            if lhs.file != rhs.file {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let langValue = try lang.toCBORValue()
-            map = map.adding(key: "lang", value: langValue)
+            map.append(key: "lang", value: langValue)
             let fileValue = try file.toCBORValue()
-            map = map.adding(key: "file", value: fileValue)
+            map.append(key: "file", value: fileValue)
             return map
         }
 
@@ -209,49 +219,54 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                playlist = try container.decode(URI.self, forKey: .playlist)
+                playlist = try container.decode(URI.self, forKey: "playlist")
             } catch {
-                LogManager.logError("Decoding error for required property 'playlist': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("playlist", error)
                 throw error
             }
             do {
-                thumbnail = try container.decodeIfPresent(URI.self, forKey: .thumbnail)
+                thumbnail = try container.decodeIfPresent(URI.self, forKey: "thumbnail")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'thumbnail' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("thumbnail", error)
                 thumbnail = nil
             }
             do {
-                alt = try container.decodeIfPresent(String.self, forKey: .alt)
+                alt = try container.decodeIfPresent(String.self, forKey: "alt")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'alt' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("alt", error)
                 alt = nil
             }
             do {
-                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
+                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: "aspectRatio")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("aspectRatio", error)
                 aspectRatio = nil
             }
             do {
-                presentation = try container.decodeIfPresent(String.self, forKey: .presentation)
+                presentation = try container.decodeIfPresent(String.self, forKey: "presentation")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'presentation' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("presentation", error)
                 presentation = nil
             }
         }
@@ -294,53 +309,53 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if cid != other.cid {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if playlist != other.playlist {
+            if lhs.playlist != rhs.playlist {
                 return false
             }
-            if thumbnail != other.thumbnail {
+            if lhs.thumbnail != rhs.thumbnail {
                 return false
             }
-            if alt != other.alt {
+            if lhs.alt != rhs.alt {
                 return false
             }
-            if aspectRatio != other.aspectRatio {
+            if lhs.aspectRatio != rhs.aspectRatio {
                 return false
             }
-            if presentation != other.presentation {
+            if lhs.presentation != rhs.presentation {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 7)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             let playlistValue = try playlist.toCBORValue()
-            map = map.adding(key: "playlist", value: playlistValue)
+            map.append(key: "playlist", value: playlistValue)
             if let value = thumbnail {
                 let thumbnailValue = try value.toCBORValue()
-                map = map.adding(key: "thumbnail", value: thumbnailValue)
+                map.append(key: "thumbnail", value: thumbnailValue)
             }
             if let value = alt {
                 let altValue = try value.toCBORValue()
-                map = map.adding(key: "alt", value: altValue)
+                map.append(key: "alt", value: altValue)
             }
             if let value = aspectRatio {
                 let aspectRatioValue = try value.toCBORValue()
-                map = map.adding(key: "aspectRatio", value: aspectRatioValue)
+                map.append(key: "aspectRatio", value: aspectRatioValue)
             }
             if let value = presentation {
                 let presentationValue = try value.toCBORValue()
-                map = map.adding(key: "presentation", value: presentationValue)
+                map.append(key: "presentation", value: presentationValue)
             }
             return map
         }

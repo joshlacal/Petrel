@@ -39,45 +39,50 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: "seq")
             } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("seq", error)
                 throw error
             }
             do {
-                rebase = try container.decode(Bool.self, forKey: .rebase)
+                rebase = try container.decode(Bool.self, forKey: "rebase")
             } catch {
-                LogManager.logError("Decoding error for required property 'rebase': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rebase", error)
                 throw error
             }
             do {
-                tooBig = try container.decode(Bool.self, forKey: .tooBig)
+                tooBig = try container.decode(Bool.self, forKey: "tooBig")
             } catch {
-                LogManager.logError("Decoding error for required property 'tooBig': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("tooBig", error)
                 throw error
             }
             do {
-                repo = try container.decode(DID.self, forKey: .repo)
+                repo = try container.decode(DID.self, forKey: "repo")
             } catch {
-                LogManager.logError("Decoding error for required property 'repo': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("repo", error)
                 throw error
             }
             do {
-                commit = try container.decode(CID.self, forKey: .commit)
+                commit = try container.decode(CID.self, forKey: "commit")
             } catch {
-                LogManager.logError("Decoding error for required property 'commit': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("commit", error)
                 throw error
             }
             do {
-                rev = try container.decode(TID.self, forKey: .rev)
+                rev = try container.decode(TID.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                guard container.contains(.since) else {
+                guard container.contains("since") else {
                     throw DecodingError.keyNotFound(
                         CodingKeys.since,
                         DecodingError.Context(
@@ -86,41 +91,41 @@ public enum ComAtprotoSyncSubscribeRepos {
                         )
                     )
                 }
-                since = try container.decodeIfPresent(TID.self, forKey: .since)
+                since = try container.decodeIfPresent(TID.self, forKey: "since")
             } catch {
-                LogManager.logError("Decoding error for required property 'since': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("since", error)
                 throw error
             }
             do {
-                blocks = try container.decode(Bytes.self, forKey: .blocks)
+                blocks = try container.decode(Bytes.self, forKey: "blocks")
             } catch {
-                LogManager.logError("Decoding error for required property 'blocks': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("blocks", error)
                 throw error
             }
             do {
-                ops = try container.decode([RepoOp].self, forKey: .ops)
+                ops = try container.decode([RepoOp].self, forKey: "ops")
             } catch {
-                LogManager.logError("Decoding error for required property 'ops': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("ops", error)
                 throw error
             }
             do {
-                blobs = try container.decode([CID].self, forKey: .blobs)
+                blobs = try container.decode([CID].self, forKey: "blobs")
             } catch {
-                LogManager.logError("Decoding error for required property 'blobs': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("blobs", error)
                 throw error
             }
             do {
-                prevData = try container.decodeIfPresent(CID.self, forKey: .prevData)
+                prevData = try container.decodeIfPresent(CID.self, forKey: "prevData")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'prevData' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("prevData", error)
                 prevData = nil
             }
             do {
-                time = try container.decode(ATProtocolDate.self, forKey: .time)
+                time = try container.decode(ATProtocolDate.self, forKey: "time")
             } catch {
-                LogManager.logError("Decoding error for required property 'time': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("time", error)
                 throw error
             }
         }
@@ -167,82 +172,82 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if seq != other.seq {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.seq != rhs.seq {
                 return false
             }
-            if rebase != other.rebase {
+            if lhs.rebase != rhs.rebase {
                 return false
             }
-            if tooBig != other.tooBig {
+            if lhs.tooBig != rhs.tooBig {
                 return false
             }
-            if repo != other.repo {
+            if lhs.repo != rhs.repo {
                 return false
             }
-            if commit != other.commit {
+            if lhs.commit != rhs.commit {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if since != other.since {
+            if lhs.since != rhs.since {
                 return false
             }
-            if blocks != other.blocks {
+            if lhs.blocks != rhs.blocks {
                 return false
             }
-            if ops != other.ops {
+            if lhs.ops != rhs.ops {
                 return false
             }
-            if blobs != other.blobs {
+            if lhs.blobs != rhs.blobs {
                 return false
             }
-            if prevData != other.prevData {
+            if lhs.prevData != rhs.prevData {
                 return false
             }
-            if time != other.time {
+            if lhs.time != rhs.time {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 13)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
-            map = map.adding(key: "seq", value: seqValue)
+            map.append(key: "seq", value: seqValue)
             let rebaseValue = try rebase.toCBORValue()
-            map = map.adding(key: "rebase", value: rebaseValue)
+            map.append(key: "rebase", value: rebaseValue)
             let tooBigValue = try tooBig.toCBORValue()
-            map = map.adding(key: "tooBig", value: tooBigValue)
+            map.append(key: "tooBig", value: tooBigValue)
             let repoValue = try repo.toCBORValue()
-            map = map.adding(key: "repo", value: repoValue)
+            map.append(key: "repo", value: repoValue)
             let commitValue = try commit.toCBORValue()
-            map = map.adding(key: "commit", value: commitValue)
+            map.append(key: "commit", value: commitValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             if let value = since {
                 let sinceValue = try value.toCBORValue()
-                map = map.adding(key: "since", value: sinceValue)
+                map.append(key: "since", value: sinceValue)
             } else {
-                map = map.adding(key: "since", value: NSNull())
+                map.append(key: "since", value: NSNull())
             }
             let blocksValue = try blocks.toCBORValue()
-            map = map.adding(key: "blocks", value: blocksValue)
+            map.append(key: "blocks", value: blocksValue)
             let opsValue = try ops.toCBORValue()
-            map = map.adding(key: "ops", value: opsValue)
+            map.append(key: "ops", value: opsValue)
             let blobsValue = try blobs.toCBORValue()
-            map = map.adding(key: "blobs", value: blobsValue)
+            map.append(key: "blobs", value: blobsValue)
             if let value = prevData {
                 let prevDataValue = try value.toCBORValue()
-                map = map.adding(key: "prevData", value: prevDataValue)
+                map.append(key: "prevData", value: prevDataValue)
             }
             let timeValue = try time.toCBORValue()
-            map = map.adding(key: "time", value: timeValue)
+            map.append(key: "time", value: timeValue)
             return map
         }
 
@@ -282,35 +287,40 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: "seq")
             } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("seq", error)
                 throw error
             }
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                blocks = try container.decode(Bytes.self, forKey: .blocks)
+                blocks = try container.decode(Bytes.self, forKey: "blocks")
             } catch {
-                LogManager.logError("Decoding error for required property 'blocks': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("blocks", error)
                 throw error
             }
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                time = try container.decode(ATProtocolDate.self, forKey: .time)
+                time = try container.decode(ATProtocolDate.self, forKey: "time")
             } catch {
-                LogManager.logError("Decoding error for required property 'time': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("time", error)
                 throw error
             }
         }
@@ -335,41 +345,41 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if seq != other.seq {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.seq != rhs.seq {
                 return false
             }
-            if did != other.did {
+            if lhs.did != rhs.did {
                 return false
             }
-            if blocks != other.blocks {
+            if lhs.blocks != rhs.blocks {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if time != other.time {
+            if lhs.time != rhs.time {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 6)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
-            map = map.adding(key: "seq", value: seqValue)
+            map.append(key: "seq", value: seqValue)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let blocksValue = try blocks.toCBORValue()
-            map = map.adding(key: "blocks", value: blocksValue)
+            map.append(key: "blocks", value: blocksValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let timeValue = try time.toCBORValue()
-            map = map.adding(key: "time", value: timeValue)
+            map.append(key: "time", value: timeValue)
             return map
         }
 
@@ -400,31 +410,36 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: "seq")
             } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("seq", error)
                 throw error
             }
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                time = try container.decode(ATProtocolDate.self, forKey: .time)
+                time = try container.decode(ATProtocolDate.self, forKey: "time")
             } catch {
-                LogManager.logError("Decoding error for required property 'time': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("time", error)
                 throw error
             }
             do {
-                handle = try container.decodeIfPresent(Handle.self, forKey: .handle)
+                handle = try container.decodeIfPresent(Handle.self, forKey: "handle")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'handle' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("handle", error)
                 handle = nil
             }
         }
@@ -451,37 +466,37 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if seq != other.seq {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.seq != rhs.seq {
                 return false
             }
-            if did != other.did {
+            if lhs.did != rhs.did {
                 return false
             }
-            if time != other.time {
+            if lhs.time != rhs.time {
                 return false
             }
-            if handle != other.handle {
+            if lhs.handle != rhs.handle {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
-            map = map.adding(key: "seq", value: seqValue)
+            map.append(key: "seq", value: seqValue)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let timeValue = try time.toCBORValue()
-            map = map.adding(key: "time", value: timeValue)
+            map.append(key: "time", value: timeValue)
             if let value = handle {
                 let handleValue = try value.toCBORValue()
-                map = map.adding(key: "handle", value: handleValue)
+                map.append(key: "handle", value: handleValue)
             }
             return map
         }
@@ -514,37 +529,42 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                seq = try container.decode(Int.self, forKey: "seq")
             } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("seq", error)
                 throw error
             }
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                time = try container.decode(ATProtocolDate.self, forKey: .time)
+                time = try container.decode(ATProtocolDate.self, forKey: "time")
             } catch {
-                LogManager.logError("Decoding error for required property 'time': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("time", error)
                 throw error
             }
             do {
-                active = try container.decode(Bool.self, forKey: .active)
+                active = try container.decode(Bool.self, forKey: "active")
             } catch {
-                LogManager.logError("Decoding error for required property 'active': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("active", error)
                 throw error
             }
             do {
-                status = try container.decodeIfPresent(String.self, forKey: .status)
+                status = try container.decodeIfPresent(String.self, forKey: "status")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("status", error)
                 status = nil
             }
         }
@@ -573,42 +593,42 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if seq != other.seq {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.seq != rhs.seq {
                 return false
             }
-            if did != other.did {
+            if lhs.did != rhs.did {
                 return false
             }
-            if time != other.time {
+            if lhs.time != rhs.time {
                 return false
             }
-            if active != other.active {
+            if lhs.active != rhs.active {
                 return false
             }
-            if status != other.status {
+            if lhs.status != rhs.status {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 6)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
-            map = map.adding(key: "seq", value: seqValue)
+            map.append(key: "seq", value: seqValue)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let timeValue = try time.toCBORValue()
-            map = map.adding(key: "time", value: timeValue)
+            map.append(key: "time", value: timeValue)
             let activeValue = try active.toCBORValue()
-            map = map.adding(key: "active", value: activeValue)
+            map.append(key: "active", value: activeValue)
             if let value = status {
                 let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
+                map.append(key: "status", value: statusValue)
             }
             return map
         }
@@ -636,19 +656,24 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: "name")
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("name", error)
                 throw error
             }
             do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
+                message = try container.decodeIfPresent(String.self, forKey: "message")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("message", error)
                 message = nil
             }
         }
@@ -671,27 +696,27 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if name != other.name {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.name != rhs.name {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             if let value = message {
                 let messageValue = try value.toCBORValue()
-                map = map.adding(key: "message", value: messageValue)
+                map.append(key: "message", value: messageValue)
             }
             return map
         }
@@ -720,21 +745,26 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                action = try container.decode(String.self, forKey: .action)
+                action = try container.decode(String.self, forKey: "action")
             } catch {
-                LogManager.logError("Decoding error for required property 'action': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("action", error)
                 throw error
             }
             do {
-                path = try container.decode(String.self, forKey: .path)
+                path = try container.decode(String.self, forKey: "path")
             } catch {
-                LogManager.logError("Decoding error for required property 'path': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("path", error)
                 throw error
             }
             do {
-                guard container.contains(.cid) else {
+                guard container.contains("cid") else {
                     throw DecodingError.keyNotFound(
                         CodingKeys.cid,
                         DecodingError.Context(
@@ -743,17 +773,17 @@ public enum ComAtprotoSyncSubscribeRepos {
                         )
                     )
                 }
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+                cid = try container.decodeIfPresent(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                prev = try container.decodeIfPresent(CID.self, forKey: .prev)
+                prev = try container.decodeIfPresent(CID.self, forKey: "prev")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'prev' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("prev", error)
                 prev = nil
             }
         }
@@ -784,41 +814,41 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if action != other.action {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.action != rhs.action {
                 return false
             }
-            if path != other.path {
+            if lhs.path != rhs.path {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if prev != other.prev {
+            if lhs.prev != rhs.prev {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let actionValue = try action.toCBORValue()
-            map = map.adding(key: "action", value: actionValue)
+            map.append(key: "action", value: actionValue)
             let pathValue = try path.toCBORValue()
-            map = map.adding(key: "path", value: pathValue)
+            map.append(key: "path", value: pathValue)
             if let value = cid {
                 let cidValue = try value.toCBORValue()
-                map = map.adding(key: "cid", value: cidValue)
+                map.append(key: "cid", value: cidValue)
             } else {
-                map = map.adding(key: "cid", value: NSNull())
+                map.append(key: "cid", value: NSNull())
             }
             if let value = prev {
                 let prevValue = try value.toCBORValue()
-                map = map.adding(key: "prev", value: prevValue)
+                map.append(key: "prev", value: prevValue)
             }
             return map
         }

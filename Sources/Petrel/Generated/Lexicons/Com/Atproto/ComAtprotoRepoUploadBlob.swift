@@ -11,6 +11,7 @@ import Foundation
 
 public enum ComAtprotoRepoUploadBlob {
     public static let typeIdentifier = "com.atproto.repo.uploadBlob"
+
     public struct Input: ATProtocolCodable {
         public let data: Data
 
@@ -30,9 +31,9 @@ public enum ComAtprotoRepoUploadBlob {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let dataValue = try data.toCBORValue()
-            map = map.adding(key: "data", value: dataValue)
+            map.append(key: "data", value: dataValue)
             return map
         }
 
@@ -65,10 +66,10 @@ public enum ComAtprotoRepoUploadBlob {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let blobValue = try blob.toCBORValue()
-            map = map.adding(key: "blob", value: blobValue)
+            map.append(key: "blob", value: blobValue)
 
             return map
         }
@@ -152,7 +153,7 @@ extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.repo.uploadBlob: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.repo.uploadBlob", error)
                 return (responseCode, nil)
             }
         } else {

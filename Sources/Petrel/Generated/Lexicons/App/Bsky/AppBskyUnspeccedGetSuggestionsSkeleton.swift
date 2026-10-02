@@ -66,7 +66,7 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -76,7 +76,7 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
                 relativeToDid = try container.decodeIfPresent(DID.self, forKey: .relativeToDid)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'relativeToDid' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("relativeToDid", error)
                 relativeToDid = nil
             }
 
@@ -84,7 +84,7 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
                 recId = try container.decodeIfPresent(Int.self, forKey: .recId)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'recId' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("recId", error)
                 recId = nil
             }
 
@@ -92,7 +92,7 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
                 recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("recIdStr", error)
                 recIdStr = nil
             }
         }
@@ -116,33 +116,33 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 5)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let actorsValue = try actors.toCBORValue()
-            map = map.adding(key: "actors", value: actorsValue)
+            map.append(key: "actors", value: actorsValue)
 
             if let value = relativeToDid {
                 // Encode optional property even if it's an empty array for CBOR
                 let relativeToDidValue = try value.toCBORValue()
-                map = map.adding(key: "relativeToDid", value: relativeToDidValue)
+                map.append(key: "relativeToDid", value: relativeToDidValue)
             }
 
             if let value = recId {
                 // Encode optional property even if it's an empty array for CBOR
                 let recIdValue = try value.toCBORValue()
-                map = map.adding(key: "recId", value: recIdValue)
+                map.append(key: "recId", value: recIdValue)
             }
 
             if let value = recIdStr {
                 // Encode optional property even if it's an empty array for CBOR
                 let recIdStrValue = try value.toCBORValue()
-                map = map.adding(key: "recIdStr", value: recIdStrValue)
+                map.append(key: "recIdStr", value: recIdStrValue)
             }
 
             return map
@@ -205,7 +205,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getSuggestionsSkeleton: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getSuggestionsSkeleton", error)
                 return (responseCode, nil)
             }
         } else {

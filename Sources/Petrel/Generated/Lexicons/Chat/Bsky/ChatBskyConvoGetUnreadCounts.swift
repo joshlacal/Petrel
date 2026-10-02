@@ -49,13 +49,13 @@ public enum ChatBskyConvoGetUnreadCounts {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let unreadAcceptedConvosValue = try unreadAcceptedConvos.toCBORValue()
-            map = map.adding(key: "unreadAcceptedConvos", value: unreadAcceptedConvosValue)
+            map.append(key: "unreadAcceptedConvos", value: unreadAcceptedConvosValue)
 
             let unreadRequestConvosValue = try unreadRequestConvos.toCBORValue()
-            map = map.adding(key: "unreadRequestConvos", value: unreadRequestConvosValue)
+            map.append(key: "unreadRequestConvos", value: unreadRequestConvosValue)
 
             return map
         }
@@ -114,7 +114,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.getUnreadCounts: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.getUnreadCounts", error)
                 return (responseCode, nil)
             }
         } else {

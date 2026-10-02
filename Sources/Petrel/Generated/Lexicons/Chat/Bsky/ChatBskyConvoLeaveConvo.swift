@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyConvoLeaveConvo {
     public static let typeIdentifier = "chat.bsky.convo.leaveConvo"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
 
@@ -24,9 +25,9 @@ public enum ChatBskyConvoLeaveConvo {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -69,13 +70,13 @@ public enum ChatBskyConvoLeaveConvo {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
 
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
 
             return map
         }
@@ -159,7 +160,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.leaveConvo: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.leaveConvo", error)
                 return (responseCode, nil)
             }
         } else {

@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyNotificationUnregisterPush {
     public static let typeIdentifier = "app.bsky.notification.unregisterPush"
+
     public struct Input: ATProtocolCodable {
         public let serviceDid: DID
         public let token: String
@@ -36,15 +37,15 @@ public enum AppBskyNotificationUnregisterPush {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
             let serviceDidValue = try serviceDid.toCBORValue()
-            map = map.adding(key: "serviceDid", value: serviceDidValue)
+            map.append(key: "serviceDid", value: serviceDidValue)
             let tokenValue = try token.toCBORValue()
-            map = map.adding(key: "token", value: tokenValue)
+            map.append(key: "token", value: tokenValue)
             let platformValue = try platform.toCBORValue()
-            map = map.adding(key: "platform", value: platformValue)
+            map.append(key: "platform", value: platformValue)
             let appIdValue = try appId.toCBORValue()
-            map = map.adding(key: "appId", value: appIdValue)
+            map.append(key: "appId", value: appIdValue)
             return map
         }
 

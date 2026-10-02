@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyContactSendNotification {
     public static let typeIdentifier = "app.bsky.contact.sendNotification"
+
     public struct Input: ATProtocolCodable {
         public let from: DID
         public let to: DID
@@ -28,11 +29,11 @@ public enum AppBskyContactSendNotification {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let fromValue = try from.toCBORValue()
-            map = map.adding(key: "from", value: fromValue)
+            map.append(key: "from", value: fromValue)
             let toValue = try to.toCBORValue()
-            map = map.adding(key: "to", value: toValue)
+            map.append(key: "to", value: toValue)
             return map
         }
 
@@ -124,7 +125,7 @@ public extension ATProtoClient.App.Bsky.Contact {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.contact.sendNotification: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.contact.sendNotification", error)
                 return (responseCode, nil)
             }
         } else {

@@ -30,10 +30,10 @@ public enum ComAtprotoServerRequestEmailUpdate {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let tokenRequiredValue = try tokenRequired.toCBORValue()
-            map = map.adding(key: "tokenRequired", value: tokenRequiredValue)
+            map.append(key: "tokenRequired", value: tokenRequiredValue)
 
             return map
         }
@@ -96,7 +96,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.requestEmailUpdate: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.requestEmailUpdate", error)
                 return (responseCode, nil)
             }
         } else {

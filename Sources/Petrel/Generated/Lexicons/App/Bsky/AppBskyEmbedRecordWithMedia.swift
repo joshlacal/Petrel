@@ -14,9 +14,14 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        record = try container.decode(AppBskyEmbedRecord.self, forKey: .record)
-        media = try container.decode(AppBskyEmbedRecordWithMediaMediaUnion.self, forKey: .media)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        record = try container.decode(AppBskyEmbedRecord.self, forKey: "record")
+        media = try container.decode(AppBskyEmbedRecordWithMediaMediaUnion.self, forKey: "media")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -32,25 +37,25 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if record != other.record {
+        return self == other
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        if lhs.record != rhs.record {
             return false
         }
-        if media != other.media {
+        if lhs.media != rhs.media {
             return false
         }
         return true
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
+        var map = OrderedCBORMap(minimumCapacity: 2)
         let recordValue = try record.toCBORValue()
-        map = map.adding(key: "record", value: recordValue)
+        map.append(key: "record", value: recordValue)
         let mediaValue = try media.toCBORValue()
-        map = map.adding(key: "media", value: mediaValue)
+        map.append(key: "media", value: mediaValue)
         return map
     }
 
@@ -72,17 +77,22 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                record = try container.decode(AppBskyEmbedRecord.View.self, forKey: .record)
+                record = try container.decode(AppBskyEmbedRecord.View.self, forKey: "record")
             } catch {
-                LogManager.logError("Decoding error for required property 'record': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("record", error)
                 throw error
             }
             do {
-                media = try container.decode(ViewMediaUnion.self, forKey: .media)
+                media = try container.decode(ViewMediaUnion.self, forKey: "media")
             } catch {
-                LogManager.logError("Decoding error for required property 'media': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("media", error)
                 throw error
             }
         }
@@ -101,26 +111,26 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if record != other.record {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.record != rhs.record {
                 return false
             }
-            if media != other.media {
+            if lhs.media != rhs.media {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let recordValue = try record.toCBORValue()
-            map = map.adding(key: "record", value: recordValue)
+            map.append(key: "record", value: recordValue)
             let mediaValue = try media.toCBORValue()
-            map = map.adding(key: "media", value: mediaValue)
+            map.append(key: "media", value: mediaValue)
             return map
         }
 
@@ -154,21 +164,23 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.embed.images#view":
-                let value = try AppBskyEmbedImages.View(from: decoder)
+                let value = try AppBskyEmbedImages.View(_lexiconContainer: container)
                 self = .appBskyEmbedImagesView(value)
             case "app.bsky.embed.video#view":
-                let value = try AppBskyEmbedVideo.View(from: decoder)
+                let value = try AppBskyEmbedVideo.View(_lexiconContainer: container)
                 self = .appBskyEmbedVideoView(value)
             case "app.bsky.embed.gallery#view":
-                let value = try AppBskyEmbedGallery.View(from: decoder)
+                let value = try AppBskyEmbedGallery.View(_lexiconContainer: container)
                 self = .appBskyEmbedGalleryView(value)
             case "app.bsky.embed.external#view":
-                let value = try AppBskyEmbedExternal.View(from: decoder)
+                let value = try AppBskyEmbedExternal.View(_lexiconContainer: container)
                 self = .appBskyEmbedExternalView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -244,7 +256,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -255,80 +267,30 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyEmbedImagesView(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.images#view")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.images#view",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyEmbedVideoView(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.video#view")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.video#view",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyEmbedGalleryView(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.gallery#view")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.gallery#view",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyEmbedExternalView(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.external#view")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.external#view",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -358,21 +320,23 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.embed.images":
-                let value = try AppBskyEmbedImages(from: decoder)
+                let value = try AppBskyEmbedImages(_lexiconContainer: container)
                 self = .appBskyEmbedImages(value)
             case "app.bsky.embed.video":
-                let value = try AppBskyEmbedVideo(from: decoder)
+                let value = try AppBskyEmbedVideo(_lexiconContainer: container)
                 self = .appBskyEmbedVideo(value)
             case "app.bsky.embed.gallery":
-                let value = try AppBskyEmbedGallery(from: decoder)
+                let value = try AppBskyEmbedGallery(_lexiconContainer: container)
                 self = .appBskyEmbedGallery(value)
             case "app.bsky.embed.external":
-                let value = try AppBskyEmbedExternal(from: decoder)
+                let value = try AppBskyEmbedExternal(_lexiconContainer: container)
                 self = .appBskyEmbedExternal(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -448,7 +412,7 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -459,80 +423,30 @@ public struct AppBskyEmbedRecordWithMedia: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyEmbedImages(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.images")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.images",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyEmbedVideo(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.video")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.video",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyEmbedGallery(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.gallery")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.gallery",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyEmbedExternal(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.external")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.external",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

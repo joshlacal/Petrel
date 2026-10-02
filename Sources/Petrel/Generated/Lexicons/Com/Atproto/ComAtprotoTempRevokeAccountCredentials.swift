@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoTempRevokeAccountCredentials {
     public static let typeIdentifier = "com.atproto.temp.revokeAccountCredentials"
+
     public struct Input: ATProtocolCodable {
         public let account: ATIdentifier
 
@@ -24,9 +25,9 @@ public enum ComAtprotoTempRevokeAccountCredentials {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let accountValue = try account.toCBORValue()
-            map = map.adding(key: "account", value: accountValue)
+            map.append(key: "account", value: accountValue)
             return map
         }
 

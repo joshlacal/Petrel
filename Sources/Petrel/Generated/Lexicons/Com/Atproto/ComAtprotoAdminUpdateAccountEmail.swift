@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoAdminUpdateAccountEmail {
     public static let typeIdentifier = "com.atproto.admin.updateAccountEmail"
+
     public struct Input: ATProtocolCodable {
         public let account: ATIdentifier
         public let email: String
@@ -28,11 +29,11 @@ public enum ComAtprotoAdminUpdateAccountEmail {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let accountValue = try account.toCBORValue()
-            map = map.adding(key: "account", value: accountValue)
+            map.append(key: "account", value: accountValue)
             let emailValue = try email.toCBORValue()
-            map = map.adding(key: "email", value: emailValue)
+            map.append(key: "email", value: emailValue)
             return map
         }
 

@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSimplespaceRemoveMember {
     public static let typeIdentifier = "com.atproto.simplespace.removeMember"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let did: DID
@@ -28,11 +29,11 @@ public enum ComAtprotoSimplespaceRemoveMember {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             return map
         }
 

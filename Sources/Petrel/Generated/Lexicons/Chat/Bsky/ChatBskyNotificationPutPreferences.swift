@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyNotificationPutPreferences {
     public static let typeIdentifier = "chat.bsky.notification.putPreferences"
+
     public struct Input: ATProtocolCodable {
         public let chat: ChatBskyNotificationDefs.ChatPreference?
         public let chatRequest: ChatBskyNotificationDefs.ChatPreference?
@@ -28,14 +29,14 @@ public enum ChatBskyNotificationPutPreferences {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             if let value = chat {
                 let chatValue = try value.toCBORValue()
-                map = map.adding(key: "chat", value: chatValue)
+                map.append(key: "chat", value: chatValue)
             }
             if let value = chatRequest {
                 let chatRequestValue = try value.toCBORValue()
-                map = map.adding(key: "chatRequest", value: chatRequestValue)
+                map.append(key: "chatRequest", value: chatRequestValue)
             }
             return map
         }
@@ -70,10 +71,10 @@ public enum ChatBskyNotificationPutPreferences {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let preferencesValue = try preferences.toCBORValue()
-            map = map.adding(key: "preferences", value: preferencesValue)
+            map.append(key: "preferences", value: preferencesValue)
 
             return map
         }
@@ -143,7 +144,7 @@ public extension ATProtoClient.Chat.Bsky.Notification {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.notification.putPreferences: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.notification.putPreferences", error)
                 return (responseCode, nil)
             }
         } else {

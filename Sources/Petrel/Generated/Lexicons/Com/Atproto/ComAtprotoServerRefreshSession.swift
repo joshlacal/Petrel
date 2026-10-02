@@ -86,7 +86,7 @@ public enum ComAtprotoServerRefreshSession {
                 didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'didDoc' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("didDoc", error)
                 didDoc = nil
             }
 
@@ -94,7 +94,7 @@ public enum ComAtprotoServerRefreshSession {
                 email = try container.decodeIfPresent(String.self, forKey: .email)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("email", error)
                 email = nil
             }
 
@@ -102,7 +102,7 @@ public enum ComAtprotoServerRefreshSession {
                 emailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .emailConfirmed)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'emailConfirmed' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("emailConfirmed", error)
                 emailConfirmed = nil
             }
 
@@ -110,7 +110,7 @@ public enum ComAtprotoServerRefreshSession {
                 emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'emailAuthFactor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("emailAuthFactor", error)
                 emailAuthFactor = nil
             }
 
@@ -118,7 +118,7 @@ public enum ComAtprotoServerRefreshSession {
                 active = try container.decodeIfPresent(Bool.self, forKey: .active)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'active' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("active", error)
                 active = nil
             }
 
@@ -126,7 +126,7 @@ public enum ComAtprotoServerRefreshSession {
                 status = try container.decodeIfPresent(String.self, forKey: .status)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("status", error)
                 status = nil
             }
         }
@@ -162,54 +162,54 @@ public enum ComAtprotoServerRefreshSession {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 10)
 
             let accessJwtValue = try accessJwt.toCBORValue()
-            map = map.adding(key: "accessJwt", value: accessJwtValue)
+            map.append(key: "accessJwt", value: accessJwtValue)
 
             let refreshJwtValue = try refreshJwt.toCBORValue()
-            map = map.adding(key: "refreshJwt", value: refreshJwtValue)
+            map.append(key: "refreshJwt", value: refreshJwtValue)
 
             let handleValue = try handle.toCBORValue()
-            map = map.adding(key: "handle", value: handleValue)
+            map.append(key: "handle", value: handleValue)
 
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
 
             if let value = didDoc {
                 // Encode optional property even if it's an empty array for CBOR
                 let didDocValue = try value.toCBORValue()
-                map = map.adding(key: "didDoc", value: didDocValue)
+                map.append(key: "didDoc", value: didDocValue)
             }
 
             if let value = email {
                 // Encode optional property even if it's an empty array for CBOR
                 let emailValue = try value.toCBORValue()
-                map = map.adding(key: "email", value: emailValue)
+                map.append(key: "email", value: emailValue)
             }
 
             if let value = emailConfirmed {
                 // Encode optional property even if it's an empty array for CBOR
                 let emailConfirmedValue = try value.toCBORValue()
-                map = map.adding(key: "emailConfirmed", value: emailConfirmedValue)
+                map.append(key: "emailConfirmed", value: emailConfirmedValue)
             }
 
             if let value = emailAuthFactor {
                 // Encode optional property even if it's an empty array for CBOR
                 let emailAuthFactorValue = try value.toCBORValue()
-                map = map.adding(key: "emailAuthFactor", value: emailAuthFactorValue)
+                map.append(key: "emailAuthFactor", value: emailAuthFactorValue)
             }
 
             if let value = active {
                 // Encode optional property even if it's an empty array for CBOR
                 let activeValue = try value.toCBORValue()
-                map = map.adding(key: "active", value: activeValue)
+                map.append(key: "active", value: activeValue)
             }
 
             if let value = status {
                 // Encode optional property even if it's an empty array for CBOR
                 let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
+                map.append(key: "status", value: statusValue)
             }
 
             return map
@@ -295,7 +295,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.refreshSession: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.refreshSession", error)
                 return (responseCode, nil)
             }
         } else {

@@ -16,14 +16,19 @@ public struct AppBskyFeedLike: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .subject)
-        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: "subject")
+        createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
         do {
-            via = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .via)
+            via = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: "via")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'via' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("via", error)
             via = nil
         }
     }
@@ -37,21 +42,21 @@ public struct AppBskyFeedLike: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.subject != rhs.subject {
+            return false
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return false
+        }
+        if lhs.via != rhs.via {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if subject != other.subject {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        if via != other.via {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -65,15 +70,15 @@ public struct AppBskyFeedLike: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 4)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let subjectValue = try subject.toCBORValue()
-        map = map.adding(key: "subject", value: subjectValue)
+        map.append(key: "subject", value: subjectValue)
         let createdAtValue = try createdAt.toCBORValue()
-        map = map.adding(key: "createdAt", value: createdAtValue)
+        map.append(key: "createdAt", value: createdAtValue)
         if let value = via {
             let viaValue = try value.toCBORValue()
-            map = map.adding(key: "via", value: viaValue)
+            map.append(key: "via", value: viaValue)
         }
         return map
     }

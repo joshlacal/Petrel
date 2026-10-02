@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoServerDeactivateAccount {
     public static let typeIdentifier = "com.atproto.server.deactivateAccount"
+
     public struct Input: ATProtocolCodable {
         public let deleteAfter: ATProtocolDate?
 
@@ -24,10 +25,10 @@ public enum ComAtprotoServerDeactivateAccount {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             if let value = deleteAfter {
                 let deleteAfterValue = try value.toCBORValue()
-                map = map.adding(key: "deleteAfter", value: deleteAfterValue)
+                map.append(key: "deleteAfter", value: deleteAfterValue)
             }
             return map
         }

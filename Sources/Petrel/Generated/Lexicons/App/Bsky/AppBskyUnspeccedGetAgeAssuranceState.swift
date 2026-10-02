@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyUnspeccedGetAgeAssuranceState {
     public static let typeIdentifier = "app.bsky.unspecced.getAgeAssuranceState"
+
     public typealias Output = AppBskyUnspeccedDefs.AgeAssuranceState
 }
 
@@ -53,7 +54,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getAgeAssuranceState: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getAgeAssuranceState", error)
                 return (responseCode, nil)
             }
         } else {

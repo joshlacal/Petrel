@@ -45,117 +45,122 @@ public enum ComAtprotoSpaceDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                ver = try container.decode(Int.self, forKey: .ver)
+                ver = try container.decode(Int.self, forKey: "ver")
             } catch {
-                LogManager.logError("Decoding error for required property 'ver': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("ver", error)
                 throw error
             }
             do {
-                did = try container.decodeIfPresent(DID.self, forKey: .did)
+                did = try container.decodeIfPresent(DID.self, forKey: "did")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'did' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("did", error)
                 did = nil
             }
             do {
-                rev = try container.decode(TID.self, forKey: .rev)
+                rev = try container.decode(TID.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                prevRev = try container.decodeIfPresent(TID.self, forKey: .prevRev)
+                prevRev = try container.decodeIfPresent(TID.self, forKey: "prevRev")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'prevRev' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("prevRev", error)
                 prevRev = nil
             }
             do {
-                hash = try container.decode(Bytes.self, forKey: .hash)
+                hash = try container.decode(Bytes.self, forKey: "hash")
             } catch {
-                LogManager.logError("Decoding error for required property 'hash': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("hash", error)
                 throw error
             }
             do {
-                prevHash = try container.decodeIfPresent(Bytes.self, forKey: .prevHash)
+                prevHash = try container.decodeIfPresent(Bytes.self, forKey: "prevHash")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'prevHash' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("prevHash", error)
                 prevHash = nil
             }
             do {
-                sig = try container.decode(Bytes.self, forKey: .sig)
+                sig = try container.decode(Bytes.self, forKey: "sig")
             } catch {
-                LogManager.logError("Decoding error for required property 'sig': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("sig", error)
                 throw error
             }
             do {
-                space = try container.decodeIfPresent(ATProtocolURI.self, forKey: .space)
+                space = try container.decodeIfPresent(ATProtocolURI.self, forKey: "space")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'space' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("space", error)
                 space = nil
             }
             do {
-                path = try container.decodeIfPresent(String.self, forKey: .path)
+                path = try container.decodeIfPresent(String.self, forKey: "path")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'path' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("path", error)
                 path = nil
             }
             do {
-                action = try container.decodeIfPresent(String.self, forKey: .action)
+                action = try container.decodeIfPresent(String.self, forKey: "action")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'action' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("action", error)
                 action = nil
             }
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+                cid = try container.decodeIfPresent(CID.self, forKey: "cid")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cid", error)
                 cid = nil
             }
             do {
-                prevCid = try container.decodeIfPresent(CID.self, forKey: .prevCid)
+                prevCid = try container.decodeIfPresent(CID.self, forKey: "prevCid")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'prevCid' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("prevCid", error)
                 prevCid = nil
             }
             do {
-                val = try container.decodeIfPresent(Bytes.self, forKey: .val)
+                val = try container.decodeIfPresent(Bytes.self, forKey: "val")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'val' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("val", error)
                 val = nil
             }
             do {
-                ikm = try container.decodeIfPresent(Bytes.self, forKey: .ikm)
+                ikm = try container.decodeIfPresent(Bytes.self, forKey: "ikm")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'ikm' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("ikm", error)
                 ikm = nil
             }
             do {
-                mac = try container.decodeIfPresent(Bytes.self, forKey: .mac)
+                mac = try container.decodeIfPresent(Bytes.self, forKey: "mac")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'mac' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("mac", error)
                 mac = nil
             }
         }
@@ -244,112 +249,112 @@ public enum ComAtprotoSpaceDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if ver != other.ver {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.ver != rhs.ver {
                 return false
             }
-            if did != other.did {
+            if lhs.did != rhs.did {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if prevRev != other.prevRev {
+            if lhs.prevRev != rhs.prevRev {
                 return false
             }
-            if hash != other.hash {
+            if lhs.hash != rhs.hash {
                 return false
             }
-            if prevHash != other.prevHash {
+            if lhs.prevHash != rhs.prevHash {
                 return false
             }
-            if sig != other.sig {
+            if lhs.sig != rhs.sig {
                 return false
             }
-            if space != other.space {
+            if lhs.space != rhs.space {
                 return false
             }
-            if path != other.path {
+            if lhs.path != rhs.path {
                 return false
             }
-            if action != other.action {
+            if lhs.action != rhs.action {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if prevCid != other.prevCid {
+            if lhs.prevCid != rhs.prevCid {
                 return false
             }
-            if val != other.val {
+            if lhs.val != rhs.val {
                 return false
             }
-            if ikm != other.ikm {
+            if lhs.ikm != rhs.ikm {
                 return false
             }
-            if mac != other.mac {
+            if lhs.mac != rhs.mac {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 16)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let verValue = try ver.toCBORValue()
-            map = map.adding(key: "ver", value: verValue)
+            map.append(key: "ver", value: verValue)
             if let value = did {
                 let didValue = try value.toCBORValue()
-                map = map.adding(key: "did", value: didValue)
+                map.append(key: "did", value: didValue)
             }
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             if let value = prevRev {
                 let prevRevValue = try value.toCBORValue()
-                map = map.adding(key: "prevRev", value: prevRevValue)
+                map.append(key: "prevRev", value: prevRevValue)
             }
             let hashValue = try hash.toCBORValue()
-            map = map.adding(key: "hash", value: hashValue)
+            map.append(key: "hash", value: hashValue)
             if let value = prevHash {
                 let prevHashValue = try value.toCBORValue()
-                map = map.adding(key: "prevHash", value: prevHashValue)
+                map.append(key: "prevHash", value: prevHashValue)
             }
             let sigValue = try sig.toCBORValue()
-            map = map.adding(key: "sig", value: sigValue)
+            map.append(key: "sig", value: sigValue)
             if let value = space {
                 let spaceValue = try value.toCBORValue()
-                map = map.adding(key: "space", value: spaceValue)
+                map.append(key: "space", value: spaceValue)
             }
             if let value = path {
                 let pathValue = try value.toCBORValue()
-                map = map.adding(key: "path", value: pathValue)
+                map.append(key: "path", value: pathValue)
             }
             if let value = action {
                 let actionValue = try value.toCBORValue()
-                map = map.adding(key: "action", value: actionValue)
+                map.append(key: "action", value: actionValue)
             }
             if let value = cid {
                 let cidValue = try value.toCBORValue()
-                map = map.adding(key: "cid", value: cidValue)
+                map.append(key: "cid", value: cidValue)
             }
             if let value = prevCid {
                 let prevCidValue = try value.toCBORValue()
-                map = map.adding(key: "prevCid", value: prevCidValue)
+                map.append(key: "prevCid", value: prevCidValue)
             }
             if let value = val {
                 let valValue = try value.toCBORValue()
-                map = map.adding(key: "val", value: valValue)
+                map.append(key: "val", value: valValue)
             }
             if let value = ikm {
                 let ikmValue = try value.toCBORValue()
-                map = map.adding(key: "ikm", value: ikmValue)
+                map.append(key: "ikm", value: ikmValue)
             }
             if let value = mac {
                 let macValue = try value.toCBORValue()
-                map = map.adding(key: "mac", value: macValue)
+                map.append(key: "mac", value: macValue)
             }
             return map
         }

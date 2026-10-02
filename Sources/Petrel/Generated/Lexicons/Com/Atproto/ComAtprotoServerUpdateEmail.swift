@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoServerUpdateEmail {
     public static let typeIdentifier = "com.atproto.server.updateEmail"
+
     public struct Input: ATProtocolCodable {
         public let email: String
         public let emailAuthFactor: Bool?
@@ -32,16 +33,16 @@ public enum ComAtprotoServerUpdateEmail {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
             let emailValue = try email.toCBORValue()
-            map = map.adding(key: "email", value: emailValue)
+            map.append(key: "email", value: emailValue)
             if let value = emailAuthFactor {
                 let emailAuthFactorValue = try value.toCBORValue()
-                map = map.adding(key: "emailAuthFactor", value: emailAuthFactorValue)
+                map.append(key: "emailAuthFactor", value: emailAuthFactorValue)
             }
             if let value = token {
                 let tokenValue = try value.toCBORValue()
-                map = map.adding(key: "token", value: tokenValue)
+                map.append(key: "token", value: tokenValue)
             }
             return map
         }

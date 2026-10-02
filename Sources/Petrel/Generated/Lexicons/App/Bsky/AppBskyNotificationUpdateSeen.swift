@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyNotificationUpdateSeen {
     public static let typeIdentifier = "app.bsky.notification.updateSeen"
+
     public struct Input: ATProtocolCodable {
         public let seenAt: ATProtocolDate
 
@@ -24,9 +25,9 @@ public enum AppBskyNotificationUpdateSeen {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let seenAtValue = try seenAt.toCBORValue()
-            map = map.adding(key: "seenAt", value: seenAtValue)
+            map.append(key: "seenAt", value: seenAtValue)
             return map
         }
 

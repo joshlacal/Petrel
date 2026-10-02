@@ -21,23 +21,28 @@ public enum SiteStandardThemeColor {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                b = try container.decode(Int.self, forKey: .b)
+                b = try container.decode(Int.self, forKey: "b")
             } catch {
-                LogManager.logError("Decoding error for required property 'b': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("b", error)
                 throw error
             }
             do {
-                g = try container.decode(Int.self, forKey: .g)
+                g = try container.decode(Int.self, forKey: "g")
             } catch {
-                LogManager.logError("Decoding error for required property 'g': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("g", error)
                 throw error
             }
             do {
-                r = try container.decode(Int.self, forKey: .r)
+                r = try container.decode(Int.self, forKey: "r")
             } catch {
-                LogManager.logError("Decoding error for required property 'r': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("r", error)
                 throw error
             }
         }
@@ -58,31 +63,31 @@ public enum SiteStandardThemeColor {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if b != other.b {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.b != rhs.b {
                 return false
             }
-            if g != other.g {
+            if lhs.g != rhs.g {
                 return false
             }
-            if r != other.r {
+            if lhs.r != rhs.r {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let bValue = try b.toCBORValue()
-            map = map.adding(key: "b", value: bValue)
+            map.append(key: "b", value: bValue)
             let gValue = try g.toCBORValue()
-            map = map.adding(key: "g", value: gValue)
+            map.append(key: "g", value: gValue)
             let rValue = try r.toCBORValue()
-            map = map.adding(key: "r", value: rValue)
+            map.append(key: "r", value: rValue)
             return map
         }
 
@@ -111,29 +116,34 @@ public enum SiteStandardThemeColor {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                a = try container.decode(Int.self, forKey: .a)
+                a = try container.decode(Int.self, forKey: "a")
             } catch {
-                LogManager.logError("Decoding error for required property 'a': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("a", error)
                 throw error
             }
             do {
-                b = try container.decode(Int.self, forKey: .b)
+                b = try container.decode(Int.self, forKey: "b")
             } catch {
-                LogManager.logError("Decoding error for required property 'b': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("b", error)
                 throw error
             }
             do {
-                g = try container.decode(Int.self, forKey: .g)
+                g = try container.decode(Int.self, forKey: "g")
             } catch {
-                LogManager.logError("Decoding error for required property 'g': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("g", error)
                 throw error
             }
             do {
-                r = try container.decode(Int.self, forKey: .r)
+                r = try container.decode(Int.self, forKey: "r")
             } catch {
-                LogManager.logError("Decoding error for required property 'r': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("r", error)
                 throw error
             }
         }
@@ -156,36 +166,36 @@ public enum SiteStandardThemeColor {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if a != other.a {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.a != rhs.a {
                 return false
             }
-            if b != other.b {
+            if lhs.b != rhs.b {
                 return false
             }
-            if g != other.g {
+            if lhs.g != rhs.g {
                 return false
             }
-            if r != other.r {
+            if lhs.r != rhs.r {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let aValue = try a.toCBORValue()
-            map = map.adding(key: "a", value: aValue)
+            map.append(key: "a", value: aValue)
             let bValue = try b.toCBORValue()
-            map = map.adding(key: "b", value: bValue)
+            map.append(key: "b", value: bValue)
             let gValue = try g.toCBORValue()
-            map = map.adding(key: "g", value: gValue)
+            map.append(key: "g", value: gValue)
             let rValue = try r.toCBORValue()
-            map = map.adding(key: "r", value: rValue)
+            map.append(key: "r", value: rValue)
             return map
         }
 

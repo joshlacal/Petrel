@@ -41,7 +41,7 @@ public enum ChatBskyConvoGetConvoAvailability {
                 convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'convo' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("convo", error)
                 convo = nil
             }
         }
@@ -56,15 +56,15 @@ public enum ChatBskyConvoGetConvoAvailability {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let canChatValue = try canChat.toCBORValue()
-            map = map.adding(key: "canChat", value: canChatValue)
+            map.append(key: "canChat", value: canChatValue)
 
             if let value = convo {
                 // Encode optional property even if it's an empty array for CBOR
                 let convoValue = try value.toCBORValue()
-                map = map.adding(key: "convo", value: convoValue)
+                map.append(key: "convo", value: convoValue)
             }
 
             return map
@@ -124,7 +124,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.getConvoAvailability: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.getConvoAvailability", error)
                 return (responseCode, nil)
             }
         } else {

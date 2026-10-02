@@ -39,10 +39,10 @@ public enum ComAtprotoIdentityResolveHandle {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
 
             return map
         }
@@ -112,7 +112,7 @@ public extension ATProtoClient.Com.Atproto.Identity {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.identity.resolveHandle: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.identity.resolveHandle", error)
                 return (responseCode, nil)
             }
         } else {

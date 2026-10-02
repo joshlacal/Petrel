@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoAdminUpdateAccountSigningKey {
     public static let typeIdentifier = "com.atproto.admin.updateAccountSigningKey"
+
     public struct Input: ATProtocolCodable {
         public let did: DID
         public let signingKey: DID
@@ -28,11 +29,11 @@ public enum ComAtprotoAdminUpdateAccountSigningKey {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let signingKeyValue = try signingKey.toCBORValue()
-            map = map.adding(key: "signingKey", value: signingKeyValue)
+            map.append(key: "signingKey", value: signingKeyValue)
             return map
         }
 

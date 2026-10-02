@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyGraphMuteThread {
     public static let typeIdentifier = "app.bsky.graph.muteThread"
+
     public struct Input: ATProtocolCodable {
         public let root: ATProtocolURI
 
@@ -24,9 +25,9 @@ public enum AppBskyGraphMuteThread {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let rootValue = try root.toCBORValue()
-            map = map.adding(key: "root", value: rootValue)
+            map.append(key: "root", value: rootValue)
             return map
         }
 

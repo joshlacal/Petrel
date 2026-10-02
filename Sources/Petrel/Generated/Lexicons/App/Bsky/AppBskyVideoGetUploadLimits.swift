@@ -50,7 +50,7 @@ public enum AppBskyVideoGetUploadLimits {
                 remainingDailyVideos = try container.decodeIfPresent(Int.self, forKey: .remainingDailyVideos)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'remainingDailyVideos' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("remainingDailyVideos", error)
                 remainingDailyVideos = nil
             }
 
@@ -58,7 +58,7 @@ public enum AppBskyVideoGetUploadLimits {
                 remainingDailyBytes = try container.decodeIfPresent(Int.self, forKey: .remainingDailyBytes)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'remainingDailyBytes' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("remainingDailyBytes", error)
                 remainingDailyBytes = nil
             }
 
@@ -66,7 +66,7 @@ public enum AppBskyVideoGetUploadLimits {
                 message = try container.decodeIfPresent(String.self, forKey: .message)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("message", error)
                 message = nil
             }
 
@@ -74,7 +74,7 @@ public enum AppBskyVideoGetUploadLimits {
                 error = try container.decodeIfPresent(String.self, forKey: .error)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'error' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("error", error)
                 self.error = nil
             }
         }
@@ -98,33 +98,33 @@ public enum AppBskyVideoGetUploadLimits {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 5)
 
             let canUploadValue = try canUpload.toCBORValue()
-            map = map.adding(key: "canUpload", value: canUploadValue)
+            map.append(key: "canUpload", value: canUploadValue)
 
             if let value = remainingDailyVideos {
                 // Encode optional property even if it's an empty array for CBOR
                 let remainingDailyVideosValue = try value.toCBORValue()
-                map = map.adding(key: "remainingDailyVideos", value: remainingDailyVideosValue)
+                map.append(key: "remainingDailyVideos", value: remainingDailyVideosValue)
             }
 
             if let value = remainingDailyBytes {
                 // Encode optional property even if it's an empty array for CBOR
                 let remainingDailyBytesValue = try value.toCBORValue()
-                map = map.adding(key: "remainingDailyBytes", value: remainingDailyBytesValue)
+                map.append(key: "remainingDailyBytes", value: remainingDailyBytesValue)
             }
 
             if let value = message {
                 // Encode optional property even if it's an empty array for CBOR
                 let messageValue = try value.toCBORValue()
-                map = map.adding(key: "message", value: messageValue)
+                map.append(key: "message", value: messageValue)
             }
 
             if let value = error {
                 // Encode optional property even if it's an empty array for CBOR
                 let errorValue = try value.toCBORValue()
-                map = map.adding(key: "error", value: errorValue)
+                map.append(key: "error", value: errorValue)
             }
 
             return map
@@ -185,7 +185,7 @@ public extension ATProtoClient.App.Bsky.Video {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.getUploadLimits: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.video.getUploadLimits", error)
                 return (responseCode, nil)
             }
         } else {

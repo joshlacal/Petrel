@@ -30,10 +30,10 @@ public enum ChatBskyNotificationGetPreferences {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let preferencesValue = try preferences.toCBORValue()
-            map = map.adding(key: "preferences", value: preferencesValue)
+            map.append(key: "preferences", value: preferencesValue)
 
             return map
         }
@@ -89,7 +89,7 @@ public extension ATProtoClient.Chat.Bsky.Notification {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.notification.getPreferences: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.notification.getPreferences", error)
                 return (responseCode, nil)
             }
         } else {

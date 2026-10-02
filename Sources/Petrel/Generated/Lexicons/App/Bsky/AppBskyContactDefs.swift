@@ -19,17 +19,22 @@ public enum AppBskyContactDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                match = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .match)
+                match = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: "match")
             } catch {
-                LogManager.logError("Decoding error for required property 'match': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("match", error)
                 throw error
             }
             do {
-                contactIndex = try container.decode(Int.self, forKey: .contactIndex)
+                contactIndex = try container.decode(Int.self, forKey: "contactIndex")
             } catch {
-                LogManager.logError("Decoding error for required property 'contactIndex': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("contactIndex", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum AppBskyContactDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if match != other.match {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.match != rhs.match {
                 return false
             }
-            if contactIndex != other.contactIndex {
+            if lhs.contactIndex != rhs.contactIndex {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let matchValue = try match.toCBORValue()
-            map = map.adding(key: "match", value: matchValue)
+            map.append(key: "match", value: matchValue)
             let contactIndexValue = try contactIndex.toCBORValue()
-            map = map.adding(key: "contactIndex", value: contactIndexValue)
+            map.append(key: "contactIndex", value: contactIndexValue)
             return map
         }
 
@@ -91,17 +96,22 @@ public enum AppBskyContactDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                syncedAt = try container.decode(ATProtocolDate.self, forKey: .syncedAt)
+                syncedAt = try container.decode(ATProtocolDate.self, forKey: "syncedAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'syncedAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("syncedAt", error)
                 throw error
             }
             do {
-                matchesCount = try container.decode(Int.self, forKey: .matchesCount)
+                matchesCount = try container.decode(Int.self, forKey: "matchesCount")
             } catch {
-                LogManager.logError("Decoding error for required property 'matchesCount': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("matchesCount", error)
                 throw error
             }
         }
@@ -120,26 +130,26 @@ public enum AppBskyContactDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if syncedAt != other.syncedAt {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.syncedAt != rhs.syncedAt {
                 return false
             }
-            if matchesCount != other.matchesCount {
+            if lhs.matchesCount != rhs.matchesCount {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let syncedAtValue = try syncedAt.toCBORValue()
-            map = map.adding(key: "syncedAt", value: syncedAtValue)
+            map.append(key: "syncedAt", value: syncedAtValue)
             let matchesCountValue = try matchesCount.toCBORValue()
-            map = map.adding(key: "matchesCount", value: matchesCountValue)
+            map.append(key: "matchesCount", value: matchesCountValue)
             return map
         }
 
@@ -163,17 +173,22 @@ public enum AppBskyContactDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                from = try container.decode(DID.self, forKey: .from)
+                from = try container.decode(DID.self, forKey: "from")
             } catch {
-                LogManager.logError("Decoding error for required property 'from': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("from", error)
                 throw error
             }
             do {
-                to = try container.decode(DID.self, forKey: .to)
+                to = try container.decode(DID.self, forKey: "to")
             } catch {
-                LogManager.logError("Decoding error for required property 'to': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("to", error)
                 throw error
             }
         }
@@ -192,26 +207,26 @@ public enum AppBskyContactDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if from != other.from {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.from != rhs.from {
                 return false
             }
-            if to != other.to {
+            if lhs.to != rhs.to {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let fromValue = try from.toCBORValue()
-            map = map.adding(key: "from", value: fromValue)
+            map.append(key: "from", value: fromValue)
             let toValue = try to.toCBORValue()
-            map = map.adding(key: "to", value: toValue)
+            map.append(key: "to", value: toValue)
             return map
         }
 

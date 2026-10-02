@@ -23,35 +23,40 @@ public enum ComAtprotoSyncListHosts {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                hostname = try container.decode(String.self, forKey: .hostname)
+                hostname = try container.decode(String.self, forKey: "hostname")
             } catch {
-                LogManager.logError("Decoding error for required property 'hostname': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("hostname", error)
                 throw error
             }
             do {
-                seq = try container.decodeIfPresent(Int.self, forKey: .seq)
+                seq = try container.decodeIfPresent(Int.self, forKey: "seq")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'seq' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("seq", error)
                 seq = nil
             }
             do {
-                accountCount = try container.decodeIfPresent(Int.self, forKey: .accountCount)
+                accountCount = try container.decodeIfPresent(Int.self, forKey: "accountCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'accountCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("accountCount", error)
                 accountCount = nil
             }
             do {
-                status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: .status)
+                status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: "status")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("status", error)
                 status = nil
             }
         }
@@ -86,41 +91,41 @@ public enum ComAtprotoSyncListHosts {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if hostname != other.hostname {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.hostname != rhs.hostname {
                 return false
             }
-            if seq != other.seq {
+            if lhs.seq != rhs.seq {
                 return false
             }
-            if accountCount != other.accountCount {
+            if lhs.accountCount != rhs.accountCount {
                 return false
             }
-            if status != other.status {
+            if lhs.status != rhs.status {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let hostnameValue = try hostname.toCBORValue()
-            map = map.adding(key: "hostname", value: hostnameValue)
+            map.append(key: "hostname", value: hostnameValue)
             if let value = seq {
                 let seqValue = try value.toCBORValue()
-                map = map.adding(key: "seq", value: seqValue)
+                map.append(key: "seq", value: seqValue)
             }
             if let value = accountCount {
                 let accountCountValue = try value.toCBORValue()
-                map = map.adding(key: "accountCount", value: accountCountValue)
+                map.append(key: "accountCount", value: accountCountValue)
             }
             if let value = status {
                 let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
+                map.append(key: "status", value: statusValue)
             }
             return map
         }
@@ -171,7 +176,7 @@ public enum ComAtprotoSyncListHosts {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -188,16 +193,16 @@ public enum ComAtprotoSyncListHosts {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let hostsValue = try hosts.toCBORValue()
-            map = map.adding(key: "hosts", value: hostsValue)
+            map.append(key: "hosts", value: hostsValue)
 
             return map
         }
@@ -256,7 +261,7 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.listHosts: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.sync.listHosts", error)
                 return (responseCode, nil)
             }
         } else {

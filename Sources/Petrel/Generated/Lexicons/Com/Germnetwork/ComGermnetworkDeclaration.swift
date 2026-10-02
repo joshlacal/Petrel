@@ -20,28 +20,33 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        version = try container.decode(String.self, forKey: .version)
-        currentKey = try container.decode(Bytes.self, forKey: .currentKey)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        version = try container.decode(String.self, forKey: "version")
+        currentKey = try container.decode(Bytes.self, forKey: "currentKey")
         do {
-            messageMe = try container.decodeIfPresent(MessageMe.self, forKey: .messageMe)
+            messageMe = try container.decodeIfPresent(MessageMe.self, forKey: "messageMe")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'messageMe' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("messageMe", error)
             messageMe = nil
         }
         do {
-            keyPackage = try container.decodeIfPresent(Bytes.self, forKey: .keyPackage)
+            keyPackage = try container.decodeIfPresent(Bytes.self, forKey: "keyPackage")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'keyPackage' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("keyPackage", error)
             keyPackage = nil
         }
         do {
-            continuityProofs = try container.decodeIfPresent([Bytes].self, forKey: .continuityProofs)
+            continuityProofs = try container.decodeIfPresent([Bytes].self, forKey: "continuityProofs")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'continuityProofs' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("continuityProofs", error)
             continuityProofs = nil
         }
     }
@@ -57,27 +62,27 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.version != rhs.version {
+            return false
+        }
+        if lhs.currentKey != rhs.currentKey {
+            return false
+        }
+        if lhs.messageMe != rhs.messageMe {
+            return false
+        }
+        if lhs.keyPackage != rhs.keyPackage {
+            return false
+        }
+        if lhs.continuityProofs != rhs.continuityProofs {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if version != other.version {
-            return false
-        }
-        if currentKey != other.currentKey {
-            return false
-        }
-        if messageMe != other.messageMe {
-            return false
-        }
-        if keyPackage != other.keyPackage {
-            return false
-        }
-        if continuityProofs != other.continuityProofs {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -101,23 +106,23 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 6)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let versionValue = try version.toCBORValue()
-        map = map.adding(key: "version", value: versionValue)
+        map.append(key: "version", value: versionValue)
         let currentKeyValue = try currentKey.toCBORValue()
-        map = map.adding(key: "currentKey", value: currentKeyValue)
+        map.append(key: "currentKey", value: currentKeyValue)
         if let value = messageMe {
             let messageMeValue = try value.toCBORValue()
-            map = map.adding(key: "messageMe", value: messageMeValue)
+            map.append(key: "messageMe", value: messageMeValue)
         }
         if let value = keyPackage {
             let keyPackageValue = try value.toCBORValue()
-            map = map.adding(key: "keyPackage", value: keyPackageValue)
+            map.append(key: "keyPackage", value: keyPackageValue)
         }
         if let value = continuityProofs {
             let continuityProofsValue = try value.toCBORValue()
-            map = map.adding(key: "continuityProofs", value: continuityProofsValue)
+            map.append(key: "continuityProofs", value: continuityProofsValue)
         }
         return map
     }
@@ -144,17 +149,22 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                messageMeUrl = try container.decode(URI.self, forKey: .messageMeUrl)
+                messageMeUrl = try container.decode(URI.self, forKey: "messageMeUrl")
             } catch {
-                LogManager.logError("Decoding error for required property 'messageMeUrl': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("messageMeUrl", error)
                 throw error
             }
             do {
-                showButtonTo = try container.decode(String.self, forKey: .showButtonTo)
+                showButtonTo = try container.decode(String.self, forKey: "showButtonTo")
             } catch {
-                LogManager.logError("Decoding error for required property 'showButtonTo': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("showButtonTo", error)
                 throw error
             }
         }
@@ -173,26 +183,26 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if messageMeUrl != other.messageMeUrl {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.messageMeUrl != rhs.messageMeUrl {
                 return false
             }
-            if showButtonTo != other.showButtonTo {
+            if lhs.showButtonTo != rhs.showButtonTo {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let messageMeUrlValue = try messageMeUrl.toCBORValue()
-            map = map.adding(key: "messageMeUrl", value: messageMeUrlValue)
+            map.append(key: "messageMeUrl", value: messageMeUrlValue)
             let showButtonToValue = try showButtonTo.toCBORValue()
-            map = map.adding(key: "showButtonTo", value: showButtonToValue)
+            map.append(key: "showButtonTo", value: showButtonToValue)
             return map
         }
 

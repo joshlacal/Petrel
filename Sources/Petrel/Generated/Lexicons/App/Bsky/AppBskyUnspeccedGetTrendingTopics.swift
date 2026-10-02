@@ -52,13 +52,13 @@ public enum AppBskyUnspeccedGetTrendingTopics {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let topicsValue = try topics.toCBORValue()
-            map = map.adding(key: "topics", value: topicsValue)
+            map.append(key: "topics", value: topicsValue)
 
             let suggestedValue = try suggested.toCBORValue()
-            map = map.adding(key: "suggested", value: suggestedValue)
+            map.append(key: "suggested", value: suggestedValue)
 
             return map
         }
@@ -117,7 +117,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getTrendingTopics: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getTrendingTopics", error)
                 return (responseCode, nil)
             }
         } else {

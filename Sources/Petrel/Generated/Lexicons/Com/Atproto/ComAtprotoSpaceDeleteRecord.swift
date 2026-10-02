@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSpaceDeleteRecord {
     public static let typeIdentifier = "com.atproto.space.deleteRecord"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let repo: DID
@@ -36,15 +37,15 @@ public enum ComAtprotoSpaceDeleteRecord {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             let repoValue = try repo.toCBORValue()
-            map = map.adding(key: "repo", value: repoValue)
+            map.append(key: "repo", value: repoValue)
             let collectionValue = try collection.toCBORValue()
-            map = map.adding(key: "collection", value: collectionValue)
+            map.append(key: "collection", value: collectionValue)
             let rkeyValue = try rkey.toCBORValue()
-            map = map.adding(key: "rkey", value: rkeyValue)
+            map.append(key: "rkey", value: rkeyValue)
             return map
         }
 
@@ -170,7 +171,7 @@ public extension ATProtoClient.Com.Atproto.Space {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.deleteRecord: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.space.deleteRecord", error)
                 return (responseCode, nil)
             }
         } else {

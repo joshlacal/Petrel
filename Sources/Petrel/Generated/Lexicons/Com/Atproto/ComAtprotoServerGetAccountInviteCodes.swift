@@ -42,10 +42,10 @@ public enum ComAtprotoServerGetAccountInviteCodes {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let codesValue = try codes.toCBORValue()
-            map = map.adding(key: "codes", value: codesValue)
+            map.append(key: "codes", value: codesValue)
 
             return map
         }
@@ -114,7 +114,7 @@ public extension ATProtoClient.Com.Atproto.Server {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.getAccountInviteCodes: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.server.getAccountInviteCodes", error)
                 return (responseCode, nil)
             }
         } else {

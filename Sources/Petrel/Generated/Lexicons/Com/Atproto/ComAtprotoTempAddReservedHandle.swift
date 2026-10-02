@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoTempAddReservedHandle {
     public static let typeIdentifier = "com.atproto.temp.addReservedHandle"
+
     public struct Input: ATProtocolCodable {
         public let handle: String
 
@@ -24,9 +25,9 @@ public enum ComAtprotoTempAddReservedHandle {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let handleValue = try handle.toCBORValue()
-            map = map.adding(key: "handle", value: handleValue)
+            map.append(key: "handle", value: handleValue)
             return map
         }
 
@@ -117,7 +118,7 @@ public extension ATProtoClient.Com.Atproto.Temp {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.temp.addReservedHandle: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.temp.addReservedHandle", error)
                 return (responseCode, nil)
             }
         } else {

@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupAddMembers {
     public static let typeIdentifier = "chat.bsky.group.addMembers"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
         public let members: [DID]
@@ -28,11 +29,11 @@ public enum ChatBskyGroupAddMembers {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let membersValue = try members.toCBORValue()
-            map = map.adding(key: "members", value: membersValue)
+            map.append(key: "members", value: membersValue)
             return map
         }
 
@@ -68,7 +69,7 @@ public enum ChatBskyGroupAddMembers {
                 addedMembers = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .addedMembers)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'addedMembers' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("addedMembers", error)
                 addedMembers = nil
             }
         }
@@ -83,15 +84,15 @@ public enum ChatBskyGroupAddMembers {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let convoValue = try convo.toCBORValue()
-            map = map.adding(key: "convo", value: convoValue)
+            map.append(key: "convo", value: convoValue)
 
             if let value = addedMembers {
                 // Encode optional property even if it's an empty array for CBOR
                 let addedMembersValue = try value.toCBORValue()
-                map = map.adding(key: "addedMembers", value: addedMembersValue)
+                map.append(key: "addedMembers", value: addedMembersValue)
             }
 
             return map
@@ -183,7 +184,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.addMembers: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.addMembers", error)
                 return (responseCode, nil)
             }
         } else {

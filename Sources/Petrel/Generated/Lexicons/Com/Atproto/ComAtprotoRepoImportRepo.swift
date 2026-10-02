@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoRepoImportRepo {
     public static let typeIdentifier = "com.atproto.repo.importRepo"
+
     public struct Input: ATProtocolCodable {
         public let data: Data
 
@@ -24,9 +25,9 @@ public enum ComAtprotoRepoImportRepo {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let dataValue = try data.toCBORValue()
-            map = map.adding(key: "data", value: dataValue)
+            map.append(key: "data", value: dataValue)
             return map
         }
 

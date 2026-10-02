@@ -21,23 +21,28 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                depth = try container.decode(Int.self, forKey: .depth)
+                depth = try container.decode(Int.self, forKey: "depth")
             } catch {
-                LogManager.logError("Decoding error for required property 'depth': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("depth", error)
                 throw error
             }
             do {
-                value = try container.decode(ThreadItemValueUnion.self, forKey: .value)
+                value = try container.decode(ThreadItemValueUnion.self, forKey: "value")
             } catch {
-                LogManager.logError("Decoding error for required property 'value': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("value", error)
                 throw error
             }
         }
@@ -58,31 +63,31 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if depth != other.depth {
+            if lhs.depth != rhs.depth {
                 return false
             }
-            if value != other.value {
+            if lhs.value != rhs.value {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let depthValue = try depth.toCBORValue()
-            map = map.adding(key: "depth", value: depthValue)
+            map.append(key: "depth", value: depthValue)
             let valueValue = try value.toCBORValue()
-            map = map.adding(key: "value", value: valueValue)
+            map.append(key: "value", value: valueValue)
             return map
         }
 
@@ -148,7 +153,7 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
                 threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'threadgate' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("threadgate", error)
                 threadgate = nil
             }
 
@@ -167,19 +172,19 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let threadValue = try thread.toCBORValue()
-            map = map.adding(key: "thread", value: threadValue)
+            map.append(key: "thread", value: threadValue)
 
             if let value = threadgate {
                 // Encode optional property even if it's an empty array for CBOR
                 let threadgateValue = try value.toCBORValue()
-                map = map.adding(key: "threadgate", value: threadgateValue)
+                map.append(key: "threadgate", value: threadgateValue)
             }
 
             let hasOtherRepliesValue = try hasOtherReplies.toCBORValue()
-            map = map.adding(key: "hasOtherReplies", value: hasOtherRepliesValue)
+            map.append(key: "hasOtherReplies", value: hasOtherRepliesValue)
 
             return map
         }
@@ -214,21 +219,23 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.unspecced.defs#threadItemPost":
-                let value = try AppBskyUnspeccedDefs.ThreadItemPost(from: decoder)
+                let value = try AppBskyUnspeccedDefs.ThreadItemPost(_lexiconContainer: container)
                 self = .appBskyUnspeccedDefsThreadItemPost(value)
             case "app.bsky.unspecced.defs#threadItemNoUnauthenticated":
-                let value = try AppBskyUnspeccedDefs.ThreadItemNoUnauthenticated(from: decoder)
+                let value = try AppBskyUnspeccedDefs.ThreadItemNoUnauthenticated(_lexiconContainer: container)
                 self = .appBskyUnspeccedDefsThreadItemNoUnauthenticated(value)
             case "app.bsky.unspecced.defs#threadItemNotFound":
-                let value = try AppBskyUnspeccedDefs.ThreadItemNotFound(from: decoder)
+                let value = try AppBskyUnspeccedDefs.ThreadItemNotFound(_lexiconContainer: container)
                 self = .appBskyUnspeccedDefsThreadItemNotFound(value)
             case "app.bsky.unspecced.defs#threadItemBlocked":
-                let value = try AppBskyUnspeccedDefs.ThreadItemBlocked(from: decoder)
+                let value = try AppBskyUnspeccedDefs.ThreadItemBlocked(_lexiconContainer: container)
                 self = .appBskyUnspeccedDefsThreadItemBlocked(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -304,7 +311,7 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -315,80 +322,30 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyUnspeccedDefsThreadItemPost(value):
-                map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemPost")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.unspecced.defs#threadItemPost",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyUnspeccedDefsThreadItemNoUnauthenticated(value):
-                map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemNoUnauthenticated")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.unspecced.defs#threadItemNoUnauthenticated",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyUnspeccedDefsThreadItemNotFound(value):
-                map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemNotFound")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.unspecced.defs#threadItemNotFound",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyUnspeccedDefsThreadItemBlocked(value):
-                map = map.adding(key: "$type", value: "app.bsky.unspecced.defs#threadItemBlocked")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.unspecced.defs#threadItemBlocked",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -443,7 +400,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getPostThreadV2: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getPostThreadV2", error)
                 return (responseCode, nil)
             }
         } else {

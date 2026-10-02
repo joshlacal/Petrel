@@ -39,10 +39,10 @@ public enum AppBskyFeedGetPosts {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let postsValue = try posts.toCBORValue()
-            map = map.adding(key: "posts", value: postsValue)
+            map.append(key: "posts", value: postsValue)
 
             return map
         }
@@ -100,7 +100,7 @@ public extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.getPosts: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.feed.getPosts", error)
                 return (responseCode, nil)
             }
         } else {

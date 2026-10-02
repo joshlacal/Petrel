@@ -39,18 +39,18 @@ public enum ComAtprotoIdentityGetRecommendedDidCredentials {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
             do {
-                rotationKeys = try container.decodeIfPresent([String].self, forKey: .rotationKeys)
+                rotationKeys = try container.decodeIfPresent(_LexiconStringArray.self, forKey: .rotationKeys)?.values
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'rotationKeys' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("rotationKeys", error)
                 rotationKeys = nil
             }
 
             do {
-                alsoKnownAs = try container.decodeIfPresent([String].self, forKey: .alsoKnownAs)
+                alsoKnownAs = try container.decodeIfPresent(_LexiconStringArray.self, forKey: .alsoKnownAs)?.values
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'alsoKnownAs' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("alsoKnownAs", error)
                 alsoKnownAs = nil
             }
 
@@ -58,7 +58,7 @@ public enum ComAtprotoIdentityGetRecommendedDidCredentials {
                 verificationMethods = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .verificationMethods)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'verificationMethods' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("verificationMethods", error)
                 verificationMethods = nil
             }
 
@@ -66,7 +66,7 @@ public enum ComAtprotoIdentityGetRecommendedDidCredentials {
                 services = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .services)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'services' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("services", error)
                 services = nil
             }
         }
@@ -88,30 +88,30 @@ public enum ComAtprotoIdentityGetRecommendedDidCredentials {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
 
             if let value = rotationKeys {
                 // Encode optional property even if it's an empty array for CBOR
                 let rotationKeysValue = try value.toCBORValue()
-                map = map.adding(key: "rotationKeys", value: rotationKeysValue)
+                map.append(key: "rotationKeys", value: rotationKeysValue)
             }
 
             if let value = alsoKnownAs {
                 // Encode optional property even if it's an empty array for CBOR
                 let alsoKnownAsValue = try value.toCBORValue()
-                map = map.adding(key: "alsoKnownAs", value: alsoKnownAsValue)
+                map.append(key: "alsoKnownAs", value: alsoKnownAsValue)
             }
 
             if let value = verificationMethods {
                 // Encode optional property even if it's an empty array for CBOR
                 let verificationMethodsValue = try value.toCBORValue()
-                map = map.adding(key: "verificationMethods", value: verificationMethodsValue)
+                map.append(key: "verificationMethods", value: verificationMethodsValue)
             }
 
             if let value = services {
                 // Encode optional property even if it's an empty array for CBOR
                 let servicesValue = try value.toCBORValue()
-                map = map.adding(key: "services", value: servicesValue)
+                map.append(key: "services", value: servicesValue)
             }
 
             return map
@@ -171,7 +171,7 @@ public extension ATProtoClient.Com.Atproto.Identity {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.identity.getRecommendedDidCredentials: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.identity.getRecommendedDidCredentials", error)
                 return (responseCode, nil)
             }
         } else {

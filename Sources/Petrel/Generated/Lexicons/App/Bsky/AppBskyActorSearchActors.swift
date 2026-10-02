@@ -48,7 +48,7 @@ public enum AppBskyActorSearchActors {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -65,16 +65,16 @@ public enum AppBskyActorSearchActors {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let actorsValue = try actors.toCBORValue()
-            map = map.adding(key: "actors", value: actorsValue)
+            map.append(key: "actors", value: actorsValue)
 
             return map
         }
@@ -133,7 +133,7 @@ public extension ATProtoClient.App.Bsky.Actor {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.actor.searchActors: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.actor.searchActors", error)
                 return (responseCode, nil)
             }
         } else {

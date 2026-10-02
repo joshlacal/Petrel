@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupWithdrawJoinRequest {
     public static let typeIdentifier = "chat.bsky.group.withdrawJoinRequest"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
 
@@ -24,9 +25,9 @@ public enum ChatBskyGroupWithdrawJoinRequest {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -128,7 +129,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.withdrawJoinRequest: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.withdrawJoinRequest", error)
                 return (responseCode, nil)
             }
         } else {

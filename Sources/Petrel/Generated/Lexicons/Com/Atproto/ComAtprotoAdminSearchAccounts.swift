@@ -45,7 +45,7 @@ public enum ComAtprotoAdminSearchAccounts {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -62,16 +62,16 @@ public enum ComAtprotoAdminSearchAccounts {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let accountsValue = try accounts.toCBORValue()
-            map = map.adding(key: "accounts", value: accountsValue)
+            map.append(key: "accounts", value: accountsValue)
 
             return map
         }
@@ -130,7 +130,7 @@ public extension ATProtoClient.Com.Atproto.Admin {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.admin.searchAccounts: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.admin.searchAccounts", error)
                 return (responseCode, nil)
             }
         } else {

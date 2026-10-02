@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupUpdateJoinRequestsRead {
     public static let typeIdentifier = "chat.bsky.group.updateJoinRequestsRead"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
 
@@ -24,9 +25,9 @@ public enum ChatBskyGroupUpdateJoinRequestsRead {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -129,7 +130,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.updateJoinRequestsRead: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.updateJoinRequestsRead", error)
                 return (responseCode, nil)
             }
         } else {

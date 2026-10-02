@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyVideoAbortUpload {
     public static let typeIdentifier = "app.bsky.video.abortUpload"
+
     public struct Input: ATProtocolCodable {
         public let jobId: String
 
@@ -24,9 +25,9 @@ public enum AppBskyVideoAbortUpload {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let jobIdValue = try jobId.toCBORValue()
-            map = map.adding(key: "jobId", value: jobIdValue)
+            map.append(key: "jobId", value: jobIdValue)
             return map
         }
 
@@ -67,7 +68,7 @@ public enum AppBskyVideoAbortUpload {
                 completedJobId = try container.decodeIfPresent(String.self, forKey: .completedJobId)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'completedJobId' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("completedJobId", error)
                 completedJobId = nil
             }
 
@@ -75,7 +76,7 @@ public enum AppBskyVideoAbortUpload {
                 failureReason = try container.decodeIfPresent(String.self, forKey: .failureReason)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'failureReason' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("failureReason", error)
                 failureReason = nil
             }
         }
@@ -93,21 +94,21 @@ public enum AppBskyVideoAbortUpload {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let stateValue = try state.toCBORValue()
-            map = map.adding(key: "state", value: stateValue)
+            map.append(key: "state", value: stateValue)
 
             if let value = completedJobId {
                 // Encode optional property even if it's an empty array for CBOR
                 let completedJobIdValue = try value.toCBORValue()
-                map = map.adding(key: "completedJobId", value: completedJobIdValue)
+                map.append(key: "completedJobId", value: completedJobIdValue)
             }
 
             if let value = failureReason {
                 // Encode optional property even if it's an empty array for CBOR
                 let failureReasonValue = try value.toCBORValue()
-                map = map.adding(key: "failureReason", value: failureReasonValue)
+                map.append(key: "failureReason", value: failureReasonValue)
             }
 
             return map
@@ -194,7 +195,7 @@ public extension ATProtoClient.App.Bsky.Video {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.abortUpload: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.video.abortUpload", error)
                 return (responseCode, nil)
             }
         } else {

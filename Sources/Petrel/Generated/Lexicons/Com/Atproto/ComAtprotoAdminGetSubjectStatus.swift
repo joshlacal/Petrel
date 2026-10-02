@@ -53,7 +53,7 @@ public enum ComAtprotoAdminGetSubjectStatus {
                 takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'takedown' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("takedown", error)
                 takedown = nil
             }
 
@@ -61,7 +61,7 @@ public enum ComAtprotoAdminGetSubjectStatus {
                 deactivated = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .deactivated)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'deactivated' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("deactivated", error)
                 deactivated = nil
             }
         }
@@ -79,21 +79,21 @@ public enum ComAtprotoAdminGetSubjectStatus {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
 
             if let value = takedown {
                 // Encode optional property even if it's an empty array for CBOR
                 let takedownValue = try value.toCBORValue()
-                map = map.adding(key: "takedown", value: takedownValue)
+                map.append(key: "takedown", value: takedownValue)
             }
 
             if let value = deactivated {
                 // Encode optional property even if it's an empty array for CBOR
                 let deactivatedValue = try value.toCBORValue()
-                map = map.adding(key: "deactivated", value: deactivatedValue)
+                map.append(key: "deactivated", value: deactivatedValue)
             }
 
             return map
@@ -124,18 +124,20 @@ public enum ComAtprotoAdminGetSubjectStatus {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(_lexiconContainer: container)
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(_lexiconContainer: container)
                 self = .comAtprotoRepoStrongRef(value)
             case "com.atproto.admin.defs#repoBlobRef":
-                let value = try ComAtprotoAdminDefs.RepoBlobRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoBlobRef(_lexiconContainer: container)
                 self = .comAtprotoAdminDefsRepoBlobRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -200,7 +202,7 @@ public enum ComAtprotoAdminGetSubjectStatus {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -211,63 +213,25 @@ public enum ComAtprotoAdminGetSubjectStatus {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
-                map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.admin.defs#repoRef",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoRepoStrongRef(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.strongRef",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoAdminDefsRepoBlobRef(value):
-                map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoBlobRef")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.admin.defs#repoBlobRef",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -322,7 +286,7 @@ public extension ATProtoClient.Com.Atproto.Admin {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.admin.getSubjectStatus: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.admin.getSubjectStatus", error)
                 return (responseCode, nil)
             }
         } else {

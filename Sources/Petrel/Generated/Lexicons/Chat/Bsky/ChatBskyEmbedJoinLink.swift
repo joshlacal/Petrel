@@ -12,8 +12,13 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        code = try container.decode(String.self, forKey: .code)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        code = try container.decode(String.self, forKey: "code")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -27,20 +32,20 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if code != other.code {
+        return self == other
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        if lhs.code != rhs.code {
             return false
         }
         return true
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
+        var map = OrderedCBORMap(minimumCapacity: 1)
         let codeValue = try code.toCBORValue()
-        map = map.adding(key: "code", value: codeValue)
+        map.append(key: "code", value: codeValue)
         return map
     }
 
@@ -59,11 +64,16 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                joinLinkPreview = try container.decode(ViewJoinLinkPreviewUnion.self, forKey: .joinLinkPreview)
+                joinLinkPreview = try container.decode(ViewJoinLinkPreviewUnion.self, forKey: "joinLinkPreview")
             } catch {
-                LogManager.logError("Decoding error for required property 'joinLinkPreview': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("joinLinkPreview", error)
                 throw error
             }
         }
@@ -80,21 +90,21 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if joinLinkPreview != other.joinLinkPreview {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.joinLinkPreview != rhs.joinLinkPreview {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let joinLinkPreviewValue = try joinLinkPreview.toCBORValue()
-            map = map.adding(key: "joinLinkPreview", value: joinLinkPreviewValue)
+            map.append(key: "joinLinkPreview", value: joinLinkPreviewValue)
             return map
         }
 
@@ -122,18 +132,20 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.group.defs#joinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.JoinLinkPreviewView(_lexiconContainer: container)
                 self = .chatBskyGroupDefsJoinLinkPreviewView(value)
             case "chat.bsky.group.defs#disabledJoinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.DisabledJoinLinkPreviewView(_lexiconContainer: container)
                 self = .chatBskyGroupDefsDisabledJoinLinkPreviewView(value)
             case "chat.bsky.group.defs#invalidJoinLinkPreviewView":
-                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(from: decoder)
+                let value = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(_lexiconContainer: container)
                 self = .chatBskyGroupDefsInvalidJoinLinkPreviewView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -198,7 +210,7 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -209,63 +221,25 @@ public struct ChatBskyEmbedJoinLink: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyGroupDefsJoinLinkPreviewView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.group.defs#joinLinkPreviewView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.group.defs#joinLinkPreviewView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyGroupDefsDisabledJoinLinkPreviewView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.group.defs#disabledJoinLinkPreviewView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.group.defs#disabledJoinLinkPreviewView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyGroupDefsInvalidJoinLinkPreviewView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.group.defs#invalidJoinLinkPreviewView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.group.defs#invalidJoinLinkPreviewView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

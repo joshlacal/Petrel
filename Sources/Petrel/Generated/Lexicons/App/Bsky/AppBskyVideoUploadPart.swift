@@ -37,9 +37,9 @@ public enum AppBskyVideoUploadPart {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let dataValue = try data.toCBORValue()
-            map = map.adding(key: "data", value: dataValue)
+            map.append(key: "data", value: dataValue)
             return map
         }
 
@@ -82,13 +82,13 @@ public enum AppBskyVideoUploadPart {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let partNumberValue = try partNumber.toCBORValue()
-            map = map.adding(key: "partNumber", value: partNumberValue)
+            map.append(key: "partNumber", value: partNumberValue)
 
             let sizeBytesValue = try sizeBytes.toCBORValue()
-            map = map.adding(key: "sizeBytes", value: sizeBytesValue)
+            map.append(key: "sizeBytes", value: sizeBytesValue)
 
             return map
         }
@@ -188,7 +188,7 @@ public extension ATProtoClient.App.Bsky.Video {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.uploadPart: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.video.uploadPart", error)
                 return (responseCode, nil)
             }
         } else {

@@ -39,10 +39,10 @@ public enum ComAtprotoSyncGetHead {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let rootValue = try root.toCBORValue()
-            map = map.adding(key: "root", value: rootValue)
+            map.append(key: "root", value: rootValue)
 
             return map
         }
@@ -111,7 +111,7 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.getHead: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.sync.getHead", error)
                 return (responseCode, nil)
             }
         } else {

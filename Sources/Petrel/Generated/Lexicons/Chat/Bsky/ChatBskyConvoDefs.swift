@@ -19,17 +19,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -48,26 +53,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -93,23 +98,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                messageId = try container.decode(String.self, forKey: .messageId)
+                messageId = try container.decode(String.self, forKey: "messageId")
             } catch {
-                LogManager.logError("Decoding error for required property 'messageId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("messageId", error)
                 throw error
             }
         }
@@ -130,31 +140,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if messageId != other.messageId {
+            if lhs.messageId != rhs.messageId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageIdValue = try messageId.toCBORValue()
-            map = map.adding(key: "messageId", value: messageIdValue)
+            map.append(key: "messageId", value: messageIdValue)
             return map
         }
 
@@ -183,35 +193,40 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                text = try container.decode(String.self, forKey: .text)
+                text = try container.decode(String.self, forKey: "text")
             } catch {
-                LogManager.logError("Decoding error for required property 'text': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("text", error)
                 throw error
             }
             do {
-                facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .facets)
+                facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: "facets")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'facets' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("facets", error)
                 facets = nil
             }
             do {
-                embed = try container.decodeIfPresent(MessageInputEmbedUnion.self, forKey: .embed)
+                embed = try container.decodeIfPresent(MessageInputEmbedUnion.self, forKey: "embed")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("embed", error)
                 embed = nil
             }
             do {
-                replyTo = try container.decodeIfPresent(ReplyRef.self, forKey: .replyTo)
+                replyTo = try container.decodeIfPresent(ReplyRef.self, forKey: "replyTo")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'replyTo' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("replyTo", error)
                 replyTo = nil
             }
         }
@@ -246,41 +261,41 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if text != other.text {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.text != rhs.text {
                 return false
             }
-            if facets != other.facets {
+            if lhs.facets != rhs.facets {
                 return false
             }
-            if embed != other.embed {
+            if lhs.embed != rhs.embed {
                 return false
             }
-            if replyTo != other.replyTo {
+            if lhs.replyTo != rhs.replyTo {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let textValue = try text.toCBORValue()
-            map = map.adding(key: "text", value: textValue)
+            map.append(key: "text", value: textValue)
             if let value = facets {
                 let facetsValue = try value.toCBORValue()
-                map = map.adding(key: "facets", value: facetsValue)
+                map.append(key: "facets", value: facetsValue)
             }
             if let value = embed {
                 let embedValue = try value.toCBORValue()
-                map = map.adding(key: "embed", value: embedValue)
+                map.append(key: "embed", value: embedValue)
             }
             if let value = replyTo {
                 let replyToValue = try value.toCBORValue()
-                map = map.adding(key: "replyTo", value: replyToValue)
+                map.append(key: "replyTo", value: replyToValue)
             }
             return map
         }
@@ -305,11 +320,16 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                messageId = try container.decode(String.self, forKey: .messageId)
+                messageId = try container.decode(String.self, forKey: "messageId")
             } catch {
-                LogManager.logError("Decoding error for required property 'messageId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("messageId", error)
                 throw error
             }
         }
@@ -326,21 +346,21 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if messageId != other.messageId {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.messageId != rhs.messageId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let messageIdValue = try messageId.toCBORValue()
-            map = map.adding(key: "messageId", value: messageIdValue)
+            map.append(key: "messageId", value: messageIdValue)
             return map
         }
 
@@ -377,67 +397,72 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                id = try container.decode(String.self, forKey: .id)
+                id = try container.decode(String.self, forKey: "id")
             } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("id", error)
                 throw error
             }
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                text = try container.decode(String.self, forKey: .text)
+                text = try container.decode(String.self, forKey: "text")
             } catch {
-                LogManager.logError("Decoding error for required property 'text': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("text", error)
                 throw error
             }
             do {
-                facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .facets)
+                facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: "facets")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'facets' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("facets", error)
                 facets = nil
             }
             do {
-                embed = try container.decodeIfPresent(MessageViewEmbedUnion.self, forKey: .embed)
+                embed = try container.decodeIfPresent(MessageViewEmbedUnion.self, forKey: "embed")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("embed", error)
                 embed = nil
             }
             do {
-                reactions = try container.decodeIfPresent([ReactionView].self, forKey: .reactions)
+                reactions = try container.decodeIfPresent([ReactionView].self, forKey: "reactions")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'reactions' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("reactions", error)
                 reactions = nil
             }
             do {
-                replyTo = try container.decodeIfPresent(MessageViewReplyToUnion.self, forKey: .replyTo)
+                replyTo = try container.decodeIfPresent(MessageViewReplyToUnion.self, forKey: "replyTo")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'replyTo' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("replyTo", error)
                 replyTo = nil
             }
             do {
-                sender = try container.decode(MessageViewSender.self, forKey: .sender)
+                sender = try container.decode(MessageViewSender.self, forKey: "sender")
             } catch {
-                LogManager.logError("Decoding error for required property 'sender': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("sender", error)
                 throw error
             }
             do {
-                sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
+                sentAt = try container.decode(ATProtocolDate.self, forKey: "sentAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'sentAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("sentAt", error)
                 throw error
             }
         }
@@ -486,69 +511,69 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if id != other.id {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.id != rhs.id {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if text != other.text {
+            if lhs.text != rhs.text {
                 return false
             }
-            if facets != other.facets {
+            if lhs.facets != rhs.facets {
                 return false
             }
-            if embed != other.embed {
+            if lhs.embed != rhs.embed {
                 return false
             }
-            if reactions != other.reactions {
+            if lhs.reactions != rhs.reactions {
                 return false
             }
-            if replyTo != other.replyTo {
+            if lhs.replyTo != rhs.replyTo {
                 return false
             }
-            if sender != other.sender {
+            if lhs.sender != rhs.sender {
                 return false
             }
-            if sentAt != other.sentAt {
+            if lhs.sentAt != rhs.sentAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 10)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
+            map.append(key: "id", value: idValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let textValue = try text.toCBORValue()
-            map = map.adding(key: "text", value: textValue)
+            map.append(key: "text", value: textValue)
             if let value = facets {
                 let facetsValue = try value.toCBORValue()
-                map = map.adding(key: "facets", value: facetsValue)
+                map.append(key: "facets", value: facetsValue)
             }
             if let value = embed {
                 let embedValue = try value.toCBORValue()
-                map = map.adding(key: "embed", value: embedValue)
+                map.append(key: "embed", value: embedValue)
             }
             if let value = reactions {
                 let reactionsValue = try value.toCBORValue()
-                map = map.adding(key: "reactions", value: reactionsValue)
+                map.append(key: "reactions", value: reactionsValue)
             }
             if let value = replyTo {
                 let replyToValue = try value.toCBORValue()
-                map = map.adding(key: "replyTo", value: replyToValue)
+                map.append(key: "replyTo", value: replyToValue)
             }
             let senderValue = try sender.toCBORValue()
-            map = map.adding(key: "sender", value: senderValue)
+            map.append(key: "sender", value: senderValue)
             let sentAtValue = try sentAt.toCBORValue()
-            map = map.adding(key: "sentAt", value: sentAtValue)
+            map.append(key: "sentAt", value: sentAtValue)
             return map
         }
 
@@ -577,11 +602,16 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
         }
@@ -598,21 +628,21 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             return map
         }
 
@@ -639,29 +669,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                id = try container.decode(String.self, forKey: .id)
+                id = try container.decode(String.self, forKey: "id")
             } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("id", error)
                 throw error
             }
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
+                sentAt = try container.decode(ATProtocolDate.self, forKey: "sentAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'sentAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("sentAt", error)
                 throw error
             }
             do {
-                data = try container.decode(SystemMessageViewDataUnion.self, forKey: .data)
+                data = try container.decode(SystemMessageViewDataUnion.self, forKey: "data")
             } catch {
-                LogManager.logError("Decoding error for required property 'data': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("data", error)
                 throw error
             }
         }
@@ -684,36 +719,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if id != other.id {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.id != rhs.id {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if sentAt != other.sentAt {
+            if lhs.sentAt != rhs.sentAt {
                 return false
             }
-            if data != other.data {
+            if lhs.data != rhs.data {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
+            map.append(key: "id", value: idValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let sentAtValue = try sentAt.toCBORValue()
-            map = map.adding(key: "sentAt", value: sentAtValue)
+            map.append(key: "sentAt", value: sentAtValue)
             let dataValue = try data.toCBORValue()
-            map = map.adding(key: "data", value: dataValue)
+            map.append(key: "data", value: dataValue)
             return map
         }
 
@@ -741,23 +776,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+                member = try container.decode(SystemMessageReferredUser.self, forKey: "member")
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("member", error)
                 throw error
             }
             do {
-                role = try container.decode(ChatBskyActorDefs.MemberRole.self, forKey: .role)
+                role = try container.decode(ChatBskyActorDefs.MemberRole.self, forKey: "role")
             } catch {
-                LogManager.logError("Decoding error for required property 'role': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("role", error)
                 throw error
             }
             do {
-                addedBy = try container.decode(SystemMessageReferredUser.self, forKey: .addedBy)
+                addedBy = try container.decode(SystemMessageReferredUser.self, forKey: "addedBy")
             } catch {
-                LogManager.logError("Decoding error for required property 'addedBy': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("addedBy", error)
                 throw error
             }
         }
@@ -778,31 +818,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if member != other.member {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.member != rhs.member {
                 return false
             }
-            if role != other.role {
+            if lhs.role != rhs.role {
                 return false
             }
-            if addedBy != other.addedBy {
+            if lhs.addedBy != rhs.addedBy {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             let roleValue = try role.toCBORValue()
-            map = map.adding(key: "role", value: roleValue)
+            map.append(key: "role", value: roleValue)
             let addedByValue = try addedBy.toCBORValue()
-            map = map.adding(key: "addedBy", value: addedByValue)
+            map.append(key: "addedBy", value: addedByValue)
             return map
         }
 
@@ -827,17 +867,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+                member = try container.decode(SystemMessageReferredUser.self, forKey: "member")
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("member", error)
                 throw error
             }
             do {
-                removedBy = try container.decode(SystemMessageReferredUser.self, forKey: .removedBy)
+                removedBy = try container.decode(SystemMessageReferredUser.self, forKey: "removedBy")
             } catch {
-                LogManager.logError("Decoding error for required property 'removedBy': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("removedBy", error)
                 throw error
             }
         }
@@ -856,26 +901,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if member != other.member {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.member != rhs.member {
                 return false
             }
-            if removedBy != other.removedBy {
+            if lhs.removedBy != rhs.removedBy {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             let removedByValue = try removedBy.toCBORValue()
-            map = map.adding(key: "removedBy", value: removedByValue)
+            map.append(key: "removedBy", value: removedByValue)
             return map
         }
 
@@ -901,25 +946,30 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+                member = try container.decode(SystemMessageReferredUser.self, forKey: "member")
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("member", error)
                 throw error
             }
             do {
-                role = try container.decode(ChatBskyActorDefs.MemberRole.self, forKey: .role)
+                role = try container.decode(ChatBskyActorDefs.MemberRole.self, forKey: "role")
             } catch {
-                LogManager.logError("Decoding error for required property 'role': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("role", error)
                 throw error
             }
             do {
-                approvedBy = try container.decodeIfPresent(SystemMessageReferredUser.self, forKey: .approvedBy)
+                approvedBy = try container.decodeIfPresent(SystemMessageReferredUser.self, forKey: "approvedBy")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'approvedBy' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("approvedBy", error)
                 approvedBy = nil
             }
         }
@@ -944,32 +994,32 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if member != other.member {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.member != rhs.member {
                 return false
             }
-            if role != other.role {
+            if lhs.role != rhs.role {
                 return false
             }
-            if approvedBy != other.approvedBy {
+            if lhs.approvedBy != rhs.approvedBy {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             let roleValue = try role.toCBORValue()
-            map = map.adding(key: "role", value: roleValue)
+            map.append(key: "role", value: roleValue)
             if let value = approvedBy {
                 let approvedByValue = try value.toCBORValue()
-                map = map.adding(key: "approvedBy", value: approvedByValue)
+                map.append(key: "approvedBy", value: approvedByValue)
             }
             return map
         }
@@ -993,11 +1043,16 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+                member = try container.decode(SystemMessageReferredUser.self, forKey: "member")
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("member", error)
                 throw error
             }
         }
@@ -1014,21 +1069,21 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if member != other.member {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.member != rhs.member {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             return map
         }
 
@@ -1049,11 +1104,16 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                lockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .lockedBy)
+                lockedBy = try container.decode(SystemMessageReferredUser.self, forKey: "lockedBy")
             } catch {
-                LogManager.logError("Decoding error for required property 'lockedBy': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("lockedBy", error)
                 throw error
             }
         }
@@ -1070,21 +1130,21 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if lockedBy != other.lockedBy {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.lockedBy != rhs.lockedBy {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let lockedByValue = try lockedBy.toCBORValue()
-            map = map.adding(key: "lockedBy", value: lockedByValue)
+            map.append(key: "lockedBy", value: lockedByValue)
             return map
         }
 
@@ -1105,11 +1165,16 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                unlockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .unlockedBy)
+                unlockedBy = try container.decode(SystemMessageReferredUser.self, forKey: "unlockedBy")
             } catch {
-                LogManager.logError("Decoding error for required property 'unlockedBy': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("unlockedBy", error)
                 throw error
             }
         }
@@ -1126,21 +1191,21 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if unlockedBy != other.unlockedBy {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.unlockedBy != rhs.unlockedBy {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let unlockedByValue = try unlockedBy.toCBORValue()
-            map = map.adding(key: "unlockedBy", value: unlockedByValue)
+            map.append(key: "unlockedBy", value: unlockedByValue)
             return map
         }
 
@@ -1161,11 +1226,16 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                lockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .lockedBy)
+                lockedBy = try container.decode(SystemMessageReferredUser.self, forKey: "lockedBy")
             } catch {
-                LogManager.logError("Decoding error for required property 'lockedBy': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("lockedBy", error)
                 throw error
             }
         }
@@ -1182,21 +1252,21 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if lockedBy != other.lockedBy {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.lockedBy != rhs.lockedBy {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let lockedByValue = try lockedBy.toCBORValue()
-            map = map.adding(key: "lockedBy", value: lockedByValue)
+            map.append(key: "lockedBy", value: lockedByValue)
             return map
         }
 
@@ -1219,21 +1289,26 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                oldName = try container.decodeIfPresent(String.self, forKey: .oldName)
+                oldName = try container.decodeIfPresent(String.self, forKey: "oldName")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'oldName' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("oldName", error)
                 oldName = nil
             }
             do {
-                newName = try container.decodeIfPresent(String.self, forKey: .newName)
+                newName = try container.decodeIfPresent(String.self, forKey: "newName")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'newName' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("newName", error)
                 newName = nil
             }
         }
@@ -1260,29 +1335,29 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if oldName != other.oldName {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.oldName != rhs.oldName {
                 return false
             }
-            if newName != other.newName {
+            if lhs.newName != rhs.newName {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             if let value = oldName {
                 let oldNameValue = try value.toCBORValue()
-                map = map.adding(key: "oldName", value: oldNameValue)
+                map.append(key: "oldName", value: oldNameValue)
             }
             if let value = newName {
                 let newNameValue = try value.toCBORValue()
-                map = map.adding(key: "newName", value: newNameValue)
+                map.append(key: "newName", value: newNameValue)
             }
             return map
         }
@@ -1303,6 +1378,12 @@ public enum ChatBskyConvoDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -1315,12 +1396,12 @@ public enum ChatBskyConvoDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -1338,6 +1419,12 @@ public enum ChatBskyConvoDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -1350,12 +1437,12 @@ public enum ChatBskyConvoDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -1373,6 +1460,12 @@ public enum ChatBskyConvoDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -1385,12 +1478,12 @@ public enum ChatBskyConvoDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -1408,6 +1501,12 @@ public enum ChatBskyConvoDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -1420,12 +1519,12 @@ public enum ChatBskyConvoDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -1451,29 +1550,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                id = try container.decode(String.self, forKey: .id)
+                id = try container.decode(String.self, forKey: "id")
             } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("id", error)
                 throw error
             }
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                sender = try container.decode(MessageViewSender.self, forKey: .sender)
+                sender = try container.decode(MessageViewSender.self, forKey: "sender")
             } catch {
-                LogManager.logError("Decoding error for required property 'sender': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("sender", error)
                 throw error
             }
             do {
-                sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
+                sentAt = try container.decode(ATProtocolDate.self, forKey: "sentAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'sentAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("sentAt", error)
                 throw error
             }
         }
@@ -1496,36 +1600,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if id != other.id {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.id != rhs.id {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if sender != other.sender {
+            if lhs.sender != rhs.sender {
                 return false
             }
-            if sentAt != other.sentAt {
+            if lhs.sentAt != rhs.sentAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
+            map.append(key: "id", value: idValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let senderValue = try sender.toCBORValue()
-            map = map.adding(key: "sender", value: senderValue)
+            map.append(key: "sender", value: senderValue)
             let sentAtValue = try sentAt.toCBORValue()
-            map = map.adding(key: "sentAt", value: sentAtValue)
+            map.append(key: "sentAt", value: sentAtValue)
             return map
         }
 
@@ -1547,6 +1651,12 @@ public enum ChatBskyConvoDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -1559,12 +1669,12 @@ public enum ChatBskyConvoDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -1584,11 +1694,16 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
         }
@@ -1605,21 +1720,21 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             return map
         }
 
@@ -1644,23 +1759,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                value = try container.decode(String.self, forKey: .value)
+                value = try container.decode(String.self, forKey: "value")
             } catch {
-                LogManager.logError("Decoding error for required property 'value': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("value", error)
                 throw error
             }
             do {
-                sender = try container.decode(ReactionViewSender.self, forKey: .sender)
+                sender = try container.decode(ReactionViewSender.self, forKey: "sender")
             } catch {
-                LogManager.logError("Decoding error for required property 'sender': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("sender", error)
                 throw error
             }
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("createdAt", error)
                 throw error
             }
         }
@@ -1681,31 +1801,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if value != other.value {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.value != rhs.value {
                 return false
             }
-            if sender != other.sender {
+            if lhs.sender != rhs.sender {
                 return false
             }
-            if createdAt != other.createdAt {
+            if lhs.createdAt != rhs.createdAt {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let valueValue = try value.toCBORValue()
-            map = map.adding(key: "value", value: valueValue)
+            map.append(key: "value", value: valueValue)
             let senderValue = try sender.toCBORValue()
-            map = map.adding(key: "sender", value: senderValue)
+            map.append(key: "sender", value: senderValue)
             let createdAtValue = try createdAt.toCBORValue()
-            map = map.adding(key: "createdAt", value: createdAtValue)
+            map.append(key: "createdAt", value: createdAtValue)
             return map
         }
 
@@ -1728,11 +1848,16 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                did = try container.decode(DID.self, forKey: "did")
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("did", error)
                 throw error
             }
         }
@@ -1749,21 +1874,21 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if did != other.did {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.did != rhs.did {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             return map
         }
 
@@ -1786,17 +1911,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                message = try container.decode(MessageView.self, forKey: .message)
+                message = try container.decode(MessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                reaction = try container.decode(ReactionView.self, forKey: .reaction)
+                reaction = try container.decode(ReactionView.self, forKey: "reaction")
             } catch {
-                LogManager.logError("Decoding error for required property 'reaction': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("reaction", error)
                 throw error
             }
         }
@@ -1815,26 +1945,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if message != other.message {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.message != rhs.message {
                 return false
             }
-            if reaction != other.reaction {
+            if lhs.reaction != rhs.reaction {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let reactionValue = try reaction.toCBORValue()
-            map = map.adding(key: "reaction", value: reactionValue)
+            map.append(key: "reaction", value: reactionValue)
             return map
         }
 
@@ -1872,67 +2002,72 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                id = try container.decode(String.self, forKey: .id)
+                id = try container.decode(String.self, forKey: "id")
             } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("id", error)
                 throw error
             }
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                members = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .members)
+                members = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "members")
             } catch {
-                LogManager.logError("Decoding error for required property 'members': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("members", error)
                 throw error
             }
             do {
-                lastMessage = try container.decodeIfPresent(ConvoViewLastMessageUnion.self, forKey: .lastMessage)
+                lastMessage = try container.decodeIfPresent(ConvoViewLastMessageUnion.self, forKey: "lastMessage")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'lastMessage' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("lastMessage", error)
                 lastMessage = nil
             }
             do {
-                lastReaction = try container.decodeIfPresent(ConvoViewLastReactionUnion.self, forKey: .lastReaction)
+                lastReaction = try container.decodeIfPresent(ConvoViewLastReactionUnion.self, forKey: "lastReaction")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'lastReaction' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("lastReaction", error)
                 lastReaction = nil
             }
             do {
-                muted = try container.decode(Bool.self, forKey: .muted)
+                muted = try container.decode(Bool.self, forKey: "muted")
             } catch {
-                LogManager.logError("Decoding error for required property 'muted': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("muted", error)
                 throw error
             }
             do {
-                status = try container.decodeIfPresent(ConvoStatus.self, forKey: .status)
+                status = try container.decodeIfPresent(ConvoStatus.self, forKey: "status")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("status", error)
                 status = nil
             }
             do {
-                unreadCount = try container.decode(Int.self, forKey: .unreadCount)
+                unreadCount = try container.decode(Int.self, forKey: "unreadCount")
             } catch {
-                LogManager.logError("Decoding error for required property 'unreadCount': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("unreadCount", error)
                 throw error
             }
             do {
-                kind = try container.decodeIfPresent(ConvoViewKindUnion.self, forKey: .kind)
+                kind = try container.decodeIfPresent(ConvoViewKindUnion.self, forKey: "kind")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'kind' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("kind", error)
                 kind = nil
             }
         }
@@ -1981,68 +2116,68 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if id != other.id {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.id != rhs.id {
                 return false
             }
-            if rev != other.rev {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if members != other.members {
+            if lhs.members != rhs.members {
                 return false
             }
-            if lastMessage != other.lastMessage {
+            if lhs.lastMessage != rhs.lastMessage {
                 return false
             }
-            if lastReaction != other.lastReaction {
+            if lhs.lastReaction != rhs.lastReaction {
                 return false
             }
-            if muted != other.muted {
+            if lhs.muted != rhs.muted {
                 return false
             }
-            if status != other.status {
+            if lhs.status != rhs.status {
                 return false
             }
-            if unreadCount != other.unreadCount {
+            if lhs.unreadCount != rhs.unreadCount {
                 return false
             }
-            if kind != other.kind {
+            if lhs.kind != rhs.kind {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 10)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
+            map.append(key: "id", value: idValue)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let membersValue = try members.toCBORValue()
-            map = map.adding(key: "members", value: membersValue)
+            map.append(key: "members", value: membersValue)
             if let value = lastMessage {
                 let lastMessageValue = try value.toCBORValue()
-                map = map.adding(key: "lastMessage", value: lastMessageValue)
+                map.append(key: "lastMessage", value: lastMessageValue)
             }
             if let value = lastReaction {
                 let lastReactionValue = try value.toCBORValue()
-                map = map.adding(key: "lastReaction", value: lastReactionValue)
+                map.append(key: "lastReaction", value: lastReactionValue)
             }
             let mutedValue = try muted.toCBORValue()
-            map = map.adding(key: "muted", value: mutedValue)
+            map.append(key: "muted", value: mutedValue)
             if let value = status {
                 let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
+                map.append(key: "status", value: statusValue)
             }
             let unreadCountValue = try unreadCount.toCBORValue()
-            map = map.adding(key: "unreadCount", value: unreadCountValue)
+            map.append(key: "unreadCount", value: unreadCountValue)
             if let value = kind {
                 let kindValue = try value.toCBORValue()
-                map = map.adding(key: "kind", value: kindValue)
+                map.append(key: "kind", value: kindValue)
             }
             return map
         }
@@ -2070,6 +2205,12 @@ public enum ChatBskyConvoDefs {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -2082,12 +2223,12 @@ public enum ChatBskyConvoDefs {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -2123,65 +2264,70 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
             } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("createdAt", error)
                 throw error
             }
             do {
-                joinLink = try container.decodeIfPresent(ChatBskyGroupDefs.JoinLinkView.self, forKey: .joinLink)
+                joinLink = try container.decodeIfPresent(ChatBskyGroupDefs.JoinLinkView.self, forKey: "joinLink")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'joinLink' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("joinLink", error)
                 joinLink = nil
             }
             do {
-                joinRequestCount = try container.decodeIfPresent(Int.self, forKey: .joinRequestCount)
+                joinRequestCount = try container.decodeIfPresent(Int.self, forKey: "joinRequestCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'joinRequestCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("joinRequestCount", error)
                 joinRequestCount = nil
             }
             do {
-                lockStatus = try container.decode(ConvoLockStatus.self, forKey: .lockStatus)
+                lockStatus = try container.decode(ConvoLockStatus.self, forKey: "lockStatus")
             } catch {
-                LogManager.logError("Decoding error for required property 'lockStatus': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("lockStatus", error)
                 throw error
             }
             do {
-                lockStatusModerationOverride = try container.decode(Bool.self, forKey: .lockStatusModerationOverride)
+                lockStatusModerationOverride = try container.decode(Bool.self, forKey: "lockStatusModerationOverride")
             } catch {
-                LogManager.logError("Decoding error for required property 'lockStatusModerationOverride': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("lockStatusModerationOverride", error)
                 throw error
             }
             do {
-                memberCount = try container.decode(Int.self, forKey: .memberCount)
+                memberCount = try container.decode(Int.self, forKey: "memberCount")
             } catch {
-                LogManager.logError("Decoding error for required property 'memberCount': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("memberCount", error)
                 throw error
             }
             do {
-                memberLimit = try container.decode(Int.self, forKey: .memberLimit)
+                memberLimit = try container.decode(Int.self, forKey: "memberLimit")
             } catch {
-                LogManager.logError("Decoding error for required property 'memberLimit': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("memberLimit", error)
                 throw error
             }
             do {
-                name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: "name")
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("name", error)
                 throw error
             }
             do {
-                unreadJoinRequestCount = try container.decodeIfPresent(Int.self, forKey: .unreadJoinRequestCount)
+                unreadJoinRequestCount = try container.decodeIfPresent(Int.self, forKey: "unreadJoinRequestCount")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'unreadJoinRequestCount' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("unreadJoinRequestCount", error)
                 unreadJoinRequestCount = nil
             }
         }
@@ -2226,66 +2372,66 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if createdAt != other.createdAt {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.createdAt != rhs.createdAt {
                 return false
             }
-            if joinLink != other.joinLink {
+            if lhs.joinLink != rhs.joinLink {
                 return false
             }
-            if joinRequestCount != other.joinRequestCount {
+            if lhs.joinRequestCount != rhs.joinRequestCount {
                 return false
             }
-            if lockStatus != other.lockStatus {
+            if lhs.lockStatus != rhs.lockStatus {
                 return false
             }
-            if lockStatusModerationOverride != other.lockStatusModerationOverride {
+            if lhs.lockStatusModerationOverride != rhs.lockStatusModerationOverride {
                 return false
             }
-            if memberCount != other.memberCount {
+            if lhs.memberCount != rhs.memberCount {
                 return false
             }
-            if memberLimit != other.memberLimit {
+            if lhs.memberLimit != rhs.memberLimit {
                 return false
             }
-            if name != other.name {
+            if lhs.name != rhs.name {
                 return false
             }
-            if unreadJoinRequestCount != other.unreadJoinRequestCount {
+            if lhs.unreadJoinRequestCount != rhs.unreadJoinRequestCount {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 10)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let createdAtValue = try createdAt.toCBORValue()
-            map = map.adding(key: "createdAt", value: createdAtValue)
+            map.append(key: "createdAt", value: createdAtValue)
             if let value = joinLink {
                 let joinLinkValue = try value.toCBORValue()
-                map = map.adding(key: "joinLink", value: joinLinkValue)
+                map.append(key: "joinLink", value: joinLinkValue)
             }
             if let value = joinRequestCount {
                 let joinRequestCountValue = try value.toCBORValue()
-                map = map.adding(key: "joinRequestCount", value: joinRequestCountValue)
+                map.append(key: "joinRequestCount", value: joinRequestCountValue)
             }
             let lockStatusValue = try lockStatus.toCBORValue()
-            map = map.adding(key: "lockStatus", value: lockStatusValue)
+            map.append(key: "lockStatus", value: lockStatusValue)
             let lockStatusModerationOverrideValue = try lockStatusModerationOverride.toCBORValue()
-            map = map.adding(key: "lockStatusModerationOverride", value: lockStatusModerationOverrideValue)
+            map.append(key: "lockStatusModerationOverride", value: lockStatusModerationOverrideValue)
             let memberCountValue = try memberCount.toCBORValue()
-            map = map.adding(key: "memberCount", value: memberCountValue)
+            map.append(key: "memberCount", value: memberCountValue)
             let memberLimitValue = try memberLimit.toCBORValue()
-            map = map.adding(key: "memberLimit", value: memberLimitValue)
+            map.append(key: "memberLimit", value: memberLimitValue)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             if let value = unreadJoinRequestCount {
                 let unreadJoinRequestCountValue = try value.toCBORValue()
-                map = map.adding(key: "unreadJoinRequestCount", value: unreadJoinRequestCountValue)
+                map.append(key: "unreadJoinRequestCount", value: unreadJoinRequestCountValue)
             }
             return map
         }
@@ -2317,17 +2463,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -2346,26 +2497,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -2389,17 +2540,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -2418,26 +2574,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -2461,17 +2617,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -2490,26 +2651,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -2533,17 +2694,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -2562,26 +2728,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -2605,17 +2771,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -2634,26 +2805,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -2681,31 +2852,36 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(LogCreateMessageMessageUnion.self, forKey: .message)
+                message = try container.decode(LogCreateMessageMessageUnion.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'relatedProfiles' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("relatedProfiles", error)
                 relatedProfiles = nil
             }
         }
@@ -2732,37 +2908,37 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             if let value = relatedProfiles {
                 let relatedProfilesValue = try value.toCBORValue()
-                map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+                map.append(key: "relatedProfiles", value: relatedProfilesValue)
             }
             return map
         }
@@ -2791,23 +2967,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(LogDeleteMessageMessageUnion.self, forKey: .message)
+                message = try container.decode(LogDeleteMessageMessageUnion.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -2828,31 +3009,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -2879,23 +3060,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(LogReadMessageMessageUnion.self, forKey: .message)
+                message = try container.decode(LogReadMessageMessageUnion.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -2916,31 +3102,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -2971,37 +3157,42 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(LogAddReactionMessageUnion.self, forKey: .message)
+                message = try container.decode(LogAddReactionMessageUnion.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                reaction = try container.decode(ReactionView.self, forKey: .reaction)
+                reaction = try container.decode(ReactionView.self, forKey: "reaction")
             } catch {
-                LogManager.logError("Decoding error for required property 'reaction': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("reaction", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'relatedProfiles' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("relatedProfiles", error)
                 relatedProfiles = nil
             }
         }
@@ -3030,42 +3221,42 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if reaction != other.reaction {
+            if lhs.reaction != rhs.reaction {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 6)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let reactionValue = try reaction.toCBORValue()
-            map = map.adding(key: "reaction", value: reactionValue)
+            map.append(key: "reaction", value: reactionValue)
             if let value = relatedProfiles {
                 let relatedProfilesValue = try value.toCBORValue()
-                map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+                map.append(key: "relatedProfiles", value: relatedProfilesValue)
             }
             return map
         }
@@ -3099,37 +3290,42 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(LogRemoveReactionMessageUnion.self, forKey: .message)
+                message = try container.decode(LogRemoveReactionMessageUnion.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                reaction = try container.decode(ReactionView.self, forKey: .reaction)
+                reaction = try container.decode(ReactionView.self, forKey: "reaction")
             } catch {
-                LogManager.logError("Decoding error for required property 'reaction': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("reaction", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'relatedProfiles' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("relatedProfiles", error)
                 relatedProfiles = nil
             }
         }
@@ -3158,42 +3354,42 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if reaction != other.reaction {
+            if lhs.reaction != rhs.reaction {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 6)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let reactionValue = try reaction.toCBORValue()
-            map = map.adding(key: "reaction", value: reactionValue)
+            map.append(key: "reaction", value: reactionValue)
             if let value = relatedProfiles {
                 let relatedProfilesValue = try value.toCBORValue()
-                map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+                map.append(key: "relatedProfiles", value: relatedProfilesValue)
             }
             return map
         }
@@ -3223,23 +3419,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(LogReadConvoMessageUnion.self, forKey: .message)
+                message = try container.decode(LogReadConvoMessageUnion.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -3260,31 +3461,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -3313,29 +3514,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("relatedProfiles", error)
                 throw error
             }
         }
@@ -3358,36 +3564,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
-            map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+            map.append(key: "relatedProfiles", value: relatedProfilesValue)
             return map
         }
 
@@ -3417,29 +3623,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("relatedProfiles", error)
                 throw error
             }
         }
@@ -3462,36 +3673,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
-            map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+            map.append(key: "relatedProfiles", value: relatedProfilesValue)
             return map
         }
 
@@ -3521,29 +3732,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("relatedProfiles", error)
                 throw error
             }
         }
@@ -3566,36 +3782,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
-            map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+            map.append(key: "relatedProfiles", value: relatedProfilesValue)
             return map
         }
 
@@ -3625,29 +3841,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("relatedProfiles", error)
                 throw error
             }
         }
@@ -3670,36 +3891,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
-            map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+            map.append(key: "relatedProfiles", value: relatedProfilesValue)
             return map
         }
 
@@ -3729,29 +3950,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("relatedProfiles", error)
                 throw error
             }
         }
@@ -3774,36 +4000,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
-            map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+            map.append(key: "relatedProfiles", value: relatedProfilesValue)
             return map
         }
 
@@ -3833,29 +4059,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("relatedProfiles", error)
                 throw error
             }
         }
@@ -3878,36 +4109,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
-            map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+            map.append(key: "relatedProfiles", value: relatedProfilesValue)
             return map
         }
 
@@ -3937,29 +4168,34 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
             do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: "relatedProfiles")
             } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("relatedProfiles", error)
                 throw error
             }
         }
@@ -3982,36 +4218,36 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
-            if relatedProfiles != other.relatedProfiles {
+            if lhs.relatedProfiles != rhs.relatedProfiles {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
-            map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
+            map.append(key: "relatedProfiles", value: relatedProfilesValue)
             return map
         }
 
@@ -4039,23 +4275,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -4076,31 +4317,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -4127,23 +4368,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -4164,31 +4410,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -4215,23 +4461,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -4252,31 +4503,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -4303,23 +4554,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -4340,31 +4596,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -4391,23 +4647,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
+                message = try container.decode(SystemMessageView.self, forKey: "message")
             } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("message", error)
                 throw error
             }
         }
@@ -4428,31 +4689,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if message != other.message {
+            if lhs.message != rhs.message {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
-            map = map.adding(key: "message", value: messageValue)
+            map.append(key: "message", value: messageValue)
             return map
         }
 
@@ -4479,23 +4740,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
+                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: "member")
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("member", error)
                 throw error
             }
         }
@@ -4516,31 +4782,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if member != other.member {
+            if lhs.member != rhs.member {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             return map
         }
 
@@ -4567,23 +4833,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
+                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: "member")
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("member", error)
                 throw error
             }
         }
@@ -4604,31 +4875,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if member != other.member {
+            if lhs.member != rhs.member {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             return map
         }
 
@@ -4655,23 +4926,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
+                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: "member")
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("member", error)
                 throw error
             }
         }
@@ -4692,31 +4968,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if member != other.member {
+            if lhs.member != rhs.member {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             return map
         }
 
@@ -4741,17 +5017,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -4770,26 +5051,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -4815,23 +5096,28 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
             do {
-                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
+                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: "member")
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("member", error)
                 throw error
             }
         }
@@ -4852,31 +5138,31 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
-            if member != other.member {
+            if lhs.member != rhs.member {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
-            map = map.adding(key: "member", value: memberValue)
+            map.append(key: "member", value: memberValue)
             return map
         }
 
@@ -4901,17 +5187,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -4930,26 +5221,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -4973,17 +5264,22 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                rev = try container.decode(String.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                convoId = try container.decode(String.self, forKey: "convoId")
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convoId", error)
                 throw error
             }
         }
@@ -5002,26 +5298,26 @@ public enum ChatBskyConvoDefs {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if convoId != other.convoId {
+            if lhs.convoId != rhs.convoId {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -5177,15 +5473,17 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.embed.record":
-                let value = try AppBskyEmbedRecord(from: decoder)
+                let value = try AppBskyEmbedRecord(_lexiconContainer: container)
                 self = .appBskyEmbedRecord(value)
             case "chat.bsky.embed.joinLink":
-                let value = try ChatBskyEmbedJoinLink(from: decoder)
+                let value = try ChatBskyEmbedJoinLink(_lexiconContainer: container)
                 self = .chatBskyEmbedJoinLink(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -5239,7 +5537,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -5250,46 +5548,20 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyEmbedRecord(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.record")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.record",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyEmbedJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.embed.joinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.embed.joinLink",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -5309,15 +5581,17 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.embed.record#view":
-                let value = try AppBskyEmbedRecord.View(from: decoder)
+                let value = try AppBskyEmbedRecord.View(_lexiconContainer: container)
                 self = .appBskyEmbedRecordView(value)
             case "chat.bsky.embed.joinLink#view":
-                let value = try ChatBskyEmbedJoinLink.View(from: decoder)
+                let value = try ChatBskyEmbedJoinLink.View(_lexiconContainer: container)
                 self = .chatBskyEmbedJoinLinkView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -5371,7 +5645,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -5382,46 +5656,20 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyEmbedRecordView(value):
-                map = map.adding(key: "$type", value: "app.bsky.embed.record#view")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.embed.record#view",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyEmbedJoinLinkView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.embed.joinLink#view")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.embed.joinLink#view",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -5446,18 +5694,20 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             case "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView":
-                let value = try ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -5522,7 +5772,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -5533,63 +5783,25 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#deletedMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsMessageBeforeUserJoinedGroupView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -5659,45 +5871,47 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#systemMessageDataAddMember":
-                let value = try ChatBskyConvoDefs.SystemMessageDataAddMember(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataAddMember(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataAddMember(value)
             case "chat.bsky.convo.defs#systemMessageDataRemoveMember":
-                let value = try ChatBskyConvoDefs.SystemMessageDataRemoveMember(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataRemoveMember(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataRemoveMember(value)
             case "chat.bsky.convo.defs#systemMessageDataMemberJoin":
-                let value = try ChatBskyConvoDefs.SystemMessageDataMemberJoin(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataMemberJoin(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataMemberJoin(value)
             case "chat.bsky.convo.defs#systemMessageDataMemberLeave":
-                let value = try ChatBskyConvoDefs.SystemMessageDataMemberLeave(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataMemberLeave(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataMemberLeave(value)
             case "chat.bsky.convo.defs#systemMessageDataLockConvo":
-                let value = try ChatBskyConvoDefs.SystemMessageDataLockConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataLockConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataLockConvo(value)
             case "chat.bsky.convo.defs#systemMessageDataUnlockConvo":
-                let value = try ChatBskyConvoDefs.SystemMessageDataUnlockConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataUnlockConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataUnlockConvo(value)
             case "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently":
-                let value = try ChatBskyConvoDefs.SystemMessageDataLockConvoPermanently(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataLockConvoPermanently(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataLockConvoPermanently(value)
             case "chat.bsky.convo.defs#systemMessageDataEditGroup":
-                let value = try ChatBskyConvoDefs.SystemMessageDataEditGroup(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataEditGroup(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataEditGroup(value)
             case "chat.bsky.convo.defs#systemMessageDataCreateJoinLink":
-                let value = try ChatBskyConvoDefs.SystemMessageDataCreateJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataCreateJoinLink(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataCreateJoinLink(value)
             case "chat.bsky.convo.defs#systemMessageDataEditJoinLink":
-                let value = try ChatBskyConvoDefs.SystemMessageDataEditJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataEditJoinLink(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataEditJoinLink(value)
             case "chat.bsky.convo.defs#systemMessageDataEnableJoinLink":
-                let value = try ChatBskyConvoDefs.SystemMessageDataEnableJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataEnableJoinLink(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataEnableJoinLink(value)
             case "chat.bsky.convo.defs#systemMessageDataDisableJoinLink":
-                let value = try ChatBskyConvoDefs.SystemMessageDataDisableJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageDataDisableJoinLink(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageDataDisableJoinLink(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -5861,7 +6075,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -5872,216 +6086,70 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsSystemMessageDataAddMember(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataAddMember")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataAddMember",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataRemoveMember(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataRemoveMember")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataRemoveMember",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataMemberJoin(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataMemberJoin")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataMemberJoin",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataMemberLeave(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataMemberLeave")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataMemberLeave",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataLockConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataLockConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataLockConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataUnlockConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataUnlockConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataUnlockConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataLockConvoPermanently(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataEditGroup(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataEditGroup")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataEditGroup",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataCreateJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataCreateJoinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataCreateJoinLink",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataEditJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataEditJoinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataEditJoinLink",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataEnableJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataEnableJoinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataEnableJoinLink",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageDataDisableJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageDataDisableJoinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageDataDisableJoinLink",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -6106,18 +6174,20 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             case "chat.bsky.convo.defs#systemMessageView":
-                let value = try ChatBskyConvoDefs.SystemMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -6182,7 +6252,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -6193,63 +6263,25 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#deletedMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -6264,12 +6296,14 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageAndReactionView":
-                let value = try ChatBskyConvoDefs.MessageAndReactionView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageAndReactionView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageAndReactionView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -6312,7 +6346,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -6323,29 +6357,15 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageAndReactionView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageAndReactionView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageAndReactionView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -6365,15 +6385,17 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#directConvo":
-                let value = try ChatBskyConvoDefs.DirectConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.DirectConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDirectConvo(value)
             case "chat.bsky.convo.defs#groupConvo":
-                let value = try ChatBskyConvoDefs.GroupConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.GroupConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsGroupConvo(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -6427,7 +6449,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -6438,46 +6460,20 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsDirectConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#directConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#directConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsGroupConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#groupConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#groupConvo",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -6497,15 +6493,17 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -6559,7 +6557,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -6570,46 +6568,20 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#deletedMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -6629,15 +6601,17 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -6691,7 +6665,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -6702,46 +6676,20 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#deletedMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -6766,18 +6714,20 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             case "chat.bsky.convo.defs#systemMessageView":
-                let value = try ChatBskyConvoDefs.SystemMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -6842,7 +6792,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -6853,63 +6803,25 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#deletedMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -6929,15 +6841,17 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -6991,7 +6905,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -7002,46 +6916,20 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#deletedMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -7061,15 +6949,17 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -7123,7 +7013,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -7134,46 +7024,20 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#deletedMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -7198,18 +7062,20 @@ public enum ChatBskyConvoDefs {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#messageView":
-                let value = try ChatBskyConvoDefs.MessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.MessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsMessageView(value)
             case "chat.bsky.convo.defs#deletedMessageView":
-                let value = try ChatBskyConvoDefs.DeletedMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.DeletedMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsDeletedMessageView(value)
             case "chat.bsky.convo.defs#systemMessageView":
-                let value = try ChatBskyConvoDefs.SystemMessageView(from: decoder)
+                let value = try ChatBskyConvoDefs.SystemMessageView(_lexiconContainer: container)
                 self = .chatBskyConvoDefsSystemMessageView(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -7274,7 +7140,7 @@ public enum ChatBskyConvoDefs {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -7285,63 +7151,25 @@ public enum ChatBskyConvoDefs {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#messageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#messageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsDeletedMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#deletedMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#deletedMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsSystemMessageView(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#systemMessageView")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#systemMessageView",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

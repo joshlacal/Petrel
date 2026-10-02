@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyContactVerifyPhone {
     public static let typeIdentifier = "app.bsky.contact.verifyPhone"
+
     public struct Input: ATProtocolCodable {
         public let phone: String
         public let code: String
@@ -28,11 +29,11 @@ public enum AppBskyContactVerifyPhone {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let phoneValue = try phone.toCBORValue()
-            map = map.adding(key: "phone", value: phoneValue)
+            map.append(key: "phone", value: phoneValue)
             let codeValue = try code.toCBORValue()
-            map = map.adding(key: "code", value: codeValue)
+            map.append(key: "code", value: codeValue)
             return map
         }
 
@@ -66,10 +67,10 @@ public enum AppBskyContactVerifyPhone {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let tokenValue = try token.toCBORValue()
-            map = map.adding(key: "token", value: tokenValue)
+            map.append(key: "token", value: tokenValue)
 
             return map
         }
@@ -154,7 +155,7 @@ public extension ATProtoClient.App.Bsky.Contact {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.contact.verifyPhone: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.contact.verifyPhone", error)
                 return (responseCode, nil)
             }
         } else {

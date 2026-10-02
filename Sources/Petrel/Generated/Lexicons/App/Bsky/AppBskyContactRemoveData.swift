@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyContactRemoveData {
     public static let typeIdentifier = "app.bsky.contact.removeData"
+
     public struct Input: ATProtocolCodable {
         /// Standard public initializer
         public init() {}
@@ -108,7 +109,7 @@ public extension ATProtoClient.App.Bsky.Contact {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.contact.removeData: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.contact.removeData", error)
                 return (responseCode, nil)
             }
         } else {

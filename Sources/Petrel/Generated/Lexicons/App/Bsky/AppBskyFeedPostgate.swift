@@ -18,21 +18,26 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-        post = try container.decode(ATProtocolURI.self, forKey: .post)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
+        post = try container.decode(ATProtocolURI.self, forKey: "post")
         do {
-            detachedEmbeddingUris = try container.decodeIfPresent([ATProtocolURI].self, forKey: .detachedEmbeddingUris)
+            detachedEmbeddingUris = try container.decodeIfPresent([ATProtocolURI].self, forKey: "detachedEmbeddingUris")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'detachedEmbeddingUris' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("detachedEmbeddingUris", error)
             detachedEmbeddingUris = nil
         }
         do {
-            embeddingRules = try container.decodeIfPresent([AppBskyFeedPostgateEmbeddingRulesUnion].self, forKey: .embeddingRules)
+            embeddingRules = try container.decodeIfPresent([AppBskyFeedPostgateEmbeddingRulesUnion].self, forKey: "embeddingRules")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'embeddingRules' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("embeddingRules", error)
             embeddingRules = nil
         }
     }
@@ -47,24 +52,24 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.createdAt != rhs.createdAt {
+            return false
+        }
+        if lhs.post != rhs.post {
+            return false
+        }
+        if lhs.detachedEmbeddingUris != rhs.detachedEmbeddingUris {
+            return false
+        }
+        if lhs.embeddingRules != rhs.embeddingRules {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if createdAt != other.createdAt {
-            return false
-        }
-        if post != other.post {
-            return false
-        }
-        if detachedEmbeddingUris != other.detachedEmbeddingUris {
-            return false
-        }
-        if embeddingRules != other.embeddingRules {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -83,19 +88,19 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 5)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let createdAtValue = try createdAt.toCBORValue()
-        map = map.adding(key: "createdAt", value: createdAtValue)
+        map.append(key: "createdAt", value: createdAtValue)
         let postValue = try post.toCBORValue()
-        map = map.adding(key: "post", value: postValue)
+        map.append(key: "post", value: postValue)
         if let value = detachedEmbeddingUris {
             let detachedEmbeddingUrisValue = try value.toCBORValue()
-            map = map.adding(key: "detachedEmbeddingUris", value: detachedEmbeddingUrisValue)
+            map.append(key: "detachedEmbeddingUris", value: detachedEmbeddingUrisValue)
         }
         if let value = embeddingRules {
             let embeddingRulesValue = try value.toCBORValue()
-            map = map.adding(key: "embeddingRules", value: embeddingRulesValue)
+            map.append(key: "embeddingRules", value: embeddingRulesValue)
         }
         return map
     }
@@ -117,6 +122,12 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -129,12 +140,12 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -151,12 +162,14 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.feed.postgate#disableRule":
-                let value = try AppBskyFeedPostgate.DisableRule(from: decoder)
+                let value = try AppBskyFeedPostgate.DisableRule(_lexiconContainer: container)
                 self = .appBskyFeedPostgateDisableRule(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -199,7 +212,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -210,29 +223,15 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyFeedPostgateDisableRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.postgate#disableRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.feed.postgate#disableRule",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

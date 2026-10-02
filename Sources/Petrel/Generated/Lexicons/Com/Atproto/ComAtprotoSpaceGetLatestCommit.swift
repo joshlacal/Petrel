@@ -42,10 +42,10 @@ public enum ComAtprotoSpaceGetLatestCommit {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let commitValue = try commit.toCBORValue()
-            map = map.adding(key: "commit", value: commitValue)
+            map.append(key: "commit", value: commitValue)
 
             return map
         }
@@ -139,7 +139,7 @@ public extension ATProtoClient.Com.Atproto.Space {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.getLatestCommit: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.space.getLatestCommit", error)
                 return (responseCode, nil)
             }
         } else {

@@ -27,27 +27,32 @@ public enum ComAtprotoSpaceListRepoOps {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                rev = try container.decode(TID.self, forKey: .rev)
+                rev = try container.decode(TID.self, forKey: "rev")
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rev", error)
                 throw error
             }
             do {
-                collection = try container.decode(NSID.self, forKey: .collection)
+                collection = try container.decode(NSID.self, forKey: "collection")
             } catch {
-                LogManager.logError("Decoding error for required property 'collection': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("collection", error)
                 throw error
             }
             do {
-                rkey = try container.decode(RecordKey.self, forKey: .rkey)
+                rkey = try container.decode(RecordKey.self, forKey: "rkey")
             } catch {
-                LogManager.logError("Decoding error for required property 'rkey': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rkey", error)
                 throw error
             }
             do {
-                guard container.contains(.cid) else {
+                guard container.contains("cid") else {
                     throw DecodingError.keyNotFound(
                         CodingKeys.cid,
                         DecodingError.Context(
@@ -56,13 +61,13 @@ public enum ComAtprotoSpaceListRepoOps {
                         )
                     )
                 }
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+                cid = try container.decodeIfPresent(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                guard container.contains(.prev) else {
+                guard container.contains("prev") else {
                     throw DecodingError.keyNotFound(
                         CodingKeys.prev,
                         DecodingError.Context(
@@ -71,17 +76,17 @@ public enum ComAtprotoSpaceListRepoOps {
                         )
                     )
                 }
-                prev = try container.decodeIfPresent(CID.self, forKey: .prev)
+                prev = try container.decodeIfPresent(CID.self, forKey: "prev")
             } catch {
-                LogManager.logError("Decoding error for required property 'prev': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("prev", error)
                 throw error
             }
             do {
-                value = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .value)
+                value = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: "value")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'value' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("value", error)
                 value = nil
             }
         }
@@ -120,55 +125,55 @@ public enum ComAtprotoSpaceListRepoOps {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if rev != other.rev {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.rev != rhs.rev {
                 return false
             }
-            if collection != other.collection {
+            if lhs.collection != rhs.collection {
                 return false
             }
-            if rkey != other.rkey {
+            if lhs.rkey != rhs.rkey {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if prev != other.prev {
+            if lhs.prev != rhs.prev {
                 return false
             }
-            if value != other.value {
+            if lhs.value != rhs.value {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 7)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
-            map = map.adding(key: "rev", value: revValue)
+            map.append(key: "rev", value: revValue)
             let collectionValue = try collection.toCBORValue()
-            map = map.adding(key: "collection", value: collectionValue)
+            map.append(key: "collection", value: collectionValue)
             let rkeyValue = try rkey.toCBORValue()
-            map = map.adding(key: "rkey", value: rkeyValue)
+            map.append(key: "rkey", value: rkeyValue)
             if let value = cid {
                 let cidValue = try value.toCBORValue()
-                map = map.adding(key: "cid", value: cidValue)
+                map.append(key: "cid", value: cidValue)
             } else {
-                map = map.adding(key: "cid", value: NSNull())
+                map.append(key: "cid", value: NSNull())
             }
             if let value = prev {
                 let prevValue = try value.toCBORValue()
-                map = map.adding(key: "prev", value: prevValue)
+                map.append(key: "prev", value: prevValue)
             } else {
-                map = map.adding(key: "prev", value: NSNull())
+                map.append(key: "prev", value: NSNull())
             }
             if let value = value {
                 let valueValue = try value.toCBORValue()
-                map = map.adding(key: "value", value: valueValue)
+                map.append(key: "value", value: valueValue)
             }
             return map
         }
@@ -241,7 +246,7 @@ public enum ComAtprotoSpaceListRepoOps {
                 commit = try container.decodeIfPresent(ComAtprotoSpaceDefs.SignedCommit.self, forKey: .commit)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("commit", error)
                 commit = nil
             }
 
@@ -249,7 +254,7 @@ public enum ComAtprotoSpaceListRepoOps {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
         }
@@ -267,21 +272,21 @@ public enum ComAtprotoSpaceListRepoOps {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let opsValue = try ops.toCBORValue()
-            map = map.adding(key: "ops", value: opsValue)
+            map.append(key: "ops", value: opsValue)
 
             if let value = commit {
                 // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
-                map = map.adding(key: "commit", value: commitValue)
+                map.append(key: "commit", value: commitValue)
             }
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             return map
@@ -378,7 +383,7 @@ public extension ATProtoClient.Com.Atproto.Space {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.listRepoOps: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.space.listRepoOps", error)
                 return (responseCode, nil)
             }
         } else {

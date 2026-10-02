@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyConvoUpdateAllRead {
     public static let typeIdentifier = "chat.bsky.convo.updateAllRead"
+
     public struct Input: ATProtocolCodable {
         public let status: String?
 
@@ -24,10 +25,10 @@ public enum ChatBskyConvoUpdateAllRead {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             if let value = status {
                 let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
+                map.append(key: "status", value: statusValue)
             }
             return map
         }
@@ -61,10 +62,10 @@ public enum ChatBskyConvoUpdateAllRead {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let updatedCountValue = try updatedCount.toCBORValue()
-            map = map.adding(key: "updatedCount", value: updatedCountValue)
+            map.append(key: "updatedCount", value: updatedCountValue)
 
             return map
         }
@@ -134,7 +135,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.updateAllRead: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.updateAllRead", error)
                 return (responseCode, nil)
             }
         } else {

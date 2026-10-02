@@ -23,29 +23,34 @@ public enum ChatBskyModerationGetActorMetadata {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                messagesSent = try container.decode(Int.self, forKey: .messagesSent)
+                messagesSent = try container.decode(Int.self, forKey: "messagesSent")
             } catch {
-                LogManager.logError("Decoding error for required property 'messagesSent': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("messagesSent", error)
                 throw error
             }
             do {
-                messagesReceived = try container.decode(Int.self, forKey: .messagesReceived)
+                messagesReceived = try container.decode(Int.self, forKey: "messagesReceived")
             } catch {
-                LogManager.logError("Decoding error for required property 'messagesReceived': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("messagesReceived", error)
                 throw error
             }
             do {
-                convos = try container.decode(Int.self, forKey: .convos)
+                convos = try container.decode(Int.self, forKey: "convos")
             } catch {
-                LogManager.logError("Decoding error for required property 'convos': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convos", error)
                 throw error
             }
             do {
-                convosStarted = try container.decode(Int.self, forKey: .convosStarted)
+                convosStarted = try container.decode(Int.self, forKey: "convosStarted")
             } catch {
-                LogManager.logError("Decoding error for required property 'convosStarted': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("convosStarted", error)
                 throw error
             }
         }
@@ -68,36 +73,36 @@ public enum ChatBskyModerationGetActorMetadata {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if messagesSent != other.messagesSent {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.messagesSent != rhs.messagesSent {
                 return false
             }
-            if messagesReceived != other.messagesReceived {
+            if lhs.messagesReceived != rhs.messagesReceived {
                 return false
             }
-            if convos != other.convos {
+            if lhs.convos != rhs.convos {
                 return false
             }
-            if convosStarted != other.convosStarted {
+            if lhs.convosStarted != rhs.convosStarted {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let messagesSentValue = try messagesSent.toCBORValue()
-            map = map.adding(key: "messagesSent", value: messagesSentValue)
+            map.append(key: "messagesSent", value: messagesSentValue)
             let messagesReceivedValue = try messagesReceived.toCBORValue()
-            map = map.adding(key: "messagesReceived", value: messagesReceivedValue)
+            map.append(key: "messagesReceived", value: messagesReceivedValue)
             let convosValue = try convos.toCBORValue()
-            map = map.adding(key: "convos", value: convosValue)
+            map.append(key: "convos", value: convosValue)
             let convosStartedValue = try convosStarted.toCBORValue()
-            map = map.adding(key: "convosStarted", value: convosStartedValue)
+            map.append(key: "convosStarted", value: convosStartedValue)
             return map
         }
 
@@ -164,16 +169,16 @@ public enum ChatBskyModerationGetActorMetadata {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let dayValue = try day.toCBORValue()
-            map = map.adding(key: "day", value: dayValue)
+            map.append(key: "day", value: dayValue)
 
             let monthValue = try month.toCBORValue()
-            map = map.adding(key: "month", value: monthValue)
+            map.append(key: "month", value: monthValue)
 
             let allValue = try all.toCBORValue()
-            map = map.adding(key: "all", value: allValue)
+            map.append(key: "all", value: allValue)
 
             return map
         }
@@ -233,7 +238,7 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.moderation.getActorMetadata: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.moderation.getActorMetadata", error)
                 return (responseCode, nil)
             }
         } else {

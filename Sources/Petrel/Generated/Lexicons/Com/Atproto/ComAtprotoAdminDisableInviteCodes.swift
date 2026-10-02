@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoAdminDisableInviteCodes {
     public static let typeIdentifier = "com.atproto.admin.disableInviteCodes"
+
     public struct Input: ATProtocolCodable {
         public let codes: [String]?
         public let accounts: [String]?
@@ -17,8 +18,8 @@ public enum ComAtprotoAdminDisableInviteCodes {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            codes = try container.decodeIfPresent([String].self, forKey: .codes)
-            accounts = try container.decodeIfPresent([String].self, forKey: .accounts)
+            codes = try container.decodeIfPresent(_LexiconStringArray.self, forKey: .codes)?.values
+            accounts = try container.decodeIfPresent(_LexiconStringArray.self, forKey: .accounts)?.values
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -28,14 +29,14 @@ public enum ComAtprotoAdminDisableInviteCodes {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             if let value = codes {
                 let codesValue = try value.toCBORValue()
-                map = map.adding(key: "codes", value: codesValue)
+                map.append(key: "codes", value: codesValue)
             }
             if let value = accounts {
                 let accountsValue = try value.toCBORValue()
-                map = map.adding(key: "accounts", value: accountsValue)
+                map.append(key: "accounts", value: accountsValue)
             }
             return map
         }

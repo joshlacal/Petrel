@@ -45,10 +45,10 @@ public enum AppBskyActorSearchActorsTypeahead {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let actorsValue = try actors.toCBORValue()
-            map = map.adding(key: "actors", value: actorsValue)
+            map.append(key: "actors", value: actorsValue)
 
             return map
         }
@@ -106,7 +106,7 @@ public extension ATProtoClient.App.Bsky.Actor {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.actor.searchActorsTypeahead: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.actor.searchActorsTypeahead", error)
                 return (responseCode, nil)
             }
         } else {

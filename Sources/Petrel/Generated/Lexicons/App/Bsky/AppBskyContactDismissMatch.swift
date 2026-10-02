@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyContactDismissMatch {
     public static let typeIdentifier = "app.bsky.contact.dismissMatch"
+
     public struct Input: ATProtocolCodable {
         public let subject: DID
 
@@ -24,9 +25,9 @@ public enum AppBskyContactDismissMatch {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
             return map
         }
 
@@ -129,7 +130,7 @@ public extension ATProtoClient.App.Bsky.Contact {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.contact.dismissMatch: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.contact.dismissMatch", error)
                 return (responseCode, nil)
             }
         } else {

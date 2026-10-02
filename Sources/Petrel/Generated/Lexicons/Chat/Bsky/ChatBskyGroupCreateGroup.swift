@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupCreateGroup {
     public static let typeIdentifier = "chat.bsky.group.createGroup"
+
     public struct Input: ATProtocolCodable {
         public let members: [DID]
         public let name: String
@@ -28,11 +29,11 @@ public enum ChatBskyGroupCreateGroup {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let membersValue = try members.toCBORValue()
-            map = map.adding(key: "members", value: membersValue)
+            map.append(key: "members", value: membersValue)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             return map
         }
 
@@ -66,10 +67,10 @@ public enum ChatBskyGroupCreateGroup {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let convoValue = try convo.toCBORValue()
-            map = map.adding(key: "convo", value: convoValue)
+            map.append(key: "convo", value: convoValue)
 
             return map
         }
@@ -156,7 +157,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.createGroup: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.createGroup", error)
                 return (responseCode, nil)
             }
         } else {

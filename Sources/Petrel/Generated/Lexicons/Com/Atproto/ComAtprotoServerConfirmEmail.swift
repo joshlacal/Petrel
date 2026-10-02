@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoServerConfirmEmail {
     public static let typeIdentifier = "com.atproto.server.confirmEmail"
+
     public struct Input: ATProtocolCodable {
         public let email: String
         public let token: String
@@ -28,11 +29,11 @@ public enum ComAtprotoServerConfirmEmail {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let emailValue = try email.toCBORValue()
-            map = map.adding(key: "email", value: emailValue)
+            map.append(key: "email", value: emailValue)
             let tokenValue = try token.toCBORValue()
-            map = map.adding(key: "token", value: tokenValue)
+            map.append(key: "token", value: tokenValue)
             return map
         }
 

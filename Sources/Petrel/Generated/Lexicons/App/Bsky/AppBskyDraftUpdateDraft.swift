@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyDraftUpdateDraft {
     public static let typeIdentifier = "app.bsky.draft.updateDraft"
+
     public struct Input: ATProtocolCodable {
         public let draft: AppBskyDraftDefs.DraftWithId
 
@@ -24,9 +25,9 @@ public enum AppBskyDraftUpdateDraft {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let draftValue = try draft.toCBORValue()
-            map = map.adding(key: "draft", value: draftValue)
+            map.append(key: "draft", value: draftValue)
             return map
         }
 

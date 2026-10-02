@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSpaceGetSpaceCredential {
     public static let typeIdentifier = "com.atproto.space.getSpaceCredential"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let clientAttestation: String?
@@ -41,12 +42,12 @@ public enum ComAtprotoSpaceGetSpaceCredential {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             if let value = clientAttestation {
                 let clientAttestationValue = try value.toCBORValue()
-                map = map.adding(key: "clientAttestation", value: clientAttestationValue)
+                map.append(key: "clientAttestation", value: clientAttestationValue)
             }
             return map
         }
@@ -81,10 +82,10 @@ public enum ComAtprotoSpaceGetSpaceCredential {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let credentialValue = try credential.toCBORValue()
-            map = map.adding(key: "credential", value: credentialValue)
+            map.append(key: "credential", value: credentialValue)
 
             return map
         }
@@ -195,7 +196,7 @@ public extension ATProtoClient.Com.Atproto.Space {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.getSpaceCredential: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.space.getSpaceCredential", error)
                 return (responseCode, nil)
             }
         } else {

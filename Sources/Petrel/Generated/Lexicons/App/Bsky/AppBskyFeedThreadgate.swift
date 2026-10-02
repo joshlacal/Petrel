@@ -18,21 +18,26 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        post = try container.decode(ATProtocolURI.self, forKey: .post)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        post = try container.decode(ATProtocolURI.self, forKey: "post")
         do {
-            allow = try container.decodeIfPresent([AppBskyFeedThreadgateAllowUnion].self, forKey: .allow)
+            allow = try container.decodeIfPresent([AppBskyFeedThreadgateAllowUnion].self, forKey: "allow")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'allow' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("allow", error)
             allow = nil
         }
-        createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        createdAt = try container.decode(ATProtocolDate.self, forKey: "createdAt")
         do {
-            hiddenReplies = try container.decodeIfPresent([ATProtocolURI].self, forKey: .hiddenReplies)
+            hiddenReplies = try container.decodeIfPresent([ATProtocolURI].self, forKey: "hiddenReplies")
         } catch {
             // Forward compatibility: a malformed optional field must not fail the whole record.
-            LogManager.logWarning("Decoding error for optional property 'hiddenReplies' — degrading to nil: \(error)")
+            _LexiconDecodeDiagnostics.optionalPropertyDegraded("hiddenReplies", error)
             hiddenReplies = nil
         }
     }
@@ -47,24 +52,24 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+        if lhs.post != rhs.post {
+            return false
+        }
+        if lhs.allow != rhs.allow {
+            return false
+        }
+        if lhs.createdAt != rhs.createdAt {
+            return false
+        }
+        if lhs.hiddenReplies != rhs.hiddenReplies {
+            return false
+        }
+        return true
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if post != other.post {
-            return false
-        }
-        if allow != other.allow {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        if hiddenReplies != other.hiddenReplies {
-            return false
-        }
-        return true
+        return self == other
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -83,19 +88,19 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
     }
 
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
-        map = map.adding(key: "$type", value: Self.typeIdentifier)
+        var map = OrderedCBORMap(minimumCapacity: 5)
+        map.append(key: "$type", value: Self.typeIdentifier)
         let postValue = try post.toCBORValue()
-        map = map.adding(key: "post", value: postValue)
+        map.append(key: "post", value: postValue)
         if let value = allow {
             let allowValue = try value.toCBORValue()
-            map = map.adding(key: "allow", value: allowValue)
+            map.append(key: "allow", value: allowValue)
         }
         let createdAtValue = try createdAt.toCBORValue()
-        map = map.adding(key: "createdAt", value: createdAtValue)
+        map.append(key: "createdAt", value: createdAtValue)
         if let value = hiddenReplies {
             let hiddenRepliesValue = try value.toCBORValue()
-            map = map.adding(key: "hiddenReplies", value: hiddenRepliesValue)
+            map.append(key: "hiddenReplies", value: hiddenRepliesValue)
         }
         return map
     }
@@ -117,6 +122,12 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -129,12 +140,12 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -152,6 +163,12 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -164,12 +181,12 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -187,6 +204,12 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -199,12 +222,12 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -224,11 +247,16 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                list = try container.decode(ATProtocolURI.self, forKey: .list)
+                list = try container.decode(ATProtocolURI.self, forKey: "list")
             } catch {
-                LogManager.logError("Decoding error for required property 'list': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("list", error)
                 throw error
             }
         }
@@ -245,21 +273,21 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if list != other.list {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.list != rhs.list {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let listValue = try list.toCBORValue()
-            map = map.adding(key: "list", value: listValue)
+            map.append(key: "list", value: listValue)
             return map
         }
 
@@ -292,21 +320,23 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.feed.threadgate#mentionRule":
-                let value = try AppBskyFeedThreadgate.MentionRule(from: decoder)
+                let value = try AppBskyFeedThreadgate.MentionRule(_lexiconContainer: container)
                 self = .appBskyFeedThreadgateMentionRule(value)
             case "app.bsky.feed.threadgate#followerRule":
-                let value = try AppBskyFeedThreadgate.FollowerRule(from: decoder)
+                let value = try AppBskyFeedThreadgate.FollowerRule(_lexiconContainer: container)
                 self = .appBskyFeedThreadgateFollowerRule(value)
             case "app.bsky.feed.threadgate#followingRule":
-                let value = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
+                let value = try AppBskyFeedThreadgate.FollowingRule(_lexiconContainer: container)
                 self = .appBskyFeedThreadgateFollowingRule(value)
             case "app.bsky.feed.threadgate#listRule":
-                let value = try AppBskyFeedThreadgate.ListRule(from: decoder)
+                let value = try AppBskyFeedThreadgate.ListRule(_lexiconContainer: container)
                 self = .appBskyFeedThreadgateListRule(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -382,7 +412,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -393,80 +423,30 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyFeedThreadgateMentionRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#mentionRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.feed.threadgate#mentionRule",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyFeedThreadgateFollowerRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followerRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.feed.threadgate#followerRule",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyFeedThreadgateFollowingRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#followingRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.feed.threadgate#followingRule",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyFeedThreadgateListRule(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.threadgate#listRule")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.feed.threadgate#listRule",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }

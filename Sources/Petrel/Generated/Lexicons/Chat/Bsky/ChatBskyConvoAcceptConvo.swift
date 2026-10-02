@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyConvoAcceptConvo {
     public static let typeIdentifier = "chat.bsky.convo.acceptConvo"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
 
@@ -24,9 +25,9 @@ public enum ChatBskyConvoAcceptConvo {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let convoIdValue = try convoId.toCBORValue()
-            map = map.adding(key: "convoId", value: convoIdValue)
+            map.append(key: "convoId", value: convoIdValue)
             return map
         }
 
@@ -53,7 +54,7 @@ public enum ChatBskyConvoAcceptConvo {
                 rev = try container.decodeIfPresent(String.self, forKey: .rev)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'rev' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("rev", error)
                 rev = nil
             }
         }
@@ -66,12 +67,12 @@ public enum ChatBskyConvoAcceptConvo {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             if let value = rev {
                 // Encode optional property even if it's an empty array for CBOR
                 let revValue = try value.toCBORValue()
-                map = map.adding(key: "rev", value: revValue)
+                map.append(key: "rev", value: revValue)
             }
 
             return map
@@ -153,7 +154,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.acceptConvo: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.acceptConvo", error)
                 return (responseCode, nil)
             }
         } else {

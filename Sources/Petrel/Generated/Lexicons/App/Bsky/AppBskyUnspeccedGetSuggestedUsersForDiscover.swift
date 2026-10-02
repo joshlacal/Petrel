@@ -41,7 +41,7 @@ public enum AppBskyUnspeccedGetSuggestedUsersForDiscover {
                 recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("recIdStr", error)
                 recIdStr = nil
             }
         }
@@ -56,15 +56,15 @@ public enum AppBskyUnspeccedGetSuggestedUsersForDiscover {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let actorsValue = try actors.toCBORValue()
-            map = map.adding(key: "actors", value: actorsValue)
+            map.append(key: "actors", value: actorsValue)
 
             if let value = recIdStr {
                 // Encode optional property even if it's an empty array for CBOR
                 let recIdStrValue = try value.toCBORValue()
-                map = map.adding(key: "recIdStr", value: recIdStrValue)
+                map.append(key: "recIdStr", value: recIdStrValue)
             }
 
             return map
@@ -124,7 +124,7 @@ public extension ATProtoClient.App.Bsky.Unspecced {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getSuggestedUsersForDiscover: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.unspecced.getSuggestedUsersForDiscover", error)
                 return (responseCode, nil)
             }
         } else {

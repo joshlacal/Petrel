@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoTempRequestPhoneVerification {
     public static let typeIdentifier = "com.atproto.temp.requestPhoneVerification"
+
     public struct Input: ATProtocolCodable {
         public let phoneNumber: String
 
@@ -24,9 +25,9 @@ public enum ComAtprotoTempRequestPhoneVerification {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let phoneNumberValue = try phoneNumber.toCBORValue()
-            map = map.adding(key: "phoneNumber", value: phoneNumberValue)
+            map.append(key: "phoneNumber", value: phoneNumberValue)
             return map
         }
 

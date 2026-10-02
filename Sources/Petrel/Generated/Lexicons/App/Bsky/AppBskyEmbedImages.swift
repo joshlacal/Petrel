@@ -12,8 +12,13 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
     }
 
     public init(from decoder: Decoder) throws {
-        let container = try decoder.container(keyedBy: CodingKeys.self)
-        images = try container.decode([Image].self, forKey: .images)
+        self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+    }
+
+    /// Decodes from an already-opened keyed container. Generated unions pass the
+    /// container they read `$type` from, so the object's keys are materialized once.
+    public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+        images = try container.decode([Image].self, forKey: "images")
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -27,20 +32,20 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let other = other as? Self else { return false }
-        if images != other.images {
+        return self == other
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        if lhs.images != rhs.images {
             return false
         }
         return true
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
     public func toCBORValue() throws -> Any {
-        var map = OrderedCBORMap()
+        var map = OrderedCBORMap(minimumCapacity: 1)
         let imagesValue = try images.toCBORValue()
-        map = map.adding(key: "images", value: imagesValue)
+        map.append(key: "images", value: imagesValue)
         return map
     }
 
@@ -63,25 +68,30 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                image = try container.decode(Blob.self, forKey: .image)
+                image = try container.decode(Blob.self, forKey: "image")
             } catch {
-                LogManager.logError("Decoding error for required property 'image': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("image", error)
                 throw error
             }
             do {
-                alt = try container.decode(String.self, forKey: .alt)
+                alt = try container.decode(String.self, forKey: "alt")
             } catch {
-                LogManager.logError("Decoding error for required property 'alt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("alt", error)
                 throw error
             }
             do {
-                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
+                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: "aspectRatio")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("aspectRatio", error)
                 aspectRatio = nil
             }
         }
@@ -106,32 +116,32 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if image != other.image {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.image != rhs.image {
                 return false
             }
-            if alt != other.alt {
+            if lhs.alt != rhs.alt {
                 return false
             }
-            if aspectRatio != other.aspectRatio {
+            if lhs.aspectRatio != rhs.aspectRatio {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let imageValue = try image.toCBORValue()
-            map = map.adding(key: "image", value: imageValue)
+            map.append(key: "image", value: imageValue)
             let altValue = try alt.toCBORValue()
-            map = map.adding(key: "alt", value: altValue)
+            map.append(key: "alt", value: altValue)
             if let value = aspectRatio {
                 let aspectRatioValue = try value.toCBORValue()
-                map = map.adding(key: "aspectRatio", value: aspectRatioValue)
+                map.append(key: "aspectRatio", value: aspectRatioValue)
             }
             return map
         }
@@ -155,11 +165,16 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                images = try container.decode([ViewImage].self, forKey: .images)
+                images = try container.decode([ViewImage].self, forKey: "images")
             } catch {
-                LogManager.logError("Decoding error for required property 'images': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("images", error)
                 throw error
             }
         }
@@ -176,21 +191,21 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if images != other.images {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.images != rhs.images {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 2)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let imagesValue = try images.toCBORValue()
-            map = map.adding(key: "images", value: imagesValue)
+            map.append(key: "images", value: imagesValue)
             return map
         }
 
@@ -217,31 +232,36 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                thumb = try container.decode(URI.self, forKey: .thumb)
+                thumb = try container.decode(URI.self, forKey: "thumb")
             } catch {
-                LogManager.logError("Decoding error for required property 'thumb': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("thumb", error)
                 throw error
             }
             do {
-                fullsize = try container.decode(URI.self, forKey: .fullsize)
+                fullsize = try container.decode(URI.self, forKey: "fullsize")
             } catch {
-                LogManager.logError("Decoding error for required property 'fullsize': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("fullsize", error)
                 throw error
             }
             do {
-                alt = try container.decode(String.self, forKey: .alt)
+                alt = try container.decode(String.self, forKey: "alt")
             } catch {
-                LogManager.logError("Decoding error for required property 'alt': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("alt", error)
                 throw error
             }
             do {
-                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
+                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: "aspectRatio")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("aspectRatio", error)
                 aspectRatio = nil
             }
         }
@@ -268,37 +288,37 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if thumb != other.thumb {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.thumb != rhs.thumb {
                 return false
             }
-            if fullsize != other.fullsize {
+            if lhs.fullsize != rhs.fullsize {
                 return false
             }
-            if alt != other.alt {
+            if lhs.alt != rhs.alt {
                 return false
             }
-            if aspectRatio != other.aspectRatio {
+            if lhs.aspectRatio != rhs.aspectRatio {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 5)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let thumbValue = try thumb.toCBORValue()
-            map = map.adding(key: "thumb", value: thumbValue)
+            map.append(key: "thumb", value: thumbValue)
             let fullsizeValue = try fullsize.toCBORValue()
-            map = map.adding(key: "fullsize", value: fullsizeValue)
+            map.append(key: "fullsize", value: fullsizeValue)
             let altValue = try alt.toCBORValue()
-            map = map.adding(key: "alt", value: altValue)
+            map.append(key: "alt", value: altValue)
             if let value = aspectRatio {
                 let aspectRatioValue = try value.toCBORValue()
-                map = map.adding(key: "aspectRatio", value: aspectRatioValue)
+                map.append(key: "aspectRatio", value: aspectRatioValue)
             }
             return map
         }

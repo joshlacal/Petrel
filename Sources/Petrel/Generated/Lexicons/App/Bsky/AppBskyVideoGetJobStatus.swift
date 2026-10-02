@@ -39,10 +39,10 @@ public enum AppBskyVideoGetJobStatus {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let jobStatusValue = try jobStatus.toCBORValue()
-            map = map.adding(key: "jobStatus", value: jobStatusValue)
+            map.append(key: "jobStatus", value: jobStatusValue)
 
             return map
         }
@@ -100,7 +100,7 @@ public extension ATProtoClient.App.Bsky.Video {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.getJobStatus: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.video.getJobStatus", error)
                 return (responseCode, nil)
             }
         } else {

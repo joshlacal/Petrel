@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyNotificationPutPreferences {
     public static let typeIdentifier = "app.bsky.notification.putPreferences"
+
     public struct Input: ATProtocolCodable {
         public let priority: Bool
 
@@ -24,9 +25,9 @@ public enum AppBskyNotificationPutPreferences {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let priorityValue = try priority.toCBORValue()
-            map = map.adding(key: "priority", value: priorityValue)
+            map.append(key: "priority", value: priorityValue)
             return map
         }
 

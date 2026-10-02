@@ -19,19 +19,24 @@ public enum ComAtprotoModerationCreateReport {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                name = try container.decode(String.self, forKey: .name)
+                name = try container.decode(String.self, forKey: "name")
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("name", error)
                 throw error
             }
             do {
-                meta = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .meta)
+                meta = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: "meta")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'meta' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("meta", error)
                 meta = nil
             }
         }
@@ -54,27 +59,27 @@ public enum ComAtprotoModerationCreateReport {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if name != other.name {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.name != rhs.name {
                 return false
             }
-            if meta != other.meta {
+            if lhs.meta != rhs.meta {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let nameValue = try name.toCBORValue()
-            map = map.adding(key: "name", value: nameValue)
+            map.append(key: "name", value: nameValue)
             if let value = meta {
                 let metaValue = try value.toCBORValue()
-                map = map.adding(key: "meta", value: metaValue)
+                map.append(key: "meta", value: metaValue)
             }
             return map
         }
@@ -117,18 +122,18 @@ public enum ComAtprotoModerationCreateReport {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
             let reasonTypeValue = try reasonType.toCBORValue()
-            map = map.adding(key: "reasonType", value: reasonTypeValue)
+            map.append(key: "reasonType", value: reasonTypeValue)
             if let value = reason {
                 let reasonValue = try value.toCBORValue()
-                map = map.adding(key: "reason", value: reasonValue)
+                map.append(key: "reason", value: reasonValue)
             }
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
             if let value = modTool {
                 let modToolValue = try value.toCBORValue()
-                map = map.adding(key: "modTool", value: modToolValue)
+                map.append(key: "modTool", value: modToolValue)
             }
             return map
         }
@@ -193,7 +198,7 @@ public enum ComAtprotoModerationCreateReport {
                 reason = try container.decodeIfPresent(String.self, forKey: .reason)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'reason' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("reason", error)
                 reason = nil
             }
 
@@ -222,28 +227,28 @@ public enum ComAtprotoModerationCreateReport {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 6)
 
             let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
+            map.append(key: "id", value: idValue)
 
             let reasonTypeValue = try reasonType.toCBORValue()
-            map = map.adding(key: "reasonType", value: reasonTypeValue)
+            map.append(key: "reasonType", value: reasonTypeValue)
 
             if let value = reason {
                 // Encode optional property even if it's an empty array for CBOR
                 let reasonValue = try value.toCBORValue()
-                map = map.adding(key: "reason", value: reasonValue)
+                map.append(key: "reason", value: reasonValue)
             }
 
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
 
             let reportedByValue = try reportedBy.toCBORValue()
-            map = map.adding(key: "reportedBy", value: reportedByValue)
+            map.append(key: "reportedBy", value: reportedByValue)
 
             let createdAtValue = try createdAt.toCBORValue()
-            map = map.adding(key: "createdAt", value: createdAtValue)
+            map.append(key: "createdAt", value: createdAtValue)
 
             return map
         }
@@ -271,15 +276,17 @@ public enum ComAtprotoModerationCreateReport {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(_lexiconContainer: container)
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(_lexiconContainer: container)
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -333,7 +340,7 @@ public enum ComAtprotoModerationCreateReport {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -344,46 +351,20 @@ public enum ComAtprotoModerationCreateReport {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
-                map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.admin.defs#repoRef",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoRepoStrongRef(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.strongRef",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -403,15 +384,17 @@ public enum ComAtprotoModerationCreateReport {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.admin.defs#repoRef":
-                let value = try ComAtprotoAdminDefs.RepoRef(from: decoder)
+                let value = try ComAtprotoAdminDefs.RepoRef(_lexiconContainer: container)
                 self = .comAtprotoAdminDefsRepoRef(value)
             case "com.atproto.repo.strongRef":
-                let value = try ComAtprotoRepoStrongRef(from: decoder)
+                let value = try ComAtprotoRepoStrongRef(_lexiconContainer: container)
                 self = .comAtprotoRepoStrongRef(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -465,7 +448,7 @@ public enum ComAtprotoModerationCreateReport {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -476,46 +459,20 @@ public enum ComAtprotoModerationCreateReport {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoAdminDefsRepoRef(value):
-                map = map.adding(key: "$type", value: "com.atproto.admin.defs#repoRef")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.admin.defs#repoRef",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoRepoStrongRef(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.strongRef")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.strongRef",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -582,7 +539,7 @@ public extension ATProtoClient.Com.Atproto.Moderation {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.moderation.createReport: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.moderation.createReport", error)
                 return (responseCode, nil)
             }
         } else {

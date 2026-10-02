@@ -39,7 +39,7 @@ public enum ChatBskyConvoGetLog {
                 cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("cursor", error)
                 cursor = nil
             }
 
@@ -56,16 +56,16 @@ public enum ChatBskyConvoGetLog {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = cursor {
                 // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
-                map = map.adding(key: "cursor", value: cursorValue)
+                map.append(key: "cursor", value: cursorValue)
             }
 
             let logsValue = try logs.toCBORValue()
-            map = map.adding(key: "logs", value: logsValue)
+            map.append(key: "logs", value: logsValue)
 
             return map
         }
@@ -229,99 +229,101 @@ public enum ChatBskyConvoGetLog {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "chat.bsky.convo.defs#logBeginConvo":
-                let value = try ChatBskyConvoDefs.LogBeginConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogBeginConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogBeginConvo(value)
             case "chat.bsky.convo.defs#logAcceptConvo":
-                let value = try ChatBskyConvoDefs.LogAcceptConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogAcceptConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogAcceptConvo(value)
             case "chat.bsky.convo.defs#logLeaveConvo":
-                let value = try ChatBskyConvoDefs.LogLeaveConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogLeaveConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogLeaveConvo(value)
             case "chat.bsky.convo.defs#logMuteConvo":
-                let value = try ChatBskyConvoDefs.LogMuteConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogMuteConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogMuteConvo(value)
             case "chat.bsky.convo.defs#logUnmuteConvo":
-                let value = try ChatBskyConvoDefs.LogUnmuteConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogUnmuteConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogUnmuteConvo(value)
             case "chat.bsky.convo.defs#logCreateMessage":
-                let value = try ChatBskyConvoDefs.LogCreateMessage(from: decoder)
+                let value = try ChatBskyConvoDefs.LogCreateMessage(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogCreateMessage(value)
             case "chat.bsky.convo.defs#logDeleteMessage":
-                let value = try ChatBskyConvoDefs.LogDeleteMessage(from: decoder)
+                let value = try ChatBskyConvoDefs.LogDeleteMessage(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogDeleteMessage(value)
             case "chat.bsky.convo.defs#logReadMessage":
-                let value = try ChatBskyConvoDefs.LogReadMessage(from: decoder)
+                let value = try ChatBskyConvoDefs.LogReadMessage(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogReadMessage(value)
             case "chat.bsky.convo.defs#logAddReaction":
-                let value = try ChatBskyConvoDefs.LogAddReaction(from: decoder)
+                let value = try ChatBskyConvoDefs.LogAddReaction(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogAddReaction(value)
             case "chat.bsky.convo.defs#logRemoveReaction":
-                let value = try ChatBskyConvoDefs.LogRemoveReaction(from: decoder)
+                let value = try ChatBskyConvoDefs.LogRemoveReaction(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogRemoveReaction(value)
             case "chat.bsky.convo.defs#logReadConvo":
-                let value = try ChatBskyConvoDefs.LogReadConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogReadConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogReadConvo(value)
             case "chat.bsky.convo.defs#logAddMember":
-                let value = try ChatBskyConvoDefs.LogAddMember(from: decoder)
+                let value = try ChatBskyConvoDefs.LogAddMember(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogAddMember(value)
             case "chat.bsky.convo.defs#logRemoveMember":
-                let value = try ChatBskyConvoDefs.LogRemoveMember(from: decoder)
+                let value = try ChatBskyConvoDefs.LogRemoveMember(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogRemoveMember(value)
             case "chat.bsky.convo.defs#logMemberJoin":
-                let value = try ChatBskyConvoDefs.LogMemberJoin(from: decoder)
+                let value = try ChatBskyConvoDefs.LogMemberJoin(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogMemberJoin(value)
             case "chat.bsky.convo.defs#logMemberLeave":
-                let value = try ChatBskyConvoDefs.LogMemberLeave(from: decoder)
+                let value = try ChatBskyConvoDefs.LogMemberLeave(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogMemberLeave(value)
             case "chat.bsky.convo.defs#logLockConvo":
-                let value = try ChatBskyConvoDefs.LogLockConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogLockConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogLockConvo(value)
             case "chat.bsky.convo.defs#logUnlockConvo":
-                let value = try ChatBskyConvoDefs.LogUnlockConvo(from: decoder)
+                let value = try ChatBskyConvoDefs.LogUnlockConvo(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogUnlockConvo(value)
             case "chat.bsky.convo.defs#logLockConvoPermanently":
-                let value = try ChatBskyConvoDefs.LogLockConvoPermanently(from: decoder)
+                let value = try ChatBskyConvoDefs.LogLockConvoPermanently(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogLockConvoPermanently(value)
             case "chat.bsky.convo.defs#logEditGroup":
-                let value = try ChatBskyConvoDefs.LogEditGroup(from: decoder)
+                let value = try ChatBskyConvoDefs.LogEditGroup(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogEditGroup(value)
             case "chat.bsky.convo.defs#logCreateJoinLink":
-                let value = try ChatBskyConvoDefs.LogCreateJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.LogCreateJoinLink(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogCreateJoinLink(value)
             case "chat.bsky.convo.defs#logEditJoinLink":
-                let value = try ChatBskyConvoDefs.LogEditJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.LogEditJoinLink(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogEditJoinLink(value)
             case "chat.bsky.convo.defs#logEnableJoinLink":
-                let value = try ChatBskyConvoDefs.LogEnableJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.LogEnableJoinLink(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogEnableJoinLink(value)
             case "chat.bsky.convo.defs#logDisableJoinLink":
-                let value = try ChatBskyConvoDefs.LogDisableJoinLink(from: decoder)
+                let value = try ChatBskyConvoDefs.LogDisableJoinLink(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogDisableJoinLink(value)
             case "chat.bsky.convo.defs#logIncomingJoinRequest":
-                let value = try ChatBskyConvoDefs.LogIncomingJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogIncomingJoinRequest(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogIncomingJoinRequest(value)
             case "chat.bsky.convo.defs#logApproveJoinRequest":
-                let value = try ChatBskyConvoDefs.LogApproveJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogApproveJoinRequest(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogApproveJoinRequest(value)
             case "chat.bsky.convo.defs#logRejectJoinRequest":
-                let value = try ChatBskyConvoDefs.LogRejectJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogRejectJoinRequest(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogRejectJoinRequest(value)
             case "chat.bsky.convo.defs#logOutgoingJoinRequest":
-                let value = try ChatBskyConvoDefs.LogOutgoingJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogOutgoingJoinRequest(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogOutgoingJoinRequest(value)
             case "chat.bsky.convo.defs#logWithdrawIncomingJoinRequest":
-                let value = try ChatBskyConvoDefs.LogWithdrawIncomingJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogWithdrawIncomingJoinRequest(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogWithdrawIncomingJoinRequest(value)
             case "chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest":
-                let value = try ChatBskyConvoDefs.LogWithdrawOutgoingJoinRequest(from: decoder)
+                let value = try ChatBskyConvoDefs.LogWithdrawOutgoingJoinRequest(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogWithdrawOutgoingJoinRequest(value)
             case "chat.bsky.convo.defs#logReadJoinRequests":
-                let value = try ChatBskyConvoDefs.LogReadJoinRequests(from: decoder)
+                let value = try ChatBskyConvoDefs.LogReadJoinRequests(_lexiconContainer: container)
                 self = .chatBskyConvoDefsLogReadJoinRequests(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -683,7 +685,7 @@ public enum ChatBskyConvoGetLog {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -694,522 +696,160 @@ public enum ChatBskyConvoGetLog {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .chatBskyConvoDefsLogBeginConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logBeginConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logBeginConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogAcceptConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAcceptConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logAcceptConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogLeaveConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLeaveConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logLeaveConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogMuteConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMuteConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logMuteConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogUnmuteConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logUnmuteConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logUnmuteConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogCreateMessage(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logCreateMessage")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logCreateMessage",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogDeleteMessage(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logDeleteMessage")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logDeleteMessage",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogReadMessage(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logReadMessage")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logReadMessage",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogAddReaction(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAddReaction")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logAddReaction",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogRemoveReaction(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRemoveReaction")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logRemoveReaction",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogReadConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logReadConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logReadConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogAddMember(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logAddMember")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logAddMember",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogRemoveMember(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRemoveMember")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logRemoveMember",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogMemberJoin(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMemberJoin")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logMemberJoin",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogMemberLeave(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logMemberLeave")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logMemberLeave",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogLockConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLockConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logLockConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogUnlockConvo(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logUnlockConvo")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logUnlockConvo",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogLockConvoPermanently(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logLockConvoPermanently")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logLockConvoPermanently",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogEditGroup(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEditGroup")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logEditGroup",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogCreateJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logCreateJoinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logCreateJoinLink",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogEditJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEditJoinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logEditJoinLink",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogEnableJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logEnableJoinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logEnableJoinLink",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogDisableJoinLink(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logDisableJoinLink")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logDisableJoinLink",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogIncomingJoinRequest(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logIncomingJoinRequest")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logIncomingJoinRequest",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogApproveJoinRequest(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logApproveJoinRequest")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logApproveJoinRequest",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogRejectJoinRequest(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logRejectJoinRequest")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logRejectJoinRequest",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogOutgoingJoinRequest(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logOutgoingJoinRequest")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logOutgoingJoinRequest",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogWithdrawIncomingJoinRequest(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logWithdrawIncomingJoinRequest")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logWithdrawIncomingJoinRequest",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogWithdrawOutgoingJoinRequest(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest",
+                    payload: value.toCBORValue()
+                )
             case let .chatBskyConvoDefsLogReadJoinRequests(value):
-                map = map.adding(key: "$type", value: "chat.bsky.convo.defs#logReadJoinRequests")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "chat.bsky.convo.defs#logReadJoinRequests",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -1264,7 +904,7 @@ public extension ATProtoClient.Chat.Bsky.Convo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.getLog: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.convo.getLog", error)
                 return (responseCode, nil)
             }
         } else {

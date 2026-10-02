@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyDraftCreateDraft {
     public static let typeIdentifier = "app.bsky.draft.createDraft"
+
     public struct Input: ATProtocolCodable {
         public let draft: AppBskyDraftDefs.Draft
 
@@ -24,9 +25,9 @@ public enum AppBskyDraftCreateDraft {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let draftValue = try draft.toCBORValue()
-            map = map.adding(key: "draft", value: draftValue)
+            map.append(key: "draft", value: draftValue)
             return map
         }
 
@@ -59,10 +60,10 @@ public enum AppBskyDraftCreateDraft {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let idValue = try id.toCBORValue()
-            map = map.adding(key: "id", value: idValue)
+            map.append(key: "id", value: idValue)
 
             return map
         }
@@ -144,7 +145,7 @@ public extension ATProtoClient.App.Bsky.Draft {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.draft.createDraft: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.draft.createDraft", error)
                 return (responseCode, nil)
             }
         } else {

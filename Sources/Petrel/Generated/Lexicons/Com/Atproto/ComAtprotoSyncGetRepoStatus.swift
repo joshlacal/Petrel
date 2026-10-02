@@ -55,7 +55,7 @@ public enum ComAtprotoSyncGetRepoStatus {
                 status = try container.decodeIfPresent(String.self, forKey: .status)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("status", error)
                 status = nil
             }
 
@@ -63,7 +63,7 @@ public enum ComAtprotoSyncGetRepoStatus {
                 rev = try container.decodeIfPresent(TID.self, forKey: .rev)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'rev' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("rev", error)
                 rev = nil
             }
         }
@@ -83,24 +83,24 @@ public enum ComAtprotoSyncGetRepoStatus {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
 
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
 
             let activeValue = try active.toCBORValue()
-            map = map.adding(key: "active", value: activeValue)
+            map.append(key: "active", value: activeValue)
 
             if let value = status {
                 // Encode optional property even if it's an empty array for CBOR
                 let statusValue = try value.toCBORValue()
-                map = map.adding(key: "status", value: statusValue)
+                map.append(key: "status", value: statusValue)
             }
 
             if let value = rev {
                 // Encode optional property even if it's an empty array for CBOR
                 let revValue = try value.toCBORValue()
-                map = map.adding(key: "rev", value: revValue)
+                map.append(key: "rev", value: revValue)
             }
 
             return map
@@ -173,7 +173,7 @@ public extension ATProtoClient.Com.Atproto.Sync {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.getRepoStatus: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.sync.getRepoStatus", error)
                 return (responseCode, nil)
             }
         } else {

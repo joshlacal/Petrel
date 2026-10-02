@@ -47,7 +47,7 @@ public enum AppBskyFeedGetPostThread {
                 threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'threadgate' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("threadgate", error)
                 threadgate = nil
             }
         }
@@ -62,15 +62,15 @@ public enum AppBskyFeedGetPostThread {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let threadValue = try thread.toCBORValue()
-            map = map.adding(key: "thread", value: threadValue)
+            map.append(key: "thread", value: threadValue)
 
             if let value = threadgate {
                 // Encode optional property even if it's an empty array for CBOR
                 let threadgateValue = try value.toCBORValue()
-                map = map.adding(key: "threadgate", value: threadgateValue)
+                map.append(key: "threadgate", value: threadgateValue)
             }
 
             return map
@@ -111,18 +111,20 @@ public enum AppBskyFeedGetPostThread {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "app.bsky.feed.defs#threadViewPost":
-                let value = try AppBskyFeedDefs.ThreadViewPost(from: decoder)
+                let value = try AppBskyFeedDefs.ThreadViewPost(_lexiconContainer: container)
                 self = .appBskyFeedDefsThreadViewPost(value)
             case "app.bsky.feed.defs#notFoundPost":
-                let value = try AppBskyFeedDefs.NotFoundPost(from: decoder)
+                let value = try AppBskyFeedDefs.NotFoundPost(_lexiconContainer: container)
                 self = .appBskyFeedDefsNotFoundPost(value)
             case "app.bsky.feed.defs#blockedPost":
-                let value = try AppBskyFeedDefs.BlockedPost(from: decoder)
+                let value = try AppBskyFeedDefs.BlockedPost(_lexiconContainer: container)
                 self = .appBskyFeedDefsBlockedPost(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -187,7 +189,7 @@ public enum AppBskyFeedGetPostThread {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -198,63 +200,25 @@ public enum AppBskyFeedGetPostThread {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .appBskyFeedDefsThreadViewPost(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.defs#threadViewPost")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.feed.defs#threadViewPost",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyFeedDefsNotFoundPost(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.defs#notFoundPost")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.feed.defs#notFoundPost",
+                    payload: value.toCBORValue()
+                )
             case let .appBskyFeedDefsBlockedPost(value):
-                map = map.adding(key: "$type", value: "app.bsky.feed.defs#blockedPost")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "app.bsky.feed.defs#blockedPost",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -309,7 +273,7 @@ public extension ATProtoClient.App.Bsky.Feed {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.getPostThread: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.feed.getPostThread", error)
                 return (responseCode, nil)
             }
         } else {

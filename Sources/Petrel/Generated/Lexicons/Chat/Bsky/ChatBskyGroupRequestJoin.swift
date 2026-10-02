@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyGroupRequestJoin {
     public static let typeIdentifier = "chat.bsky.group.requestJoin"
+
     public struct Input: ATProtocolCodable {
         public let code: String
 
@@ -24,9 +25,9 @@ public enum ChatBskyGroupRequestJoin {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let codeValue = try code.toCBORValue()
-            map = map.adding(key: "code", value: codeValue)
+            map.append(key: "code", value: codeValue)
             return map
         }
 
@@ -61,7 +62,7 @@ public enum ChatBskyGroupRequestJoin {
                 convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'convo' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("convo", error)
                 convo = nil
             }
         }
@@ -76,15 +77,15 @@ public enum ChatBskyGroupRequestJoin {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let statusValue = try status.toCBORValue()
-            map = map.adding(key: "status", value: statusValue)
+            map.append(key: "status", value: statusValue)
 
             if let value = convo {
                 // Encode optional property even if it's an empty array for CBOR
                 let convoValue = try value.toCBORValue()
-                map = map.adding(key: "convo", value: convoValue)
+                map.append(key: "convo", value: convoValue)
             }
 
             return map
@@ -172,7 +173,7 @@ public extension ATProtoClient.Chat.Bsky.Group {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.requestJoin: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("chat.bsky.group.requestJoin", error)
                 return (responseCode, nil)
             }
         } else {

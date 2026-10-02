@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoIdentitySubmitPlcOperation {
     public static let typeIdentifier = "com.atproto.identity.submitPlcOperation"
+
     public struct Input: ATProtocolCodable {
         public let operation: ATProtocolValueContainer
 
@@ -24,9 +25,9 @@ public enum ComAtprotoIdentitySubmitPlcOperation {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let operationValue = try operation.toCBORValue()
-            map = map.adding(key: "operation", value: operationValue)
+            map.append(key: "operation", value: operationValue)
             return map
         }
 

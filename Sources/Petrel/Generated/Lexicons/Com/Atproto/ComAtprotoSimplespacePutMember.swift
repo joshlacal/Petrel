@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSimplespacePutMember {
     public static let typeIdentifier = "com.atproto.simplespace.putMember"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let did: DID
@@ -36,15 +37,15 @@ public enum ComAtprotoSimplespacePutMember {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
+            map.append(key: "did", value: didValue)
             let readValue = try read.toCBORValue()
-            map = map.adding(key: "read", value: readValue)
+            map.append(key: "read", value: readValue)
             let writeValue = try write.toCBORValue()
-            map = map.adding(key: "write", value: writeValue)
+            map.append(key: "write", value: writeValue)
             return map
         }
 

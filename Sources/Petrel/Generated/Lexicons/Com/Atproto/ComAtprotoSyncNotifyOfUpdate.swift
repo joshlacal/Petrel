@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSyncNotifyOfUpdate {
     public static let typeIdentifier = "com.atproto.sync.notifyOfUpdate"
+
     public struct Input: ATProtocolCodable {
         public let hostname: String
 
@@ -24,9 +25,9 @@ public enum ComAtprotoSyncNotifyOfUpdate {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
             let hostnameValue = try hostname.toCBORValue()
-            map = map.adding(key: "hostname", value: hostnameValue)
+            map.append(key: "hostname", value: hostnameValue)
             return map
         }
 

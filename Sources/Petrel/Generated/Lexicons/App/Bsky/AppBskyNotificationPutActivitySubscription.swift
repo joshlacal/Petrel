@@ -5,6 +5,7 @@ import Foundation
 
 public enum AppBskyNotificationPutActivitySubscription {
     public static let typeIdentifier = "app.bsky.notification.putActivitySubscription"
+
     public struct Input: ATProtocolCodable {
         public let subject: DID
         public let activitySubscription: AppBskyNotificationDefs.ActivitySubscription
@@ -28,11 +29,11 @@ public enum AppBskyNotificationPutActivitySubscription {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
             let activitySubscriptionValue = try activitySubscription.toCBORValue()
-            map = map.adding(key: "activitySubscription", value: activitySubscriptionValue)
+            map.append(key: "activitySubscription", value: activitySubscriptionValue)
             return map
         }
 
@@ -68,7 +69,7 @@ public enum AppBskyNotificationPutActivitySubscription {
                 activitySubscription = try container.decodeIfPresent(AppBskyNotificationDefs.ActivitySubscription.self, forKey: .activitySubscription)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'activitySubscription' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("activitySubscription", error)
                 activitySubscription = nil
             }
         }
@@ -83,15 +84,15 @@ public enum AppBskyNotificationPutActivitySubscription {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             let subjectValue = try subject.toCBORValue()
-            map = map.adding(key: "subject", value: subjectValue)
+            map.append(key: "subject", value: subjectValue)
 
             if let value = activitySubscription {
                 // Encode optional property even if it's an empty array for CBOR
                 let activitySubscriptionValue = try value.toCBORValue()
-                map = map.adding(key: "activitySubscription", value: activitySubscriptionValue)
+                map.append(key: "activitySubscription", value: activitySubscriptionValue)
             }
 
             return map
@@ -163,7 +164,7 @@ public extension ATProtoClient.App.Bsky.Notification {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.notification.putActivitySubscription: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.notification.putActivitySubscription", error)
                 return (responseCode, nil)
             }
         } else {

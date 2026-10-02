@@ -21,25 +21,30 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                collection = try container.decode(NSID.self, forKey: .collection)
+                collection = try container.decode(NSID.self, forKey: "collection")
             } catch {
-                LogManager.logError("Decoding error for required property 'collection': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("collection", error)
                 throw error
             }
             do {
-                rkey = try container.decodeIfPresent(RecordKey.self, forKey: .rkey)
+                rkey = try container.decodeIfPresent(RecordKey.self, forKey: "rkey")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'rkey' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("rkey", error)
                 rkey = nil
             }
             do {
-                value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
+                value = try container.decode(ATProtocolValueContainer.self, forKey: "value")
             } catch {
-                LogManager.logError("Decoding error for required property 'value': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("value", error)
                 throw error
             }
         }
@@ -64,33 +69,33 @@ public enum ComAtprotoRepoApplyWrites {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if collection != other.collection {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.collection != rhs.collection {
                 return false
             }
-            if rkey != other.rkey {
+            if lhs.rkey != rhs.rkey {
                 return false
             }
-            if value != other.value {
+            if lhs.value != rhs.value {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let collectionValue = try collection.toCBORValue()
-            map = map.adding(key: "collection", value: collectionValue)
+            map.append(key: "collection", value: collectionValue)
             if let value = rkey {
                 let rkeyValue = try value.toCBORValue()
-                map = map.adding(key: "rkey", value: rkeyValue)
+                map.append(key: "rkey", value: rkeyValue)
             }
             let valueValue = try value.toCBORValue()
-            map = map.adding(key: "value", value: valueValue)
+            map.append(key: "value", value: valueValue)
             return map
         }
 
@@ -117,23 +122,28 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                collection = try container.decode(NSID.self, forKey: .collection)
+                collection = try container.decode(NSID.self, forKey: "collection")
             } catch {
-                LogManager.logError("Decoding error for required property 'collection': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("collection", error)
                 throw error
             }
             do {
-                rkey = try container.decode(RecordKey.self, forKey: .rkey)
+                rkey = try container.decode(RecordKey.self, forKey: "rkey")
             } catch {
-                LogManager.logError("Decoding error for required property 'rkey': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rkey", error)
                 throw error
             }
             do {
-                value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
+                value = try container.decode(ATProtocolValueContainer.self, forKey: "value")
             } catch {
-                LogManager.logError("Decoding error for required property 'value': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("value", error)
                 throw error
             }
         }
@@ -154,31 +164,31 @@ public enum ComAtprotoRepoApplyWrites {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if collection != other.collection {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.collection != rhs.collection {
                 return false
             }
-            if rkey != other.rkey {
+            if lhs.rkey != rhs.rkey {
                 return false
             }
-            if value != other.value {
+            if lhs.value != rhs.value {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let collectionValue = try collection.toCBORValue()
-            map = map.adding(key: "collection", value: collectionValue)
+            map.append(key: "collection", value: collectionValue)
             let rkeyValue = try rkey.toCBORValue()
-            map = map.adding(key: "rkey", value: rkeyValue)
+            map.append(key: "rkey", value: rkeyValue)
             let valueValue = try value.toCBORValue()
-            map = map.adding(key: "value", value: valueValue)
+            map.append(key: "value", value: valueValue)
             return map
         }
 
@@ -203,17 +213,22 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                collection = try container.decode(NSID.self, forKey: .collection)
+                collection = try container.decode(NSID.self, forKey: "collection")
             } catch {
-                LogManager.logError("Decoding error for required property 'collection': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("collection", error)
                 throw error
             }
             do {
-                rkey = try container.decode(RecordKey.self, forKey: .rkey)
+                rkey = try container.decode(RecordKey.self, forKey: "rkey")
             } catch {
-                LogManager.logError("Decoding error for required property 'rkey': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("rkey", error)
                 throw error
             }
         }
@@ -232,26 +247,26 @@ public enum ComAtprotoRepoApplyWrites {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if collection != other.collection {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.collection != rhs.collection {
                 return false
             }
-            if rkey != other.rkey {
+            if lhs.rkey != rhs.rkey {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 3)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let collectionValue = try collection.toCBORValue()
-            map = map.adding(key: "collection", value: collectionValue)
+            map.append(key: "collection", value: collectionValue)
             let rkeyValue = try rkey.toCBORValue()
-            map = map.adding(key: "rkey", value: rkeyValue)
+            map.append(key: "rkey", value: rkeyValue)
             return map
         }
 
@@ -277,25 +292,30 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+                validationStatus = try container.decodeIfPresent(String.self, forKey: "validationStatus")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'validationStatus' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("validationStatus", error)
                 validationStatus = nil
             }
         }
@@ -320,32 +340,32 @@ public enum ComAtprotoRepoApplyWrites {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if validationStatus != other.validationStatus {
+            if lhs.validationStatus != rhs.validationStatus {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             if let value = validationStatus {
                 let validationStatusValue = try value.toCBORValue()
-                map = map.adding(key: "validationStatus", value: validationStatusValue)
+                map.append(key: "validationStatus", value: validationStatusValue)
             }
             return map
         }
@@ -373,25 +393,30 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
+            self = try .init(_lexiconContainer: decoder.container(keyedBy: LexiconCodingKey.self))
+        }
+
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                uri = try container.decode(ATProtocolURI.self, forKey: "uri")
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("uri", error)
                 throw error
             }
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                cid = try container.decode(CID.self, forKey: "cid")
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
+                _LexiconDecodeDiagnostics.requiredPropertyFailed("cid", error)
                 throw error
             }
             do {
-                validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+                validationStatus = try container.decodeIfPresent(String.self, forKey: "validationStatus")
             } catch {
                 // Forward compatibility: a malformed or unknown-shaped optional field
                 // must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'validationStatus' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("validationStatus", error)
                 validationStatus = nil
             }
         }
@@ -416,32 +441,32 @@ public enum ComAtprotoRepoApplyWrites {
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            return self == other
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            if lhs.uri != rhs.uri {
                 return false
             }
-            if cid != other.cid {
+            if lhs.cid != rhs.cid {
                 return false
             }
-            if validationStatus != other.validationStatus {
+            if lhs.validationStatus != rhs.validationStatus {
                 return false
             }
             return true
         }
 
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 4)
+            map.append(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
             if let value = validationStatus {
                 let validationStatusValue = try value.toCBORValue()
-                map = map.adding(key: "validationStatus", value: validationStatusValue)
+                map.append(key: "validationStatus", value: validationStatusValue)
             }
             return map
         }
@@ -463,6 +488,12 @@ public enum ComAtprotoRepoApplyWrites {
             _ = decoder
         }
 
+        /// Decodes from an already-opened keyed container. Generated unions pass the
+        /// container they read `$type` from, so the object's keys are materialized once.
+        public init(_lexiconContainer container: KeyedDecodingContainer<LexiconCodingKey>) throws {
+            _ = container
+        }
+
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
@@ -475,12 +506,12 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
+            return true
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            var map = OrderedCBORMap(minimumCapacity: 1)
+            map.append(key: "$type", value: Self.typeIdentifier)
             return map
         }
 
@@ -520,18 +551,18 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 4)
             let repoValue = try repo.toCBORValue()
-            map = map.adding(key: "repo", value: repoValue)
+            map.append(key: "repo", value: repoValue)
             if let value = validate {
                 let validateValue = try value.toCBORValue()
-                map = map.adding(key: "validate", value: validateValue)
+                map.append(key: "validate", value: validateValue)
             }
             let writesValue = try writes.toCBORValue()
-            map = map.adding(key: "writes", value: writesValue)
+            map.append(key: "writes", value: writesValue)
             if let value = swapCommit {
                 let swapCommitValue = try value.toCBORValue()
-                map = map.adding(key: "swapCommit", value: swapCommitValue)
+                map.append(key: "swapCommit", value: swapCommitValue)
             }
             return map
         }
@@ -568,7 +599,7 @@ public enum ComAtprotoRepoApplyWrites {
                 commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("commit", error)
                 commit = nil
             }
 
@@ -576,7 +607,7 @@ public enum ComAtprotoRepoApplyWrites {
                 results = try container.decodeIfPresent([OutputResultsUnion].self, forKey: .results)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'results' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("results", error)
                 results = nil
             }
         }
@@ -592,18 +623,18 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 2)
 
             if let value = commit {
                 // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
-                map = map.adding(key: "commit", value: commitValue)
+                map.append(key: "commit", value: commitValue)
             }
 
             if let value = results {
                 // Encode optional property even if it's an empty array for CBOR
                 let resultsValue = try value.toCBORValue()
-                map = map.adding(key: "results", value: resultsValue)
+                map.append(key: "results", value: resultsValue)
             }
 
             return map
@@ -645,18 +676,20 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.repo.applyWrites#create":
-                let value = try ComAtprotoRepoApplyWrites.Create(from: decoder)
+                let value = try ComAtprotoRepoApplyWrites.Create(_lexiconContainer: container)
                 self = .comAtprotoRepoApplyWritesCreate(value)
             case "com.atproto.repo.applyWrites#update":
-                let value = try ComAtprotoRepoApplyWrites.Update(from: decoder)
+                let value = try ComAtprotoRepoApplyWrites.Update(_lexiconContainer: container)
                 self = .comAtprotoRepoApplyWritesUpdate(value)
             case "com.atproto.repo.applyWrites#delete":
-                let value = try ComAtprotoRepoApplyWrites.Delete(from: decoder)
+                let value = try ComAtprotoRepoApplyWrites.Delete(_lexiconContainer: container)
                 self = .comAtprotoRepoApplyWritesDelete(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -721,7 +754,7 @@ public enum ComAtprotoRepoApplyWrites {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -732,63 +765,25 @@ public enum ComAtprotoRepoApplyWrites {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoRepoApplyWritesCreate(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#create")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.applyWrites#create",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoRepoApplyWritesUpdate(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#update")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.applyWrites#update",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoRepoApplyWritesDelete(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#delete")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.applyWrites#delete",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -813,18 +808,20 @@ public enum ComAtprotoRepoApplyWrites {
         }
 
         public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
+            // One keyed container serves both the `$type` read and object variants
+            // (`init(_lexiconContainer:)`), so the object's keys are materialized once.
+            let container = try decoder.container(keyedBy: LexiconCodingKey.self)
+            let typeValue = try container.decode(String.self, forKey: "$type")
 
             switch typeValue {
             case "com.atproto.repo.applyWrites#createResult":
-                let value = try ComAtprotoRepoApplyWrites.CreateResult(from: decoder)
+                let value = try ComAtprotoRepoApplyWrites.CreateResult(_lexiconContainer: container)
                 self = .comAtprotoRepoApplyWritesCreateResult(value)
             case "com.atproto.repo.applyWrites#updateResult":
-                let value = try ComAtprotoRepoApplyWrites.UpdateResult(from: decoder)
+                let value = try ComAtprotoRepoApplyWrites.UpdateResult(_lexiconContainer: container)
                 self = .comAtprotoRepoApplyWritesUpdateResult(value)
             case "com.atproto.repo.applyWrites#deleteResult":
-                let value = try ComAtprotoRepoApplyWrites.DeleteResult(from: decoder)
+                let value = try ComAtprotoRepoApplyWrites.DeleteResult(_lexiconContainer: container)
                 self = .comAtprotoRepoApplyWritesDeleteResult(value)
             default:
                 let unknownValue = try ATProtocolValueContainer(from: decoder)
@@ -889,7 +886,7 @@ public enum ComAtprotoRepoApplyWrites {
             ):
                 return lhsValue == rhsValue
             case let (.unexpected(lhsValue), .unexpected(rhsValue)):
-                return lhsValue.isEqual(to: rhsValue)
+                return lhsValue == rhsValue
             default:
                 return false
             }
@@ -900,63 +897,25 @@ public enum ComAtprotoRepoApplyWrites {
             return self == other
         }
 
-        /// DAGCBOR encoding with field ordering
+        /// DAGCBOR encoding with field ordering: `$type` first, then the variant's
+        /// own entries in order (see OrderedCBORMap.unionVariant).
         public func toCBORValue() throws -> Any {
-            // Create an ordered map to maintain field order
-            var map = OrderedCBORMap()
-
             switch self {
             case let .comAtprotoRepoApplyWritesCreateResult(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#createResult")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.applyWrites#createResult",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoRepoApplyWritesUpdateResult(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#updateResult")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.applyWrites#updateResult",
+                    payload: value.toCBORValue()
+                )
             case let .comAtprotoRepoApplyWritesDeleteResult(value):
-                map = map.adding(key: "$type", value: "com.atproto.repo.applyWrites#deleteResult")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
+                return try OrderedCBORMap.unionVariant(
+                    typeIdentifier: "com.atproto.repo.applyWrites#deleteResult",
+                    payload: value.toCBORValue()
+                )
             case let .unexpected(container):
                 return try container.toCBORValue()
             }
@@ -1023,7 +982,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.repo.applyWrites: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.repo.applyWrites", error)
                 return (responseCode, nil)
             }
         } else {

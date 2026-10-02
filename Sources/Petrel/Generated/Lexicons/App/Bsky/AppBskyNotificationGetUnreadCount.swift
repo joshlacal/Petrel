@@ -42,10 +42,10 @@ public enum AppBskyNotificationGetUnreadCount {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 1)
 
             let countValue = try count.toCBORValue()
-            map = map.adding(key: "count", value: countValue)
+            map.append(key: "count", value: countValue)
 
             return map
         }
@@ -103,7 +103,7 @@ public extension ATProtoClient.App.Bsky.Notification {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.notification.getUnreadCount: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("app.bsky.notification.getUnreadCount", error)
                 return (responseCode, nil)
             }
         } else {

@@ -5,6 +5,7 @@ import Foundation
 
 public enum ComAtprotoSpaceCreateRecord {
     public static let typeIdentifier = "com.atproto.space.createRecord"
+
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
         public let repo: DID
@@ -70,23 +71,23 @@ public enum ComAtprotoSpaceCreateRecord {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 6)
             let spaceValue = try space.toCBORValue()
-            map = map.adding(key: "space", value: spaceValue)
+            map.append(key: "space", value: spaceValue)
             let repoValue = try repo.toCBORValue()
-            map = map.adding(key: "repo", value: repoValue)
+            map.append(key: "repo", value: repoValue)
             let collectionValue = try collection.toCBORValue()
-            map = map.adding(key: "collection", value: collectionValue)
+            map.append(key: "collection", value: collectionValue)
             if let value = rkey {
                 let rkeyValue = try value.toCBORValue()
-                map = map.adding(key: "rkey", value: rkeyValue)
+                map.append(key: "rkey", value: rkeyValue)
             }
             if let value = validate {
                 let validateValue = try value.toCBORValue()
-                map = map.adding(key: "validate", value: validateValue)
+                map.append(key: "validate", value: validateValue)
             }
             let recordValue = try record.toCBORValue()
-            map = map.adding(key: "record", value: recordValue)
+            map.append(key: "record", value: recordValue)
             return map
         }
 
@@ -134,7 +135,7 @@ public enum ComAtprotoSpaceCreateRecord {
                 validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
             } catch {
                 // Forward compatibility: a malformed optional field must not fail the whole response.
-                LogManager.logWarning("Decoding error for optional property 'validationStatus' — degrading to nil: \(error)")
+                _LexiconDecodeDiagnostics.optionalPropertyDegraded("validationStatus", error)
                 validationStatus = nil
             }
         }
@@ -151,18 +152,18 @@ public enum ComAtprotoSpaceCreateRecord {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
+            var map = OrderedCBORMap(minimumCapacity: 3)
 
             let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            map.append(key: "uri", value: uriValue)
 
             let cidValue = try cid.toCBORValue()
-            map = map.adding(key: "cid", value: cidValue)
+            map.append(key: "cid", value: cidValue)
 
             if let value = validationStatus {
                 // Encode optional property even if it's an empty array for CBOR
                 let validationStatusValue = try value.toCBORValue()
-                map = map.adding(key: "validationStatus", value: validationStatusValue)
+                map.append(key: "validationStatus", value: validationStatusValue)
             }
 
             return map
@@ -269,7 +270,7 @@ public extension ATProtoClient.Com.Atproto.Space {
                 return (responseCode, decodedData)
             } catch {
                 // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.createRecord: \(error)")
+                _LexiconDecodeDiagnostics.successfulResponseDecodeFailed("com.atproto.space.createRecord", error)
                 return (responseCode, nil)
             }
         } else {
