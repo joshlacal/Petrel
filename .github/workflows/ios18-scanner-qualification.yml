@@ -1,0 +1,162 @@
+name: iOS 18 scanner qualification
+
+'on':
+  push:
+    branches: [codex/petrel-ios18-qualification-20261002]
+  # Initial execution uses the branch push; dispatch requires default-branch registration.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  qualify:
+    if: github.ref == 'refs/heads/codex/petrel-ios18-qualification-20261002'
+    runs-on: macos-15
+    timeout-minutes: 45
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_16.4.app/Contents/Developer
+      FROZEN_SOURCE: 329b5fbe412286ff4c094246b6f30c2989e58f94
+    steps:
+      - name: Prepare evidence directory
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$RUNNER_TEMP/petrel-ios18-qualification"
+          printf 'EVIDENCE_DIR=%s/petrel-ios18-qualification\n' "$RUNNER_TEMP" >> "$GITHUB_ENV"
+
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Verify source, Xcode, and iOS 18.5 simulator
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          git rev-parse HEAD > "$EVIDENCE_DIR/checkout-commit.txt"
+          printf '%s\n' "$FROZEN_SOURCE" > "$EVIDENCE_DIR/frozen-source-commit.txt"
+          git diff --name-only "$FROZEN_SOURCE" HEAD > "$EVIDENCE_DIR/source-delta.txt"
+          git diff "$FROZEN_SOURCE" HEAD > "$EVIDENCE_DIR/source-delta.patch"
+          cp Package.swift Package.resolved "$EVIDENCE_DIR/"
+          shasum -a 256 Package.swift Package.resolved > "$EVIDENCE_DIR/package-sha256.txt"
+          sw_vers > "$EVIDENCE_DIR/host-version.txt"
+          printf '%s\n' "${ImageOS:-unknown}" "${ImageVersion:-unknown}" > "$EVIDENCE_DIR/runner-image.txt"
+          xcodebuild -version | tee "$EVIDENCE_DIR/xcode-version.txt"
+          xcrun swift --version | tee "$EVIDENCE_DIR/swift-version.txt"
+          xcrun --sdk iphonesimulator --show-sdk-version > "$EVIDENCE_DIR/simulator-sdk-version.txt"
+          xcrun simctl list runtimes --json > "$EVIDENCE_DIR/runtimes.json"
+          xcrun simctl list devices available --json > "$EVIDENCE_DIR/devices.json"
+          python3 - <<'PY'
+          import json, os, pathlib, re
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          allowed = {".github/workflows/ios18-scanner-qualification.yml"}
+          changed = set((evidence / "source-delta.txt").read_text().splitlines())
+          assert changed == allowed, f"Unexpected source delta: {sorted(changed)}"
+          assert (evidence / "xcode-version.txt").read_text().splitlines() == ["Xcode 16.4", "Build version 16F6"], "Xcode identity mismatch"
+          assert (evidence / "simulator-sdk-version.txt").read_text().strip() == "18.5", "SDK identity mismatch"
+          runtimes = json.loads((evidence / "runtimes.json").read_text())["runtimes"]
+          matches = [r for r in runtimes if r.get("isAvailable") and r.get("version") == "18.5" and r.get("identifier") == "com.apple.CoreSimulator.SimRuntime.iOS-18-5"]
+          assert len(matches) == 1, "Required available iOS 18.5 runtime is missing or ambiguous"
+          runtime = matches[0]
+          devices = json.loads((evidence / "devices.json").read_text())["devices"].get(runtime["identifier"], [])
+          matches = [d for d in devices if d.get("isAvailable") and d.get("name") == "iPhone 16"]
+          assert len(matches) == 1, "Required available iPhone 16 simulator is missing or ambiguous"
+          device = matches[0]
+          assert re.fullmatch(r"[0-9A-Fa-f-]{36}", device["udid"]), "Invalid simulator UUID"
+          (evidence / "selected-runtime-device.json").write_text(json.dumps({"runtime": runtime, "device": device}, indent=2) + "\n")
+          with open(os.environ["GITHUB_ENV"], "a") as output:
+              output.write(f'SIMULATOR_UDID={device["udid"]}\n')
+          print(json.dumps({"runtime": runtime["version"], "device": device["name"], "udid": device["udid"]}))
+          PY
+
+      - name: Execute scanner and URI equivalence tests on iOS 18.5
+        timeout-minutes: 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun simctl bootstatus "$SIMULATOR_UDID" -b | tee "$EVIDENCE_DIR/simulator-boot.log"
+          xcrun simctl list devices --json > "$EVIDENCE_DIR/devices-after-boot.json"
+          command=(xcodebuild test
+            -scheme Petrel
+            -destination "platform=iOS Simulator,id=$SIMULATOR_UDID"
+            -jobs 2
+            -parallel-testing-enabled NO
+            -maximum-concurrent-test-simulator-destinations 1
+            -only-testing:PetrelTests/LeafScannerEquivalenceTests
+            -only-testing:PetrelTests/URIScanTests
+            -only-testing:PetrelTests/URIWireFidelityTests
+            -disableAutomaticPackageResolution
+            -onlyUsePackageVersionsFromResolvedFile
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/petrel-ios18-packages"
+            -derivedDataPath "$RUNNER_TEMP/petrel-ios18-derived-data"
+            -resultBundlePath "$EVIDENCE_DIR/qualification.xcresult")
+          printf '%q ' "${command[@]}" > "$EVIDENCE_DIR/test-command.txt"
+          printf '\n' >> "$EVIDENCE_DIR/test-command.txt"
+          set +e
+          "${command[@]}" 2>&1 | tee "$EVIDENCE_DIR/xcodebuild-test.log"
+          statuses=("${PIPESTATUS[@]}")
+          set -e
+          printf '%s\n' "${statuses[0]}" > "$EVIDENCE_DIR/xcodebuild-exit-code.txt"
+          printf '%s\n' "${statuses[1]}" > "$EVIDENCE_DIR/log-capture-exit-code.txt"
+          test "${statuses[0]}" -eq 0
+          test "${statuses[1]}" -eq 0
+
+      - name: Verify executed tests and retain result metadata
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$EVIDENCE_DIR"
+          test -d "$EVIDENCE_DIR/qualification.xcresult"
+          xcrun xcresulttool get test-results summary --path "$EVIDENCE_DIR/qualification.xcresult" > "$EVIDENCE_DIR/test-summary.json"
+          xcrun xcresulttool get test-results tests --path "$EVIDENCE_DIR/qualification.xcresult" > "$EVIDENCE_DIR/test-tree.json"
+          cmp Package.resolved "$EVIDENCE_DIR/Package.resolved"
+          git diff --exit-code -- Sources Tests Package.swift Package.resolved
+          python3 - <<'PY' 2>&1 | tee "$EVIDENCE_DIR/qualification-check.log"
+          import json, os, pathlib
+
+          evidence = pathlib.Path(os.environ["EVIDENCE_DIR"])
+          summary = json.loads((evidence / "test-summary.json").read_text())
+          tree = json.loads((evidence / "test-tree.json").read_text())
+          selected = json.loads((evidence / "selected-runtime-device.json").read_text())
+          assert (evidence / "xcodebuild-exit-code.txt").read_text().strip() == "0", "xcodebuild failed"
+          assert summary.get("result") == "Passed", "Test result did not pass"
+          assert summary.get("passedTests", 0) > 0 and summary.get("failedTests") == 0, "No passing tests or some failed tests"
+          assert summary.get("skippedTests") == 0 and summary.get("expectedFailures") == 0, "Skipped tests or expected failures cannot qualify"
+          devices = tree.get("devices", [])
+          assert devices, "Result bundle has no executed device metadata"
+          assert all(d.get("osVersion") == "18.5" and d.get("deviceId") == selected["device"]["udid"] for d in devices), "Executed device differs from selected iOS 18.5 simulator"
+
+          def walk(nodes):
+              for node in nodes:
+                  yield node
+                  yield from walk(node.get("children", []))
+
+          cases = [n for n in walk(tree.get("testNodes", [])) if n.get("nodeType") == "Test Case"]
+          assert cases and all(n.get("result") == "Passed" for n in cases), "Missing or nonpassing test cases"
+          identifiers = [n.get("nodeIdentifier", "") for n in cases]
+          required = {
+              "LeafScannerEquivalenceTests": ["dateSweep()", "dateEdgeShapes()", "dateFormatting()", "fuzzATURI()"],
+              "URIScanTests": ["simpleHTTPMatchesURLComponents()", "uriFieldsMatchLegacy()"],
+              "URIWireFidelityTests": ["paddedURIsStayTrimmed()", "legacyBlobRoundTrips()"],
+          }
+          for suite, methods in required.items():
+              for method in methods:
+                  assert any(f"{suite}/{method}" in identifier for identifier in identifiers), f"Required test did not execute: {suite}/{method}"
+          receipt = {"qualified": True, "frozenSource": os.environ["FROZEN_SOURCE"], "runtimeVersion": "18.5", "deviceId": selected["device"]["udid"], "passedTests": summary["passedTests"], "requiredTests": required, "executedTestIdentifiers": identifiers}
+          (evidence / "qualification.json").write_text(json.dumps(receipt, indent=2) + "\n")
+          print(json.dumps(receipt, indent=2))
+          PY
+
+      - name: Upload qualification evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: petrel-ios18-qualification-${{ github.sha }}-${{ github.run_attempt }}
+          path: ${{ env.EVIDENCE_DIR }}
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 14
