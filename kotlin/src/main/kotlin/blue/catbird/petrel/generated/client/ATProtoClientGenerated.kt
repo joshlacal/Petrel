@@ -341,18 +341,6 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
-            val simplespace: Simplespace = Simplespace()
-
-            inner class Simplespace {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val space: Space = Space()
-
-            inner class Space {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
             val sync: Sync = Sync()
 
             inner class Sync {
