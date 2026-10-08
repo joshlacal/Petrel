@@ -213,6 +213,97 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         return (client, storage)
     }
 
+    func testNetworkCurrentGateway401EmitsScopedProofWithoutLegacyLogout() async throws {
+        try await withInMemoryBackend { _ in
+            let (client, storage) = try await makeClient(namespace: "test.network.scoped.failure.\(UUID().uuidString)")
+            let proofs = TestThreadSafeArray<GatewaySessionFailureContext>()
+            let legacyEvents = TestThreadSafeArray<AuthEvent>()
+            await AuthEventBroadcaster.shared.addObserver { event in
+                switch event {
+                case let .gatewaySessionRejected(context, _): proofs.append(context)
+                case .autoLogoutTriggered: legacyEvents.append(event)
+                default: break
+                }
+            }
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                let response = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil,
+                                               headerFields: ["Content-Type": "application/json"])!
+                return (response, Data(#"{"error":"invalid_session","message":"Session expired"}"#.utf8))
+            }
+            do {
+                _ = try await client.networkService.request(URLRequest(
+                    url: gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile")
+                ), skipTokenRefresh: false)
+                XCTFail("Expected rejected gateway request")
+            } catch let error as NetworkError {
+                guard case .authenticationRequired = error else { throw error }
+            }
+            await AuthEventBroadcaster.shared.removeAllObservers()
+            XCTAssertEqual(proofs.values.count, 1)
+            XCTAssertTrue(legacyEvents.values.isEmpty)
+            let proof = try XCTUnwrap(proofs.values.first)
+            XCTAssertEqual(proof.did, aliceDID)
+            let isCurrent = await client.isCurrentGatewaySessionFailure(proof)
+            XCTAssertTrue(isCurrent, "The actual network event must remain actionable")
+            let removed = try await storage.getGatewaySession(for: aliceDID)
+            XCTAssertNil(removed)
+        }
+    }
+
+    func testNetworkLateTarget401CannotInvalidateRestoredAccount() async throws {
+        try await withInMemoryBackend { _ in
+            let targetToken = UUID().uuidString.lowercased()
+            let (client, storage) = try await makeClient(
+                namespace: "test.network.late.target.\(UUID().uuidString)", initialSession: targetToken
+            )
+            let restoredToken = UUID().uuidString.lowercased()
+            try await storage.saveAccount(Account(did: bobDID, handle: "bob.test", pdsURL: gatewayURL), for: bobDID)
+            try await storage.saveGatewaySession(restoredToken, for: bobDID)
+            let failures = TestThreadSafeArray<AuthEvent>()
+            await AuthEventBroadcaster.shared.addObserver { event in
+                switch event {
+                case .gatewaySessionRejected, .autoLogoutTriggered: failures.append(event)
+                default: break
+                }
+            }
+            let requestStarted = TestAsyncGate()
+            let releaseResponse = TestAsyncGate()
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                requestStarted.open()
+                releaseResponse.waitBlocking()
+                let response = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil,
+                                               headerFields: ["Content-Type": "application/json"])!
+                return (response, Data(#"{"error":"invalid_session","message":"Session expired"}"#.utf8))
+            }
+            let url = gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile")
+            let task = Task { try await client.networkService.request(URLRequest(url: url), skipTokenRefresh: false) }
+            await requestStarted.wait()
+            do {
+                try await client.switchToAccount(did: bobDID)
+            } catch {
+                releaseResponse.open()
+                _ = try? await task.value
+                await AuthEventBroadcaster.shared.removeAllObservers()
+                throw error
+            }
+            releaseResponse.open()
+            do {
+                _ = try await task.value
+                XCTFail("Expected rejected stale request")
+            } catch let error as NetworkError {
+                guard case .authenticationRequired = error else { throw error }
+            }
+            await AuthEventBroadcaster.shared.removeAllObservers()
+            XCTAssertTrue(failures.values.isEmpty)
+            let active = try await client.getDid()
+            XCTAssertEqual(active, bobDID)
+            let source = try await storage.getGatewaySession(for: bobDID)
+            let target = try await storage.getGatewaySession(for: aliceDID)
+            XCTAssertEqual(source, restoredToken)
+            XCTAssertEqual(target, targetToken)
+        }
+    }
+
     // MARK: - 1. Start Scope Upgrade Tests
 
     func testStartUpgradeSendsCorrectWireRequestAndValidatesParameters() async throws {
@@ -2621,7 +2712,9 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 storage: storage,
                 accountManager: accountManager
             )
-            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            var req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            // Recovery is authorized only by the credential rejected by this response.
+            req.setValue("Bearer \(oldSessionUUID)", forHTTPHeaderField: "Authorization")
             let gateway401Response = HTTPURLResponse(
                 url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
                 statusCode: 401,
@@ -3823,6 +3916,12 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             """.data(using: .utf8)!
             try await storage.savePendingGatewayUpgradeData(pendingState, for: alice)
 
+            // Keep the storage actor's warmed bearer cache intact. Persisted corruption
+            // must be detected before a retryable commit response can preserve continuity.
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                return (HTTPURLResponse(url: request.url!, statusCode: 503, httpVersion: nil, headerFields: nil)!, Data())
+            }
+
             // 1. Plant invalid UTF-8 bytes at currentDID key (corrupted selector)
             let invalidUTF8 = Data([0xFF, 0xFE, 0xFD, 0x00, 0xFF])
             KeychainManager.clearCache()
@@ -3839,6 +3938,14 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
 
             let isValidWithCorruptedSession = await client.hasValidSession()
             XCTAssertFalse(isValidWithCorruptedSession, "Corrupted session must be terminal (hasValidSession = false)")
+
+            XCTAssertEqual(GatewayUpgradeTestURLProtocol.recordedRequests().count, 0,
+                           "Corrupted persisted recovery state must fail before any commit request")
+            XCTAssertEqual(backend.peek(key: "gatewaySession.\(alice)", namespace: namespace), invalidUTF8,
+                           "Terminal storage validation must preserve the existing bytes")
+            let pendingAfterFailure = try await storage.getPendingGatewayUpgradeData(for: alice)
+            XCTAssertEqual(pendingAfterFailure, pendingState,
+                           "Terminal storage validation must preserve pending candidate recovery state")
         }
     }
 
@@ -4493,7 +4600,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 "Bearer \(candidateUUID)",
                 "prepareAuthenticatedRequestWithContext must return the candidate session"
             )
-            XCTAssertNil(ctx.did)
+            XCTAssertEqual(ctx.did, alice)
             XCTAssertNil(ctx.jkt)
         }
     }
@@ -4817,7 +4924,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             // Task 3 must execute and succeed without coordinator deadlock
             let (authedReq3, ctx3) = try await task3.value
             XCTAssertEqual(authedReq3.value(forHTTPHeaderField: "Authorization"), "Bearer \(initialSessionUUID)")
-            XCTAssertNil(ctx3.did)
+            XCTAssertEqual(ctx3.did, alice)
             XCTAssertNil(ctx3.jkt)
             ctx3.releaseAuthenticationLease()
 
@@ -6033,7 +6140,9 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 accountManager: accountManager
             )
 
-            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            var req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            // Recovery is authorized only by the credential rejected by this response.
+            req.setValue("Bearer \(oldSessionUUID)", forHTTPHeaderField: "Authorization")
             let gateway401Response = HTTPURLResponse(
                 url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
                 statusCode: 401,
@@ -6143,7 +6252,9 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 accountManager: accountManager
             )
 
-            let req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            var req = URLRequest(url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"))
+            // Recovery is authorized only by the credential rejected by this response.
+            req.setValue("Bearer \(oldSessionUUID)", forHTTPHeaderField: "Authorization")
             let gateway401Response = HTTPURLResponse(
                 url: self.gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile"),
                 statusCode: 401,

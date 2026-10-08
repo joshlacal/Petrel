@@ -355,21 +355,20 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         data: Data,
         for request: URLRequest
     ) async throws -> (Data, HTTPURLResponse) {
-        let invalidatesGatewayContinuity = currentMode == .gateway
-            && gatewayBaseURL.map {
-                isTerminalGatewayUnauthorized(data: data, request: request, gatewayURL: $0)
-            } == true
-        if invalidatesGatewayContinuity {
-            // The strategy will clear the local session. Change continuity
-            // before forwarding across the actor boundary.
-            await beginAuthContinuityMutation()
-        }
-        defer {
-            if invalidatesGatewayContinuity {
-                endAuthContinuityMutation()
-            }
-        }
+        // Actual credential mutations notify continuity through KeychainStorage.
+        // A stale response must not invalidate the currently selected identity.
         return try await activeStrategy.handleUnauthorizedResponse(response, data: data, for: request)
+    }
+
+    func handleUnauthorizedResponse(
+        _ response: HTTPURLResponse, data: Data, for request: URLRequest, context: AuthContext?
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await activeStrategy.handleUnauthorizedResponse(response, data: data, for: request, context: context)
+    }
+
+    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
+        guard currentMode == .gateway else { return false }
+        return await storage.isCurrentGatewaySessionFailure(context)
     }
 
     func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {

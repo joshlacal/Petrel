@@ -66,6 +66,9 @@ public enum AuthEvent: Sendable, Equatable {
     /// Auto-logout triggered due to unrecoverable auth error
     case autoLogoutTriggered(did: String, reason: String)
 
+    /// A credential-specific gateway rejection, revalidated by the client before UI effects.
+    case gatewaySessionRejected(context: GatewaySessionFailureContext, reason: String)
+
     // MARK: - Error Events
 
     /// Account not found during set current account

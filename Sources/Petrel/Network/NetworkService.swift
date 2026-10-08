@@ -304,6 +304,12 @@ public protocol AuthenticationProvider: Sendable {
     func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest)
         async throws -> (Data, HTTPURLResponse)
 
+    /// Handles a response using the immutable principal captured with its credential.
+    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest,
+                                    context: AuthContext?) async throws -> (Data, HTTPURLResponse)
+
+    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool
+
     /// Updates the DPoP nonce for a URL, optionally scoped to a specific DID and DPoP key thumbprint (JKT)
     /// - Parameters:
     ///   - url: The URL to update the nonce for
@@ -311,6 +317,15 @@ public protocol AuthenticationProvider: Sendable {
     ///   - did: Optional DID that was used to authenticate the request
     ///   - jkt: Optional JWK thumbprint (key id) for DPoP key used to sign the request
     func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async
+}
+
+public extension AuthenticationProvider {
+    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest,
+                                    context: AuthContext?) async throws -> (Data, HTTPURLResponse) {
+        try await handleUnauthorizedResponse(response, data: data, for: request)
+    }
+
+    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool { false }
 }
 
 /// Protocol defining the interface for network services.
@@ -1007,8 +1022,13 @@ public actor NetworkService: NetworkServiceProtocol {
         return parseLabelerHeader(contentLabelers)
     }
 
-    /// Sets the authentication provider for authenticated requests
-    /// - Parameter provider: The authentication provider
+    /// Validates a queued gateway rejection against this provider's current storage.
+    public func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
+        guard gatewayMode, let authProvider else { return false }
+        return await authProvider.isCurrentGatewaySessionFailure(context)
+    }
+
+    /// Sets the authentication provider for authenticated requests.
     public func setAuthenticationProvider(_ provider: AuthenticationProvider) async {
         await requestDeduplicator.cancelAllRequests()
         if let continuityProvider = provider as? any AuthContinuityProviding,
@@ -1291,7 +1311,10 @@ public actor NetworkService: NetworkServiceProtocol {
                 let request = requestToSend
 
                 // Use deduplicator for non-refresh requests to prevent concurrent identical calls
-                let authIdentity = authCtx?.did ?? request.value(forHTTPHeaderField: "Authorization")
+                // Gateway requests must stay distinct across same-DID bearer rotation.
+                let authIdentity = gatewayMode
+                    ? request.value(forHTTPHeaderField: "Authorization")
+                    : (authCtx?.did ?? request.value(forHTTPHeaderField: "Authorization"))
                 let (data, response) = if !skipTokenRefresh {
                     try await requestDeduplicator.deduplicate(request: request, authIdentity: authIdentity) { @Sendable [session, sessionDelegate] in
                         return try await Self.executeDataTask(request, using: session, delegate: sessionDelegate)
@@ -1388,8 +1411,10 @@ public actor NetworkService: NetworkServiceProtocol {
                         )
                         let autoLogoutDID = authCtx?.did ?? ""
                         // Broadcast auto-logout event so UI can redirect to reauth
-                        Task {
-                            await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "401_no_auth_provider_or_url"))
+                        if !gatewayMode {
+                            Task {
+                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "401_no_auth_provider_or_url"))
+                            }
                         }
                         throw NetworkError.authenticationRequired // Cannot handle 401 without provider/URL
                     }
@@ -1418,46 +1443,29 @@ public actor NetworkService: NetworkServiceProtocol {
                         LogManager.logInfo("Network Service - Gateway mode: delegating 401 to auth provider")
                         do {
                             let (retryData, retryResponse) = try await authProvider.handleUnauthorizedResponse(
-                                httpResponse, data: decompressedData, for: requestToSend
+                                httpResponse, data: decompressedData, for: requestToSend, context: authCtx
                             )
                             return (retryData, retryResponse)
+                        } catch let rejection as ScopedGatewaySessionRejection {
+                            // Await delivery; do not create another unstructured event task.
+                            // Consumers still revalidate, since observers can suspend.
+                            if await authProvider.isCurrentGatewaySessionFailure(rejection.context) {
+                                await AuthEventBroadcaster.shared.broadcast(.gatewaySessionRejected(
+                                    context: rejection.context, reason: rejection.reason
+                                ))
+                            }
+                            throw NetworkError.authenticationRequired
                         } catch let gatewayError as ConfidentialGatewayStrategy.GatewayError {
                             LogManager.logError(
                                 "Network Service - Gateway mode: auth provider returned gateway error: \(gatewayError)"
                             )
 
-                            let reason: String? = {
-                                switch gatewayError {
-                                case .sessionExpired:
-                                    return "gateway_session_expired"
-                                case .invalidSession:
-                                    return "gateway_invalid_session"
-                                case .missingSession:
-                                    return "gateway_missing_session"
-                                case .authenticationRequired,
-                                     .invalidCallbackURL,
-                                     .invalidGatewayURL,
-                                     .networkError,
-                                     .upgradeTemporarilyUnavailable,
-                                     .upgradeFailed:
-                                    return nil
-                                }
-                            }()
-
-                            if let reason {
-                                let autoLogoutDID = authCtx?.did ?? ""
-                                Task {
-                                    await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: reason))
-                                }
-                            }
+                            // Without a credential-bound proof, this is a request failure,
+                            // never authority to invalidate whichever account is now active.
                             throw NetworkError.authenticationRequired
                         } catch {
                             LogManager.logError("Network Service - Gateway mode: auth provider failed to handle 401: \(error)")
-                            // Unknown gateway auth failure - still signal auto-logout as a fallback.
-                            let autoLogoutDID = authCtx?.did ?? ""
-                            Task {
-                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "gateway_401_unhandled_unknown"))
-                            }
+                            // Storage/transport/unknown errors cannot prove session expiry.
                             throw NetworkError.authenticationRequired
                         }
                     }

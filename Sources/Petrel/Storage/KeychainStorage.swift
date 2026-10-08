@@ -841,6 +841,46 @@ public actor KeychainStorage {
         return true
     }
 
+    /// Produces an invalidation proof only for the exact selected credential.
+    /// Keep the post-mutation generation inside the same gate as the CAS.
+    func recordGatewaySessionFailure(
+        ifMatches expectedSession: String, for did: String, deleteMatchingSession: Bool
+    ) async throws -> GatewaySessionFailureContext? {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+        guard try await readExactCurrentDID() == did,
+              try await readExactPerDIDGatewaySession(for: did) == expectedSession else {
+            return nil
+        }
+        if deleteMatchingSession {
+            try await deleteGatewaySessionInternal(for: did)
+        }
+        let scope = accountScopeDID(for: did)
+        return GatewaySessionFailureContext(
+            did: did, storageScope: scope,
+            generation: AccountMutationHub.shared.generation(for: scope),
+            expectedSession: deleteMatchingSession ? nil : expectedSession
+        )
+    }
+
+    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+        let scope = accountScopeDID(for: context.did)
+        guard scope == context.storageScope,
+              AccountMutationHub.shared.generation(for: scope) == context.generation else { return false }
+        do {
+            guard try await readExactCurrentDID() == context.did else { return false }
+            let session = try await readExactPerDIDGatewaySession(for: context.did)
+            return context.matchesSession(session)
+                && AccountMutationHub.shared.generation(for: scope) == context.generation
+        } catch {
+            return false
+        }
+    }
+
     private func deleteGatewaySessionInternal(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
         let continuityTicket = await beginAuthContinuityMutation()
@@ -911,6 +951,24 @@ public actor KeychainStorage {
             throw error
         }
     }
+    /// Snapshot the exact stored selector and bearer before pending-candidate recovery.
+    /// Cached actor values cannot establish whether the persisted old anchor is usable.
+    /// The gate serializes this snapshot with same-process selector/session mutations;
+    /// candidate promotion still performs its own authoritative CAS after the request.
+    func readGatewayCandidateRecoveryState(
+        for did: String
+    ) async throws -> (currentDID: String?, session: String?) {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+
+        // Subsequent recovery checks must not reuse an older actor-cache anchor.
+        gatewaySessionCache.removeValue(forKey: did)
+        let currentDID = try await readExactCurrentDID()
+        guard currentDID == did else { return (currentDID, nil) }
+        return (currentDID, try await readExactPerDIDGatewaySession(for: did))
+    }
+
     /// Reads the selector directly using authoritative (cache-bypassing) keychain reads.
     private func readExactCurrentDID() async throws -> String? {
         let key = makeKey("currentDID")

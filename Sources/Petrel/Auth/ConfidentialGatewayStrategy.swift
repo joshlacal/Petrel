@@ -1152,11 +1152,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard let currentAccount = await accountManager.getCurrentAccount(), currentAccount.did == targetDID else {
             throw AuthError.invalidCredentials
         }
-        guard let keychainCurrentDID = try await storage.getCurrentDID(), keychainCurrentDID == targetDID else {
+        let storedState = try await storage.readGatewayCandidateRecoveryState(for: targetDID)
+        guard storedState.currentDID == targetDID else {
             throw AuthError.invalidCredentials
         }
         let (pendingState, candidateSession, candidateGrants) = recovery
-        guard let currentSession = try await storage.getGatewaySession(for: targetDID), !currentSession.isEmpty else {
+        guard let currentSession = storedState.session, !currentSession.isEmpty else {
             throw GatewayError.missingSession
         }
 
@@ -1758,9 +1759,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     ) {
         let lease = try await coordinator.acquireLease()
         do {
-            let authed = try await self.prepareAuthenticatedRequestLocked(request)
-            // For gateway auth, we don't have DID/JKT at request time - gateway handles it
-            return (authed, AuthContext(did: nil, jkt: nil, lease: lease))
+            // Capture identity and bearer from one selection, before any suspension
+            // can make a later getCurrentAccount refer to another account.
+            let identity = try await gatewaySessionLocked()
+            var authed = request
+            authed.setValue("Bearer \(identity.session)", forHTTPHeaderField: "Authorization")
+            return (authed, AuthContext(did: identity.did, jkt: nil, lease: lease))
         } catch {
             lease.release()
             throw error
@@ -1773,7 +1777,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         LogManager.logDebug(
             "ConfidentialGatewayStrategy - Adding Bearer token to request: \(request.url?.absoluteString ?? "unknown")"
         )
-        request.setValue("Bearer \(session)", forHTTPHeaderField: "Authorization")
+        request.setValue("Bearer \(session.session)", forHTTPHeaderField: "Authorization")
         return request
     }
 
@@ -1856,16 +1860,42 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
     }
 
+    func handleUnauthorizedResponse(
+        _ response: HTTPURLResponse, data: Data, for request: URLRequest, context: AuthContext?
+    ) async throws -> (Data, HTTPURLResponse) {
+        // Network responses without a principal cannot authorize account mutation.
+        guard let did = context?.did, !did.isEmpty else { throw GatewayError.authenticationRequired }
+        return try await coordinator.run { [self] in
+            try await self.handleUnauthorizedResponseLocked(response, data: data, for: request,
+                                                             requestDID: did, scopedFailure: true)
+        }
+    }
+
     private func handleUnauthorizedResponseLocked(
-        _ response: HTTPURLResponse, data: Data, for request: URLRequest
+        _ response: HTTPURLResponse, data: Data, for request: URLRequest,
+        requestDID: String? = nil, scopedFailure: Bool = false
     ) async throws -> (Data, HTTPURLResponse) {
         // Only clear session if the 401 came from our gateway
         // 401s from other services (MLS, Bluesky API) shouldn't invalidate gateway session
         if isRequestToGatewayOrigin(request, gatewayURL: gatewayURL) {
             switch classifyUnauthorizedGatewayResponse(data) {
             case let .terminal(reason):
-                if let account = await accountManager.getCurrentAccount(),
-                   let recovery = try await recoverablePendingCandidate(for: account.did)
+                guard let selectedAccount = await accountManager.getCurrentAccount(),
+                      requestDID == nil || requestDID == selectedAccount.did,
+                      let presentedToken = extractPresentedBearerToken(from: request) else {
+                    throw GatewayError.authenticationRequired
+                }
+                guard try await storage.recordGatewaySessionFailure(
+                    ifMatches: presentedToken, for: selectedAccount.did, deleteMatchingSession: false
+                ) != nil else {
+                    // The authoritative comparison can observe an external rotation
+                    // while this storage actor still has the rejected bearer cached.
+                    // Evict only the captured account's cache; never its stored value.
+                    await storage.dropCachedGatewaySession(for: requestDID ?? selectedAccount.did)
+                    throw GatewayError.authenticationRequired
+                }
+                let account = selectedAccount
+                if let recovery = try await recoverablePendingCandidate(for: account.did)
                 {
                     // A recoverable candidate owns the old anchor until CAS succeeds.
                     do {
@@ -1886,32 +1916,36 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
                             logger.warning(
                                 "Gateway terminal 401: candidate recovery encountered terminal error: \(error.localizedDescription)"
                             )
+                            if scopedFailure,
+                               case GatewayError.sessionExpired = error,
+                               let proof = try await storage.recordGatewaySessionFailure(
+                                   ifMatches: presentedToken, for: selectedAccount.did,
+                                   deleteMatchingSession: false
+                               ) {
+                                throw ScopedGatewaySessionRejection(context: proof, reason: reason)
+                            }
                             throw error
                         }
                     }
                 }
-                guard let currentAccount = await accountManager.getCurrentAccount() else {
+                guard let currentAccount = await accountManager.getCurrentAccount(),
+                      currentAccount.did == selectedAccount.did else {
                     logger.warning(
                         "Gateway returned terminal auth error (reason: \(reason)) with no active account - preserving state"
                     )
                     throw GatewayError.authenticationRequired
                 }
 
-                guard let presentedToken = extractPresentedBearerToken(from: request) else {
-                    logger.warning(
-                        "Gateway returned terminal auth error (reason: \(reason)) on request without valid bearer token - preserving session"
-                    )
-                    throw GatewayError.authenticationRequired
-                }
-
-                let deleted = try await storage.deleteGatewaySession(
-                    ifMatches: presentedToken,
-                    for: currentAccount.did
+                let proof = try await storage.recordGatewaySessionFailure(
+                    ifMatches: presentedToken, for: currentAccount.did, deleteMatchingSession: true
                 )
-                if deleted {
+                if let proof {
                     logger.warning(
                         "Gateway returned terminal auth error (reason: \(reason)) for matching presented session - clearing local session"
                     )
+                    if scopedFailure {
+                        throw ScopedGatewaySessionRejection(context: proof, reason: reason)
+                    }
                     throw GatewayError.sessionExpired
                 } else {
                     // The presented token is not the stored one, so this process
@@ -1986,7 +2020,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
 
     /// Gets the gateway session for the current account
-    private func gatewaySessionLocked() async throws -> String {
+    private func gatewaySessionLocked() async throws -> (did: String, session: String) {
         // Get the current account's DID
         guard let currentAccount = await accountManager.getCurrentAccount() else {
             LogManager.logError("ConfidentialGatewayStrategy - No current account set!")
@@ -2004,7 +2038,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         LogManager.logDebug(
             "ConfidentialGatewayStrategy - Found gateway session for \(currentAccount.did.prefix(20))..."
         )
-        return session
+        return (currentAccount.did, session)
     }
 
     private func saveGatewaySession(_ session: String, for did: String) async throws {
