@@ -77,11 +77,13 @@ actor RequestDeduplicator {
     /// - Parameters:
     ///   - request: The URLRequest to deduplicate
     ///   - authIdentity: Optional auth identity (e.g. account DID or authorization token)
+    ///   - onJoinExisting: Called when this caller joins an identical in-flight request instead of launching one
     ///   - work: The async work to perform if this is the first request
     /// - Returns: The result of the network request
     func deduplicate(
         request: URLRequest,
         authIdentity: String? = nil,
+        onJoinExisting: (@Sendable () -> Void)? = nil,
         work: @escaping @Sendable () async throws -> (Data, URLResponse)
     ) async throws -> (Data, URLResponse) {
         guard let key = RequestKey(from: request, authIdentity: authIdentity) else {
@@ -113,6 +115,7 @@ actor RequestDeduplicator {
                 LogManager.logDebug(
                     "RequestDeduplicator: Found existing request for \(key.url), waiting for completion"
                 )
+                onJoinExisting?()
                 return try await existing.task.value
             }
         }

@@ -12,11 +12,21 @@ private final class GatewayUpgradeTestURLProtocol: URLProtocol {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var handler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
     private nonisolated(unsafe) static var requests: [URLRequest] = []
+    /// URLSession starts custom protocols on one loader thread; a handler that blocks there
+    /// stalls every other request. Concurrency tests answer off that thread instead.
+    private nonisolated(unsafe) static var answersOffLoaderThread = false
 
     static func reset() {
         lock.lock()
         handler = nil
         requests = []
+        answersOffLoaderThread = false
+        lock.unlock()
+    }
+
+    static func setAnswersOffLoaderThread(_ enabled: Bool) {
+        lock.lock()
+        answersOffLoaderThread = enabled
         lock.unlock()
     }
 
@@ -43,6 +53,7 @@ private final class GatewayUpgradeTestURLProtocol: URLProtocol {
     override func startLoading() {
         GatewayUpgradeTestURLProtocol.lock.lock()
         let currentHandler = GatewayUpgradeTestURLProtocol.handler
+        let offLoaderThread = GatewayUpgradeTestURLProtocol.answersOffLoaderThread
         GatewayUpgradeTestURLProtocol.requests.append(request)
         GatewayUpgradeTestURLProtocol.lock.unlock()
 
@@ -51,6 +62,17 @@ private final class GatewayUpgradeTestURLProtocol: URLProtocol {
             return
         }
 
+        guard offLoaderThread else {
+            answer(using: currentHandler)
+            return
+        }
+        nonisolated(unsafe) let loader = self
+        DispatchQueue.global().async {
+            loader.answer(using: currentHandler)
+        }
+    }
+
+    private func answer(using currentHandler: @Sendable (URLRequest) throws -> (HTTPURLResponse, Data)) {
         do {
             let (response, data) = try currentHandler(request)
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
@@ -301,6 +323,35 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             let target = try await storage.getGatewaySession(for: aliceDID)
             XCTAssertEqual(source, restoredToken)
             XCTAssertEqual(target, targetToken)
+        }
+    }
+
+    func testConcurrentGatewayRequestsAreInFlightTogether() async throws {
+        try await withInMemoryBackend { _ in
+            let (client, _) = try await makeClient(namespace: "test.network.concurrent.\(UUID().uuidString)")
+            let secondLaunched = DispatchSemaphore(value: 0)
+            let overlapped = TestThreadSafeArray<Bool>()
+            GatewayUpgradeTestURLProtocol.setAnswersOffLoaderThread(true)
+            defer { GatewayUpgradeTestURLProtocol.setAnswersOffLoaderThread(false) }
+            GatewayUpgradeTestURLProtocol.setHandler { request in
+                if request.url?.path.hasSuffix("app.bsky.actor.getProfile") == true {
+                    // Hold the first response open; the second request must still reach the wire.
+                    overlapped.append(secondLaunched.wait(timeout: .now() + 5) == .success)
+                } else {
+                    secondLaunched.signal()
+                }
+                let response = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil,
+                                               headerFields: ["Content-Type": "application/json"])!
+                return (response, Data("{}".utf8))
+            }
+            let firstURL = gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getProfile")
+            let secondURL = gatewayURL.appendingPathComponent("xrpc/app.bsky.actor.getPreferences")
+            let first = Task { try await client.networkService.request(URLRequest(url: firstURL), skipTokenRefresh: false) }
+            try await Task.sleep(nanoseconds: 100_000_000)
+            let second = Task { try await client.networkService.request(URLRequest(url: secondURL), skipTokenRefresh: false) }
+            _ = try await first.value
+            _ = try await second.value
+            XCTAssertEqual(overlapped.values, [true], "Gateway requests must not hold the lifecycle lease until response")
         }
     }
 

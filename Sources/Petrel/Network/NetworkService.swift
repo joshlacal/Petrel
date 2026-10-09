@@ -1145,7 +1145,13 @@ public actor NetworkService: NetworkServiceProtocol {
         // Perform the request using the internal session
         do {
             LogManager.logRequest(requestToSend)
-            let (data, response) = try await Self.executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
+            let launchedCtx = authCtx_simple
+            let (data, response) = try await Self.executeDataTask(
+                requestToSend,
+                using: session,
+                delegate: sessionDelegate,
+                onLaunch: { launchedCtx?.releaseAuthenticationLease() }
+            )
             authCtx_simple?.releaseAuthenticationLease()
 
             if let httpResponse = response as? HTTPURLResponse {
@@ -1315,13 +1321,26 @@ public actor NetworkService: NetworkServiceProtocol {
                 let authIdentity = gatewayMode
                     ? request.value(forHTTPHeaderField: "Authorization")
                     : (authCtx?.did ?? request.value(forHTTPHeaderField: "Authorization"))
+                // The lifecycle lease only has to cover credential attachment through task launch.
+                // Holding it until the response arrives serializes every authenticated gateway
+                // request; stale-credential 401s are already scoped by the credential-bound proof.
+                let launchedCtx = authCtx
+                let releaseLease: @Sendable () -> Void = { launchedCtx?.releaseAuthenticationLease() }
                 let (data, response) = if !skipTokenRefresh {
-                    try await requestDeduplicator.deduplicate(request: request, authIdentity: authIdentity) { @Sendable [session, sessionDelegate] in
-                        return try await Self.executeDataTask(request, using: session, delegate: sessionDelegate)
+                    try await requestDeduplicator.deduplicate(
+                        request: request,
+                        authIdentity: authIdentity,
+                        onJoinExisting: releaseLease
+                    ) { @Sendable [session, sessionDelegate] in
+                        return try await Self.executeDataTask(
+                            request, using: session, delegate: sessionDelegate, onLaunch: releaseLease
+                        )
                     }
                 } else {
                     // Skip deduplication for refresh requests to avoid circular dependencies
-                    try await Self.executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
+                    try await Self.executeDataTask(
+                        requestToSend, using: session, delegate: sessionDelegate, onLaunch: releaseLease
+                    )
                 }
                 authCtx?.releaseAuthenticationLease()
 
@@ -1818,7 +1837,8 @@ public actor NetworkService: NetworkServiceProtocol {
     static func executeDataTask(
         _ request: URLRequest,
         using targetSession: URLSession,
-        delegate: HardenedURLSessionDelegate
+        delegate: HardenedURLSessionDelegate,
+        onLaunch: (@Sendable () -> Void)? = nil
     ) async throws -> (Data, URLResponse) {
         try Task.checkCancellation()
         guard let url = request.url, let host = url.host?.lowercased() else {
@@ -1843,6 +1863,7 @@ public actor NetworkService: NetworkServiceProtocol {
                 }
                 delegate.contextManager.setApprovedAddresses(addresses, for: task)
                 task.resume()
+                onLaunch?()
                 if Task.isCancelled {
                     task.cancel()
                 }
