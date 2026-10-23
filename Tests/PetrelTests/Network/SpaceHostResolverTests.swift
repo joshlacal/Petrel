@@ -5,15 +5,23 @@
 
 import Foundation
 #if canImport(FoundationNetworking)
-  import FoundationNetworking
+    import FoundationNetworking
 #endif
-import Testing
 @testable import Petrel
+import Testing
 
 private final class DummyDIDResolver: DIDResolving, @unchecked Sendable {
-    func resolveHandleToDID(handle: String) async throws -> String { "did:plc:123" }
-    func resolveDIDToPDSURL(did: String) async throws -> URL { URL(string: "https://pds.test")! }
-    func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) { ("user.test", URL(string: "https://pds.test")!) }
+    func resolveHandleToDID(handle: String) async throws -> String {
+        "did:plc:123"
+    }
+
+    func resolveDIDToPDSURL(did: String) async throws -> URL {
+        URL(string: "https://pds.test")!
+    }
+
+    func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
+        ("user.test", URL(string: "https://pds.test")!)
+    }
 }
 
 private final class ResolverMockURLProtocol: URLProtocol {
@@ -30,8 +38,13 @@ private final class ResolverMockURLProtocol: URLProtocol {
         }
     }
 
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
 
     override func startLoading() {
         guard let host = request.url?.host else {
@@ -95,17 +108,17 @@ struct SpaceHostResolverTests {
         return URLSession(configuration: config)
     }
 
-    @Test("prefers #atproto_space_host over #atproto_pds")
+    @Test("ignores legacy #atproto_space_host in favor of #atproto_pds")
     func prefersSpaceHost() throws {
         let d = doc(
             services: [
                 ("#atproto_pds", "https://pds.test"),
-                ("#atproto_space_host", "https://space.test")
+                ("#atproto_space_host", "https://space.test"),
             ],
             verificationMethods: ["#atproto"]
         )
         let e = try SpaceAuthorityEndpoints.extract(from: d)
-        #expect(e.spaceHost == URL(string: "https://space.test")!)
+        #expect(e.spaceHost == URL(string: "https://pds.test")!)
     }
 
     @Test("falls back to #atproto_pds when no space host")
@@ -117,13 +130,13 @@ struct SpaceHostResolverTests {
         #expect(try SpaceAuthorityEndpoints.extract(from: d).spaceHost == URL(string: "https://pds.test")!)
     }
 
-    @Test("prefers #atproto_space key, falls back to #atproto")
+    @Test("ignores legacy signing keys")
     func keyFallback() throws {
         let withKey = doc(
             services: [("#atproto_pds", "https://pds.test")],
             verificationMethods: ["#atproto", "#atproto_space"]
         )
-        #expect(try SpaceAuthorityEndpoints.extract(from: withKey).signingKeyFragment == "#atproto_space")
+        #expect(try SpaceAuthorityEndpoints.extract(from: withKey).signingKeyFragment == "#atproto")
 
         let without = doc(
             services: [("#atproto_pds", "https://pds.test")],
@@ -136,14 +149,14 @@ struct SpaceHostResolverTests {
     func fullIdMatching() throws {
         let d = doc(
             services: [
-                ("did:plc:123#atproto_pds", "https://pds.test"),
-                ("did:plc:123#atproto_space_host", "https://space.test")
+                ("did:example:123#atproto_pds", "https://pds.test"),
+                ("did:plc:123#atproto_space_host", "https://space.test"),
             ],
             verificationMethods: ["did:plc:123#atproto", "did:plc:123#atproto_space"]
         )
         let e = try SpaceAuthorityEndpoints.extract(from: d)
-        #expect(e.spaceHost == URL(string: "https://space.test")!)
-        #expect(e.signingKeyFragment == "#atproto_space")
+        #expect(e.spaceHost == URL(string: "https://pds.test")!)
+        #expect(e.signingKeyFragment == "#atproto")
     }
 
     @Test("throws when document has no usable service endpoint")
@@ -151,12 +164,13 @@ struct SpaceHostResolverTests {
         let d = doc(services: [], verificationMethods: ["#atproto"])
         #expect(throws: (any Error).self) { try SpaceAuthorityEndpoints.extract(from: d) }
     }
+
     @Test("falls back to #atproto_pds when #atproto_space_host endpoint is unparseable")
     func fallbackWhenSpaceHostEndpointIsInvalid() throws {
         let d = doc(
             services: [
                 ("#atproto_space_host", ""),
-                ("#atproto_pds", "https://pds.test")
+                ("#atproto_pds", "https://pds.test"),
             ],
             verificationMethods: ["#atproto"]
         )
@@ -169,7 +183,7 @@ struct SpaceHostResolverTests {
         let d = doc(
             services: [
                 ("#atproto_space_host", "http://insecure-space.example.com"),
-                ("#atproto_pds", "https://pds.example.com")
+                ("#atproto_pds", "https://pds.example.com"),
             ],
             verificationMethods: ["#atproto"]
         )
@@ -177,17 +191,17 @@ struct SpaceHostResolverTests {
         #expect(e.spaceHost == URL(string: "https://pds.example.com")!)
     }
 
-    @Test("accepts loopback http for #atproto_space_host")
+    @Test("ignores legacy loopback space service")
     func acceptsLoopbackHTTP() throws {
         let d = doc(
             services: [
                 ("#atproto_space_host", "http://127.0.0.1:8080"),
-                ("#atproto_pds", "https://pds.example.com")
+                ("#atproto_pds", "https://pds.example.com"),
             ],
             verificationMethods: ["#atproto"]
         )
         let e = try SpaceAuthorityEndpoints.extract(from: d)
-        #expect(e.spaceHost == URL(string: "http://127.0.0.1:8080")!)
+        #expect(e.spaceHost == URL(string: "https://pds.example.com")!)
     }
 
     @Test("throws when service matches type but not #atproto_space_host or #atproto_pds id")
@@ -202,14 +216,14 @@ struct SpaceHostResolverTests {
                     type: "Multikey",
                     controller: "did:example:123",
                     publicKeyMultibase: "zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPqiYBme"
-                )
+                ),
             ],
             service: [
                 Service(
                     id: "#custom_service",
                     type: "AtprotoPersonalDataServer",
                     serviceEndpoint: "https://pds.test"
-                )
+                ),
             ]
         )
         #expect(throws: (any Error).self) { try SpaceAuthorityEndpoints.extract(from: d) }
@@ -247,7 +261,7 @@ struct SpaceHostResolverTests {
             ],
             "service": [
                 {
-                    "id": "#atproto_space_host",
+                    "id": "#atproto_pds",
                     "type": "AtprotoSpaceHost",
                     "serviceEndpoint": "https://space.plc.test"
                 }
@@ -272,7 +286,7 @@ struct SpaceHostResolverTests {
         )
         let endpoints = try await resolver.resolve(authorityDID: "did:plc:test12345")
         #expect(endpoints.spaceHost == URL(string: "https://space.plc.test")!)
-        #expect(endpoints.signingKeyFragment == "#atproto_space")
+        #expect(endpoints.signingKeyFragment == "#atproto")
     }
 
     @Test("SpaceHostResolver actor resolves did:web DID document over network")
@@ -321,11 +335,11 @@ struct SpaceHostResolverTests {
     }
 
     @Test("SpaceAuthorityEndpoints.isSecureOrLoopback rejects https with no host")
-    func isSecureOrLoopbackNoHost() {
-        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https://example.com")!) == true)
-        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https:")!) == false)
-        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https://")!) == false)
-        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https:///path")!) == false)
+    func isSecureOrLoopbackNoHost() throws {
+        #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https://example.com"))) == true)
+        #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https:"))) == false)
+        #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https://"))) == false)
+        #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https:///path"))) == false)
     }
 
     @Test("SpaceHostResolver.didDocumentURL validates did:web paths and rejects path traversal")

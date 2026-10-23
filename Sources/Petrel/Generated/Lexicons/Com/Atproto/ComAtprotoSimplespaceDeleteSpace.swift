@@ -72,7 +72,7 @@ public enum ComAtprotoSimplespaceDeleteSpace {
 public extension ATProtoClient.Com.Atproto.Simplespace {
     // MARK: - deleteSpace
 
-    // Delete a space. The authenticated user must be the space owner. The authority's own repo in the space is deleted along with it, since the space host and the repo host are the same service here; other members' repos are flagged as belonging to a deleted space rather than erased. After deletion, all reads and writes against the space fail with SpaceNotFound, and getSpaceCredential answers SpaceDeleted so a syncer that missed the notification still learns to drop its copy. Idempotent. Requires auth, implemented by PDS.
+    // Delete a space. Requires auth as the space owner. Deletes the owner's own repo in the space; other members' repos are left in place. Afterwards, reads and writes fail with SpaceNotFound and getSpaceCredential returns SpaceDeleted. Idempotent. Implemented by PDS.
     //
     // - Parameter input: The input parameters for the request
 

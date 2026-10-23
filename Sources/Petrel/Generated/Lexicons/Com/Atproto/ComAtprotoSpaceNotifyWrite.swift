@@ -9,16 +9,16 @@ public enum ComAtprotoSpaceNotifyWrite {
         public let space: SpaceRef
         public let repo: DID
         public let repoRev: TID
-        public let hash: Bytes
+        public let data: Bytes
         public let spaceRev: TID?
         public let prevSpaceRev: TID?
 
         /// Standard public initializer
-        public init(space: SpaceRef, repo: DID, repoRev: TID, hash: Bytes, spaceRev: TID? = nil, prevSpaceRev: TID? = nil) {
+        public init(space: SpaceRef, repo: DID, repoRev: TID, data: Bytes, spaceRev: TID? = nil, prevSpaceRev: TID? = nil) {
             self.space = space
             self.repo = repo
             self.repoRev = repoRev
-            self.hash = hash
+            self.data = data
             self.spaceRev = spaceRev
             self.prevSpaceRev = prevSpaceRev
         }
@@ -28,7 +28,7 @@ public enum ComAtprotoSpaceNotifyWrite {
             space = try container.decode(SpaceRef.self, forKey: .space)
             repo = try container.decode(DID.self, forKey: .repo)
             repoRev = try container.decode(TID.self, forKey: .repoRev)
-            hash = try container.decode(Bytes.self, forKey: .hash)
+            data = try container.decode(Bytes.self, forKey: .data)
             if container.contains(.spaceRev) {
                 guard try !container.decodeNil(forKey: .spaceRev) else {
                     throw DecodingError.valueNotFound(
@@ -64,7 +64,7 @@ public enum ComAtprotoSpaceNotifyWrite {
             try container.encode(space, forKey: .space)
             try container.encode(repo, forKey: .repo)
             try container.encode(repoRev, forKey: .repoRev)
-            try container.encode(hash, forKey: .hash)
+            try container.encode(data, forKey: .data)
             try container.encodeIfPresent(spaceRev, forKey: .spaceRev)
             try container.encodeIfPresent(prevSpaceRev, forKey: .prevSpaceRev)
         }
@@ -77,8 +77,8 @@ public enum ComAtprotoSpaceNotifyWrite {
             map = map.adding(key: "repo", value: repoValue)
             let repoRevValue = try repoRev.toCBORValue()
             map = map.adding(key: "repoRev", value: repoRevValue)
-            let hashValue = try hash.toCBORValue()
-            map = map.adding(key: "hash", value: hashValue)
+            let dataValue = try data.toCBORValue()
+            map = map.adding(key: "data", value: dataValue)
             if let value = spaceRev {
                 let spaceRevValue = try value.toCBORValue()
                 map = map.adding(key: "spaceRev", value: spaceRevValue)
@@ -94,7 +94,7 @@ public enum ComAtprotoSpaceNotifyWrite {
             case space
             case repo
             case repoRev
-            case hash
+            case data
             case spaceRev
             case prevSpaceRev
         }

@@ -10,15 +10,15 @@ public enum ComAtprotoSpaceListRepos {
         public static let typeIdentifier = "com.atproto.space.listRepos#repo"
         public let did: DID
         public let repoRev: TID
-        public let hash: Bytes
+        public let data: Bytes
         public let spaceRev: TID
 
         public init(
-            did: DID, repoRev: TID, hash: Bytes, spaceRev: TID
+            did: DID, repoRev: TID, data: Bytes, spaceRev: TID
         ) {
             self.did = did
             self.repoRev = repoRev
-            self.hash = hash
+            self.data = data
             self.spaceRev = spaceRev
         }
 
@@ -37,9 +37,9 @@ public enum ComAtprotoSpaceListRepos {
                 throw error
             }
             do {
-                hash = try container.decode(Bytes.self, forKey: .hash)
+                data = try container.decode(Bytes.self, forKey: .data)
             } catch {
-                LogManager.logError("Decoding error for required property 'hash': \(error)")
+                LogManager.logError("Decoding error for required property 'data': \(error)")
                 throw error
             }
             do {
@@ -55,14 +55,14 @@ public enum ComAtprotoSpaceListRepos {
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
             try container.encode(repoRev, forKey: .repoRev)
-            try container.encode(hash, forKey: .hash)
+            try container.encode(data, forKey: .data)
             try container.encode(spaceRev, forKey: .spaceRev)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
             hasher.combine(repoRev)
-            hasher.combine(hash)
+            hasher.combine(data)
             hasher.combine(spaceRev)
         }
 
@@ -74,7 +74,7 @@ public enum ComAtprotoSpaceListRepos {
             if repoRev != other.repoRev {
                 return false
             }
-            if hash != other.hash {
+            if data != other.data {
                 return false
             }
             if spaceRev != other.spaceRev {
@@ -94,8 +94,8 @@ public enum ComAtprotoSpaceListRepos {
             map = map.adding(key: "did", value: didValue)
             let repoRevValue = try repoRev.toCBORValue()
             map = map.adding(key: "repoRev", value: repoRevValue)
-            let hashValue = try hash.toCBORValue()
-            map = map.adding(key: "hash", value: hashValue)
+            let dataValue = try data.toCBORValue()
+            map = map.adding(key: "data", value: dataValue)
             let spaceRevValue = try spaceRev.toCBORValue()
             map = map.adding(key: "spaceRev", value: spaceRevValue)
             return map
@@ -105,7 +105,7 @@ public enum ComAtprotoSpaceListRepos {
             case typeIdentifier = "$type"
             case did
             case repoRev
-            case hash
+            case data
             case spaceRev
         }
     }
@@ -223,7 +223,7 @@ public enum ComAtprotoSpaceListRepos {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - listRepos
 
-    /// List the known repos that hold data in a space (the writer set), with each repo's current repoRev and commit hash. Served by the space host. This is the sync boundary, not an access-control list: it enumerates only writers, never readers. The set is what the authority claims from write notifications and is not itself authoritative; a repo's host is the source of truth.
+    /// List the known repos that hold data in a space (the writer set), with each repo's current repoRev and commit data. Served by the space host. This is the sync boundary, not an access-control list: it enumerates only writers, never readers. The set is what the authority claims from write notifications and is not itself authoritative; a repo's host is the source of truth.
     ///
     /// - Parameter input: The input parameters for the request
     ///

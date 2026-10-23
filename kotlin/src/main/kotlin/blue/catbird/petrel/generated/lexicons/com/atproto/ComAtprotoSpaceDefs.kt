@@ -17,18 +17,17 @@ object ComAtprotoSpaceDefsDefs {
 }
 
     /**
-     * A signed commit over the current state of a permissioned repo.
+     * A commit over the current state of a permissioned repo. Carries no signature: the repo host authenticates it to a syncer with a MAC in the Atproto-Space-Mac response header.
      */
     @Serializable
-    data class ComAtprotoSpaceDefsSignedCommit(
-/** Commit format version, currently 1. Corresponds to the version in the ctx protocol tag (atproto-space-v1). */        @SerialName("ver")
-        val ver: Int,/** sha256 digest of the LtHash state (32 bytes). */        @SerialName("hash")
-        val hash: Bytes,/** Per-signature input keying material (32 random bytes) */        @SerialName("ikm")
-        val ikm: Bytes,/** Signature over ctx (space, author DID, rev, ikm) by the user's atproto signing key. Does not cover the repo hash. */        @SerialName("sig")
-        val sig: Bytes,/** HMAC-SHA256 over hash, keyed by HKDF-SHA256(ikm, info=ctx). Binds the repo hash to this commit's context. */        @SerialName("mac")
-        val mac: Bytes,/** Commit revision (TID), also bound into ctx. */        @SerialName("rev")
-        val rev: String    ) {
+    data class ComAtprotoSpaceDefsCommit(
+/** Commit format version, currently 1. */        @SerialName("ver")
+        val ver: Int,/** The author DID of the repo. */        @SerialName("repo")
+        val repo: DID,/** Reference to the space. */        @SerialName("space")
+        val space: SpaceRef,/** Commit revision (TID). */        @SerialName("rev")
+        val rev: String,/** sha256 digest of the LtHash state (32 bytes). */        @SerialName("data")
+        val `data`: Bytes    ) {
         companion object {
-            const val TYPE_IDENTIFIER = "#comAtprotoSpaceDefsSignedCommit"
+            const val TYPE_IDENTIFIER = "#comAtprotoSpaceDefsCommit"
         }
     }

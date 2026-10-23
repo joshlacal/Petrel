@@ -1,3 +1,4 @@
+import CoreFoundation
 import Foundation
 import PetrelCrypto
 import SwiftCBOR
@@ -20,6 +21,7 @@ public struct VerifiedSpaceRepository: Sendable {
         public let cid: CID
         public let bytes: Data
     }
+
     public let revision: String
     public let data: Data
     public let records: [Record]
@@ -38,11 +40,12 @@ public enum SpaceSTAR {
     ) throws -> VerifiedSpaceRepository {
         guard archive.count <= maximumArchiveBytes else { throw SpaceVerificationError.boundsExceeded }
         var cursor = Cursor(bytes: archive)
-        guard try cursor.take(4) == Data([0x2a, 0x6c, 1, 0]) else { throw SpaceVerificationError.invalidArchive }
-        let metadata = try cursor.frame(limit: 65_536)
+        guard try cursor.take(4) == Data([0x2A, 0x6C, 1, 0]) else { throw SpaceVerificationError.invalidArchive }
+        let metadata = try cursor.frame(limit: 65536)
         let value = try canonicalObject(metadata)
         guard value["$type"] as? String == "atproto-space-repo",
-              Set(value.keys) == ["$type", "ver", "repo", "space", "rev", "data"] else {
+              Set(value.keys) == ["$type", "ver", "repo", "space", "rev", "data"]
+        else {
             throw SpaceVerificationError.invalidCommit
         }
         let commit = try SpaceResponseVerifier.commitFields(value, space: space, repo: repo)
@@ -79,28 +82,39 @@ public enum SpaceSTAR {
         try DAGCBOR.decodeCBORPreflight(bytes)
         guard let cbor = try CBOR.decode(Array(bytes)),
               let object = try DAGCBOR.decodeCBORItem(cbor) as? [String: Any],
-              try DAGCBOR.encodeValue(object) == bytes else { throw SpaceVerificationError.invalidRecord }
+              try DAGCBOR.encodeValue(cborValue(object)) == bytes else { throw SpaceVerificationError.invalidRecord }
         return object
     }
 
+    private static func cborValue(_ value: Any) throws -> Any {
+        if let cid = value as? CID { return CIDAsLink(cid: cid, representation: .link) }
+        if let object = value as? [String: Any] { return try object.mapValues { try cborValue($0) } }
+        if let array = value as? [Any] { return try array.map { try cborValue($0) } }
+        return value
+    }
+
     static func validRecordKey(_ value: String) -> Bool {
-        (1...512).contains(value.utf8.count) && value != "." && value != ".." && value.utf8.allSatisfy {
-            (48...57).contains($0) || (65...90).contains($0) || (97...122).contains($0) || [45, 46, 95, 58, 126].contains($0)
+        (1 ... 512).contains(value.utf8.count) && value != "." && value != ".." && value.utf8.allSatisfy {
+            (48 ... 57).contains($0) || (65 ... 90).contains($0) || (97 ... 122).contains($0) || [45, 46, 95, 58, 126].contains($0)
         }
     }
 
     private struct Cursor {
         let bytes: Data
         var offset = 0
-        var isAtEnd: Bool { offset == bytes.count }
+        var isAtEnd: Bool {
+            offset == bytes.count
+        }
+
         mutating func take(_ count: Int) throws -> Data {
             guard count >= 0, count <= bytes.count - offset else { throw SpaceVerificationError.invalidArchive }
             defer { offset += count }
-            return bytes.subdata(in: offset..<offset + count)
+            return bytes.subdata(in: offset ..< offset + count)
         }
+
         mutating func frame(limit: Int) throws -> Data {
             var length: UInt64 = 0
-            for index in 0..<10 {
+            for index in 0 ..< 10 {
                 let byte = try take(1)[0]
                 guard index < 9 || byte < 2 else { throw SpaceVerificationError.invalidArchive }
                 length |= UInt64(byte & 127) << (index * 7)
@@ -120,13 +134,14 @@ enum SpaceResponseVerifier {
         guard let version = value["ver"] as? NSNumber,
               CFGetTypeID(version) != CFBooleanGetTypeID(), version.intValue == 1, version.doubleValue == 1,
               value["repo"] as? String == repo, value["space"] as? String == space.uriString(),
-              let rev = value["rev"] as? String, (try? TID(tidString: rev)) != nil else {
+              let rev = value["rev"] as? String, (try? TID(tidString: rev)) != nil
+        else {
             throw SpaceVerificationError.invalidCommit
         }
         let digest: Data?
         if let raw = value["data"] as? Data { digest = raw }
         else if let wrapper = value["data"] as? [String: String], wrapper.count == 1,
-                let encoded = wrapper["$bytes"] { digest = Data(base64Encoded: encoded) }
+                let encoded = wrapper["$bytes"] { digest = try? decodeBytes(encoded) }
         else { digest = nil }
         guard let digest, digest.count == 32 else { throw SpaceVerificationError.invalidCommit }
         return (rev, digest)
@@ -140,7 +155,8 @@ enum SpaceResponseVerifier {
                   let rkey = items.first(where: { $0.name == "rkey" })?.value else { throw SpaceVerificationError.invalidRecord }
             let uri = "\(space.uriString())/\(repo)/\(collection)/\(rkey)"
             guard value["uri"] as? String == uri, let cidString = value["cid"] as? String,
-                  let cid = CID(string: cidString), let record = value["value"] as? [String: Any] else {
+                  let cid = try? CID.parse(cidString), let record = value["value"] as? [String: Any]
+            else {
                 throw SpaceVerificationError.invalidRecord
             }
             let mac = try SpaceMACHeader.parse(macHeader, type: "atproto-space-record")
@@ -158,13 +174,25 @@ enum SpaceResponseVerifier {
         try SpaceMAC.verify(mac: mac, expected: SpaceMAC.commit(sharedSecret: secret, space: space.uriString(), repo: repo, rev: fields.rev, data: fields.data))
     }
 
+    private static func decodeBytes(_ encoded: String) throws -> Data {
+        let json = try JSONSerialization.data(withJSONObject: ["$bytes": encoded])
+        return try JSONDecoder().decode(Bytes.self, from: json).data
+    }
+
     private static func lexiconValue(_ value: Any) throws -> Any {
         if let object = value as? [String: Any] {
-            if object.count == 1, let text = object["$bytes"] as? String, let data = Data(base64Encoded: text) { return data }
-            if object.count == 1, let text = object["$link"] as? String, let cid = CID(string: text) { return cid }
+            if object.count == 1, let text = object["$bytes"] as? String { return try decodeBytes(text) }
+            if object.count == 1, let text = object["$link"] as? String, let cid = try? CID.parse(text) { return CIDAsLink(cid: cid, representation: .link) }
             return try object.mapValues { try lexiconValue($0) }
         }
         if let array = value as? [Any] { return try array.map { try lexiconValue($0) } }
+        if let number = value as? NSNumber {
+            if CFGetTypeID(number) == CFBooleanGetTypeID() { return number.boolValue }
+            let text = number.stringValue
+            if let integer = Int64(text) { return integer }
+            if let integer = UInt64(text) { return integer }
+            throw SpaceVerificationError.invalidRecord
+        }
         return value
     }
 }

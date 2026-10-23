@@ -20,19 +20,31 @@ enum SpaceMACHeader {
     private struct Parser {
         let bytes: [UInt8]
         var index = 0
-        var current: UInt8? { index < bytes.count ? bytes[index] : nil }
-        mutating func spaces() { while current == 32 || current == 9 { index += 1 } }
+        var current: UInt8? {
+            index < bytes.count ? bytes[index] : nil
+        }
+
+        mutating func spaces() {
+            while current == 32 || current == 9 {
+                index += 1
+            }
+        }
+
         mutating func take(_ byte: UInt8) throws {
             guard current == byte else { throw SpaceVerificationError.malformedHeader }
             index += 1
         }
+
         mutating func key() throws -> String {
             let start = index
-            guard current == 42 || current.map({ (97...122).contains($0) }) == true else { throw SpaceVerificationError.malformedHeader }
+            guard current == 42 || current.map({ (97 ... 122).contains($0) }) == true else { throw SpaceVerificationError.malformedHeader }
             index += 1
-            while let byte = current, (97...122).contains(byte) || (48...57).contains(byte) || [95, 45, 46, 42].contains(byte) { index += 1 }
-            return String(decoding: bytes[start..<index], as: UTF8.self)
+            while let byte = current, (97 ... 122).contains(byte) || (48 ... 57).contains(byte) || [95, 45, 46, 42].contains(byte) {
+                index += 1
+            }
+            return String(decoding: bytes[start ..< index], as: UTF8.self)
         }
+
         mutating func item() throws -> Value {
             guard let byte = current else { throw SpaceVerificationError.malformedHeader }
             if byte == 34 {
@@ -44,7 +56,7 @@ enum SpaceMACHeader {
                         guard let escaped = current, escaped == 34 || escaped == 92 else { throw SpaceVerificationError.malformedHeader }
                         value.append(escaped); index += 1
                     } else {
-                        guard (32...126).contains(next) else { throw SpaceVerificationError.malformedHeader }
+                        guard (32 ... 126).contains(next) else { throw SpaceVerificationError.malformedHeader }
                         value.append(next)
                     }
                 }
@@ -55,12 +67,14 @@ enum SpaceMACHeader {
                 index += 1
                 let start = index
                 while let next = current, next != 58 {
-                    guard (65...90).contains(next) || (97...122).contains(next) || (48...57).contains(next) || [43, 47, 61].contains(next) else { throw SpaceVerificationError.malformedHeader }
+                    guard (65 ... 90).contains(next) || (97 ... 122).contains(next) || (48 ... 57).contains(next) || [43, 47, 61].contains(next) else { throw SpaceVerificationError.malformedHeader }
                     index += 1
                 }
-                var encoded = String(decoding: bytes[start..<index], as: UTF8.self)
+                var encoded = String(decoding: bytes[start ..< index], as: UTF8.self)
                 try take(58)
-                while encoded.count % 4 != 0 { encoded += "=" }
+                while encoded.count % 4 != 0 {
+                    encoded += "="
+                }
                 guard let data = Data(base64Encoded: encoded) else { throw SpaceVerificationError.malformedHeader }
                 return .bytes(data)
             }
@@ -70,20 +84,25 @@ enum SpaceMACHeader {
                 let value = current == 49; index += 1
                 return .boolean(value)
             }
-            if byte == 45 || (48...57).contains(byte) {
+            if byte == 45 || (48 ... 57).contains(byte) {
                 let start = index
                 if byte == 45 { index += 1 }
                 let digits = index
-                while let next = current, (48...57).contains(next) { index += 1 }
+                while let next = current, (48 ... 57).contains(next) {
+                    index += 1
+                }
                 guard index > digits, index - digits <= 15,
-                      let value = Int(String(decoding: bytes[start..<index], as: UTF8.self)) else { throw SpaceVerificationError.malformedHeader }
+                      let value = Int(String(decoding: bytes[start ..< index], as: UTF8.self)) else { throw SpaceVerificationError.malformedHeader }
                 return .integer(value)
             }
             let start = index
-            guard byte == 42 || (65...90).contains(byte) || (97...122).contains(byte) else { throw SpaceVerificationError.malformedHeader }
-            while let next = current, (65...90).contains(next) || (97...122).contains(next) || (48...57).contains(next) || "!#$%&'*+-.^_`|~:/".utf8.contains(next) { index += 1 }
-            return .token(String(decoding: bytes[start..<index], as: UTF8.self))
+            guard byte == 42 || (65 ... 90).contains(byte) || (97 ... 122).contains(byte) else { throw SpaceVerificationError.malformedHeader }
+            while let next = current, (65 ... 90).contains(next) || (97 ... 122).contains(next) || (48 ... 57).contains(next) || "!#$%&'*+-.^_`|~:/".utf8.contains(next) {
+                index += 1
+            }
+            return .token(String(decoding: bytes[start ..< index], as: UTF8.self))
         }
+
         mutating func dictionary() throws -> [String: Value] {
             var fields: [String: Value] = [:]
             spaces()
@@ -95,7 +114,9 @@ enum SpaceMACHeader {
                 fields[name] = value
                 while current == 59 {
                     index += 1
-                    while current == 32 { index += 1 }
+                    while current == 32 {
+                        index += 1
+                    }
                     _ = try key()
                     if current == 61 { index += 1; _ = try item() }
                 }

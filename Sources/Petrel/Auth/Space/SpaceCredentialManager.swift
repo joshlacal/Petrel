@@ -16,12 +16,6 @@ public struct SpaceCredential: Sendable {
     public let token: String
     public let expiresAt: Date
     public let keyRawRepresentation: Data
-
-    init(token: String, expiresAt: Date, keyRawRepresentation: Data) {
-        self.token = token
-        self.expiresAt = expiresAt
-        self.keyRawRepresentation = keyRawRepresentation
-    }
 }
 
 // MARK: - SpaceCredentialError
@@ -42,32 +36,32 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
         switch self {
         case .missingDelegationToken:
             return "Failed to obtain delegation token for space"
-        case .spaceDeleted(let host, let message):
+        case let .spaceDeleted(host, message):
             if let message, !message.isEmpty {
                 return "SpaceDeleted: \(message)"
             }
             return "SpaceDeleted: The space was deleted by authority at \(host)"
-        case .authorizationRefused(let host, let error, let message):
+        case let .authorizationRefused(host, error, message):
             if let message, !message.isEmpty {
                 return "You no longer have access to this space (\(host) refused authorization: \(message))"
             }
             return "You no longer have access to this space (\(host) refused authorization: \(error))"
-        case .tokenRejected(let host, _, _, let evidence):
+        case let .tokenRejected(host, _, _, evidence):
             if let evidence, !evidence.isEmpty {
                 return "\(host) rejected the delegation token as invalid (not an access denial; membership is unaffected). \(host) reports: \(evidence)."
             }
             return "\(host) rejected the delegation token as invalid (not an access denial; membership is unaffected)."
-        case .exchangeFailed(let statusCode, let message):
+        case let .exchangeFailed(statusCode, message):
             return "Space credential exchange failed with status \(statusCode): \(message)"
-        case .invalidToken(let reason):
+        case let .invalidToken(reason):
             return "Invalid space credential token: \(reason)"
         case .invalidResponse:
             return "Invalid HTTP response from server"
         case .invalidKey:
             return "Failed to initialize cryptographic key"
-        case .invalidSpaceRef(let ref):
+        case let .invalidSpaceRef(ref):
             return "Invalid space reference: \(ref)"
-        case .insecureURL(let url):
+        case let .insecureURL(url):
             return "Refusing authenticated request to insecure non-HTTPS URL: \(url)"
         }
     }
@@ -79,32 +73,18 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
 /// credential key, replacing the earlier Spaces DPoP binding. Ordinary OAuth
 /// DPoP is unrelated and unchanged.
 ///
-/// Two forms, matching the reference `createSpaceSigHeaders`:
-/// - Delegation exchange (`getSpaceCredential`): `Authorization: Bearer <token>`,
-///   covering `("authorization")` with `keyid` = the credential key's P-256 `did:key`.
-/// - Credential use: `Authorization: Atproto-Space <credential>` plus
-///   `Atproto-Space-Audience: <DID>`, covering
-///   `("authorization" "atproto-space-audience")`.
-///
-/// The signature base is the covered component lines followed by the
-/// `"@signature-params"` line, joined by LF with no trailing LF, signed with
-/// `ecdsa-p256-sha256` and carried as the 64-byte raw `r || s` value in
-/// standard base64.
+/// Credential presentation covers the exact Authorization and audience values,
+/// with the mandatory October 22 label/tag. Credential exchange uses JSON only.
 enum SpaceHTTPSignature {
-    static let label = "atproto-space"
+    static let label = "atproto-space-credential"
 
     /// The credential key's public half as a P-256 `did:key`.
     static func keyID(for key: P256.Signing.PrivateKey) -> String {
         P256DIDKey(publicKey: key.publicKey).value
     }
 
-    /// The inner list (with parameters) that follows `atproto-space=` in
-    /// `Signature-Input` and ends the signature base. `coversAudience == false`
-    /// is the delegation-exchange form, which must name its key.
-    static func signatureParams(keyID: String, coversAudience: Bool) -> String {
-        coversAudience
-            ? #"("authorization" "atproto-space-audience")"#
-            : #"("authorization");keyid="\#(keyID)""#
+    static func signatureParams() -> String {
+        #"("authorization" "atproto-space-audience");tag="atproto-space-credential""#
     }
 
     static func signatureBase(
@@ -112,22 +92,27 @@ enum SpaceHTTPSignature {
         audience: String?,
         signatureParams: String
     ) -> Data {
-        var lines = [#""authorization": "# + authorization.trimmingCharacters(in: .whitespacesAndNewlines)]
+        var lines = [#""authorization": "# + authorization]
         if let audience {
-            lines.append(#""atproto-space-audience": "# + audience.trimmingCharacters(in: .whitespacesAndNewlines))
+            lines.append(#""atproto-space-audience": "# + audience)
         }
         lines.append(#""@signature-params": "# + signatureParams)
         return Data(lines.joined(separator: "\n").utf8)
     }
 
-    /// Request headers for a space request signed by `key`. Pass `audience`
-    /// when using a space credential; omit it for the delegation exchange.
+    /// Request headers for a space credential; body-based exchange is unsigned.
     static func headers(
         key: P256.Signing.PrivateKey,
         authorization: String,
         audience: String?
     ) throws -> [String: String] {
-        let params = signatureParams(keyID: keyID(for: key), coversAudience: audience != nil)
+        guard let audience, DID.isValidDID(audience),
+              authorization.lowercased().hasPrefix("atproto-space-credential "),
+              !authorization.contains("\r"), !authorization.contains("\n")
+        else {
+            throw SpaceCredentialError.invalidToken("Invalid credential signature context")
+        }
+        let params = signatureParams()
         let base = signatureBase(authorization: authorization, audience: audience, signatureParams: params)
         let signature = try P256WireSignature.sign(base, using: key)
 
@@ -136,9 +121,7 @@ enum SpaceHTTPSignature {
             "Signature-Input": "\(label)=\(params)",
             "Signature": "\(label)=:\(signature.base64EncodedString()):",
         ]
-        if let audience {
-            headers["Atproto-Space-Audience"] = audience
-        }
+        headers["Atproto-Space-Audience"] = audience
         return headers
     }
 
@@ -148,7 +131,8 @@ enum SpaceHTTPSignature {
     static func audience(for url: URL, space: SpaceRef) -> String {
         if let repo = URLComponents(url: url, resolvingAgainstBaseURL: false)?
             .queryItems?.first(where: { $0.name == "repo" })?.value,
-            !repo.isEmpty {
+            !repo.isEmpty
+        {
             return repo
         }
         return space.spaceDID
@@ -203,6 +187,10 @@ public actor SpaceCredentialManager {
     private let urlSession: URLSession
     private let sessionDelegate: HardenedURLSessionDelegate?
     private let delegationTokenProvider: DelegationTokenProvider
+    public typealias AuthorKEMKeyProvider = @Sendable (_ repo: String, _ forceRefresh: Bool) async throws -> String
+    public typealias ClientAttestationProvider = @Sendable (SpaceRef) async throws -> String?
+    private let authorKEMKeyProvider: AuthorKEMKeyProvider
+    private let clientAttestationProvider: ClientAttestationProvider?
 
     private var cache: [SpaceRef: SpaceCredential] = [:]
     private var inFlight: [SpaceRef: Task<SpaceCredential, Error>] = [:]
@@ -213,22 +201,34 @@ public actor SpaceCredentialManager {
         client: ATProtoClient,
         authorityHostProvider: @escaping SpaceAuthorityHostProvider,
         urlSession: URLSession? = nil,
-        delegationTokenProvider: DelegationTokenProvider? = nil
+        delegationTokenProvider: DelegationTokenProvider? = nil,
+        authorKEMKeyProvider: AuthorKEMKeyProvider? = nil,
+        clientAttestationProvider: ClientAttestationProvider? = nil
     ) {
         self.client = client
+        self.clientAttestationProvider = clientAttestationProvider
+        self.authorKEMKeyProvider = authorKEMKeyProvider ?? { repo, _ in
+            let document = try await SpaceHostResolver.fetchDIDDocument(for: repo)
+            guard document.id == repo,
+                  let key = document.verificationMethod.first(where: {
+                      ($0.id == "#atproto_kem" || $0.id == repo + "#atproto_kem") &&
+                          $0.controller == repo && $0.type == "Multikey"
+                  }) else { throw SpaceVerificationError.missingKEMKey }
+            return try P256DIDKey("did:key:" + key.publicKeyMultibase).value
+        }
         self.authorityHostProvider = authorityHostProvider
         if let urlSession {
             self.urlSession = urlSession
-            self.sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
+            sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
         } else {
             let config = URLSessionConfiguration.ephemeral
             #if DEBUG
-            if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
-                config.protocolClasses = testClasses
-            }
+                if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
+                    config.protocolClasses = testClasses
+                }
             #endif
             let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
-            self.sessionDelegate = delegate
+            sessionDelegate = delegate
             self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
         }
         self.delegationTokenProvider = delegationTokenProvider ?? { [client] space in
@@ -247,7 +247,9 @@ public actor SpaceCredentialManager {
         client: ATProtoClient,
         resolver: SpaceHostResolver,
         urlSession: URLSession? = nil,
-        delegationTokenProvider: DelegationTokenProvider? = nil
+        delegationTokenProvider: DelegationTokenProvider? = nil,
+        authorKEMKeyProvider: AuthorKEMKeyProvider? = nil,
+        clientAttestationProvider: ClientAttestationProvider? = nil
     ) {
         self.init(
             client: client,
@@ -255,7 +257,9 @@ public actor SpaceCredentialManager {
                 try await resolver.resolve(authorityDID: did).spaceHost
             },
             urlSession: urlSession,
-            delegationTokenProvider: delegationTokenProvider
+            delegationTokenProvider: delegationTokenProvider,
+            authorKEMKeyProvider: authorKEMKeyProvider,
+            clientAttestationProvider: clientAttestationProvider
         )
     }
 
@@ -314,7 +318,7 @@ public actor SpaceCredentialManager {
     }
 
     /// Performs an authenticated GET with the space credential:
-    /// `Authorization: Atproto-Space <credential>`, `Atproto-Space-Audience`,
+    /// `Authorization: Atproto-Space-Credential <credential>`, `Atproto-Space-Audience`,
     /// and an HTTP message signature over both, made with the credential key.
     ///
     /// - Parameter audience: The DID the request is addressed to. Defaults to
@@ -336,7 +340,28 @@ public actor SpaceCredentialManager {
             throw SpaceCredentialError.invalidSpaceRef("invalid space audience DID: \(audience)")
         }
 
+        let method = url.lastPathComponent.replacingOccurrences(of: "com.atproto.space.", with: "")
+        let needsMAC = ["getLatestCommit", "getRepo", "listRepoOps", "getRecord"].contains(method)
+        for attempt in 0 ..< 2 {
+            do {
+                let context: SpaceMAC.Encapsulation?
+                if needsMAC {
+                    let authorKey = try await authorKEMKeyProvider(audience, attempt > 0)
+                    context = try SpaceMAC.encapsulate(authorKey: authorKey)
+                } else { context = nil }
+                return try await signedGet(url: url, space: space, audience: audience, method: method, context: context)
+            } catch SpaceMAC.Failure.mismatch where attempt == 0 {
+                // A rotated KEM key can produce a valid response under a different
+                // secret. Refresh once, and always use another ephemeral key.
+                continue
+            }
+        }
+        throw SpaceMAC.Failure.mismatch
+    }
+
+    private func signedGet(url: URL, space: SpaceRef, audience: String, method: String, context: SpaceMAC.Encapsulation?) async throws -> (Data, HTTPURLResponse) {
         let cred = try await credential(for: space)
+        let generation = generations[space, default: 0]
         guard let privateKey = try? P256.Signing.PrivateKey(rawRepresentation: cred.keyRawRepresentation) else {
             throw SpaceCredentialError.invalidKey
         }
@@ -345,13 +370,18 @@ public actor SpaceCredentialManager {
         request.httpMethod = "GET"
         let headers = try SpaceHTTPSignature.headers(
             key: privateKey,
-            authorization: "Atproto-Space \(cred.token)",
+            authorization: "Atproto-Space-Credential \(cred.token)",
             audience: audience
         )
         for (name, value) in headers {
             request.setValue(value, forHTTPHeaderField: name)
         }
 
+        if let context {
+            let type = method == "getRecord" ? "atproto-space-record" : "atproto-space-repo"
+            request.setValue("type=\"\(type)\", ver=1, key_share=\"\(context.keyShare)\"", forHTTPHeaderField: "Atproto-Space-Want-Mac")
+        }
+        if method == "getRepo" { request.setValue("application/octet-stream", forHTTPHeaderField: "Accept") }
         let data: Data
         let response: URLResponse
         if let sessionDelegate {
@@ -367,11 +397,23 @@ public actor SpaceCredentialManager {
         }
         if httpResponse.statusCode == 401,
            ATProtoErrorParser.parseGeneric(data: data, statusCode: 401)?.error == "CredentialRevoked",
-           cache[space]?.token == cred.token {
+           cache[space]?.token == cred.token
+        {
             // A revoked credential is never presented again. Any replacement
             // comes from a fresh delegation exchange, which the user's session
             // and the authority must both still authorize.
             cache.removeValue(forKey: space)
+        }
+        try Task.checkCancellation()
+        guard generations[space, default: 0] == generation else { throw CancellationError() }
+        if (200 ... 299).contains(httpResponse.statusCode), let context {
+            let header = httpResponse.value(forHTTPHeaderField: "Atproto-Space-Mac")
+            if method == "getRepo" {
+                let mac = try SpaceMACHeader.parse(header, type: "atproto-space-repo")
+                _ = try SpaceSTAR.verify(archive: data, space: space, repo: audience, sharedSecret: context.sharedSecret, mac: mac)
+            } else {
+                try SpaceResponseVerifier.verifyJSON(data, method: method, url: url, space: space, repo: audience, secret: context.sharedSecret, macHeader: header)
+            }
         }
         return (data, httpResponse)
     }
@@ -415,18 +457,12 @@ public actor SpaceCredentialManager {
         var request = URLRequest(url: exchangeURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        // The signature's keyid (the fresh key's did:key) becomes the issued
-        // credential's cnf.kid.
-        let headers = try SpaceHTTPSignature.headers(
-            key: ephemeralKey,
-            authorization: "Bearer \(delegationToken)",
-            audience: nil
+        let input = try ComAtprotoSpaceGetSpaceCredential.Input(
+            space: space,
+            credentialKid: SpaceHTTPSignature.keyID(for: ephemeralKey),
+            delegationToken: delegationToken,
+            clientAttestation: await clientAttestationProvider?(space)
         )
-        for (name, value) in headers {
-            request.setValue(value, forHTTPHeaderField: name)
-        }
-
-        let input = ComAtprotoSpaceGetSpaceCredential.Input(space: space)
         request.httpBody = try JSONEncoder().encode(input)
 
         let data: Data
@@ -442,7 +478,7 @@ public actor SpaceCredentialManager {
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SpaceCredentialError.invalidResponse
         }
-        guard (200...299).contains(httpResponse.statusCode) else {
+        guard (200 ... 299).contains(httpResponse.statusCode) else {
             let host = spaceHost.host ?? spaceHost.absoluteString
             let parsed = ATProtoErrorParser.parseGeneric(data: data, statusCode: httpResponse.statusCode)
             let errorName = parsed?.error
@@ -450,22 +486,16 @@ public actor SpaceCredentialManager {
             let rawBody = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let message = serverMessage ?? (rawBody.isEmpty ? "HTTP \(httpResponse.statusCode)" : rawBody)
 
-            let isSpaceDeleted = errorName == "SpaceDeleted" ||
-                rawBody.localizedCaseInsensitiveContains("SpaceDeleted")
+            let isSpaceDeleted = errorName == "SpaceDeleted"
             if isSpaceDeleted {
                 throw SpaceCredentialError.spaceDeleted(host: host, message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
             }
 
-            let isTokenRejected = httpResponse.statusCode == 401 && (
-                errorName == "InvalidDelegationToken" ||
-                errorName == "InvalidToken" ||
-                errorName == "ExpiredToken" ||
-                errorName == "invalid_token" ||
-                errorName == "InvalidClientAttestation" ||
-                rawBody.localizedCaseInsensitiveContains("InvalidDelegationToken") ||
-                rawBody.localizedCaseInsensitiveContains("invalid_token") ||
-                rawBody.localizedCaseInsensitiveContains("InvalidToken")
-            )
+            let isTokenRejected = (httpResponse.statusCode == 400 && errorName == "InvalidDelegationToken") ||
+                (
+                    (httpResponse.statusCode == 400 || httpResponse.statusCode == 401) &&
+                        ["InvalidToken", "ExpiredToken", "invalid_token", "InvalidClientAttestation"].contains(errorName ?? "")
+                )
             if isTokenRejected {
                 let evidence = await probeServerEvidence(spaceHost: spaceHost)
                 throw SpaceCredentialError.tokenRejected(
@@ -494,6 +524,11 @@ public actor SpaceCredentialManager {
         let output = try JSONDecoder().decode(ComAtprotoSpaceGetSpaceCredential.Output.self, from: data)
         let token = output.credential
 
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3 else { throw SpaceCredentialError.invalidToken("Malformed JWT") }
+        let syntheticHeaderJWT = "e30.\(parts[0]).x"
+        let header = try SpaceCredentialJWT.payload(ofJWT: syntheticHeaderJWT)
+        guard header["kid"] as? String == "#atproto" else { throw SpaceCredentialError.invalidToken("Credential kid must be #atproto") }
         let payload = try SpaceCredentialJWT.payload(ofJWT: token)
         guard let expValue = payload["exp"] else {
             throw SpaceCredentialError.invalidToken("Missing exp claim in credential JWT")
@@ -510,6 +545,9 @@ public actor SpaceCredentialManager {
             throw SpaceCredentialError.invalidToken("Invalid exp claim type in credential JWT")
         }
 
+        guard expSeconds.isFinite, expSeconds > Date().timeIntervalSince1970 else {
+            throw SpaceCredentialError.invalidToken("Credential has expired")
+        }
         let expiresAt = Date(timeIntervalSince1970: expSeconds)
         return SpaceCredential(
             token: token,
@@ -549,7 +587,8 @@ public actor SpaceCredentialManager {
             }
 
             guard let httpResponse = response as? HTTPURLResponse,
-                  (200...299).contains(httpResponse.statusCode) else {
+                  (200 ... 299).contains(httpResponse.statusCode)
+            else {
                 return nil
             }
 
@@ -564,7 +603,7 @@ public actor SpaceCredentialManager {
     }
 
     private static func extractIdentifyingEvidence(from json: [String: Any]) -> String? {
-        let standardKeys: Set<String> = [
+        let standardKeys: Set = [
             "did",
             "availableUserDomains",
             "inviteCodeRequired",
@@ -607,7 +646,8 @@ public actor SpaceCredentialManager {
                     lower.contains("revision") ||
                     lower.contains("build") ||
                     lower.contains("software") ||
-                    lower.contains("impl") {
+                    lower.contains("impl")
+                {
                     if let val = json[key], !(val is NSNull) {
                         let valStr = String(describing: val).trimmingCharacters(in: .whitespacesAndNewlines)
                         if !valStr.isEmpty {

@@ -12,9 +12,11 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
+import Crypto
+@testable import Petrel
+import PetrelCrypto
 import Synchronization
 import Testing
-@testable import Petrel
 
 // MARK: - Helper Functions
 
@@ -26,7 +28,7 @@ private func makeB64URL(_ data: Data) -> String {
 }
 
 private func makeMockCredentialJWT(exp: Int, sub: String = "did:plc:user123", iss: String = "did:plc:auth123") -> String {
-    let header = #"{"alg":"ES256","typ":"JWT"}"#
+    let header = ##"{"alg":"ES256","typ":"JWT","kid":"#atproto"}"##
     let payload = #"{"exp":\#(exp),"sub":"\#(sub)","iss":"\#(iss)"}"#
     let headerB64 = makeB64URL(Data(header.utf8))
     let payloadB64 = makeB64URL(Data(payload.utf8))
@@ -44,8 +46,13 @@ private final class SpaceMockURLProtocol: URLProtocol {
         handler = newHandler
     }
 
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
 
     override func startLoading() {
         SpaceMockURLProtocol.lock.lock()
@@ -58,7 +65,20 @@ private final class SpaceMockURLProtocol: URLProtocol {
         }
 
         do {
-            let (response, data) = try currentHandler(request)
+            var normalized = request
+            if normalized.httpBody == nil, let stream = normalized.httpBodyStream {
+                stream.open()
+                defer { stream.close() }
+                var bytes = Data()
+                var buffer = [UInt8](repeating: 0, count: 4096)
+                while stream.hasBytesAvailable {
+                    let count = stream.read(&buffer, maxLength: buffer.count)
+                    if count <= 0 { break }
+                    bytes.append(contentsOf: buffer.prefix(count))
+                }
+                normalized.httpBody = bytes
+            }
+            let (response, data) = try currentHandler(normalized)
             client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
             client?.urlProtocol(self, didLoad: data)
             client?.urlProtocolDidFinishLoading(self)
@@ -105,8 +125,8 @@ private func withSpaceTestSession<T>(_ body: () async throws -> T) async throws 
 // MARK: - SpaceHTTPSignature Tests
 
 private func spaceSignatureBytes(_ header: String?) -> Data? {
-    guard let header, header.hasPrefix("atproto-space=:"), header.hasSuffix(":") else { return nil }
-    return Data(base64Encoded: String(header.dropFirst("atproto-space=:".count).dropLast()))
+    guard let header, header.hasPrefix("atproto-space-credential=:"), header.hasSuffix(":") else { return nil }
+    return Data(base64Encoded: String(header.dropFirst("atproto-space-credential=:".count).dropLast()))
 }
 
 private func verifySpaceSignature(_ signature: Data, base: Data, keyID: String) throws -> Bool {
@@ -118,119 +138,34 @@ private func verifySpaceSignature(_ signature: Data, base: Data, keyID: String) 
 @Suite("Space HTTP message signatures")
 struct SpaceHTTPSignatureTests {
     // Same constants as the reference http-signature.test.ts.
-    private let authorization = "Atproto-Space credential"
+    private let authorization = "Atproto-Space-Credential credential"
     private let audience = "did:example:repo"
 
-    @Test("credential-use signature base is the guide's three LF-joined lines with no trailing LF")
-    func credentialUseSignatureBase() throws {
-        let params = SpaceHTTPSignature.signatureParams(keyID: "unused", coversAudience: true)
-        #expect(params == #"("authorization" "atproto-space-audience")"#)
-        let base = SpaceHTTPSignature.signatureBase(
-            authorization: authorization,
-            audience: audience,
-            signatureParams: params
-        )
-        let expected = Data((
-            #""authorization": Atproto-Space credential"# + "\n" +
-                #""atproto-space-audience": did:example:repo"# + "\n" +
-                #""@signature-params": ("authorization" "atproto-space-audience")"#
-        ).utf8)
-        #expect(base == expected)
-        #expect(base.last != UInt8(ascii: "\n"))
-    }
-
-    @Test("delegation-exchange signature base covers only authorization and names the keyid")
-    func exchangeSignatureBase() throws {
-        let keyID = "did:key:zDnaeiDB58sNddU7kh8FyUhsXdYX1MjHED261r8yfrYo5JwXM"
-        let params = SpaceHTTPSignature.signatureParams(keyID: keyID, coversAudience: false)
-        #expect(params == #"("authorization");keyid="did:key:zDnaeiDB58sNddU7kh8FyUhsXdYX1MjHED261r8yfrYo5JwXM""#)
-        let base = SpaceHTTPSignature.signatureBase(
-            authorization: "Bearer delegation",
-            audience: nil,
-            signatureParams: params
-        )
-        #expect(String(decoding: base, as: UTF8.self) == #""authorization": Bearer delegation"# + "\n" + #""@signature-params": "# + params)
-    }
-
-    @Test("verifies Node crypto signatures (low-S use, high-S exchange) over our signature bases")
-    func crossImplementationVectors() throws {
-        // Produced by node:crypto (ecdsa P-256, sha256, ieee-p1363) over the
-        // reference signature bases; the exchange signature is high-S.
-        let keyID = "did:key:zDnaeiDB58sNddU7kh8FyUhsXdYX1MjHED261r8yfrYo5JwXM"
-        let useBase = SpaceHTTPSignature.signatureBase(
-            authorization: authorization,
-            audience: audience,
-            signatureParams: SpaceHTTPSignature.signatureParams(keyID: keyID, coversAudience: true)
-        )
-        let useSig = try #require(Data(base64Encoded: "TavSjMA3LhHfPfifjA9AWgADPEAUK9YX5xV2BvlBUDk570Tbosj25cXbFb2O4ttEoS6ykUMs82R7YtXdM1BAew=="))
-        #expect(try verifySpaceSignature(useSig, base: useBase, keyID: keyID))
-
-        let exchangeBase = SpaceHTTPSignature.signatureBase(
-            authorization: "Bearer delegation",
-            audience: nil,
-            signatureParams: SpaceHTTPSignature.signatureParams(keyID: keyID, coversAudience: false)
-        )
-        let exchangeSig = try #require(Data(base64Encoded: "75oRo+NDKwVXeGu0nb3DTk7blEQn2nl9LE+iDEbCSiv5Qe0ZWe/GXKkXOJ4MGY6GSGv9NBkpskQCq/3A4S7R3g=="))
-        #expect(!P256WireSignature.isCanonicalLowS(exchangeSig))
-        #expect(try verifySpaceSignature(exchangeSig, base: exchangeBase, keyID: keyID))
-
-        // Positive control: the same signature does not verify over the other base.
-        #expect(try !verifySpaceSignature(useSig, base: exchangeBase, keyID: keyID))
-    }
-
-    @Test("credential-use headers: exact field values and a 64-byte raw signature that round-trips")
-    func credentialUseHeaders() throws {
+    @Test("credential signature base preserves exact bytes and required tag")
+    func exactBase() throws {
+        let params = SpaceHTTPSignature.signatureParams()
+        #expect(params == #"("authorization" "atproto-space-audience");tag="atproto-space-credential""#)
+        let base = SpaceHTTPSignature.signatureBase(authorization: authorization, audience: audience, signatureParams: params)
+        let expected = "\"authorization\": \(authorization)\n\"atproto-space-audience\": \(audience)\n\"@signature-params\": \(params)"
+        #expect(base == Data(expected.utf8))
         let key = P256.Signing.PrivateKey()
-        let keyID = SpaceHTTPSignature.keyID(for: key)
-        #expect(keyID.hasPrefix("did:key:zDn"))
-        #expect(try P256DIDKey(keyID).publicKey.rawRepresentation == key.publicKey.rawRepresentation)
-
         let headers = try SpaceHTTPSignature.headers(key: key, authorization: authorization, audience: audience)
-        #expect(Set(headers.keys) == ["Authorization", "Atproto-Space-Audience", "Signature-Input", "Signature"])
-        #expect(headers["Authorization"] == authorization)
-        #expect(headers["Atproto-Space-Audience"] == audience)
-        #expect(headers["Signature-Input"] == #"atproto-space=("authorization" "atproto-space-audience")"#)
-
+        #expect(headers["Signature-Input"] == "atproto-space-credential=" + params)
         let signature = try #require(spaceSignatureBytes(headers["Signature"]))
         #expect(signature.count == 64)
-        let base = SpaceHTTPSignature.signatureBase(
-            authorization: authorization,
-            audience: audience,
-            signatureParams: #"("authorization" "atproto-space-audience")"#
-        )
-        #expect(try verifySpaceSignature(signature, base: base, keyID: keyID))
-        // A different audience must not verify.
-        let wrongBase = SpaceHTTPSignature.signatureBase(
-            authorization: authorization,
-            audience: "did:example:other",
-            signatureParams: #"("authorization" "atproto-space-audience")"#
-        )
-        #expect(try !verifySpaceSignature(signature, base: wrongBase, keyID: keyID))
-    }
-
-    @Test("delegation-exchange headers carry keyid and no audience")
-    func exchangeHeaders() throws {
-        let key = P256.Signing.PrivateKey()
-        let keyID = SpaceHTTPSignature.keyID(for: key)
-        let headers = try SpaceHTTPSignature.headers(key: key, authorization: "Bearer delegation", audience: nil)
-        #expect(headers["Atproto-Space-Audience"] == nil)
-        #expect(headers["Signature-Input"] == #"atproto-space=("authorization");keyid=""# + keyID + #"""#)
-        let signature = try #require(spaceSignatureBytes(headers["Signature"]))
-        #expect(signature.count == 64)
-        let base = SpaceHTTPSignature.signatureBase(
-            authorization: "Bearer delegation",
-            audience: nil,
-            signatureParams: #"("authorization");keyid=""# + keyID + #"""#
-        )
-        #expect(try verifySpaceSignature(signature, base: base, keyID: keyID))
+        #expect(try verifySpaceSignature(signature, base: base, keyID: P256DIDKey(publicKey: key.publicKey).value))
+        let changed = SpaceHTTPSignature.signatureBase(authorization: authorization.lowercased(), audience: audience, signatureParams: params)
+        #expect(try !verifySpaceSignature(signature, base: changed, keyID: P256DIDKey(publicKey: key.publicKey).value))
+        #expect(throws: SpaceCredentialError.self) { try SpaceHTTPSignature.headers(key: key, authorization: "Atproto-Space old", audience: audience) }
+        #expect(throws: SpaceCredentialError.self) { try SpaceHTTPSignature.headers(key: key, authorization: "Bearer exchange", audience: nil) }
     }
 
     @Test("audience defaults to the repo DID, else the bare space authority DID")
     func audienceDerivation() throws {
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
-        let repoURL = URL(string: "https://repo.test/xrpc/com.atproto.space.getRecord?space=at://did:plc:auth123/space/com.example.drive/self&repo=did:plc:writer&collection=a.b.c&rkey=self")!
+        let repoURL = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getRecord?space=at://did:plc:auth123/space/com.example.drive/self&repo=did:plc:writer&collection=a.b.c&rkey=self"))
         #expect(SpaceHTTPSignature.audience(for: repoURL, space: space) == "did:plc:writer")
-        let hostURL = URL(string: "https://space.test/xrpc/com.atproto.space.listRepos?space=at://did:plc:auth123/space/com.example.drive/self")!
+        let hostURL = try #require(URL(string: "https://space.test/xrpc/com.atproto.space.listRepos?space=at://did:plc:auth123/space/com.example.drive/self"))
         #expect(SpaceHTTPSignature.audience(for: hostURL, space: space) == "did:plc:auth123")
     }
 
@@ -255,7 +190,7 @@ struct SpaceCredentialManagerTests {
       "alsoKnownAs": ["at://auth.test"],
       "verificationMethod": [
         {
-          "id": "did:plc:auth123#atproto_space",
+          "id": "did:plc:auth123#atproto",
           "type": "Multikey",
           "controller": "did:plc:auth123",
           "publicKeyMultibase": "zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPqiYBme"
@@ -263,7 +198,7 @@ struct SpaceCredentialManagerTests {
       ],
       "service": [
         {
-          "id": "#atproto_space_host",
+          "id": "#atproto_pds",
           "type": "AtprotoSpaceHost",
           "serviceEndpoint": "https://space.test"
         }
@@ -272,16 +207,25 @@ struct SpaceCredentialManagerTests {
     """
 
     private final class DummyDIDResolver: DIDResolving, @unchecked Sendable {
-        func resolveHandleToDID(handle: String) async throws -> String { "did:plc:123" }
-        func resolveDIDToPDSURL(did: String) async throws -> URL { URL(string: "https://pds.test")! }
-        func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) { ("user.test", URL(string: "https://pds.test")!) }
+        func resolveHandleToDID(handle: String) async throws -> String {
+            "did:plc:123"
+        }
+
+        func resolveDIDToPDSURL(did: String) async throws -> URL {
+            URL(string: "https://pds.test")!
+        }
+
+        func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
+            ("user.test", URL(string: "https://pds.test")!)
+        }
     }
-    @Test("exchange POSTs delegation token as Bearer with an HTTP message signature naming the credential key, caches until expiry")
+
+    @Test("exchange POSTs body-bound credential key and delegation without Authorization or signature")
     func exchangeAndCache() async throws {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
@@ -346,33 +290,29 @@ struct SpaceCredentialManagerTests {
 
         let req = exchangeRequests[0]
         #expect(req.httpMethod == "POST")
-        #expect(req.value(forHTTPHeaderField: "Authorization") == "Bearer mock-delegation-token-123")
+        #expect(req.value(forHTTPHeaderField: "Authorization") == nil)
         #expect(req.value(forHTTPHeaderField: "Content-Type") == "application/json")
 
         #expect(req.value(forHTTPHeaderField: "DPoP") == nil)
         #expect(req.value(forHTTPHeaderField: "Atproto-Space-Audience") == nil)
 
-        // keyid names the credential's own key, which signed `("authorization")`.
         let credentialKey = try P256.Signing.PrivateKey(rawRepresentation: cred1.keyRawRepresentation)
         let keyID = P256DIDKey(publicKey: credentialKey.publicKey).value
-        let params = #"("authorization");keyid=""# + keyID + #"""#
-        #expect(req.value(forHTTPHeaderField: "Signature-Input") == "atproto-space=" + params)
-        let signature = try #require(spaceSignatureBytes(req.value(forHTTPHeaderField: "Signature")))
-        #expect(signature.count == 64)
-        let base = SpaceHTTPSignature.signatureBase(
-            authorization: "Bearer mock-delegation-token-123",
-            audience: nil,
-            signatureParams: params
-        )
-        #expect(try verifySpaceSignature(signature, base: base, keyID: keyID))
+        #expect(req.value(forHTTPHeaderField: "Signature-Input") == nil)
+        #expect(req.value(forHTTPHeaderField: "Signature") == nil)
+        let body = try #require(req.httpBody)
+        let object = try #require(JSONSerialization.jsonObject(with: body) as? [String: String])
+        #expect(object["credentialKid"] == keyID)
+        #expect(object["delegationToken"] == "mock-delegation-token-123")
+        #expect(object["space"] == space.uriString())
     }
 
-    @Test("get() sends Atproto-Space credential, repo-DID audience, and a signature over both")
+    @Test("get() sends Atproto-Space-Credential credential, repo-DID audience, and a signature over both")
     func signedRead() async throws {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
@@ -427,7 +367,7 @@ struct SpaceCredentialManagerTests {
             delegationTokenProvider: { _ in "mock-delegation-token" }
         )
 
-        let targetURL = URL(string: "https://repo.test/xrpc/com.atproto.space.getRecord?repo=did:plc:writer&rkey=self")!
+        let targetURL = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?repo=did:plc:writer&rkey=self"))
         let (data, response) = try await manager.get(url: targetURL, space: space)
         #expect(response.statusCode == 200)
         #expect(String(data: data, encoding: .utf8) == #"{"record":{"value":"ok"}}"#)
@@ -438,18 +378,18 @@ struct SpaceCredentialManagerTests {
 
         let getReq = getRequests[0]
         #expect(getReq.httpMethod == "GET")
-        #expect(getReq.value(forHTTPHeaderField: "Authorization") == "Atproto-Space \(credentialJWT)")
+        #expect(getReq.value(forHTTPHeaderField: "Authorization") == "Atproto-Space-Credential \(credentialJWT)")
         #expect(getReq.value(forHTTPHeaderField: "Atproto-Space-Audience") == "did:plc:writer")
         #expect(getReq.value(forHTTPHeaderField: "DPoP") == nil)
-        let params = #"("authorization" "atproto-space-audience")"#
-        #expect(getReq.value(forHTTPHeaderField: "Signature-Input") == "atproto-space=" + params)
+        let params = SpaceHTTPSignature.signatureParams()
+        #expect(getReq.value(forHTTPHeaderField: "Signature-Input") == "atproto-space-credential=" + params)
 
         let cred = try await manager.credential(for: space)
-        let keyID = P256DIDKey(publicKey: try P256.Signing.PrivateKey(rawRepresentation: cred.keyRawRepresentation).publicKey).value
+        let keyID = try P256DIDKey(publicKey: P256.Signing.PrivateKey(rawRepresentation: cred.keyRawRepresentation).publicKey).value
         let signature = try #require(spaceSignatureBytes(getReq.value(forHTTPHeaderField: "Signature")))
         #expect(signature.count == 64)
         let base = SpaceHTTPSignature.signatureBase(
-            authorization: "Atproto-Space \(credentialJWT)",
+            authorization: "Atproto-Space-Credential \(credentialJWT)",
             audience: "did:plc:writer",
             signatureParams: params
         )
@@ -457,8 +397,8 @@ struct SpaceCredentialManagerTests {
 
         // Space-host operations (no repo) are addressed to the bare authority DID;
         // an explicit audience overrides derivation.
-        _ = try await manager.get(url: URL(string: "https://repo.test/xrpc/com.atproto.space.listRepos?space=x")!, space: space)
-        _ = try await manager.get(url: URL(string: "https://repo.test/xrpc/x")!, space: space, audience: "did:plc:explicit")
+        _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.listRepos?space=x")), space: space)
+        _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/x")), space: space, audience: "did:plc:explicit")
         let audiences = capturedRequests.withLock { $0 }
             .filter { $0.url?.host == "repo.test" }
             .map { $0.value(forHTTPHeaderField: "Atproto-Space-Audience") }
@@ -468,7 +408,7 @@ struct SpaceCredentialManagerTests {
     @Test("get() refuses a non-DID or fragment-bearing audience before sending")
     func rejectsInvalidAudience() async throws {
         let session = makeMockSession()
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let sent = Mutex<Int>(0)
         SpaceMockURLProtocol.setHandler { request in
@@ -483,9 +423,9 @@ struct SpaceCredentialManagerTests {
             urlSession: session,
             delegationTokenProvider: { _ in "mock-delegation-token" }
         )
-        for audience in ["did:plc:auth123#atproto_space_host", "space.test", "https://space.test"] {
+        for audience in ["did:plc:auth123#atproto_pds", "space.test", "https://space.test"] {
             await #expect(throws: SpaceCredentialError.self) {
-                _ = try await manager.get(url: URL(string: "https://repo.test/xrpc/x")!, space: space, audience: audience)
+                _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/x")), space: space, audience: audience)
             }
         }
         #expect(sent.withLock { $0 } == 0)
@@ -494,7 +434,7 @@ struct SpaceCredentialManagerTests {
     @Test("401 CredentialRevoked drops the cached credential; the next request uses a fresh exchange and key")
     func credentialRevokedDropsCache() async throws {
         let session = makeMockSession()
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let exchangeCount = Mutex<Int>(0)
         let revokeNext = Mutex<Bool>(true)
@@ -508,7 +448,7 @@ struct SpaceCredentialManagerTests {
                 }
                 let jwt = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970), sub: "cred-\(n)")
                 let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
-                return (resp, try JSONEncoder().encode(["credential": jwt]))
+                return try (resp, JSONEncoder().encode(["credential": jwt]))
             }
             if request.url?.host == "repo.test" {
                 if revokeNext.withLock({ value -> Bool in
@@ -531,7 +471,7 @@ struct SpaceCredentialManagerTests {
             urlSession: session,
             delegationTokenProvider: { _ in "mock-delegation-token" }
         )
-        let url = URL(string: "https://repo.test/xrpc/com.atproto.space.getRecord?repo=did:plc:writer")!
+        let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?repo=did:plc:writer"))
 
         let first = try await manager.credential(for: space)
         let (_, revoked) = try await manager.get(url: url, space: space)
@@ -549,7 +489,7 @@ struct SpaceCredentialManagerTests {
     @Test("a non-revocation 401 keeps the cached credential")
     func otherUnauthorizedKeepsCache() async throws {
         let session = makeMockSession()
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let exchangeCount = Mutex<Int>(0)
 
@@ -558,7 +498,7 @@ struct SpaceCredentialManagerTests {
                 exchangeCount.withLock { $0 += 1 }
                 let jwt = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970))
                 let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
-                return (resp, try JSONEncoder().encode(["credential": jwt]))
+                return try (resp, JSONEncoder().encode(["credential": jwt]))
             }
             let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
             return (resp, Data(#"{"error":"BadSpaceAudience","message":"space audience does not match the request"}"#.utf8))
@@ -571,7 +511,7 @@ struct SpaceCredentialManagerTests {
             urlSession: session,
             delegationTokenProvider: { _ in "mock-delegation-token" }
         )
-        let url = URL(string: "https://repo.test/xrpc/com.atproto.space.getRecord?repo=did:plc:writer")!
+        let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?repo=did:plc:writer"))
         _ = try await manager.get(url: url, space: space)
         _ = try await manager.get(url: url, space: space)
         #expect(exchangeCount.withLock { $0 } == 1)
@@ -582,7 +522,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
 
@@ -593,7 +533,7 @@ struct SpaceCredentialManagerTests {
             delegationTokenProvider: { _ in "mock-delegation-token" }
         )
 
-        let insecureURL = URL(string: "http://insecure.repo.test/xrpc/com.atproto.space.getRecord")!
+        let insecureURL = try #require(URL(string: "http://insecure.repo.test/xrpc/com.atproto.space.getRecord"))
         await #expect(throws: SpaceCredentialError.self) {
             _ = try await manager.get(url: insecureURL, space: space)
         }
@@ -604,7 +544,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
@@ -666,7 +606,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
@@ -765,7 +705,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let exchangeCount = Mutex<Int>(0)
@@ -827,12 +767,12 @@ struct SpaceCredentialManagerTests {
         #expect(cred2.expiresAt > cred1.expiresAt)
     }
 
-    @Test("exchange classifies 401 InvalidDelegationToken as tokenRejected with plain message when probe returns nothing")
+    @Test("exchange classifies 400 InvalidDelegationToken as tokenRejected with plain message when probe returns nothing")
     func exchangeClassifiesTokenRejectedProbeFailed() async throws {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
 
         SpaceMockURLProtocol.setHandler { request in
@@ -842,7 +782,7 @@ struct SpaceCredentialManagerTests {
                 return (resp, Data(self.didDocJSON.utf8))
             }
             if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
-                let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                 let body = #"{"error":"InvalidDelegationToken","message":"Delegation token signature invalid"}"#.data(using: .utf8)!
                 return (resp, body)
             }
@@ -866,7 +806,7 @@ struct SpaceCredentialManagerTests {
             _ = try await manager.credential(for: space)
             Issue.record("Expected credential to throw tokenRejected")
         } catch let err as SpaceCredentialError {
-            guard case .tokenRejected(let host, let error, let msg, let evidence) = err else {
+            guard case let .tokenRejected(host, error, msg, evidence) = err else {
                 Issue.record("Expected .tokenRejected, got \(err)")
                 return
             }
@@ -883,12 +823,12 @@ struct SpaceCredentialManagerTests {
         }
     }
 
-    @Test("exchange classifies 401 InvalidDelegationToken and cites identifying evidence when probe succeeds")
+    @Test("exchange classifies 400 InvalidDelegationToken and cites identifying evidence when probe succeeds")
     func exchangeClassifiesTokenRejectedProbeSucceeded() async throws {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
 
         SpaceMockURLProtocol.setHandler { request in
@@ -898,7 +838,7 @@ struct SpaceCredentialManagerTests {
                 return (resp, Data(self.didDocJSON.utf8))
             }
             if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
-                let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                 let body = #"{"error":"InvalidDelegationToken","message":"Delegation token signature invalid"}"#.data(using: .utf8)!
                 return (resp, body)
             }
@@ -923,7 +863,7 @@ struct SpaceCredentialManagerTests {
             _ = try await manager.credential(for: space)
             Issue.record("Expected credential to throw tokenRejected")
         } catch let err as SpaceCredentialError {
-            guard case .tokenRejected(let host, let error, let msg, let evidence) = err else {
+            guard case let .tokenRejected(host, error, msg, evidence) = err else {
                 Issue.record("Expected .tokenRejected, got \(err)")
                 return
             }
@@ -944,7 +884,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
 
         SpaceMockURLProtocol.setHandler { request in
@@ -954,7 +894,7 @@ struct SpaceCredentialManagerTests {
                 return (resp, Data(self.didDocJSON.utf8))
             }
             if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
-                let resp = HTTPURLResponse(url: request.url!, statusCode: 401, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                 let body = #"{"error":"InvalidDelegationToken","message":"Expired delegation token"}"#.data(using: .utf8)!
                 return (resp, body)
             }
@@ -979,7 +919,7 @@ struct SpaceCredentialManagerTests {
             _ = try await manager.credential(for: space)
             Issue.record("Expected credential to throw tokenRejected")
         } catch let err as SpaceCredentialError {
-            guard case .tokenRejected(let host, _, _, let evidence) = err else {
+            guard case let .tokenRejected(host, _, _, evidence) = err else {
                 Issue.record("Expected .tokenRejected, got \(err)")
                 return
             }
@@ -997,7 +937,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
 
         SpaceMockURLProtocol.setHandler { request in
@@ -1027,7 +967,7 @@ struct SpaceCredentialManagerTests {
             _ = try await manager.credential(for: space)
             Issue.record("Expected credential to throw authorizationRefused")
         } catch let err as SpaceCredentialError {
-            guard case .authorizationRefused(let host, let error, let msg) = err else {
+            guard case let .authorizationRefused(host, error, msg) = err else {
                 Issue.record("Expected .authorizationRefused, got \(err)")
                 return
             }
@@ -1047,7 +987,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
 
         SpaceMockURLProtocol.setHandler { request in
@@ -1077,7 +1017,7 @@ struct SpaceCredentialManagerTests {
             _ = try await manager.credential(for: space)
             Issue.record("Expected credential to throw spaceDeleted")
         } catch let err as SpaceCredentialError {
-            guard case .spaceDeleted(let host, let msg) = err else {
+            guard case let .spaceDeleted(host, msg) = err else {
                 Issue.record("Expected .spaceDeleted, got \(err)")
                 return
             }
@@ -1095,7 +1035,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
 
         SpaceMockURLProtocol.setHandler { request in
@@ -1125,7 +1065,7 @@ struct SpaceCredentialManagerTests {
             _ = try await manager.credential(for: space)
             Issue.record("Expected credential to throw exchangeFailed")
         } catch let err as SpaceCredentialError {
-            guard case .exchangeFailed(let statusCode, let message) = err else {
+            guard case let .exchangeFailed(statusCode, message) = err else {
                 Issue.record("Expected .exchangeFailed, got \(err)")
                 return
             }
@@ -1142,7 +1082,7 @@ struct SpaceCredentialManagerTests {
     @Test("provider-injection path: custom SpaceAuthorityHostProvider is invoked with space authority DID and used for exchange")
     func customAuthorityHostProviderPath() async throws {
         let session = makeMockSession()
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:customauth/space/com.example.drive/self")
         let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
         let credentialJWT = makeMockCredentialJWT(exp: expTime)
@@ -1187,7 +1127,7 @@ struct SpaceCredentialManagerTests {
             $0.url?.absoluteString == "https://custom-space.test/xrpc/com.atproto.space.getSpaceCredential"
         }
         #expect(exchangeRequests.count == 1)
-        #expect(exchangeRequests[0].value(forHTTPHeaderField: "Authorization") == "Bearer mock-delegation-token-custom")
+        #expect(exchangeRequests[0].value(forHTTPHeaderField: "Authorization") == nil)
     }
 
     @Test("compatibility-sugar path: init(resolver:) delegates to authorityHostProvider correctly")
@@ -1195,7 +1135,7 @@ struct SpaceCredentialManagerTests {
         let session = makeMockSession()
         let didResolver = DummyDIDResolver()
         let spaceResolver = SpaceHostResolver(didResolver: didResolver, urlSession: session)
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
 
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
@@ -1241,7 +1181,7 @@ struct SpaceCredentialManagerTests {
     @Test("ordering preservation: authorityHostProvider is invoked before delegationTokenProvider minting")
     func orderingPreservationProviderBeforeMint() async throws {
         let session = makeMockSession()
-        let client = await ATProtoClient(baseURL: URL(string: "https://pds.test")!)
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
         let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
         let credentialJWT = makeMockCredentialJWT(exp: expTime)
@@ -1283,24 +1223,99 @@ struct SpaceCredentialManagerTests {
         let order = callOrder.withLock { $0 }
         #expect(order == [
             "authorityHostProvider:did:plc:auth123",
-            "delegationTokenProvider:did:plc:auth123"
+            "delegationTokenProvider:did:plc:auth123",
         ])
     }
 
     @Test("isSecureOrLoopback rejects https URL with no host")
-    func isSecureOrLoopbackRejectsNoHost() {
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https://example.com")!) == true)
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https://pds.test/xrpc")!) == true)
+    func isSecureOrLoopbackRejectsNoHost() throws {
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "https://example.com"))) == true)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "https://pds.test/xrpc"))) == true)
 
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https:")!) == false)
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https://")!) == false)
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "https:///path/only")!) == false)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "https:"))) == false)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "https://"))) == false)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "https:///path/only"))) == false)
 
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http://127.0.0.1:8080")!) == true)
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http://localhost:3000")!) == true)
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http://[::1]:8080")!) == true)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "http://127.0.0.1:8080"))) == true)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "http://localhost:3000"))) == true)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "http://[::1]:8080"))) == true)
 
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http://insecure.example.com")!) == false)
-        #expect(SpaceCredentialManager.isSecureOrLoopback(URL(string: "http:")!) == false)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "http://insecure.example.com"))) == false)
+        #expect(try SpaceCredentialManager.isSecureOrLoopback(#require(URL(string: "http:"))) == false)
+    }
+}
+
+extension SpaceCredentialManagerTests {
+    @Test("KEM rotation refreshes once and uses a new share on every retry and page")
+    func rotatingKEMAndPaging() async throws {
+        let session = makeMockSession()
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+        let repo = "did:plc:writer"
+        let staleKey = Crypto.P256.KeyAgreement.PrivateKey()
+        let currentKey = Crypto.P256.KeyAgreement.PrivateKey()
+        func didKey(_ key: Crypto.P256.KeyAgreement.PrivateKey) throws -> String {
+            let publicKey = try Crypto.P256.Signing.PublicKey(compressedRepresentation: key.publicKey.compressedRepresentation)
+            return P256DIDKey(publicKey: publicKey).value
+        }
+        let stale = try didKey(staleKey), current = try didKey(currentKey)
+        let refreshes = Mutex<[Bool]>([])
+        let shares = Mutex<[String]>([])
+        let token = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970))
+        let digest = Data(repeating: 1, count: 32)
+        let revision = "3kbcq3p7ad422"
+        SpaceMockURLProtocol.setHandler { request in
+            let url = request.url!
+            if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
+                #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+                #expect(request.value(forHTTPHeaderField: "Signature") == nil)
+                return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
+            }
+            let want = try #require(request.value(forHTTPHeaderField: "Atproto-Space-Want-Mac"))
+            let share = try #require(want.components(separatedBy: "key_share=\"").last?.split(separator: "\"").first.map(String.init))
+            shares.withLock { $0.append(share) }
+            #expect(request.value(forHTTPHeaderField: "Authorization") == "Atproto-Space-Credential " + token)
+            #expect(request.value(forHTTPHeaderField: "Signature-Input") == "atproto-space-credential=" + SpaceHTTPSignature.signatureParams())
+            if url.lastPathComponent == "com.atproto.space.listRepoOps" {
+                return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(#"{"ops":[],"cursor":"next"}"#.utf8))
+            }
+            let secret = try SpaceMAC.decapsulate(privateKey: currentKey, keyShare: share)
+            let mac = try SpaceMAC.commit(sharedSecret: secret, space: space.uriString(), repo: repo, rev: revision, data: digest)
+            let body: [String: Any] = ["commit": ["ver": 1, "space": space.uriString(), "repo": repo, "rev": revision, "data": ["$bytes": digest.base64EncodedString().replacingOccurrences(of: "=", with: "")]]]
+            return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Atproto-Space-Mac": "type=\"atproto-space-repo\", ver=1, mac=:\(mac.base64EncodedString()):"])!, JSONSerialization.data(withJSONObject: body))
+        }
+        defer { SpaceMockURLProtocol.setHandler(nil) }
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+        let manager = SpaceCredentialManager(client: client, authorityHostProvider: { _ in URL(string: "https://space.test")! }, urlSession: session, delegationTokenProvider: { _ in "delegation" }, authorKEMKeyProvider: { _, forceRefresh in
+            refreshes.withLock { $0.append(forceRefresh) }
+            return forceRefresh ? current : stale
+        })
+        _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getLatestCommit?repo=\(repo)")), space: space)
+        _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.listRepoOps?repo=\(repo)&cursor=one")), space: space)
+        _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.listRepoOps?repo=\(repo)&cursor=two")), space: space)
+        #expect(refreshes.withLock { $0 } == [false, true, false, false])
+        #expect(Set(shares.withLock { $0 }).count == 4)
+    }
+
+    @Test("Only structured exact SpaceDeleted is destructive; InvalidDelegationToken is HTTP 400")
+    func exactErrors() async throws {
+        let session = makeMockSession()
+        let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+        let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+        for (body, expected) in [(#"{"error":"InvalidDelegationToken","message":"expired"}"#, "token"), (#"{"error":"Other","message":"Upstream said SpaceDeleted"}"#, "exchange"), ("SpaceDeleted", "exchange"), (#"{"error":"SpaceDeleted"}"#, "deleted")] {
+            SpaceMockURLProtocol.setHandler { request in
+                (HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+            }
+            let manager = SpaceCredentialManager(client: client, authorityHostProvider: { _ in URL(string: "https://space.test")! }, urlSession: session, delegationTokenProvider: { _ in "delegation" })
+            do { _ = try await manager.credential(for: space); Issue.record("Expected rejection") }
+            catch let error as SpaceCredentialError {
+                switch error {
+                case .tokenRejected: #expect(expected == "token")
+                case .spaceDeleted: #expect(expected == "deleted")
+                case .exchangeFailed: #expect(expected == "exchange")
+                default: Issue.record("Unexpected \(error)")
+                }
+            }
+        }
+        SpaceMockURLProtocol.setHandler(nil)
     }
 }

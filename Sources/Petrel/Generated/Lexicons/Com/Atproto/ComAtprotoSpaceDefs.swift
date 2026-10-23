@@ -6,24 +6,22 @@ import Foundation
 public enum ComAtprotoSpaceDefs {
     public static let typeIdentifier = "com.atproto.space.defs"
 
-    public struct SignedCommit: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.space.defs#signedCommit"
+    public struct Commit: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.space.defs#commit"
         public let ver: Int
-        public let hash: Bytes
-        public let ikm: Bytes
-        public let sig: Bytes
-        public let mac: Bytes
+        public let repo: DID
+        public let space: SpaceRef
         public let rev: TID
+        public let data: Bytes
 
         public init(
-            ver: Int, hash: Bytes, ikm: Bytes, sig: Bytes, mac: Bytes, rev: TID
+            ver: Int, repo: DID, space: SpaceRef, rev: TID, data: Bytes
         ) {
             self.ver = ver
-            self.hash = hash
-            self.ikm = ikm
-            self.sig = sig
-            self.mac = mac
+            self.repo = repo
+            self.space = space
             self.rev = rev
+            self.data = data
         }
 
         public init(from decoder: Decoder) throws {
@@ -35,27 +33,15 @@ public enum ComAtprotoSpaceDefs {
                 throw error
             }
             do {
-                hash = try container.decode(Bytes.self, forKey: .hash)
+                repo = try container.decode(DID.self, forKey: .repo)
             } catch {
-                LogManager.logError("Decoding error for required property 'hash': \(error)")
+                LogManager.logError("Decoding error for required property 'repo': \(error)")
                 throw error
             }
             do {
-                ikm = try container.decode(Bytes.self, forKey: .ikm)
+                space = try container.decode(SpaceRef.self, forKey: .space)
             } catch {
-                LogManager.logError("Decoding error for required property 'ikm': \(error)")
-                throw error
-            }
-            do {
-                sig = try container.decode(Bytes.self, forKey: .sig)
-            } catch {
-                LogManager.logError("Decoding error for required property 'sig': \(error)")
-                throw error
-            }
-            do {
-                mac = try container.decode(Bytes.self, forKey: .mac)
-            } catch {
-                LogManager.logError("Decoding error for required property 'mac': \(error)")
+                LogManager.logError("Decoding error for required property 'space': \(error)")
                 throw error
             }
             do {
@@ -64,26 +50,30 @@ public enum ComAtprotoSpaceDefs {
                 LogManager.logError("Decoding error for required property 'rev': \(error)")
                 throw error
             }
+            do {
+                data = try container.decode(Bytes.self, forKey: .data)
+            } catch {
+                LogManager.logError("Decoding error for required property 'data': \(error)")
+                throw error
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(ver, forKey: .ver)
-            try container.encode(hash, forKey: .hash)
-            try container.encode(ikm, forKey: .ikm)
-            try container.encode(sig, forKey: .sig)
-            try container.encode(mac, forKey: .mac)
+            try container.encode(repo, forKey: .repo)
+            try container.encode(space, forKey: .space)
             try container.encode(rev, forKey: .rev)
+            try container.encode(data, forKey: .data)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(ver)
-            hasher.combine(hash)
-            hasher.combine(ikm)
-            hasher.combine(sig)
-            hasher.combine(mac)
+            hasher.combine(repo)
+            hasher.combine(space)
             hasher.combine(rev)
+            hasher.combine(data)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -91,19 +81,16 @@ public enum ComAtprotoSpaceDefs {
             if ver != other.ver {
                 return false
             }
-            if hash != other.hash {
+            if repo != other.repo {
                 return false
             }
-            if ikm != other.ikm {
-                return false
-            }
-            if sig != other.sig {
-                return false
-            }
-            if mac != other.mac {
+            if space != other.space {
                 return false
             }
             if rev != other.rev {
+                return false
+            }
+            if data != other.data {
                 return false
             }
             return true
@@ -118,27 +105,24 @@ public enum ComAtprotoSpaceDefs {
             map = map.adding(key: "$type", value: Self.typeIdentifier)
             let verValue = try ver.toCBORValue()
             map = map.adding(key: "ver", value: verValue)
-            let hashValue = try hash.toCBORValue()
-            map = map.adding(key: "hash", value: hashValue)
-            let ikmValue = try ikm.toCBORValue()
-            map = map.adding(key: "ikm", value: ikmValue)
-            let sigValue = try sig.toCBORValue()
-            map = map.adding(key: "sig", value: sigValue)
-            let macValue = try mac.toCBORValue()
-            map = map.adding(key: "mac", value: macValue)
+            let repoValue = try repo.toCBORValue()
+            map = map.adding(key: "repo", value: repoValue)
+            let spaceValue = try space.toCBORValue()
+            map = map.adding(key: "space", value: spaceValue)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
+            let dataValue = try data.toCBORValue()
+            map = map.adding(key: "data", value: dataValue)
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
             case ver
-            case hash
-            case ikm
-            case sig
-            case mac
+            case repo
+            case space
             case rev
+            case data
         }
     }
 }

@@ -76,14 +76,16 @@ public enum SpaceMAC {
         guard mac.count == 32, expected.count == 32 else { throw Failure.mismatch }
         // Fixed-length comparison; never short-circuit on a mismatching byte.
         var difference: UInt8 = 0
-        for (left, right) in zip(mac, expected) { difference |= left ^ right }
+        for (left, right) in zip(mac, expected) {
+            difference |= left ^ right
+        }
         guard difference == 0 else { throw Failure.mismatch }
     }
 
     private static func field(_ string: String) throws -> Data {
         let bytes = Data(string.utf8)
         guard bytes.count <= Int(UInt16.max) else { throw Failure.invalidContext }
-        return Data([UInt8(bytes.count >> 8), UInt8(bytes.count & 0xff)]) + bytes
+        return Data([UInt8(bytes.count >> 8), UInt8(bytes.count & 0xFF)]) + bytes
     }
 
     private static func authenticate(_ context: Data, sharedSecret: Data) throws -> Data {

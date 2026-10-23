@@ -8,16 +8,13 @@ public enum ComAtprotoSpaceGetRepo {
     public struct Parameters: Parametrizable {
         public let space: SpaceRef
         public let repo: DID
-        public let excludeValues: Bool?
 
         public init(
             space: SpaceRef,
-            repo: DID,
-            excludeValues: Bool? = nil
+            repo: DID
         ) {
             self.space = space
             self.repo = repo
-            self.excludeValues = excludeValues
         }
     }
 
@@ -59,6 +56,8 @@ public enum ComAtprotoSpaceGetRepo {
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        /// The Atproto-Space-Want-Mac header is missing or malformed, names an unsupported type or version, or carries an invalid key share.
+        case badSpaceMac = "BadSpaceMac"
         case spaceNotFound = "SpaceNotFound"
         case repoNotFound = "RepoNotFound"
         case repoTakendown = "RepoTakendown"
@@ -83,8 +82,8 @@ public enum ComAtprotoSpaceGetRepo {
 
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.getRepo", kind: "query",
-        inputEncoding: nil, outputEncoding: "application/vnd.ipld.car",
-        declaredErrors: ["SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated"]
+        inputEncoding: nil, outputEncoding: "application/octet-stream",
+        declaredErrors: ["BadSpaceMac", "SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -98,7 +97,7 @@ public enum ComAtprotoSpaceGetRepo {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - getRepo
 
-    /// Download an account's permissioned repo within a space as a CAR file, for full-state recovery. The CAR declares two roots in order: the signed commit, then a DRISL (DAG-CBOR) index mapping '{collection}/{rkey}' to record CID. Record blocks follow, in the same canonical DAG-CBOR key order as the index (length-first, then bytewise). Blobs are not included and are fetched separately via getBlob. Served by a repo host. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+    /// Download an account's permissioned repo within a space as a STAR file, for full-state recovery. The archive's metadata is the repo's commit; each key/value pair is a record path ('{collection}/{rkey}') and the record's DRISL encoding, in strict lexicographic order of the path. Blobs are not included and are fetched separately via getBlob. Served by a repo host. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). When called with a space credential, the caller must send an Atproto-Space-Want-Mac header, and the commit's MAC is returned in the Atproto-Space-Mac response header.
     ///
     /// - Parameter input: The input parameters for the request
     ///
@@ -112,7 +111,7 @@ public extension ATProtoClient.Com.Atproto.Space {
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
-            headers: ["Accept": "application/vnd.ipld.car"],
+            headers: ["Accept": "application/octet-stream"],
             body: nil,
             queryItems: queryItems
         )
@@ -128,11 +127,11 @@ public extension ATProtoClient.Com.Atproto.Space {
         // are handled via the status code / structured error parser below.
         if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: "nil")
+                throw NetworkError.invalidContentType(expected: "application/octet-stream", actual: "nil")
             }
 
-            if !contentType.lowercased().contains("application/vnd.ipld.car") {
-                throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: contentType)
+            if !contentType.lowercased().contains("application/octet-stream") {
+                throw NetworkError.invalidContentType(expected: "application/octet-stream", actual: contentType)
             }
 
             let decodedData = ComAtprotoSpaceGetRepo.Output(data: responseData)

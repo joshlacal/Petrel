@@ -24,5 +24,7 @@ public struct SpaceSetHash: Sendable {
         }
     }
 
-    public var digest: Data { Data(SHA256.hash(data: state)) }
+    public var digest: Data {
+        Data(SHA256.hash(data: state))
+    }
 }

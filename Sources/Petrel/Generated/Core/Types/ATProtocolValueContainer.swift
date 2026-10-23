@@ -3256,13 +3256,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["com.atproto.space.defs#signedCommit"] = { decoder in
+            decoders["com.atproto.space.defs#commit"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoSpaceDefs.SignedCommit(from: decoder)
+                    let decodedObject = try ComAtprotoSpaceDefs.Commit(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoSpaceDefs.SignedCommit: \(error)")
-                    return .decodeError("Error decoding ComAtprotoSpaceDefs.SignedCommit: \(error)")
+                    LogManager.logDebug("Error decoding ComAtprotoSpaceDefs.Commit: \(error)")
+                    return .decodeError("Error decoding ComAtprotoSpaceDefs.Commit: \(error)")
                 }
             }
 

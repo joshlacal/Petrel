@@ -90,6 +90,8 @@ public enum ComAtprotoSpaceGetRecord {
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        /// The Atproto-Space-Want-Mac header is missing or malformed, names an unsupported type or version, or carries an invalid key share.
+        case badSpaceMac = "BadSpaceMac"
         case recordNotFound = "RecordNotFound"
         case spaceNotFound = "SpaceNotFound"
         case repoNotFound = "RepoNotFound"
@@ -116,7 +118,7 @@ public enum ComAtprotoSpaceGetRecord {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.getRecord", kind: "query",
         inputEncoding: nil, outputEncoding: "application/json",
-        declaredErrors: ["RecordNotFound", "SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated"]
+        declaredErrors: ["BadSpaceMac", "RecordNotFound", "SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -130,7 +132,7 @@ public enum ComAtprotoSpaceGetRecord {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - getRecord
 
-    /// Get a single record from a permissioned space. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). Throws RepoNotFound when the account holds no repo in the space; this does not distinguish a member that has never written from a non-member.
+    /// Get a single record from a permissioned space. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). When called with a space credential, the caller must send an Atproto-Space-Want-Mac header, and the record's MAC is returned in the Atproto-Space-Mac response header. Throws RepoNotFound when the account holds no repo in the space; this does not distinguish a member that has never written from a non-member.
     ///
     /// - Parameter input: The input parameters for the request
     ///

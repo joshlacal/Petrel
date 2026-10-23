@@ -21,8 +21,8 @@ object ComAtprotoSpaceNotifyWriteDefs {
 // Reference to the space.        @SerialName("space")
         val space: SpaceRef,// The DID of the account whose repo advanced.        @SerialName("repo")
         val repo: DID,// The repo revision after the write.        @SerialName("repoRev")
-        val repoRev: String,// The repo's current commit hash (sha256 of the LtHash state) after the write. Lets the space host maintain each repo's hash for listRepos.        @SerialName("hash")
-        val hash: Bytes,// The space revision assigned by the space host. Present only on notifications forwarded to syncers.        @SerialName("spaceRev")
+        val repoRev: String,// The repo's current commit data (sha256 of the LtHash state) after the write. Lets the space host maintain each repo's commit data for listRepos.        @SerialName("data")
+        val `data`: Bytes,// The space revision assigned by the space host. Present only on notifications forwarded to syncers.        @SerialName("spaceRev")
         val spaceRev: String? = null,// The previous space revision. Omitted on the first update in a space. A gap indicates missed notifications; recover using listRepos with cursor.        @SerialName("prevSpaceRev")
         val prevSpaceRev: String? = null    )
 
