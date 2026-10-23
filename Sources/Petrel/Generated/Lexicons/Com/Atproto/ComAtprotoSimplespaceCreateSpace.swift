@@ -6,15 +6,15 @@ import Foundation
 public enum ComAtprotoSimplespaceCreateSpace {
     public static let typeIdentifier = "com.atproto.simplespace.createSpace"
     public struct Input: ATProtocolCodable {
-        public let type: NSID
+        public let spaceType: NSID
         public let skey: RecordKey?
         public let readPolicy: InputReadPolicyUnion
         public let writePolicy: InputWritePolicyUnion
         public let appAccess: InputAppAccessUnion
 
         /// Standard public initializer
-        public init(type: NSID, skey: RecordKey? = nil, readPolicy: InputReadPolicyUnion, writePolicy: InputWritePolicyUnion, appAccess: InputAppAccessUnion) {
-            self.type = type
+        public init(spaceType: NSID, skey: RecordKey? = nil, readPolicy: InputReadPolicyUnion, writePolicy: InputWritePolicyUnion, appAccess: InputAppAccessUnion) {
+            self.spaceType = spaceType
             self.skey = skey
             self.readPolicy = readPolicy
             self.writePolicy = writePolicy
@@ -23,7 +23,7 @@ public enum ComAtprotoSimplespaceCreateSpace {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            type = try container.decode(NSID.self, forKey: .type)
+            spaceType = try container.decode(NSID.self, forKey: .spaceType)
             if container.contains(.skey) {
                 guard try !container.decodeNil(forKey: .skey) else {
                     throw DecodingError.valueNotFound(
@@ -45,7 +45,7 @@ public enum ComAtprotoSimplespaceCreateSpace {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(type, forKey: .type)
+            try container.encode(spaceType, forKey: .spaceType)
             try container.encodeIfPresent(skey, forKey: .skey)
             try container.encode(readPolicy, forKey: .readPolicy)
             try container.encode(writePolicy, forKey: .writePolicy)
@@ -54,8 +54,8 @@ public enum ComAtprotoSimplespaceCreateSpace {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            let typeValue = try type.toCBORValue()
-            map = map.adding(key: "type", value: typeValue)
+            let spaceTypeValue = try spaceType.toCBORValue()
+            map = map.adding(key: "spaceType", value: spaceTypeValue)
             if let value = skey {
                 let skeyValue = try value.toCBORValue()
                 map = map.adding(key: "skey", value: skeyValue)
@@ -70,7 +70,7 @@ public enum ComAtprotoSimplespaceCreateSpace {
         }
 
         private enum CodingKeys: String, CodingKey {
-            case type
+            case spaceType
             case skey
             case readPolicy
             case writePolicy

@@ -35,54 +35,26 @@ object ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnionSerializer : kotlinx.
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion")
 
-    private val TYPE_PublicPolicy = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#publicPolicy")
-    private val TYPE_MemberListPolicy = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#memberListPolicy")
-    private val TYPE_ManagingAppPolicy = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#managingAppPolicy")
-
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.PublicPolicy -> {
-                val obj = (jsonEncoder.json.encodeToJsonElement(
-                    blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(),
-                    value.value
-                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
-                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
-                    map["\$type"] = TYPE_PublicPolicy
-                    map.putAll(original)
-                    kotlinx.serialization.json.JsonObject(map)
-                } ?: kotlinx.serialization.json.buildJsonObject {
-                    put("\$type", TYPE_PublicPolicy)
-                }
-                obj
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#publicPolicy")
+                })
             }
             is ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.MemberListPolicy -> {
-                val obj = (jsonEncoder.json.encodeToJsonElement(
-                    blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(),
-                    value.value
-                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
-                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
-                    map["\$type"] = TYPE_MemberListPolicy
-                    map.putAll(original)
-                    kotlinx.serialization.json.JsonObject(map)
-                } ?: kotlinx.serialization.json.buildJsonObject {
-                    put("\$type", TYPE_MemberListPolicy)
-                }
-                obj
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#memberListPolicy")
+                })
             }
             is ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.ManagingAppPolicy -> {
-                val obj = (jsonEncoder.json.encodeToJsonElement(
-                    blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(),
-                    value.value
-                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
-                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
-                    map["\$type"] = TYPE_ManagingAppPolicy
-                    map.putAll(original)
-                    kotlinx.serialization.json.JsonObject(map)
-                } ?: kotlinx.serialization.json.buildJsonObject {
-                    put("\$type", TYPE_ManagingAppPolicy)
-                }
-                obj
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#managingAppPolicy")
+                })
             }
             is ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -97,14 +69,10 @@ object ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnionSerializer : kotlinx.
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion {
-        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
-            ?: throw kotlinx.serialization.SerializationException("ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion can only be deserialized from JSON")
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element as? kotlinx.serialization.json.JsonObject
-            ?: return ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.Unexpected(element)
-        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
-        val type = if (primitive != null && primitive.isString) primitive.content else null
-            ?: return ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.Unexpected(element)
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
 
         return when (type) {
             "com.atproto.simplespace.defs#publicPolicy" -> ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion.PublicPolicy(
@@ -140,54 +108,26 @@ object ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnionSerializer : kotlinx
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion")
 
-    private val TYPE_PublicPolicy = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#publicPolicy")
-    private val TYPE_MemberListPolicy = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#memberListPolicy")
-    private val TYPE_ManagingAppPolicy = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#managingAppPolicy")
-
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.PublicPolicy -> {
-                val obj = (jsonEncoder.json.encodeToJsonElement(
-                    blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(),
-                    value.value
-                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
-                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
-                    map["\$type"] = TYPE_PublicPolicy
-                    map.putAll(original)
-                    kotlinx.serialization.json.JsonObject(map)
-                } ?: kotlinx.serialization.json.buildJsonObject {
-                    put("\$type", TYPE_PublicPolicy)
-                }
-                obj
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsPublicPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#publicPolicy")
+                })
             }
             is ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.MemberListPolicy -> {
-                val obj = (jsonEncoder.json.encodeToJsonElement(
-                    blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(),
-                    value.value
-                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
-                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
-                    map["\$type"] = TYPE_MemberListPolicy
-                    map.putAll(original)
-                    kotlinx.serialization.json.JsonObject(map)
-                } ?: kotlinx.serialization.json.buildJsonObject {
-                    put("\$type", TYPE_MemberListPolicy)
-                }
-                obj
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsMemberListPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#memberListPolicy")
+                })
             }
             is ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.ManagingAppPolicy -> {
-                val obj = (jsonEncoder.json.encodeToJsonElement(
-                    blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(),
-                    value.value
-                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
-                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
-                    map["\$type"] = TYPE_ManagingAppPolicy
-                    map.putAll(original)
-                    kotlinx.serialization.json.JsonObject(map)
-                } ?: kotlinx.serialization.json.buildJsonObject {
-                    put("\$type", TYPE_ManagingAppPolicy)
-                }
-                obj
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsManagingAppPolicy.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#managingAppPolicy")
+                })
             }
             is ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -202,14 +142,10 @@ object ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnionSerializer : kotlinx
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion {
-        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
-            ?: throw kotlinx.serialization.SerializationException("ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion can only be deserialized from JSON")
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element as? kotlinx.serialization.json.JsonObject
-            ?: return ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.Unexpected(element)
-        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
-        val type = if (primitive != null && primitive.isString) primitive.content else null
-            ?: return ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.Unexpected(element)
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
 
         return when (type) {
             "com.atproto.simplespace.defs#publicPolicy" -> ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion.PublicPolicy(
@@ -242,39 +178,20 @@ object ComAtprotoSimplespaceCreateSpaceInputAppAccessUnionSerializer : kotlinx.s
     override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
         kotlinx.serialization.descriptors.buildClassSerialDescriptor("ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion")
 
-    private val TYPE_Open = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#open")
-    private val TYPE_AllowList = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#allowList")
-
     override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion) {
         val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
         val element = when (value) {
             is ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion.Open -> {
-                val obj = (jsonEncoder.json.encodeToJsonElement(
-                    blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsOpen.serializer(),
-                    value.value
-                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
-                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
-                    map["\$type"] = TYPE_Open
-                    map.putAll(original)
-                    kotlinx.serialization.json.JsonObject(map)
-                } ?: kotlinx.serialization.json.buildJsonObject {
-                    put("\$type", TYPE_Open)
-                }
-                obj
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsOpen.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#open")
+                })
             }
             is ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion.AllowList -> {
-                val obj = (jsonEncoder.json.encodeToJsonElement(
-                    blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsAllowList.serializer(),
-                    value.value
-                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
-                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
-                    map["\$type"] = TYPE_AllowList
-                    map.putAll(original)
-                    kotlinx.serialization.json.JsonObject(map)
-                } ?: kotlinx.serialization.json.buildJsonObject {
-                    put("\$type", TYPE_AllowList)
-                }
-                obj
+                val obj = jsonEncoder.json.encodeToJsonElement(blue.catbird.petrel.generated.ComAtprotoSimplespaceDefsAllowList.serializer(), value.value)
+                kotlinx.serialization.json.JsonObject(obj.jsonObject.toMutableMap().also {
+                    it["\$type"] = kotlinx.serialization.json.JsonPrimitive("com.atproto.simplespace.defs#allowList")
+                })
             }
             is ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion.Unexpected -> value.value
             // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
@@ -289,14 +206,10 @@ object ComAtprotoSimplespaceCreateSpaceInputAppAccessUnionSerializer : kotlinx.s
     }
 
     override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion {
-        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
-            ?: throw kotlinx.serialization.SerializationException("ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion can only be deserialized from JSON")
+        val jsonDecoder = decoder as kotlinx.serialization.json.JsonDecoder
         val element = jsonDecoder.decodeJsonElement()
-        val jsonObject = element as? kotlinx.serialization.json.JsonObject
-            ?: return ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion.Unexpected(element)
-        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
-        val type = if (primitive != null && primitive.isString) primitive.content else null
-            ?: return ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion.Unexpected(element)
+        val jsonObject = element.jsonObject
+        val type = jsonObject["\$type"]?.jsonPrimitive?.contentOrNull
 
         return when (type) {
             "com.atproto.simplespace.defs#open" -> ComAtprotoSimplespaceCreateSpaceInputAppAccessUnion.Open(
@@ -312,8 +225,8 @@ object ComAtprotoSimplespaceCreateSpaceInputAppAccessUnionSerializer : kotlinx.s
 
 @Serializable
     data class ComAtprotoSimplespaceCreateSpaceInput(
-// The NSID of the space type, describing the modality of the space (e.g. app.bsky.group, app.bsky.personal).        @SerialName("type")
-        val type: NSID,// The space key. Used to differentiate multiple spaces of the same type under the same owner. Same syntax requirements as a record key. If not provided, one will be auto-generated (TID).        @SerialName("skey")
+// The NSID of the space type, describing the modality of the space (e.g. app.bsky.group, app.bsky.personal).        @SerialName("spaceType")
+        val spaceType: NSID,// The space key. Used to differentiate multiple spaces of the same type under the same owner. Same syntax requirements as a record key. If not provided, one will be auto-generated (TID).        @SerialName("skey")
         val skey: String? = null,// How the authority decides whether to authorize a user to read the space.        @SerialName("readPolicy")
         val readPolicy: ComAtprotoSimplespaceCreateSpaceInputReadPolicyUnion,// How the authority decides whether to track and forward a user's write notifications.        @SerialName("writePolicy")
         val writePolicy: ComAtprotoSimplespaceCreateSpaceInputWritePolicyUnion,// How the authority decides whether to authorize a requesting app.        @SerialName("appAccess")

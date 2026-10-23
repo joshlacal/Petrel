@@ -63,18 +63,18 @@ public enum ComAtprotoSpaceListSpaces {
     }
 
     public struct Parameters: Parametrizable {
-        public let type: NSID?
+        public let spaceType: NSID?
         public let did: DID?
         public let limit: Int?
         public let cursor: String?
 
         public init(
-            type: NSID? = nil,
+            spaceType: NSID? = nil,
             did: DID? = nil,
             limit: Int? = nil,
             cursor: String? = nil
         ) {
-            self.type = type
+            self.spaceType = spaceType
             self.did = did
             self.limit = limit
             self.cursor = cursor

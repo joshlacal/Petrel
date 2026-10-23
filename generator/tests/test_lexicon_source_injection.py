@@ -385,7 +385,9 @@ class LexiconSourceInjectionTests(unittest.TestCase):
             }
         }
         kt_union_code = KotlinCodeGenerator(union_lexicon, self.cycle_detector).convert()
-        self.assertIn('it["\\$type"]', kt_union_code)
+        # Check the literal, independent of the serializer's local variable name.
+        self.assertIn('["\\$type"]', kt_union_code)
+        self.assertNotIn('["$type"]', kt_union_code)
 
     def test_reject_invalid_refs_in_all_schema_positions(self):
         """Adversarial schemas with invalid ref or refs (containing newlines, injection statements, bad NSIDs) must be rejected."""
