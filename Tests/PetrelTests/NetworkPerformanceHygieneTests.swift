@@ -5,8 +5,8 @@ import Foundation
 #if canImport(Compression)
     import Compression
 #endif
-import SwiftCBOR
 @testable import Petrel
+import SwiftCBOR
 import Synchronization
 import Testing
 
@@ -15,6 +15,7 @@ private actor Counter {
     func increment() {
         count += 1
     }
+
     func get() -> Int {
         count
     }
@@ -25,6 +26,7 @@ private actor Flag {
     func setTrue() {
         value = true
     }
+
     func get() -> Bool {
         value
     }
@@ -37,7 +39,7 @@ struct NetworkPerformanceHygieneTests {
     @Test("RequestDeduplicator deduplicates concurrent GET requests under the same auth identity")
     func requestDeduplicatorCoalescesConcurrentGETsSameAuth() async throws {
         let deduplicator = RequestDeduplicator()
-        let url = URL(string: "https://bsky.social/xrpc/app.bsky.actor.getProfile")!
+        let url = try #require(URL(string: "https://bsky.social/xrpc/app.bsky.actor.getProfile"))
 
         var request1 = URLRequest(url: url)
         request1.httpMethod = "GET"
@@ -72,7 +74,7 @@ struct NetworkPerformanceHygieneTests {
     @Test("Finding 4 Regression: Concurrent GETs under different account identities must NOT coalesce")
     func requestDeduplicatorDoesNotCoalesceDifferentAccounts() async throws {
         let deduplicator = RequestDeduplicator()
-        let url = URL(string: "https://bsky.social/xrpc/app.bsky.actor.getProfile")!
+        let url = try #require(URL(string: "https://bsky.social/xrpc/app.bsky.actor.getProfile"))
 
         var request1 = URLRequest(url: url)
         request1.httpMethod = "GET"
@@ -107,7 +109,7 @@ struct NetworkPerformanceHygieneTests {
     @Test("Finding 4 Regression: Authenticated vs Unauthenticated concurrent GETs must NOT coalesce")
     func requestDeduplicatorDoesNotCoalesceAuthAndUnauth() async throws {
         let deduplicator = RequestDeduplicator()
-        let url = URL(string: "https://bsky.social/xrpc/app.bsky.feed.getTimeline")!
+        let url = try #require(URL(string: "https://bsky.social/xrpc/app.bsky.feed.getTimeline"))
 
         var request1 = URLRequest(url: url)
         request1.httpMethod = "GET"
@@ -160,7 +162,7 @@ struct NetworkPerformanceHygieneTests {
     @Test("Finding 1: Distinct HTTP methods (HEAD vs GET) to same URL do not coalesce")
     func requestDeduplicatorDoesNotCoalesceDistinctMethods() async throws {
         let deduplicator = RequestDeduplicator()
-        let url = URL(string: "https://bsky.social/xrpc/test")!
+        let url = try #require(URL(string: "https://bsky.social/xrpc/test"))
 
         var request1 = URLRequest(url: url)
         request1.httpMethod = "HEAD"
@@ -194,7 +196,7 @@ struct NetworkPerformanceHygieneTests {
     @Test("RequestDeduplicator does not deduplicate POST requests")
     func requestDeduplicatorDoesNotDeduplicatePOST() async throws {
         let deduplicator = RequestDeduplicator()
-        let url = URL(string: "https://bsky.social/xrpc/com.atproto.repo.createRecord")!
+        let url = try #require(URL(string: "https://bsky.social/xrpc/com.atproto.repo.createRecord"))
 
         var request1 = URLRequest(url: url)
         request1.httpMethod = "POST"
@@ -232,11 +234,11 @@ struct NetworkPerformanceHygieneTests {
     @Test("RequestDeduplicator isRequestInFlight behavior")
     func requestDeduplicatorInFlightStatus() async throws {
         let deduplicator = RequestDeduplicator()
-        let getURL = URL(string: "https://bsky.social/xrpc/test")!
+        let getURL = try #require(URL(string: "https://bsky.social/xrpc/test"))
         var getReq = URLRequest(url: getURL)
         getReq.httpMethod = "GET"
 
-        let postURL = URL(string: "https://bsky.social/xrpc/test")!
+        let postURL = try #require(URL(string: "https://bsky.social/xrpc/test"))
         var postReq = URLRequest(url: postURL)
         postReq.httpMethod = "POST"
 
@@ -249,32 +251,32 @@ struct NetworkPerformanceHygieneTests {
     // The session-level auth-challenge delegate method (and this parameterless
     // URLAuthenticationChallenge initializer) only exist on Darwin Foundation.
     #if canImport(Darwin)
-    @Test("HardenedURLSessionDelegate performs default handling for TLS challenge")
-    func hardenedDelegateTLSChallengeDefaultHandling() async throws {
-        let delegate = HardenedURLSessionDelegate()
-        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
+        @Test("HardenedURLSessionDelegate performs default handling for TLS challenge")
+        func hardenedDelegateTLSChallengeDefaultHandling() async throws {
+            let delegate = HardenedURLSessionDelegate()
+            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
 
-        let challenge = URLAuthenticationChallenge()
-        let flag = Flag()
-        delegate.urlSession(session, didReceive: challenge) { disposition, credential in
-            #expect(disposition == .performDefaultHandling)
-            #expect(credential == nil)
-            Task {
-                await flag.setTrue()
+            let challenge = URLAuthenticationChallenge()
+            let flag = Flag()
+            delegate.urlSession(session, didReceive: challenge) { disposition, credential in
+                #expect(disposition == .performDefaultHandling)
+                #expect(credential == nil)
+                Task {
+                    await flag.setTrue()
+                }
             }
+            try await Task.sleep(nanoseconds: 10_000_000)
+            let wasHandled = await flag.get()
+            #expect(wasHandled == true)
         }
-        try await Task.sleep(nanoseconds: 10_000_000)
-        let wasHandled = await flag.get()
-        #expect(wasHandled == true)
-    }
     #endif
 
     // MARK: - Task 7: NetworkService URL Validation and SSRF Mitigation Tests
 
     @Test("NetworkService blocks private IP addresses and IPv4-mapped IPv6")
     func networkServiceBlocksPrivateIPs() async throws {
-        let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
+        let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
 
         let privateURLs = [
             "http://10.0.0.1/xrpc/test",
@@ -285,7 +287,7 @@ struct NetworkPerformanceHygieneTests {
             "http://255.255.255.255/xrpc/test",
             "https://[::ffff:127.0.0.1]/xrpc/test",
             "https://[::ffff:7f00:1]/xrpc/test",
-            "https://[::ffff:10.0.0.1]/xrpc/test"
+            "https://[::ffff:10.0.0.1]/xrpc/test",
         ]
 
         for urlString in privateURLs {
@@ -321,7 +323,7 @@ struct NetworkPerformanceHygieneTests {
             NetworkService.dnsResolverOverride = nil
         }
 
-        let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
+        let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
 
         let req1 = try await service.createURLRequest(
             endpoint: "https://bsky.social/xrpc/app.bsky.actor.getProfile",
@@ -335,7 +337,7 @@ struct NetworkPerformanceHygieneTests {
 
     @Test("Finding 2: In-flight DNS resolution cancellation propagates CancellationError promptly")
     func networkServiceCancellationPropagates() async throws {
-        let service = NetworkService(baseURL: URL(string: "https://bsky.social")!)
+        let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
 
         let cancellationHost = "cancellation-test.bsky.social"
         let enteredOperation = AsyncBarrier()
@@ -396,7 +398,7 @@ struct NetworkPerformanceHygieneTests {
             if let elapsed {
                 #expect(elapsed < .milliseconds(200))
             }
-        case .failure(let error):
+        case let .failure(error):
             Issue.record("Expected CancellationError, but got: \(error)")
         case .success:
             Issue.record("Expected CancellationError, but task.value completed successfully")
@@ -445,19 +447,21 @@ struct NetworkPerformanceHygieneTests {
         // Construct a valid ATProto WebSocket frame
         let headerCBOR: CBOR = .map([
             .utf8String("op"): .unsignedInt(1),
-            .utf8String("t"): .utf8String("#commit")
+            .utf8String("t"): .utf8String("#commit"),
         ])
         let payloadCBOR: CBOR = .map([
-            .utf8String("seq"): .unsignedInt(42)
+            .utf8String("seq"): .unsignedInt(42),
         ])
         let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
 
         final class MockOverflowWebSocketTask: WebSocketTaskProtocol, @unchecked Sendable {
             private let frameData: Data
             private let sentCount = Mutex<Int>(0)
+            private let terminated: AsyncBarrier
 
-            init(frameData: Data) {
+            init(frameData: Data, terminated: AsyncBarrier) {
                 self.frameData = frameData
+                self.terminated = terminated
             }
 
             func resume() {}
@@ -476,7 +480,9 @@ struct NetworkPerformanceHygieneTests {
                 }
             }
 
-            func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {}
+            func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+                terminated.signal()
+            }
         }
 
         NetworkService.dnsResolverOverride = { host in
@@ -485,24 +491,26 @@ struct NetworkPerformanceHygieneTests {
             }
             return nil
         }
+        let terminated = AsyncBarrier()
         NetworkService.webSocketTaskOverride = { _ in
-            MockOverflowWebSocketTask(frameData: frameBytes)
+            MockOverflowWebSocketTask(frameData: frameBytes, terminated: terminated)
         }
         defer {
             NetworkService.dnsResolverOverride = nil
             NetworkService.webSocketTaskOverride = nil
         }
 
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
         let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
             endpoint: "com.atproto.sync.subscribeRepos",
             parameters: nil
         )
+        // Hold consumption until overflow is observed, independently of scheduler speed.
+        try await terminated.waitUntilSignaled(timeoutNanoseconds: 5_000_000_000)
         var caughtOverflow = false
         do {
             for try await _ in stream {
-                // Slow consumer to let the 1000-message producer buffer saturate and drop
-                try await Task.sleep(nanoseconds: 10_000_000)
+                // Drain the already-full buffer before its terminal error.
             }
         } catch let error as NetworkError {
             if case .streamOverflow = error {
@@ -514,15 +522,16 @@ struct NetworkPerformanceHygieneTests {
 
         #expect(caughtOverflow, "Expected NetworkService.subscribe to terminate throwing NetworkError.streamOverflow on drop")
     }
+
     @Test("Server-trust revalidation uses the delegate async resolver seam")
     func serverTrustRevalidationSeam() async throws {
-        let url = URL(string: "https://pds.example.com/xrpc/test")!
+        let url = try #require(URL(string: "https://pds.example.com/xrpc/test"))
         let cases: [(String, @Sendable (String) async throws -> [String], Bool)] = [
             ("matching approved addresses", { _ in ["93.184.216.34"] }, true),
             ("different public addresses with intersection", { _ in ["93.184.216.34", "93.184.216.35"] }, true),
             ("fully disjoint public addresses", { _ in ["93.184.216.35"] }, false),
             ("private rebinding", { _ in ["10.0.0.1"] }, false),
-            ("resolver failure", { _ in throw URLError(.cannotFindHost) }, false)
+            ("resolver failure", { _ in throw URLError(.cannotFindHost) }, false),
         ]
         for (_, resolver, expected) in cases {
             let delegate = HardenedURLSessionDelegate(resolver: resolver)
@@ -657,10 +666,10 @@ struct NetworkPerformanceHygieneTests {
 
         let headerCBOR: CBOR = .map([
             .utf8String("op"): .unsignedInt(1),
-            .utf8String("t"): .utf8String("#commit")
+            .utf8String("t"): .utf8String("#commit"),
         ])
         let payloadCBOR: CBOR = .map([
-            .utf8String("seq"): .unsignedInt(UInt64.max)
+            .utf8String("seq"): .unsignedInt(UInt64.max),
         ])
         let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
         let task = MockSubscriptionWebSocketTask(message: .data(frameBytes))
@@ -672,7 +681,8 @@ struct NetworkPerformanceHygieneTests {
         }
         guard let networkError = error as? NetworkError,
               case let .invalidResponse(description) = networkError,
-              description.contains("exceeds Int.max") else {
+              description.contains("exceeds Int.max")
+        else {
             Issue.record("Expected NetworkError.invalidResponse with 'exceeds Int.max', got: \(error)")
             return
         }
@@ -701,7 +711,8 @@ struct NetworkPerformanceHygieneTests {
         }
         guard let networkError = error as? NetworkError,
               case let .invalidResponse(description) = networkError,
-              description.contains("underflows Int.min") || description.contains("exceeds Int64 boundary") else {
+              description.contains("underflows Int.min") || description.contains("exceeds Int64 boundary")
+        else {
             Issue.record("Expected NetworkError.invalidResponse with underflow description, got: \(error)")
             return
         }
@@ -715,14 +726,14 @@ struct NetworkPerformanceHygieneTests {
 
         let headerCBOR: CBOR = .map([
             .utf8String("op"): .unsignedInt(1),
-            .utf8String("t"): .utf8String("#commit")
+            .utf8String("t"): .utf8String("#commit"),
         ])
         var nested: CBOR = .utf8String("leaf")
-        for _ in 0..<70 {
+        for _ in 0 ..< 70 {
             nested = .array([nested])
         }
         let payloadCBOR: CBOR = .map([
-            .utf8String("data"): nested
+            .utf8String("data"): nested,
         ])
         let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
         let task = MockSubscriptionWebSocketTask(message: .data(frameBytes))
@@ -734,7 +745,8 @@ struct NetworkPerformanceHygieneTests {
         }
         guard let networkError = error as? NetworkError,
               case let .invalidResponse(description) = networkError,
-              description.contains("CBOR preflight failed") else {
+              description.contains("CBOR preflight failed")
+        else {
             Issue.record("Expected NetworkError.invalidResponse with preflight failure description, got: \(error)")
             return
         }
@@ -748,10 +760,10 @@ struct NetworkPerformanceHygieneTests {
 
         let headerCBOR: CBOR = .map([
             .utf8String("op"): .unsignedInt(UInt64(bitPattern: -1)),
-            .utf8String("t"): .utf8String("#error")
+            .utf8String("t"): .utf8String("#error"),
         ])
         let payloadCBOR: CBOR = .map([
-            .utf8String("error"): .utf8String("ConsumerTooSlow")
+            .utf8String("error"): .utf8String("ConsumerTooSlow"),
         ])
         let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
         let task = MockSubscriptionWebSocketTask(message: .data(frameBytes))
@@ -763,7 +775,8 @@ struct NetworkPerformanceHygieneTests {
         }
         guard let networkError = error as? NetworkError,
               case let .serverError(code, message) = networkError,
-              code == 400, message == "ConsumerTooSlow" else {
+              code == 400, message == "ConsumerTooSlow"
+        else {
             Issue.record("Expected NetworkError.serverError(code: 400, message: 'ConsumerTooSlow'), got: \(error)")
             return
         }
@@ -788,7 +801,8 @@ struct NetworkPerformanceHygieneTests {
         }
         guard let networkError = error as? NetworkError,
               case let .invalidResponse(description) = networkError,
-              description.contains("Unexpected text frame") else {
+              description.contains("Unexpected text frame")
+        else {
             Issue.record("Expected NetworkError.invalidResponse for unexpected text frame, got: \(error)")
             return
         }
@@ -803,10 +817,10 @@ struct NetworkPerformanceHygieneTests {
 
         let headerCBOR: CBOR = .map([
             .utf8String("op"): .unsignedInt(1),
-            .utf8String("t"): .utf8String("#commit")
+            .utf8String("t"): .utf8String("#commit"),
         ])
         let payloadCBOR: CBOR = .map([
-            .utf8String("wrongField"): .utf8String("value")
+            .utf8String("wrongField"): .utf8String("value"),
         ])
         let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
         let cancelled = Mutex<Bool>(false)
@@ -830,8 +844,8 @@ struct NetworkPerformanceHygieneTests {
             let seq: Int
         }
 
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        let wsTask = service.session.webSocketTask(with: URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
+        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+        let wsTask = try service.session.webSocketTask(with: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
         service.sessionDelegate.contextManager.recordSecurityViolation(for: wsTask)
         wsTask.cancel()
 
@@ -879,8 +893,8 @@ struct NetworkPerformanceHygieneTests {
             let seq: Int
         }
 
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        let wsTask = service.session.webSocketTask(with: URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
+        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+        let wsTask = try service.session.webSocketTask(with: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
         service.sessionDelegate.contextManager.recordLimitExceeded(for: wsTask)
         wsTask.cancel()
 
@@ -920,13 +934,14 @@ struct NetworkPerformanceHygieneTests {
 
         #expect(caughtLimitExceeded, "Expected NetworkError.responseLimitExceeded to be thrown to caller")
     }
+
     @Test("Delegate task completion prunes context and durable violation sets without leaking")
-    func delegateTaskCompletionPrunesContextAndSets() async throws {
+    func delegateTaskCompletionPrunesContextAndSets() throws {
         let delegate = HardenedURLSessionDelegate()
         let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
         defer { session.invalidateAndCancel() }
 
-        let url = URL(string: "https://pds.example.com/xrpc/test")!
+        let url = try #require(URL(string: "https://pds.example.com/xrpc/test"))
         let task = session.dataTask(with: url)
 
         delegate.contextManager.register(task) { _ in }
