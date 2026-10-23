@@ -130,4 +130,22 @@ struct SpaceSTARTests {
         #expect(throws: (any Error).self) { try SpaceResponseVerifier.verifyJSON(body(["text": "tampered"]), method: "getRecord", url: url, space: space, repo: repo, secret: secret, macHeader: header) }
         #expect(throws: (any Error).self) { try SpaceResponseVerifier.verifyJSON(body(record, recordURI: uri + "x"), method: "getRecord", url: url, space: space, repo: repo, secret: secret, macHeader: header) }
     }
+
+    @Test("JSON record integer conversion matches the upstream safe-number boundary")
+    func safeJSONIntegers() throws {
+        let uri = "\(space.uriString())/\(repo)/app.bsky.feed.post/self"
+        let url = try #require(URL(string: "https://repo.example/xrpc/com.atproto.space.getRecord?collection=app.bsky.feed.post&rkey=self"))
+        for number: Int64 in [9_007_199_254_740_991, -9_007_199_254_740_991, 9_007_199_254_740_992, -9_007_199_254_740_992] {
+            let record: [String: Any] = ["count": number]
+            let cid = try CID.fromDAGCBOR(DAGCBOR.encodeValue(record))
+            let mac = try SpaceMAC.record(sharedSecret: secret, uri: uri, cid: cid.bytes)
+            let header = "type=\"atproto-space-record\", ver=1, mac=:\(mac.base64EncodedString()):"
+            let body = try JSONSerialization.data(withJSONObject: ["uri": uri, "cid": cid.string, "value": record])
+            if abs(number) <= 9_007_199_254_740_991 {
+                try SpaceResponseVerifier.verifyJSON(body, method: "getRecord", url: url, space: space, repo: repo, secret: secret, macHeader: header)
+            } else {
+                #expect(throws: SpaceVerificationError.invalidRecord) { try SpaceResponseVerifier.verifyJSON(body, method: "getRecord", url: url, space: space, repo: repo, secret: secret, macHeader: header) }
+            }
+        }
+    }
 }

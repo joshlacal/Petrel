@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import PetrelCrypto
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
@@ -346,5 +347,30 @@ public actor SpaceHostResolver {
 
     public func fetchDIDDocument(for did: String) async throws -> DIDDocument {
         try await Self.fetchDIDDocument(for: did, urlSession: urlSession, sessionDelegate: sessionDelegate)
+    }
+}
+
+public extension SpaceHostResolver {
+    /// Resolve the author's sole P-256 KEM method from the exact account DID.
+    /// PLC can publish the legacy raw-point representation as well as Multikey.
+    static func authorKEMKey(from document: DIDDocument, expectedDID: String) throws -> String {
+        let candidates = document.verificationMethod.filter {
+            $0.id == "#atproto_kem" || $0.id == expectedDID + "#atproto_kem"
+        }
+        guard document.id == expectedDID, candidates.count == 1,
+              let method = candidates.first, method.controller == expectedDID
+        else {
+            throw SpaceVerificationError.missingKEMKey
+        }
+        switch method.type {
+        case "Multikey":
+            return try P256DIDKey("did:key:" + method.publicKeyMultibase).value
+        case "EcdsaSecp256r1VerificationKey2019":
+            let key = try PLCDIDKeyCodec.decodeLegacyMultibase(method.publicKeyMultibase, curve: .p256)
+            guard case .p256 = key else { throw SpaceVerificationError.missingKEMKey }
+            return key.didKey
+        default:
+            throw SpaceVerificationError.missingKEMKey
+        }
     }
 }

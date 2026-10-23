@@ -1301,9 +1301,9 @@ extension SpaceCredentialManagerTests {
         let session = makeMockSession()
         let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
         let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
-        for (body, expected) in [(#"{"error":"InvalidDelegationToken","message":"expired"}"#, "token"), (#"{"error":"Other","message":"Upstream said SpaceDeleted"}"#, "exchange"), ("SpaceDeleted", "exchange"), (#"{"error":"SpaceDeleted"}"#, "deleted")] {
+        for (status, body, expected) in [(400, #"{"error":"InvalidDelegationToken","message":"expired"}"#, "token"), (400, #"{"error":"Other","message":"Upstream said SpaceDeleted"}"#, "exchange"), (400, "SpaceDeleted", "exchange"), (400, #"{"error":"SpaceDeleted"}"#, "deleted"), (500, #"{"error":"SpaceDeleted"}"#, "exchange"), (503, #"{"error":"SpaceDeleted"}"#, "exchange")] {
             SpaceMockURLProtocol.setHandler { request in
-                (HTTPURLResponse(url: request.url!, statusCode: 400, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
+                (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
             }
             let manager = SpaceCredentialManager(client: client, authorityHostProvider: { _ in URL(string: "https://space.test")! }, urlSession: session, delegationTokenProvider: { _ in "delegation" })
             do { _ = try await manager.credential(for: space); Issue.record("Expected rejection") }

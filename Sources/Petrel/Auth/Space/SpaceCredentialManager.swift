@@ -209,12 +209,7 @@ public actor SpaceCredentialManager {
         self.clientAttestationProvider = clientAttestationProvider
         self.authorKEMKeyProvider = authorKEMKeyProvider ?? { repo, _ in
             let document = try await SpaceHostResolver.fetchDIDDocument(for: repo)
-            guard document.id == repo,
-                  let key = document.verificationMethod.first(where: {
-                      ($0.id == "#atproto_kem" || $0.id == repo + "#atproto_kem") &&
-                          $0.controller == repo && $0.type == "Multikey"
-                  }) else { throw SpaceVerificationError.missingKEMKey }
-            return try P256DIDKey("did:key:" + key.publicKeyMultibase).value
+            return try SpaceHostResolver.authorKEMKey(from: document, expectedDID: repo)
         }
         self.authorityHostProvider = authorityHostProvider
         if let urlSession {
@@ -486,7 +481,7 @@ public actor SpaceCredentialManager {
             let rawBody = String(data: data, encoding: .utf8)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
             let message = serverMessage ?? (rawBody.isEmpty ? "HTTP \(httpResponse.statusCode)" : rawBody)
 
-            let isSpaceDeleted = errorName == "SpaceDeleted"
+            let isSpaceDeleted = httpResponse.statusCode == 400 && errorName == "SpaceDeleted"
             if isSpaceDeleted {
                 throw SpaceCredentialError.spaceDeleted(host: host, message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
             }

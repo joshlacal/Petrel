@@ -372,3 +372,41 @@ struct SpaceHostResolverTests {
         }
     }
 }
+
+@Suite("Space author KEM key representations")
+struct SpaceAuthorKEMKeyTests {
+    private let did = "did:example:author"
+    /// SEC1 uncompressed P-256 point captured from the pinned TypeScript PLC lab.
+    private let legacy = "zNpRHmahHk2CgHtnsGscfUtaihjkpeHYrumpa7jpdhzf5SJUXHQDjE4dyvtDcdjSs3dJ1mNiTw3xLcUXqauy5WNBP"
+
+    @Test("PLC legacy and Multikey representations resolve to the same P-256 key")
+    func supportedRepresentations() throws {
+        let key = try PLCDIDKeyCodec.decodeLegacyMultibase(legacy, curve: .p256)
+        for (type, bytes) in [("EcdsaSecp256r1VerificationKey2019", legacy), ("Multikey", String(key.didKey.dropFirst("did:key:".count)))] {
+            let method = VerificationMethod(id: "#atproto_kem", type: type, controller: did, publicKeyMultibase: bytes)
+            #expect(try SpaceHostResolver.authorKEMKey(from: DIDDocument(id: did, verificationMethod: [method]), expectedDID: did) == key.didKey)
+        }
+    }
+
+    @Test("Duplicate methods, controllers, curve labels and malformed points fail closed")
+    func rejectedRepresentations() throws {
+        let good = VerificationMethod(id: "#atproto_kem", type: "EcdsaSecp256r1VerificationKey2019", controller: did, publicKeyMultibase: legacy)
+        let full = VerificationMethod(id: did + "#atproto_kem", type: good.type, controller: did, publicKeyMultibase: legacy)
+        for methods in [[], [good, full], [VerificationMethod(id: good.id, type: good.type, controller: "did:example:other", publicKeyMultibase: legacy)], [VerificationMethod(id: good.id, type: "EcdsaSecp256k1VerificationKey2019", controller: did, publicKeyMultibase: legacy)], [VerificationMethod(id: good.id, type: "Multikey", controller: did, publicKeyMultibase: legacy)], [VerificationMethod(id: good.id, type: good.type, controller: did, publicKeyMultibase: "z111")]] {
+            #expect(throws: (any Error).self) { try SpaceHostResolver.authorKEMKey(from: DIDDocument(id: did, verificationMethod: methods), expectedDID: did) }
+        }
+        #expect(throws: (any Error).self) { try SpaceHostResolver.authorKEMKey(from: DIDDocument(id: "did:example:other", verificationMethod: [good]), expectedDID: did) }
+    }
+
+    @Test("Read the independent pinned PLC's actual KEM document", .enabled(if: ProcessInfo.processInfo.environment["PETREL_SPACE_PLC_TEST_URL"] != nil))
+    func independentPLC() async throws {
+        let url = try #require(URL(string: ProcessInfo.processInfo.environment["PETREL_SPACE_PLC_TEST_URL"] ?? ""))
+        let (bytes, response) = try await URLSession.shared.data(from: url)
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        let document = try JSONDecoder().decode(DIDDocument.self, from: bytes)
+        let resolved = try SpaceHostResolver.authorKEMKey(from: document, expectedDID: document.id)
+        let encapsulated = try SpaceMAC.encapsulate(authorKey: resolved)
+        #expect(encapsulated.sharedSecret.count == 32)
+        #expect(encapsulated.keyShare.hasPrefix("did:key:z"))
+    }
+}

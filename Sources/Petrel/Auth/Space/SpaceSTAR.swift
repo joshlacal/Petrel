@@ -189,8 +189,7 @@ enum SpaceResponseVerifier {
         if let number = value as? NSNumber {
             if CFGetTypeID(number) == CFBooleanGetTypeID() { return number.boolValue }
             let text = number.stringValue
-            if let integer = Int64(text) { return integer }
-            if let integer = UInt64(text) { return integer }
+            if let integer = Int64(text), (-9_007_199_254_740_991 ... 9_007_199_254_740_991).contains(integer) { return integer }
             throw SpaceVerificationError.invalidRecord
         }
         return value
