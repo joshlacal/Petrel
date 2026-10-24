@@ -316,9 +316,12 @@ public actor SpaceCredentialManager {
     /// `Authorization: Atproto-Space-Credential <credential>`, `Atproto-Space-Audience`,
     /// and an HTTP message signature over both, made with the credential key.
     ///
-    /// - Parameter audience: The DID the request is addressed to. Defaults to
-    ///   the URL's `repo` query parameter (repo operations) or, without one,
-    ///   the space authority's DID (space-host operations).
+    /// - Parameters:
+    ///   - url: The secure or loopback endpoint to read with the space credential.
+    ///   - space: The permissioned space whose credential authorizes the request.
+    ///   - audience: The DID the request is addressed to. Defaults to the URL's
+    ///     `repo` query parameter (repo operations) or, without one, the space
+    ///     authority's DID (space-host operations).
     ///
     /// A `401 CredentialRevoked` response drops the cached credential so it is
     /// never presented again; the response is returned to the caller unchanged
