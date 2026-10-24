@@ -276,134 +276,140 @@ struct NetworkPerformanceHygieneTests {
 
     @Test("NetworkService blocks private IP addresses and IPv4-mapped IPv6")
     func networkServiceBlocksPrivateIPs() async throws {
-        let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
+        try await withSerializedStorageOverrideTest {
+            let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
 
-        let privateURLs = [
-            "http://10.0.0.1/xrpc/test",
-            "http://192.168.1.1/xrpc/test",
-            "http://172.16.0.1/xrpc/test",
-            "http://169.254.1.1/xrpc/test",
-            "http://0.0.0.0/xrpc/test",
-            "http://255.255.255.255/xrpc/test",
-            "https://[::ffff:127.0.0.1]/xrpc/test",
-            "https://[::ffff:7f00:1]/xrpc/test",
-            "https://[::ffff:10.0.0.1]/xrpc/test",
-        ]
+            let privateURLs = [
+                "http://10.0.0.1/xrpc/test",
+                "http://192.168.1.1/xrpc/test",
+                "http://172.16.0.1/xrpc/test",
+                "http://169.254.1.1/xrpc/test",
+                "http://0.0.0.0/xrpc/test",
+                "http://255.255.255.255/xrpc/test",
+                "https://[::ffff:127.0.0.1]/xrpc/test",
+                "https://[::ffff:7f00:1]/xrpc/test",
+                "https://[::ffff:10.0.0.1]/xrpc/test",
+            ]
 
-        for urlString in privateURLs {
-            do {
-                _ = try await service.createURLRequest(
-                    endpoint: urlString,
-                    method: "GET",
-                    headers: [:],
-                    body: nil,
-                    queryItems: nil
-                )
-                Issue.record("Expected securityViolation for \(urlString), but request creation succeeded")
-            } catch let error as NetworkError {
-                guard case .securityViolation = error else {
-                    Issue.record("Expected .securityViolation for \(urlString), got \(error)")
-                    continue
+            for urlString in privateURLs {
+                do {
+                    _ = try await service.createURLRequest(
+                        endpoint: urlString,
+                        method: "GET",
+                        headers: [:],
+                        body: nil,
+                        queryItems: nil
+                    )
+                    Issue.record("Expected securityViolation for \(urlString), but request creation succeeded")
+                } catch let error as NetworkError {
+                    guard case .securityViolation = error else {
+                        Issue.record("Expected .securityViolation for \(urlString), got \(error)")
+                        continue
+                    }
+                } catch {
+                    Issue.record("Unexpected error type for \(urlString): \(error)")
                 }
-            } catch {
-                Issue.record("Unexpected error type for \(urlString): \(error)")
             }
         }
     }
 
     @Test("NetworkService creates request for legitimate hostnames")
     func networkServiceValidatesLegitimateHost() async throws {
-        NetworkService.dnsResolverOverride = { host in
-            if host == "bsky.social" {
-                return ["104.244.42.1"]
+        try await withSerializedStorageOverrideTest {
+            NetworkService.dnsResolverOverride = { host in
+                if host == "bsky.social" {
+                    return ["104.244.42.1"]
+                }
+                return nil
             }
-            return nil
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-        }
-
-        let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
-
-        let req1 = try await service.createURLRequest(
-            endpoint: "https://bsky.social/xrpc/app.bsky.actor.getProfile",
-            method: "GET",
-            headers: [:],
-            body: nil,
-            queryItems: nil
-        )
-        #expect(req1.url?.host == "bsky.social")
-    }
-
-    @Test("Finding 2: In-flight DNS resolution cancellation propagates CancellationError promptly")
-    func networkServiceCancellationPropagates() async throws {
-        let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
-
-        let cancellationHost = "cancellation-test.bsky.social"
-        let enteredOperation = AsyncBarrier()
-
-        NetworkService.dnsResolutionHook = { host, isCancelled in
-            guard host == cancellationHost else { return }
-            enteredOperation.signal()
-            while !isCancelled() {
-                Thread.sleep(forTimeInterval: 0.002)
+            defer {
+                NetworkService.dnsResolverOverride = nil
             }
-        }
-        defer {
-            NetworkService.dnsResolutionHook = nil
-        }
 
-        let task = Task {
-            try await service.createURLRequest(
-                endpoint: "https://\(cancellationHost)/xrpc/app.bsky.actor.getProfile",
+            let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
+
+            let req1 = try await service.createURLRequest(
+                endpoint: "https://bsky.social/xrpc/app.bsky.actor.getProfile",
                 method: "GET",
                 headers: [:],
                 body: nil,
                 queryItems: nil
             )
+            #expect(req1.url?.host == "bsky.social")
         }
+    }
 
-        // Wait with a bounded timeout until the BlockOperation has actually been dequeued and started
-        try await enteredOperation.waitUntilSignaled(timeoutNanoseconds: 5_000_000_000)
+    @Test("Finding 2: In-flight DNS resolution cancellation propagates CancellationError promptly")
+    func networkServiceCancellationPropagates() async throws {
+        try await withSerializedStorageOverrideTest {
+            let service = try NetworkService(baseURL: #require(URL(string: "https://bsky.social")))
 
-        let cancelStartTime = ContinuousClock.now
+            let cancellationHost = "cancellation-test.bsky.social"
+            let enteredOperation = AsyncBarrier()
 
-        // Cancel while the operation is actively running on dnsResolutionQueue
-        task.cancel()
-
-        // Assert that CancellationError reaches caller promptly (within 200ms) with a bounded race against a clock deadline
-        let completionBarrier = AsyncBarrier()
-        let resultHolder = Mutex<(result: Result<URLRequest, any Error>?, elapsed: Duration?)>((nil, nil))
-
-        Task {
-            do {
-                let req = try await task.value
-                resultHolder.withLock {
-                    $0 = (.success(req), ContinuousClock.now - cancelStartTime)
-                }
-            } catch {
-                resultHolder.withLock {
-                    $0 = (.failure(error), ContinuousClock.now - cancelStartTime)
+            NetworkService.dnsResolutionHook = { host, isCancelled in
+                guard host == cancellationHost else { return }
+                enteredOperation.signal()
+                while !isCancelled() {
+                    Thread.sleep(forTimeInterval: 0.002)
                 }
             }
-            completionBarrier.signal()
-        }
-
-        let completed = try await completionBarrier.wait(timeoutNanoseconds: 2_000_000_000)
-        #expect(completed, "Timed out waiting for cancelled DNS resolution to complete")
-        guard completed else { return }
-        let (result, elapsed) = resultHolder.withLock { $0 }
-        switch result {
-        case .failure(is CancellationError):
-            if let elapsed {
-                #expect(elapsed < .milliseconds(200))
+            defer {
+                NetworkService.dnsResolutionHook = nil
             }
-        case let .failure(error):
-            Issue.record("Expected CancellationError, but got: \(error)")
-        case .success:
-            Issue.record("Expected CancellationError, but task.value completed successfully")
-        case nil:
-            Issue.record("Task result was missing")
+
+            let task = Task {
+                try await service.createURLRequest(
+                    endpoint: "https://\(cancellationHost)/xrpc/app.bsky.actor.getProfile",
+                    method: "GET",
+                    headers: [:],
+                    body: nil,
+                    queryItems: nil
+                )
+            }
+
+            // Wait with a bounded timeout until the BlockOperation has actually been dequeued and started
+            try await enteredOperation.waitUntilSignaled(timeoutNanoseconds: 5_000_000_000)
+
+            let cancelStartTime = ContinuousClock.now
+
+            // Cancel while the operation is actively running on dnsResolutionQueue
+            task.cancel()
+
+            // Assert that CancellationError reaches caller promptly (within 200ms) with a bounded race against a clock deadline
+            let completionBarrier = AsyncBarrier()
+            let resultHolder = Mutex<(result: Result<URLRequest, any Error>?, elapsed: Duration?)>((nil, nil))
+
+            Task {
+                do {
+                    let req = try await task.value
+                    resultHolder.withLock {
+                        $0 = (.success(req), ContinuousClock.now - cancelStartTime)
+                    }
+                } catch {
+                    resultHolder.withLock {
+                        $0 = (.failure(error), ContinuousClock.now - cancelStartTime)
+                    }
+                }
+                completionBarrier.signal()
+            }
+
+            let completed = try await completionBarrier.wait(timeoutNanoseconds: 2_000_000_000)
+            #expect(completed, "Timed out waiting for cancelled DNS resolution to complete")
+            guard completed else { return }
+            let (result, elapsed) = resultHolder.withLock { $0 }
+            switch result {
+            case .failure(is CancellationError):
+                if let elapsed {
+                    #expect(elapsed < .milliseconds(200))
+                }
+            case let .failure(error):
+                Issue.record("Expected CancellationError, but got: \(error)")
+            case .success:
+                Issue.record("Expected CancellationError, but task.value completed successfully")
+            case nil:
+                Issue.record("Task result was missing")
+            }
         }
     }
 
@@ -440,87 +446,89 @@ struct NetworkPerformanceHygieneTests {
 
     @Test("Step 7: WebSocket subscription stream drops overflow with typed error")
     func subscriptionStreamOverflowTermination() async throws {
-        struct TestSubMessage: Codable, Sendable {
-            let seq: Int
-        }
-
-        // Construct a valid ATProto WebSocket frame
-        let headerCBOR: CBOR = .map([
-            .utf8String("op"): .unsignedInt(1),
-            .utf8String("t"): .utf8String("#commit"),
-        ])
-        let payloadCBOR: CBOR = .map([
-            .utf8String("seq"): .unsignedInt(42),
-        ])
-        let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
-
-        final class MockOverflowWebSocketTask: WebSocketTaskProtocol, @unchecked Sendable {
-            private let frameData: Data
-            private let sentCount = Mutex<Int>(0)
-            private let terminated: AsyncBarrier
-
-            init(frameData: Data, terminated: AsyncBarrier) {
-                self.frameData = frameData
-                self.terminated = terminated
+        try await withSerializedStorageOverrideTest {
+            struct TestSubMessage: Codable, Sendable {
+                let seq: Int
             }
 
-            func resume() {}
+            // Construct a valid ATProto WebSocket frame
+            let headerCBOR: CBOR = .map([
+                .utf8String("op"): .unsignedInt(1),
+                .utf8String("t"): .utf8String("#commit"),
+            ])
+            let payloadCBOR: CBOR = .map([
+                .utf8String("seq"): .unsignedInt(42),
+            ])
+            let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
 
-            func receive() async throws -> URLSessionWebSocketTask.Message {
-                let current = sentCount.withLock { count -> Int in
-                    count += 1
-                    return count
+            final class MockOverflowWebSocketTask: WebSocketTaskProtocol, @unchecked Sendable {
+                private let frameData: Data
+                private let sentCount = Mutex<Int>(0)
+                private let terminated: AsyncBarrier
+
+                init(frameData: Data, terminated: AsyncBarrier) {
+                    self.frameData = frameData
+                    self.terminated = terminated
                 }
-                if current <= 1005 {
-                    return .data(frameData)
-                } else {
-                    // Sleep to prevent infinite loop after buffer overflows
-                    try await Task.sleep(nanoseconds: 1_000_000_000)
-                    return .data(frameData)
+
+                func resume() {}
+
+                func receive() async throws -> URLSessionWebSocketTask.Message {
+                    let current = sentCount.withLock { count -> Int in
+                        count += 1
+                        return count
+                    }
+                    if current <= 1005 {
+                        return .data(frameData)
+                    } else {
+                        // Sleep to prevent infinite loop after buffer overflows
+                        try await Task.sleep(nanoseconds: 1_000_000_000)
+                        return .data(frameData)
+                    }
+                }
+
+                func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
+                    terminated.signal()
                 }
             }
 
-            func cancel(with closeCode: URLSessionWebSocketTask.CloseCode, reason: Data?) {
-                terminated.signal()
+            NetworkService.dnsResolverOverride = { host in
+                if host == "pds.example.com" {
+                    return ["93.184.216.34"]
+                }
+                return nil
             }
-        }
+            let terminated = AsyncBarrier()
+            NetworkService.webSocketTaskOverride = { _ in
+                MockOverflowWebSocketTask(frameData: frameBytes, terminated: terminated)
+            }
+            defer {
+                NetworkService.dnsResolverOverride = nil
+                NetworkService.webSocketTaskOverride = nil
+            }
 
-        NetworkService.dnsResolverOverride = { host in
-            if host == "pds.example.com" {
-                return ["93.184.216.34"]
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
+                endpoint: "com.atproto.sync.subscribeRepos",
+                parameters: nil
+            )
+            // Hold consumption until overflow is observed, independently of scheduler speed.
+            try await terminated.waitUntilSignaled(timeoutNanoseconds: 5_000_000_000)
+            var caughtOverflow = false
+            do {
+                for try await _ in stream {
+                    // Drain the already-full buffer before its terminal error.
+                }
+            } catch let error as NetworkError {
+                if case .streamOverflow = error {
+                    caughtOverflow = true
+                }
+            } catch {
+                Issue.record("Unexpected error: \(error)")
             }
-            return nil
-        }
-        let terminated = AsyncBarrier()
-        NetworkService.webSocketTaskOverride = { _ in
-            MockOverflowWebSocketTask(frameData: frameBytes, terminated: terminated)
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-            NetworkService.webSocketTaskOverride = nil
-        }
 
-        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
-        let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
-            endpoint: "com.atproto.sync.subscribeRepos",
-            parameters: nil
-        )
-        // Hold consumption until overflow is observed, independently of scheduler speed.
-        try await terminated.waitUntilSignaled(timeoutNanoseconds: 5_000_000_000)
-        var caughtOverflow = false
-        do {
-            for try await _ in stream {
-                // Drain the already-full buffer before its terminal error.
-            }
-        } catch let error as NetworkError {
-            if case .streamOverflow = error {
-                caughtOverflow = true
-            }
-        } catch {
-            Issue.record("Unexpected error: \(error)")
+            #expect(caughtOverflow, "Expected NetworkService.subscribe to terminate throwing NetworkError.streamOverflow on drop")
         }
-
-        #expect(caughtOverflow, "Expected NetworkService.subscribe to terminate throwing NetworkError.streamOverflow on drop")
     }
 
     @Test("Server-trust revalidation uses the delegate async resolver seam")
@@ -629,32 +637,34 @@ struct NetworkPerformanceHygieneTests {
         task: any WebSocketTaskProtocol,
         endpoint: String = "com.atproto.sync.subscribeRepos"
     ) async throws -> Result<[Message], Error> {
-        NetworkService.dnsResolverOverride = { host in
-            if host == "pds.example.com" { return ["93.184.216.34"] }
-            return nil
-        }
-        NetworkService.webSocketTaskOverride = { _ in
-            task
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-            NetworkService.webSocketTaskOverride = nil
-        }
-
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        let stream: AsyncThrowingStream<Message, Error> = try await service.subscribe(
-            endpoint: endpoint,
-            parameters: nil
-        )
-
-        var items: [Message] = []
-        do {
-            for try await item in stream {
-                items.append(item)
+        return try await withSerializedStorageOverrideTest {
+            NetworkService.dnsResolverOverride = { host in
+                if host == "pds.example.com" { return ["93.184.216.34"] }
+                return nil
             }
-            return .success(items)
-        } catch {
-            return .failure(error)
+            NetworkService.webSocketTaskOverride = { _ in
+                task
+            }
+            defer {
+                NetworkService.dnsResolverOverride = nil
+                NetworkService.webSocketTaskOverride = nil
+            }
+
+            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
+            let stream: AsyncThrowingStream<Message, Error> = try await service.subscribe(
+                endpoint: endpoint,
+                parameters: nil
+            )
+
+            var items: [Message] = []
+            do {
+                for try await item in stream {
+                    items.append(item)
+                }
+                return .success(items)
+            } catch {
+                return .failure(error)
+            }
         }
     }
 
@@ -840,99 +850,103 @@ struct NetworkPerformanceHygieneTests {
 
     @Test("Facade: Subscription cancelled due to delegate security violation surfaces typed NetworkError.securityViolation")
     func subscriptionSecurityViolationSurfacesTypedError() async throws {
-        struct TestSubMessage: Codable, Sendable {
-            let seq: Int
-        }
-
-        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
-        let wsTask = try service.session.webSocketTask(with: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
-        service.sessionDelegate.contextManager.recordSecurityViolation(for: wsTask)
-        wsTask.cancel()
-
-        // Even if the delegate finishes and clears taskContext, the security violation is retained durably
-        service.sessionDelegate.contextManager.finish(wsTask, error: URLError(.cancelled))
-
-        NetworkService.dnsResolverOverride = { host in
-            if host == "pds.example.com" { return ["93.184.216.34"] }
-            return nil
-        }
-        NetworkService.webSocketTaskOverride = { _ in
-            wsTask
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-            NetworkService.webSocketTaskOverride = nil
-        }
-
-        let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
-            endpoint: "com.atproto.sync.subscribeRepos",
-            parameters: nil
-        )
-
-        var caughtSecurityViolation = false
-        do {
-            for try await _ in stream {
-                Issue.record("Expected subscription to fail on security violation, but received message")
+        try await withSerializedStorageOverrideTest {
+            struct TestSubMessage: Codable, Sendable {
+                let seq: Int
             }
-        } catch let error as NetworkError {
-            if case .securityViolation = error {
-                caughtSecurityViolation = true
-            } else {
-                Issue.record("Expected NetworkError.securityViolation, got: \(error)")
-            }
-        } catch {
-            Issue.record("Caught unexpected non-NetworkError: \(error)")
-        }
 
-        #expect(caughtSecurityViolation, "Expected NetworkError.securityViolation to be thrown to caller rather than completing stream with empty EOF")
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            let wsTask = try service.session.webSocketTask(with: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
+            service.sessionDelegate.contextManager.recordSecurityViolation(for: wsTask)
+            wsTask.cancel()
+
+            // Even if the delegate finishes and clears taskContext, the security violation is retained durably
+            service.sessionDelegate.contextManager.finish(wsTask, error: URLError(.cancelled))
+
+            NetworkService.dnsResolverOverride = { host in
+                if host == "pds.example.com" { return ["93.184.216.34"] }
+                return nil
+            }
+            NetworkService.webSocketTaskOverride = { _ in
+                wsTask
+            }
+            defer {
+                NetworkService.dnsResolverOverride = nil
+                NetworkService.webSocketTaskOverride = nil
+            }
+
+            let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
+                endpoint: "com.atproto.sync.subscribeRepos",
+                parameters: nil
+            )
+
+            var caughtSecurityViolation = false
+            do {
+                for try await _ in stream {
+                    Issue.record("Expected subscription to fail on security violation, but received message")
+                }
+            } catch let error as NetworkError {
+                if case .securityViolation = error {
+                    caughtSecurityViolation = true
+                } else {
+                    Issue.record("Expected NetworkError.securityViolation, got: \(error)")
+                }
+            } catch {
+                Issue.record("Caught unexpected non-NetworkError: \(error)")
+            }
+
+            #expect(caughtSecurityViolation, "Expected NetworkError.securityViolation to be thrown to caller rather than completing stream with empty EOF")
+        }
     }
 
     @Test("Facade: Subscription cancelled due to delegate response limit exceeded surfaces typed NetworkError.responseLimitExceeded")
     func subscriptionLimitExceededSurfacesTypedError() async throws {
-        struct TestSubMessage: Codable, Sendable {
-            let seq: Int
-        }
-
-        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
-        let wsTask = try service.session.webSocketTask(with: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
-        service.sessionDelegate.contextManager.recordLimitExceeded(for: wsTask)
-        wsTask.cancel()
-
-        service.sessionDelegate.contextManager.finish(wsTask, error: URLError(.cancelled))
-
-        NetworkService.dnsResolverOverride = { host in
-            if host == "pds.example.com" { return ["93.184.216.34"] }
-            return nil
-        }
-        NetworkService.webSocketTaskOverride = { _ in
-            wsTask
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-            NetworkService.webSocketTaskOverride = nil
-        }
-
-        let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
-            endpoint: "com.atproto.sync.subscribeRepos",
-            parameters: nil
-        )
-
-        var caughtLimitExceeded = false
-        do {
-            for try await _ in stream {
-                Issue.record("Expected subscription to fail on response limit exceeded, but received message")
+        try await withSerializedStorageOverrideTest {
+            struct TestSubMessage: Codable, Sendable {
+                let seq: Int
             }
-        } catch let error as NetworkError {
-            if case .responseLimitExceeded = error {
-                caughtLimitExceeded = true
-            } else {
-                Issue.record("Expected NetworkError.responseLimitExceeded, got: \(error)")
-            }
-        } catch {
-            Issue.record("Caught unexpected non-NetworkError: \(error)")
-        }
 
-        #expect(caughtLimitExceeded, "Expected NetworkError.responseLimitExceeded to be thrown to caller")
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            let wsTask = try service.session.webSocketTask(with: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
+            service.sessionDelegate.contextManager.recordLimitExceeded(for: wsTask)
+            wsTask.cancel()
+
+            service.sessionDelegate.contextManager.finish(wsTask, error: URLError(.cancelled))
+
+            NetworkService.dnsResolverOverride = { host in
+                if host == "pds.example.com" { return ["93.184.216.34"] }
+                return nil
+            }
+            NetworkService.webSocketTaskOverride = { _ in
+                wsTask
+            }
+            defer {
+                NetworkService.dnsResolverOverride = nil
+                NetworkService.webSocketTaskOverride = nil
+            }
+
+            let stream: AsyncThrowingStream<TestSubMessage, Error> = try await service.subscribe(
+                endpoint: "com.atproto.sync.subscribeRepos",
+                parameters: nil
+            )
+
+            var caughtLimitExceeded = false
+            do {
+                for try await _ in stream {
+                    Issue.record("Expected subscription to fail on response limit exceeded, but received message")
+                }
+            } catch let error as NetworkError {
+                if case .responseLimitExceeded = error {
+                    caughtLimitExceeded = true
+                } else {
+                    Issue.record("Expected NetworkError.responseLimitExceeded, got: \(error)")
+                }
+            } catch {
+                Issue.record("Caught unexpected non-NetworkError: \(error)")
+            }
+
+            #expect(caughtLimitExceeded, "Expected NetworkError.responseLimitExceeded to be thrown to caller")
+        }
     }
 
     @Test("Delegate task completion prunes context and durable violation sets without leaking")

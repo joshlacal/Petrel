@@ -168,14 +168,14 @@ struct NetworkPolicyTests {
 
     @Test("Step 3 & N1-N3 & N1-M4: Remote cleartext is rejected, loopback cleartext is admitted, private IPs rejected")
     func cleartextAndLoopbackValidation() async throws {
-        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
-        // Remote http is rejected
-        await #expect(throws: NetworkError.self) {
-            let remoteHTTPReq = try URLRequest(url: #require(URL(string: "http://remote.example.com/xrpc/test")))
-            _ = try await service.request(remoteHTTPReq)
-        }
-        // Loopback http is permitted for local development
         try await withSerializedStorageOverrideTest {
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            // Remote http is rejected
+            await #expect(throws: NetworkError.self) {
+                let remoteHTTPReq = try URLRequest(url: #require(URL(string: "http://remote.example.com/xrpc/test")))
+                _ = try await service.request(remoteHTTPReq)
+            }
+            // Loopback http is permitted for local development
             NetworkService.dnsResolverOverride = { host in
                 if host == "localhost" {
                     return ["127.0.0.1"]
@@ -194,28 +194,30 @@ struct NetworkPolicyTests {
                 queryItems: nil
             )
             #expect(localReq.url != nil)
-        }
-        await #expect(throws: NetworkError.self) {
-            let privateReq = try URLRequest(url: #require(URL(string: "http://10.0.0.1/xrpc/test")))
-            _ = try await service.request(privateReq)
+            await #expect(throws: NetworkError.self) {
+                let privateReq = try URLRequest(url: #require(URL(string: "http://10.0.0.1/xrpc/test")))
+                _ = try await service.request(privateReq)
+            }
         }
     }
 
     @Test("Step 3 & N1-C3: prepareStreamingRequest validates destination against private IP")
     func prepareStreamingRequestValidation() async throws {
-        NetworkService.dnsResolverOverride = { host in
-            if host == "internal.evil.example" {
-                return ["10.0.0.1"]
+        try await withSerializedStorageOverrideTest {
+            NetworkService.dnsResolverOverride = { host in
+                if host == "internal.evil.example" {
+                    return ["10.0.0.1"]
+                }
+                return nil
             }
-            return nil
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-        }
-        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
-        let req = try URLRequest(url: #require(URL(string: "https://internal.evil.example/xrpc/com.atproto.sync.subscribeRepos")))
-        await #expect(throws: NetworkError.self) {
-            _ = try await service.prepareStreamingRequest(req)
+            defer {
+                NetworkService.dnsResolverOverride = nil
+            }
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            let req = try URLRequest(url: #require(URL(string: "https://internal.evil.example/xrpc/com.atproto.sync.subscribeRepos")))
+            await #expect(throws: NetworkError.self) {
+                _ = try await service.prepareStreamingRequest(req)
+            }
         }
     }
 
@@ -659,22 +661,24 @@ struct NetworkPolicyTests {
 
     @Test("Step 7 & N1-N1 & N1-N2: WebSocket subscription admitted for wss and requires auth for authorized origin")
     func subscriptionWSSAdmission() async throws {
-        let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
-        NetworkService.dnsResolverOverride = { host in
-            if host == "pds.example.com" {
-                return ["93.184.216.34"]
+        try await withSerializedStorageOverrideTest {
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            NetworkService.dnsResolverOverride = { host in
+                if host == "pds.example.com" {
+                    return ["93.184.216.34"]
+                }
+                return nil
             }
-            return nil
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-        }
-        let policy = try await service.determineSecurityPolicy(for: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
-        if case let .authenticated(recipient) = policy {
-            #expect(recipient.host == "pds.example.com")
-            #expect(recipient.scheme == "https")
-        } else {
-            Issue.record("Expected authenticated policy for authorized origin WebSocket subscription")
+            defer {
+                NetworkService.dnsResolverOverride = nil
+            }
+            let policy = try await service.determineSecurityPolicy(for: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
+            if case let .authenticated(recipient) = policy {
+                #expect(recipient.host == "pds.example.com")
+                #expect(recipient.scheme == "https")
+            } else {
+                Issue.record("Expected authenticated policy for authorized origin WebSocket subscription")
+            }
         }
     }
 

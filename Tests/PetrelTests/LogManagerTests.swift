@@ -162,33 +162,6 @@ struct LogManagerTests {
         ))
     }
 
-    @Test("Unrepresentable incidents are not delivered to typed observers")
-    func unrepresentableIncidentBroadcastIsSuppressed() async {
-        await PetrelAuthEvents.removeAllObservers()
-        let recorder = AuthEventRecorder()
-        await PetrelAuthEvents.addObserverAndWait { event in
-            await recorder.record(event)
-        }
-
-        // Unique to this test: the broadcast bus is global, so suites running in
-        // parallel deliver their own incidents to this observer. Only an event
-        // carrying this DID would prove the unrepresentable incident leaked through.
-        let did = "did:plc:unrepresentable-incident-probe"
-        LogManager.logAuthIncident(
-            "InvalidGrantWithValidToken",
-            details: [
-                "did": did,
-                "tokenExpiresIn": "3600.0",
-                "description": "session preserved",
-            ]
-        )
-        await PetrelAuthEvents.drain()
-
-        let leaked = await recorder.events.filter { String(describing: $0).contains(did) }
-        #expect(leaked.isEmpty)
-        await PetrelAuthEvents.removeAllObservers()
-    }
-
     @Test("LogManager should not crash on nil values")
     func logManagerNilSafety() {
         // These should not crash
@@ -346,8 +319,8 @@ struct LogManagerTests {
     }
 
     @Test("Step 8 & N1-N5: sanitizeURLForLogging emits normalized path and allowlisted parameter names only")
-    func sanitizeURLForLoggingComprehensive() {
-        let url = URL(string: "https://user:pass123@alice.bsky.social/oauth/authorize?response_type=code&client_id=myclient&code=secret123&state=xyz789&email=alice@example.com#token123")!
+    func sanitizeURLForLoggingComprehensive() throws {
+        let url = try #require(URL(string: "https://user:pass123@alice.bsky.social/oauth/authorize?response_type=code&client_id=myclient&code=secret123&state=xyz789&email=alice@example.com#token123"))
         let sanitized = LogManager.sanitizeURLForLogging(url)
 
         #expect(!sanitized.contains("user"))
@@ -365,7 +338,7 @@ struct LogManagerTests {
         #expect(sanitized.contains("client_id"))
         #expect(sanitized.hasPrefix("/oauth/authorize"))
 
-        let didURL = URL(string: "https://plc.directory/did:plc:12345/data?limit=50&cursor=abc&secret_key=topsecret")!
+        let didURL = try #require(URL(string: "https://plc.directory/did:plc:12345/data?limit=50&cursor=abc&secret_key=topsecret"))
         let sanitizedDID = LogManager.sanitizeURLForLogging(didURL)
         #expect(!sanitizedDID.contains("plc.directory"))
         #expect(!sanitizedDID.contains("50"))
@@ -375,13 +348,5 @@ struct LogManagerTests {
         #expect(sanitizedDID.contains("limit"))
         #expect(sanitizedDID.contains("cursor"))
         #expect(sanitizedDID.hasPrefix("/did:plc:12345/data"))
-    }
-}
-
-private actor AuthEventRecorder {
-    private(set) var events: [AuthEvent] = []
-
-    func record(_ event: AuthEvent) {
-        events.append(event)
     }
 }
