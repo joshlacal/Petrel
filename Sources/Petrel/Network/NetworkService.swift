@@ -310,6 +310,12 @@ public protocol AuthenticationProvider: Sendable {
 
     func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool
 
+    /// The callback is synchronous UI-only work under the gateway mutation gate.
+    func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool
+
     /// Updates the DPoP nonce for a URL, optionally scoped to a specific DID and DPoP key thumbprint (JKT)
     /// - Parameters:
     ///   - url: The URL to update the nonce for
@@ -326,6 +332,13 @@ public extension AuthenticationProvider {
     }
 
     func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool { false }
+
+    func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool {
+        false
+    }
 }
 
 /// Protocol defining the interface for network services.
@@ -1026,6 +1039,15 @@ public actor NetworkService: NetworkServiceProtocol {
     public func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
         guard gatewayMode, let authProvider else { return false }
         return await authProvider.isCurrentGatewaySessionFailure(context)
+    }
+
+    /// Revalidates and consumes the rejection without releasing the provider's mutation gate.
+    public func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool {
+        guard gatewayMode, let authProvider else { return false }
+        return await authProvider.withCurrentGatewaySessionFailure(context, perform: perform)
     }
 
     /// Sets the authentication provider for authenticated requests.

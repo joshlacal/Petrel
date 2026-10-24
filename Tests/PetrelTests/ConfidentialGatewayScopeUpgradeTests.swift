@@ -1288,6 +1288,15 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 return (HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!, Data())
             }
 
+            // A queued rejection can validate before internal recovery without any
+            // app-level DID/client/state change. Atomic consumption must revalidate it.
+            let failure = try await storage.recordGatewaySessionFailure(
+                ifMatches: oldSessionUUID, for: alice, deleteMatchingSession: false
+            )
+            let failureContext = try XCTUnwrap(failure)
+            let validBeforeRecovery = await client.isCurrentGatewaySessionFailure(failureContext)
+            XCTAssertTrue(validBeforeRecovery)
+
             // 1. fetchGrantedScopes first recovers candidate, then queries /auth/session with candidate bearer
             let scopes = try await client.fetchGrantedScopes(for: alice)
             XCTAssertEqual(scopes, ["atproto", "transition:generic", "identity:handle"])
@@ -1298,6 +1307,12 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             XCTAssertEqual(sessionAfterFetch, candidateUUID, "Session promoted to candidate")
             let pendingAfterFetch = try await storage.getPendingGatewayUpgradeData(for: alice)
             XCTAssertNil(pendingAfterFetch, "Pending candidate state cleaned up")
+            let uiTransitions = Mutex<Int>(0)
+            let consumedAfterRecovery = await client.withCurrentGatewaySessionFailure(failureContext) {
+                uiTransitions.withLock { $0 += 1 }
+            }
+            XCTAssertFalse(consumedAfterRecovery, "A stale rejection must not consume the recovered same-client session")
+            XCTAssertEqual(uiTransitions.withLock { $0 }, 0)
 
             // 2. Now start a new upgrade: uses candidate session as the base and creates new pending state
             GatewayUpgradeTestURLProtocol.setHandler { request in

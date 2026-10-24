@@ -36,4 +36,19 @@ public extension ATProtoClient {
     func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
         await networkService.isCurrentGatewaySessionFailure(context)
     }
+
+    /// Revalidates an exact rejection and performs a synchronous UI transition while
+    /// holding the process-local gateway credential and account-selection mutation gate.
+    /// Same-process session replacement cannot interleave between validation and `perform`.
+    /// External-process storage writes and authentication mode/provider reconfiguration
+    /// are outside this gate; callers must also preserve their own UI/client continuity.
+    /// The callback must only update UI state: do not call the SDK, wait for work, or
+    /// perform cleanup from it. Run any async cleanup after this method returns.
+    /// Returns whether the proof remained current and the callback was invoked.
+    func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool {
+        await networkService.withCurrentGatewaySessionFailure(context, perform: perform)
+    }
 }

@@ -371,6 +371,14 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         return await storage.isCurrentGatewaySessionFailure(context)
     }
 
+    func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool {
+        guard currentMode == .gateway else { return false }
+        return await storage.withCurrentGatewaySessionFailure(context, perform: perform)
+    }
+
     func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {
         await activeStrategy.updateDPoPNonce(for: url, from: headers, did: did, jkt: jkt)
     }

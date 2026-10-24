@@ -255,6 +255,12 @@ private final class AsyncSerialGate: @unchecked Sendable {
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var isLocked = false
 
+    #if DEBUG
+        var waitingCountForTesting: Int {
+            lock.withLock { waiters.count }
+        }
+    #endif
+
     func acquire() async {
         await withCheckedContinuation { continuation in
             lock.lock()
@@ -308,6 +314,18 @@ public actor KeychainStorage {
     }
     private var gatewaySessionCache: [String: GatewaySessionCacheEntry] = [:]
     private static let gatewayMutationCoordinator = GatewaySessionMutationCoordinator()
+
+    #if DEBUG
+        private var gatewaySessionFailureValidatedHookForTesting: (@Sendable () async -> Void)?
+
+        func setGatewaySessionFailureValidatedHookForTesting(_ hook: (@Sendable () async -> Void)?) {
+            gatewaySessionFailureValidatedHookForTesting = hook
+        }
+
+        func gatewayMutationWaitingCountForTesting() -> Int {
+            Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey).waitingCountForTesting
+        }
+    #endif
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
     private struct PendingSessionState {
@@ -868,6 +886,34 @@ public actor KeychainStorage {
         let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
         await gate.acquire()
         defer { gate.release() }
+        return await isCurrentGatewaySessionFailureLocked(context)
+    }
+
+    /// Keep the same process-local gate held through the MainActor hop and UI callback.
+    /// The callback cannot await SDK work or cleanup that would reacquire this gate.
+    func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+        guard !Task.isCancelled, await isCurrentGatewaySessionFailureLocked(context) else { return false }
+        #if DEBUG
+            if let hook = gatewaySessionFailureValidatedHookForTesting { await hook() }
+        #endif
+        return await MainActor.run {
+            // Non-credential account metadata mutations can advance the same generation
+            // without taking the gateway gate; catch those before consuming the proof.
+            guard !Task.isCancelled,
+                  AccountMutationHub.shared.generation(for: context.storageScope) == context.generation
+            else { return false }
+            perform()
+            return true
+        }
+    }
+
+    private func isCurrentGatewaySessionFailureLocked(_ context: GatewaySessionFailureContext) async -> Bool {
         let scope = accountScopeDID(for: context.did)
         guard scope == context.storageScope,
               AccountMutationHub.shared.generation(for: scope) == context.generation else { return false }
