@@ -23,14 +23,14 @@ jobs:
             runner: macos-15
             selection: pinned-minimum
             evidence-class: stable-release
-            developer-dir: /Applications/Xcode_16.3.app/Contents/Developer
-            xcode-version: '16.3'
-            xcode-build: '16E140'
+            developer-dir: /Applications/Xcode_26.0.1.app/Contents/Developer
+            xcode-version: '26.0.1'
+            xcode-build: '17A400'
             deployment-target: '18.0'
-            ios-runtime: '18.4'
-            watchos-runtime: '11.4'
-            tvos-runtime: '18.4'
-            visionos-runtime: '2.4'
+            ios-runtime: '26.0'
+            watchos-runtime: '26.0'
+            tvos-runtime: '26.0'
+            visionos-runtime: '26.0'
           - lane: newest-stable
             runner: macos-26
             selection: official-runner-inventory
@@ -45,7 +45,7 @@ jobs:
             visionos-runtime: '26.5'
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -102,9 +102,9 @@ jobs:
           if [[ $RELEASE_TOOLCHAIN_LANE == minimum ]]; then
             SDK_PATH=$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-path)
             test -d "$SDK_PATH"
-            test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = '18.4'
+            test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = '26.0'
             "$RELEASE_SWIFT" build \
-              --scratch-path .build/xcode163-iphoneos-cross \
+              --scratch-path .build/xcode2601-iphoneos-cross \
               --triple arm64-apple-ios18.0 \
               --sdk "$SDK_PATH"
           else
@@ -115,11 +115,11 @@ jobs:
           fi
 
   linux:
-    name: Linux (Swift 6.1.2)
+    name: Linux (Swift 6.4.1)
     runs-on: ubuntu-24.04
-    container: swift:6.1.2-jammy@sha256:5910655d205a5a54b0b9efdf72c4066a8de1932513fdc81793e2544b5d5a0709
+    container: swift:6.4.1-noble@sha256:19cbe56bdaec1918f7cf5fdeba42b9bd55bdd8a6149c9990d0e0e3a89a127d63
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -131,7 +131,7 @@ jobs:
           set -euo pipefail
           RELEASE_SWIFT=$(command -v swift)
           [[ $RELEASE_SWIFT == /* ]]
-          test "$("$RELEASE_SWIFT" --version | head -n 1)" = 'Swift version 6.1.2 (swift-6.1.2-RELEASE)'
+          test "$("$RELEASE_SWIFT" --version | head -n 1)" = 'Swift version 6.4.1 (swift-6.4.1-RELEASE)'
           printf 'RELEASE_SWIFT=%s\n' "$RELEASE_SWIFT" >> "$GITHUB_ENV"
       - name: Build, test, and reject package-owned warnings
         shell: bash

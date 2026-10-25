@@ -314,7 +314,7 @@ def workflow_run_lines(text):
 
 
 _PINNED_SETUP_PYTHON_ACTION = (
-    "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5.6.0"
+    "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0 # v7.1.0"
 )
 
 
@@ -1657,7 +1657,7 @@ fi
                     self._tool_call_lines(),
                     [
                         "release-python|run.py|--manifest|generator/manifests/petrel-core.json|--language|swift",
-                        "release-mint|run|--executable|swiftformat|nicklockwood/SwiftFormat@0.61.1|Sources/Petrel/Generated",
+                        "release-mint|run|--executable|swiftformat|nicklockwood/SwiftFormat@0.64.1|Sources/Petrel/Generated",
                     ],
                 )
                 self.assertEqual(
@@ -2022,7 +2022,7 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
     def test_lint_uses_only_the_fully_qualified_pinned_mint_command(self):
         text = self.text["lint.yml"]
         self.assertIn(
-            '"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1',
+            '"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.64.1',
             text,
         )
         self.assertIn("--lint Sources/Petrel/Generated", text)
@@ -2051,7 +2051,7 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         self.assertIn("--manifest generator/manifests/petrel-core.json", text)
         self.assertIn("--language both", text)
         self.assertIn(
-            '"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1',
+            '"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.64.1',
             text,
         )
         self.assertLess(

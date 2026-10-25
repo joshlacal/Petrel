@@ -19,7 +19,7 @@ jobs:
     name: Validate documentation (read-only)
     runs-on: macos-15
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -30,13 +30,13 @@ jobs:
           export RELEASE_TOOLCHAIN_LANE=minimum
           export RELEASE_TOOLCHAIN_SELECTION=pinned-minimum
           export RELEASE_EVIDENCE_CLASS=stable-release
-          export RELEASE_DEVELOPER_DIR=/Applications/Xcode_16.3.app/Contents/Developer
-          export RELEASE_XCODE_VERSION=16.3
-          export RELEASE_XCODE_BUILD='16E140'
-          export RELEASE_IOS_RUNTIME=18.4
-          export RELEASE_WATCHOS_RUNTIME=11.4
-          export RELEASE_TVOS_RUNTIME=18.4
-          export RELEASE_VISIONOS_RUNTIME=2.4
+          export RELEASE_DEVELOPER_DIR=/Applications/Xcode_26.0.1.app/Contents/Developer
+          export RELEASE_XCODE_VERSION=26.0.1
+          export RELEASE_XCODE_BUILD='17A400'
+          export RELEASE_IOS_RUNTIME=26.0
+          export RELEASE_WATCHOS_RUNTIME=26.0
+          export RELEASE_TVOS_RUNTIME=26.0
+          export RELEASE_VISIONOS_RUNTIME=26.0
           source Scripts/activate-release-toolchain.sh
           for name in RELEASE_TOOLCHAIN_LANE RELEASE_TOOLCHAIN_SELECTION RELEASE_EVIDENCE_CLASS \
             RELEASE_DEVELOPER_DIR RELEASE_XCODE_VERSION RELEASE_XCODE_BUILD RELEASE_IOS_RUNTIME \

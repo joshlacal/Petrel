@@ -1,6 +1,6 @@
 import Crypto
 import Foundation
-@preconcurrency import secp256k1
+@preconcurrency import P256K
 
 /// Standard ATProto inter-service authentication claims.
 public struct ServiceJWTClaims: Codable, Sendable, Equatable {
@@ -52,7 +52,7 @@ public struct ServiceJWTInspection: Sendable, Equatable {
 /// Supported signing private keys for minting ATProto service JWTs.
 public enum ServiceJWTSigningKey: @unchecked Sendable {
     case p256(P256.Signing.PrivateKey)
-    case secp256k1(secp256k1.Signing.PrivateKey)
+    case secp256k1(P256K.Signing.PrivateKey)
 }
 
 /// ATProto inter-service JWT minting, inspection, and verification.
@@ -151,8 +151,8 @@ public enum ServiceJWT {
         case let .p256(p256Key):
             signatureData = try P256WireSignature.sign(signingInputData, using: p256Key)
         case let .secp256k1(secpKey):
-            let ecdsaSig = try secpKey.signature(for: signingInputData)
-            let compact = try ecdsaSig.compactRepresentation
+            let ecdsaSig = secpKey.signature(for: signingInputData)
+            let compact = ecdsaSig.compactRepresentation
             guard ATProtoJWTVerificationKey.isCanonicalSecp256k1Signature(compact) else {
                 throw PetrelCryptoError.malformed("secp256k1 signature is not canonical low-S")
             }
@@ -190,7 +190,7 @@ public enum ServiceJWT {
         method: String,
         eventID: String,
         requestBodyDigest: String? = nil,
-        key: secp256k1.Signing.PrivateKey,
+        key: P256K.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
     ) throws -> String {
@@ -234,7 +234,7 @@ public enum ServiceJWT {
         method: String,
         eventID: String,
         requestBodyDigest: String? = nil,
-        key: secp256k1.Signing.PrivateKey,
+        key: P256K.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
     ) throws -> String {
@@ -637,7 +637,7 @@ public enum ProxyServiceJWT {
         method: String,
         eventID: String,
         requestBodyDigest: String? = nil,
-        key: secp256k1.Signing.PrivateKey,
+        key: P256K.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = maximumLifetime
     ) throws -> String {
@@ -693,7 +693,7 @@ public enum SpaceServiceJWT {
         method: String,
         eventID: String,
         requestBodyDigest: String? = nil,
-        key: secp256k1.Signing.PrivateKey,
+        key: P256K.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = lifetime
     ) throws -> String {

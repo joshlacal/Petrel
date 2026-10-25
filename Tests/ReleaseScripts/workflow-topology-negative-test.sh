@@ -98,7 +98,7 @@ source = File.binread(path)
 reviewed = '            Scripts/verify-owned-warnings.sh ios-simulator -- "$RELEASE_XCODEBUILD" ' + 92.chr + "\n"
 abort "newest simulator platform proof fixture did not match" unless source.include?(reviewed)
 cross = '            "$RELEASE_SWIFT" build ' + 92.chr + "\n" \
-  + "              --scratch-path .build/xcode163-iphoneos-cross " + 92.chr + "\n" \
+  + "              --scratch-path .build/xcode2601-iphoneos-cross " + 92.chr + "\n" \
   + "              --triple arm64-apple-ios18.0 " + 92.chr + "\n" \
   + '              --sdk "$SDK_PATH"' + "\n"
 File.binwrite(path, source.sub(reviewed, cross + reviewed))
@@ -382,8 +382,8 @@ RUBY
   done <<'CASES'
 sdk-path|SDK_PATH=$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-path)
 directory|test -d "$SDK_PATH"
-runtime|--show-sdk-version)" = '18.4'
-scratch|--scratch-path .build/xcode163-iphoneos-cross
+runtime|--show-sdk-version)" = '26.0'
+scratch|--scratch-path .build/xcode2601-iphoneos-cross
 triple|--triple arm64-apple-ios18.0
 sdk-argument|--sdk "$SDK_PATH"
 simulator-destination|-destination 'generic/platform=iOS Simulator'
@@ -489,11 +489,11 @@ make_fixture "$fixture"
 /usr/bin/ruby - "$fixture/.github/workflows/release.yml" <<'RUBY'
 path = ARGV.fetch(0)
 source = File.binread(path)
-reviewed = "            xcode-build: '16E140'\n"
+reviewed = "            xcode-build: '17A400'\n"
 abort "minimum Apple toolchain fixture did not match" unless source.include?(reviewed)
 File.binwrite(path, source.sub(reviewed, "            xcode-build: '16E141'\n"))
 RUBY
-expect_failure "$fixture" 'release minimum Apple toolchain tuple must be exact Xcode 16.3'
+expect_failure "$fixture" 'release minimum Apple toolchain tuple must be exact Xcode 26.0.1'
 
 for workflow in release.yml swift.yml; do
   case $workflow in
@@ -505,11 +505,11 @@ for workflow in release.yml swift.yml; do
   /usr/bin/ruby - "$fixture/.github/workflows/$workflow" <<'RUBY'
 path = ARGV.fetch(0)
 source = File.binread(path)
-quoted = "            xcode-build: '16E140'\n"
+quoted = "            xcode-build: '17A400'\n"
 abort "quoted Xcode build fixture did not match" unless source.include?(quoted)
-File.binwrite(path, source.sub(quoted, "            xcode-build: 16E140\n"))
+File.binwrite(path, source.sub(quoted, "            xcode-build: 17A400\n"))
 RUBY
-  expect_failure "$fixture" "$label must source-quote Xcode build identity '16E140'"
+  expect_failure "$fixture" "$label must source-quote Xcode build identity '17A400'"
 done
 
 for workflow in release.yml docc.yml; do
@@ -522,11 +522,11 @@ for workflow in release.yml docc.yml; do
   /usr/bin/ruby - "$fixture/.github/workflows/$workflow" <<'RUBY'
 path = ARGV.fetch(0)
 source = File.binread(path)
-quoted = "          export RELEASE_XCODE_BUILD='16E140'\n"
+quoted = "          export RELEASE_XCODE_BUILD='17A400'\n"
 abort "quoted Xcode build export fixture did not match" unless source.include?(quoted)
-File.binwrite(path, source.sub(quoted, "          export RELEASE_XCODE_BUILD=16E140\n"))
+File.binwrite(path, source.sub(quoted, "          export RELEASE_XCODE_BUILD=17A400\n"))
 RUBY
-  expect_failure "$fixture" "$label must source-quote Xcode build identity '16E140'"
+  expect_failure "$fixture" "$label must source-quote Xcode build identity '17A400'"
 done
 
 fixture=$TMP/minimum-apple-toolchain-activation-drift
@@ -534,11 +534,11 @@ make_fixture "$fixture"
 /usr/bin/ruby - "$fixture/Scripts/activate-release-toolchain.sh" <<'RUBY'
 path = ARGV.fetch(0)
 source = File.binread(path)
-reviewed = '$RELEASE_XCODE_BUILD != 16E140'
+reviewed = '$RELEASE_XCODE_BUILD != 17A400'
 abort "minimum Apple activation fixture did not match" unless source.include?(reviewed)
 File.binwrite(path, source.sub(reviewed, '$RELEASE_XCODE_BUILD != 16E141'))
 RUBY
-expect_failure "$fixture" 'activation minimum Apple toolchain tuple must be exact Xcode 16.3'
+expect_failure "$fixture" 'activation minimum Apple toolchain tuple must be exact Xcode 26.0.1'
 
 fixture=$TMP/release-newest-stable-test-runner-deleted
 make_fixture "$fixture"

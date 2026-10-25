@@ -1,6 +1,6 @@
 import Crypto
 import Foundation
-import secp256k1
+import P256K
 
 /// A bounded public key selected from a local account projection or an
 /// operator-pinned interop fixture. P-256 remains the local issuance
@@ -74,7 +74,7 @@ public enum ATProtoJWTVerificationKey: @unchecked Sendable, Equatable {
                   Self.isCanonicalSecp256k1Signature(signature) else {
                 throw PetrelCryptoError.unauthorized("JWT algorithm or signature is invalid")
             }
-            let format: secp256k1.Format
+            let format: P256K.Format
             switch (encoded.count, encoded.first) {
             case (33, 0x02), (33, 0x03):
                 format = .compressed
@@ -84,11 +84,11 @@ public enum ATProtoJWTVerificationKey: @unchecked Sendable, Equatable {
                 throw PetrelCryptoError.unauthorized("secp256k1 public key is invalid")
             }
             do {
-                let publicKey = try secp256k1.Signing.PublicKey(
+                let publicKey = try P256K.Signing.PublicKey(
                     dataRepresentation: encoded,
                     format: format
                 )
-                let compact = try secp256k1.Signing.ECDSASignature(
+                let compact = try P256K.Signing.ECDSASignature(
                     compactRepresentation: signature
                 )
                 return publicKey.isValidSignature(compact, for: signingInput)
@@ -100,7 +100,7 @@ public enum ATProtoJWTVerificationKey: @unchecked Sendable, Equatable {
 
     public static func validatesSecp256k1PublicKey(_ encoded: Data) -> Bool {
         do {
-            let format: secp256k1.Format
+            let format: P256K.Format
             switch (encoded.count, encoded.first) {
             case (33, 0x02), (33, 0x03):
                 format = .compressed
@@ -109,7 +109,7 @@ public enum ATProtoJWTVerificationKey: @unchecked Sendable, Equatable {
             default:
                 return false
             }
-            _ = try secp256k1.Signing.PublicKey(
+            _ = try P256K.Signing.PublicKey(
                 dataRepresentation: encoded,
                 format: format
             )
