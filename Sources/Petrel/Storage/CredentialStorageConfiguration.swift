@@ -26,7 +26,7 @@ public struct CredentialStorageConfiguration: Sendable {
                 masterKey: masterKey.map { SymmetricKey(data: $0) }
             )
             try backend.validateExistingCredentials()
-            return Self(backend: backend, identifier: directory.standardizedFileURL.absoluteString)
+            return Self(backend: backend, identifier: directory.standardizedFileURL.path)
         }
     #endif
 }

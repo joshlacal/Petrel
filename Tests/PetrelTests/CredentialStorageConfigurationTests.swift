@@ -117,7 +117,9 @@
             let directory = directory()
             defer { try? FileManager.default.removeItem(at: directory) }
             let first = try storage(at: directory)
-            let second = try storage(at: directory)
+            // Directory URL spellings with and without a trailing slash identify
+            // the same on-disk backend and must share mutation coordination.
+            let second = try storage(at: URL(fileURLWithPath: directory.path, isDirectory: true))
             #expect(await first.accountScopeDID(for: did) == second.accountScopeDID(for: did))
             #expect(first.keyMutationHub === second.keyMutationHub)
             try await first.saveGatewaySession("old", for: did)
