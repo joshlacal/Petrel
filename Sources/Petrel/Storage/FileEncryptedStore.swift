@@ -254,6 +254,30 @@
             LogManager.logInfo(infoMsg)
         }
 
+        /// Validate existing encoded credential files before exposing an explicit
+        /// backend. A wrong key must fail at client construction, before a new
+        /// login can overwrite credentials it could not decrypt.
+        func validateExistingCredentials() throws {
+            for file in try FileManager.default.contentsOfDirectory(at: storageDirectory, includingPropertiesForKeys: nil) {
+                let filename = file.lastPathComponent
+                guard !filename.hasPrefix(".") else { continue }
+                var encoded = filename.replacingOccurrences(of: "_", with: "/").replacingOccurrences(of: "-", with: "+")
+                encoded += String(repeating: "=", count: (4 - encoded.count % 4) % 4)
+                guard let data = Data(base64Encoded: encoded),
+                      let namespacedKey = String(data: data, encoding: .utf8),
+                      namespacedKey.contains(".")
+                else { continue }
+                var fileStat = stat()
+                guard lstat(file.path, &fileStat) == 0,
+                      (fileStat.st_mode & S_IFMT) == S_IFREG,
+                      fileStat.st_uid == getuid(),
+                      (fileStat.st_mode & 0o077) == 0
+                else { throw FileEncryptedStoreError.insecurePermissions }
+                let combined = try Data(contentsOf: file)
+                _ = try masterKey.open(AES.GCM.SealedBox(combined: combined))
+            }
+        }
+
         private func fileURL(for key: String, namespace: String) -> URL {
             let namespacedKey = "\(namespace).\(key)"
             let filename = namespacedKey.data(using: .utf8)!.base64EncodedString()

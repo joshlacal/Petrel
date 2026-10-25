@@ -36,6 +36,7 @@ typecheck_documentation_examples() {
         oauth-authentication.swift \
         oauth-callback.swift \
         package-manifest.swift \
+        readme-encrypted-credentials.swift \
         readme-oauth.swift \
         readme-package-manifest.swift \
         readme-public-profile.swift)

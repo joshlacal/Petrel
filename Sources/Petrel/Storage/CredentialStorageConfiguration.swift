@@ -11,7 +11,8 @@ public struct CredentialStorageConfiguration: Sendable {
 
     /// Uses the existing encrypted-file format in an explicitly selected directory.
     /// Supply the durable AES key used for this directory, or set PETREL_MASTER_KEY
-    /// to its Base64 representation. No key is generated, persisted, or logged.
+    /// to its Base64 representation. Existing credential files must decrypt before
+    /// configuration succeeds. No key is generated, persisted, or logged.
     /// The directory and files must be owned by the current user; storage enforces
     /// owner-only permissions. Temporary paths and symlinks are rejected.
     /// Access groups are an Apple Keychain feature and are unavailable with files.
@@ -24,6 +25,7 @@ public struct CredentialStorageConfiguration: Sendable {
                 storageDirectory: directory,
                 masterKey: masterKey.map { SymmetricKey(data: $0) }
             )
+            try backend.validateExistingCredentials()
             return Self(backend: backend, identifier: directory.standardizedFileURL.absoluteString)
         }
     #endif
