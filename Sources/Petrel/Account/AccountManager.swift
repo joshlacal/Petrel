@@ -96,7 +96,7 @@ actor AccountManager: AccountManaging {
     private func handleAccountMutation(_ scopeDID: AccountMutationHub.ScopeDID?) async {
         if let scopeDID {
             let myScopeDID = await storage.accountScopeDID(for: scopeDID.did)
-            if scopeDID.namespace == myScopeDID.namespace && scopeDID.accessGroup == myScopeDID.accessGroup {
+            if scopeDID == myScopeDID {
                 accountsCache.removeValue(forKey: scopeDID.did)
             }
         } else {

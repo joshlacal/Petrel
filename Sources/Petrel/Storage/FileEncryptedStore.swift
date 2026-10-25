@@ -28,7 +28,7 @@
 
             init(copying key: SymmetricKey) throws {
                 let copy = try key.withUnsafeBytes { bytes -> (address: UInt, count: Int) in
-                    guard let source = bytes.baseAddress, !bytes.isEmpty else {
+                    guard let source = bytes.baseAddress, [16, 24, 32].contains(bytes.count) else {
                         throw FileEncryptedStoreError.invalidConfiguration
                     }
                     let allocation = UnsafeMutableRawPointer.allocate(
