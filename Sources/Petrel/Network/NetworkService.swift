@@ -2230,16 +2230,22 @@ public actor NetworkService: NetworkServiceProtocol {
     /// transport checks are unchanged.
     ///
     /// Requests that `SpaceCredentialManager` and `SpaceHostResolver` send on
-    /// their own sessions do not read this scope; they take explicit limits.
-    /// This covers the signed request of `SpaceCredentialManager.get` (use its
-    /// `maximumArchiveBytes` and `maximumBlobBytes`) and the
-    /// `getSpaceCredential` exchange. Work they run through a `NetworkService`
-    /// does read it: a credential exchange that starts inside a scope requests
-    /// its delegation token with the scoped limits, because the default
-    /// delegation-token provider is a generated
-    /// `com.atproto.space.getDelegationToken` call on the manager's
-    /// `ATProtoClient`. The same applies to any custom provider that sends
-    /// through a `NetworkService`.
+    /// their own sessions do not read this scope. The `getSpaceCredential`
+    /// exchange passes no per-request limits, so it gets those of the
+    /// manager's session: `NetworkResponseLimits.default` (10 MiB) when the
+    /// manager created that session itself. The signed request of
+    /// `SpaceCredentialManager.get` also uses the session's limits, except
+    /// that its `maximumArchiveBytes` (for `getRepo`) and `maximumBlobBytes`
+    /// (for `getBlob`) replace the wire and decoded byte limits for that one
+    /// request. The static fetch methods of `SpaceHostResolver` take a
+    /// `limits` argument instead, and a resolver made with
+    /// `init(didResolver:)` fetches with `NetworkResponseLimits.default`.
+    /// Work these types run through a `NetworkService` does read the scope: a
+    /// credential exchange that starts inside a scope requests its delegation
+    /// token with the scoped limits, because the default delegation-token
+    /// provider is a generated `com.atproto.space.getDelegationToken` call on
+    /// the manager's `ATProtoClient`. The same applies to any custom provider
+    /// that sends through a `NetworkService`.
     ///
     /// - Parameters:
     ///   - limits: The response limits to apply, before clamping.
