@@ -16,6 +16,7 @@ with a dated `0.2.0` heading only when the release tag is created.
 - A two-overlay compiler fixture proving PetrelCatbird and PetrelBluemoji can extend one Petrel-owned `Blue` namespace.
 - A fail-closed DocC validator that treats documentation diagnostics as errors and compile-checks every Swift example in the public guides under the sealed release toolchain.
 - PetrelCrypto service JWTs can bind an XRPC request body through the `requestBodyDigest` claim.
+- `SpaceCredentialManager.get(url:space:audience:maximumArchiveBytes:)`: the optional `maximumArchiveBytes` (default `nil`, unchanged behaviour) replaces the hardened 10 MiB response limit for a single `getRepo` request and bounds that archive's STAR verification, so callers can fetch verified repositories larger than 10 MiB. Values above `SpaceSTAR.defaultMaximumArchiveBytes` (128 MiB) are clamped; other methods ignore it. Existing calls compile unchanged.
 
 ### Changed
 - Regenerated Swift and Kotlin SimpleSpace APIs against the September 10 Spaces alpha (`9d787ebf`): independent `readPolicy`/`writePolicy`, `putMember` with required read/write flags, and access-specific managing-app checks. The obsolete `addMember` endpoint is removed.

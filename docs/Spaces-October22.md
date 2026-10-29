@@ -26,7 +26,7 @@ This verifies the archive's internal digest and request identity. Authentication
 
 ## Bounds and lifecycle
 
-STAR records are limited to 1 MiB, metadata to 64 KiB, and the standalone verifier's default archive limit is 128 MiB. The credential manager retains its existing 10 MiB hardened network limit; this implementation buffers and verifies a complete response. These bounds are deliberate and do not establish large-repository capacity. Existing DAG-CBOR depth/node limits also apply.
+STAR records are limited to 1 MiB, metadata to 64 KiB, and the standalone verifier's default archive limit is 128 MiB. The credential manager keeps its 10 MiB hardened network limit by default. Passing `maximumArchiveBytes` to `get(url:space:audience:maximumArchiveBytes:)` replaces that limit for a single `getRepo` request, up to the 128 MiB archive limit, and bounds that archive's verification; other methods ignore it. The implementation buffers and verifies a complete response. These bounds are deliberate and do not establish large-repository capacity. Existing DAG-CBOR depth/node limits also apply.
 
 A cached credential is reused until its `exp` less a margin of min(60 s, half its issued lifetime `exp - iat`), and never past that margin before one lifetime after local receipt, so a device clock behind the issuer's cannot extend reuse. A 60 s credential is therefore reused for about 30 s. Without an `iat` claim the margin is 60 s. Each renewal exchanges a fresh credential bound to a fresh key.
 

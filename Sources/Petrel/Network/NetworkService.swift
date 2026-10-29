@@ -1856,10 +1856,12 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         return (data, httpResponse)
     }
+    /// `limits` replaces the delegate's response limits for this request only.
     static func executeDataTask(
         _ request: URLRequest,
         using targetSession: URLSession,
         delegate: HardenedURLSessionDelegate,
+        limits: NetworkResponseLimits? = nil,
         onLaunch: (@Sendable () -> Void)? = nil
     ) async throws -> (Data, URLResponse) {
         try Task.checkCancellation()
@@ -1880,7 +1882,7 @@ public actor NetworkService: NetworkServiceProtocol {
         let task = targetSession.dataTask(with: request)
         let rawResult: (Data, URLResponse) = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                delegate.contextManager.register(task) { result in
+                delegate.contextManager.register(task, limits: limits) { result in
                     continuation.resume(with: result)
                 }
                 delegate.contextManager.setApprovedAddresses(addresses, for: task)
@@ -1894,7 +1896,7 @@ public actor NetworkService: NetworkServiceProtocol {
             task.cancel()
         }
         return (
-            try ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: delegate.limits),
+            try ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: limits ?? delegate.limits),
             rawResult.1
         )
     }

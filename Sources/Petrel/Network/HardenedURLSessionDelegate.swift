@@ -53,10 +53,21 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             return taskContexts[task.taskIdentifier] ?? TaskContext()
         }
 
-        package func register(_ task: URLSessionTask, completion: @escaping @Sendable (Result<(Data, URLResponse), Error>) -> Void) {
+        /// `limits` replaces the delegate's response limits for this task only.
+        package func register(
+            _ task: URLSessionTask,
+            limits: NetworkResponseLimits? = nil,
+            completion: @escaping @Sendable (Result<(Data, URLResponse), Error>) -> Void
+        ) {
             lock.lock()
             defer { lock.unlock() }
-            taskContexts[task.taskIdentifier] = TaskContext(completion: completion)
+            taskContexts[task.taskIdentifier] = TaskContext(limits: limits, completion: completion)
+        }
+
+        package func responseLimits(for task: URLSessionTask) -> NetworkResponseLimits? {
+            lock.lock()
+            defer { lock.unlock() }
+            return taskContexts[task.taskIdentifier]?.limits
         }
 
         package func updateContext(for task: URLSessionTask, update: (inout TaskContext) -> Void) {
@@ -206,6 +217,7 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         var approvedAddresses: Set<String> = []
         var data = Data()
         var response: URLResponse?
+        var limits: NetworkResponseLimits? = nil
         var completion: (@Sendable (Result<(Data, URLResponse), Error>) -> Void)? = nil
     }
 
@@ -313,11 +325,12 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         completionHandler: @escaping @Sendable (URLSession.ResponseDisposition) -> Void
     ) {
         // Check Content-Length to enforce wire size limits before downloading
+        let maximumWireBytes = contextManager.responseLimits(for: dataTask)?.maximumWireBytes ?? limits.maximumWireBytes
         if let httpResponse = response as? HTTPURLResponse,
            let contentLength = httpResponse.value(forHTTPHeaderField: "Content-Length").flatMap(Int.init),
-           contentLength > limits.maximumWireBytes
+           contentLength > maximumWireBytes
         {
-            LogManager.logError("Response Content-Length exceeds maximum limit of \(limits.maximumWireBytes) bytes")
+            LogManager.logError("Response Content-Length exceeds maximum limit of \(maximumWireBytes) bytes")
             contextManager.recordLimitExceeded(for: dataTask)
             completionHandler(.cancel)
             return
@@ -331,9 +344,10 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         dataTask: URLSessionDataTask,
         didReceive data: Data
     ) {
-        let exceeded = contextManager.addWireBytes(data.count, for: dataTask, limit: limits.maximumWireBytes)
+        let maximumWireBytes = contextManager.responseLimits(for: dataTask)?.maximumWireBytes ?? limits.maximumWireBytes
+        let exceeded = contextManager.addWireBytes(data.count, for: dataTask, limit: maximumWireBytes)
         if exceeded {
-            LogManager.logError("Wire bytes exceeded maximum limit of \(limits.maximumWireBytes) bytes")
+            LogManager.logError("Wire bytes exceeded maximum limit of \(maximumWireBytes) bytes")
             dataTask.cancel()
         } else {
             contextManager.append(data, for: dataTask)

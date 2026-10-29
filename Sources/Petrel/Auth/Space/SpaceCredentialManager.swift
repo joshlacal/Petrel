@@ -355,11 +355,21 @@ public actor SpaceCredentialManager {
     ///   - audience: The DID the request is addressed to. Defaults to the URL's
     ///     `repo` query parameter (repo operations) or, without one, the space
     ///     authority's DID (space-host operations).
+    ///   - maximumArchiveBytes: For `getRepo` only, the largest response to
+    ///     accept, replacing the session's response limit (10 MiB by default)
+    ///     for that request and bounding STAR verification. Values above
+    ///     `SpaceSTAR.defaultMaximumArchiveBytes` are clamped to it. Ignored for
+    ///     other methods. `nil` keeps the default limits.
     ///
     /// A `401 CredentialRevoked` response drops the cached credential so it is
     /// never presented again; the response is returned to the caller unchanged
     /// and nothing is retried here.
-    public func get(url: URL, space: SpaceRef, audience: String? = nil) async throws -> (Data, HTTPURLResponse) {
+    public func get(
+        url: URL,
+        space: SpaceRef,
+        audience: String? = nil,
+        maximumArchiveBytes: Int? = nil
+    ) async throws -> (Data, HTTPURLResponse) {
         guard Self.isSecureOrLoopback(url) else {
             throw SpaceCredentialError.insecureURL(url.absoluteString)
         }
@@ -373,6 +383,11 @@ public actor SpaceCredentialManager {
 
         let method = url.lastPathComponent.replacingOccurrences(of: "com.atproto.space.", with: "")
         let needsMAC = ["getLatestCommit", "getRepo", "listRepoOps", "getRecord"].contains(method)
+        let responseLimits = Self.archiveResponseLimits(
+            maximumArchiveBytes,
+            method: method,
+            base: sessionDelegate?.limits ?? .default
+        )
         for attempt in 0 ..< 2 {
             do {
                 let context: SpaceMAC.Encapsulation?
@@ -380,7 +395,7 @@ public actor SpaceCredentialManager {
                     let authorKey = try await authorKEMKeyProvider(audience, attempt > 0)
                     context = try SpaceMAC.encapsulate(authorKey: authorKey)
                 } else { context = nil }
-                return try await signedGet(url: url, space: space, audience: audience, method: method, context: context)
+                return try await signedGet(url: url, space: space, audience: audience, method: method, context: context, responseLimits: responseLimits)
             } catch SpaceMAC.Failure.mismatch where attempt == 0 {
                 // A rotated KEM key can produce a valid response under a different
                 // secret. Refresh once, and always use another ephemeral key.
@@ -390,7 +405,32 @@ public actor SpaceCredentialManager {
         throw SpaceMAC.Failure.mismatch
     }
 
-    private func signedGet(url: URL, space: SpaceRef, audience: String, method: String, context: SpaceMAC.Encapsulation?) async throws -> (Data, HTTPURLResponse) {
+    /// Per-request limits for a `getRepo` STAR archive of at most
+    /// `maximumArchiveBytes`, clamped to `SpaceSTAR.defaultMaximumArchiveBytes`.
+    /// Nil (keep the session's limits) for other methods or without a value.
+    static func archiveResponseLimits(
+        _ maximumArchiveBytes: Int?,
+        method: String,
+        base: NetworkResponseLimits
+    ) -> NetworkResponseLimits? {
+        guard method == "getRepo", let maximumArchiveBytes else { return nil }
+        let bytes = max(0, min(maximumArchiveBytes, SpaceSTAR.defaultMaximumArchiveBytes))
+        return NetworkResponseLimits(
+            maximumWireBytes: bytes,
+            maximumDecodedBytes: bytes,
+            maximumExpansionRatio: base.maximumExpansionRatio,
+            maximumDiagnosticBytes: base.maximumDiagnosticBytes
+        )
+    }
+
+    private func signedGet(
+        url: URL,
+        space: SpaceRef,
+        audience: String,
+        method: String,
+        context: SpaceMAC.Encapsulation?,
+        responseLimits: NetworkResponseLimits?
+    ) async throws -> (Data, HTTPURLResponse) {
         let cred = try await credential(for: space)
         let generation = generations[space, default: 0]
         guard let privateKey = try? P256.Signing.PrivateKey(rawRepresentation: cred.keyRawRepresentation) else {
@@ -416,9 +456,9 @@ public actor SpaceCredentialManager {
         let data: Data
         let response: URLResponse
         if let sessionDelegate {
-            (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: sessionDelegate)
+            (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: sessionDelegate, limits: responseLimits)
         } else if let delegate = urlSession.delegate as? HardenedURLSessionDelegate {
-            (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: delegate)
+            (data, response) = try await NetworkService.executeDataTask(request, using: urlSession, delegate: delegate, limits: responseLimits)
         } else {
             (data, response) = try await urlSession.data(for: request)
         }
@@ -441,7 +481,10 @@ public actor SpaceCredentialManager {
             let header = httpResponse.value(forHTTPHeaderField: "Atproto-Space-Mac")
             if method == "getRepo" {
                 let mac = try SpaceMACHeader.parse(header, type: "atproto-space-repo")
-                _ = try SpaceSTAR.verify(archive: data, space: space, repo: audience, sharedSecret: context.sharedSecret, mac: mac)
+                _ = try SpaceSTAR.verify(
+                    archive: data, space: space, repo: audience, sharedSecret: context.sharedSecret, mac: mac,
+                    maximumArchiveBytes: responseLimits?.maximumDecodedBytes ?? SpaceSTAR.defaultMaximumArchiveBytes
+                )
             } else {
                 try SpaceResponseVerifier.verifyJSON(data, method: method, url: url, space: space, repo: audience, secret: context.sharedSecret, macHeader: header)
             }

@@ -1579,3 +1579,119 @@ extension SpaceCredentialManagerTests {
         }
     }
 }
+
+// MARK: - getRepo archive limit (ATPD-1)
+
+private func starFrame(_ bytes: Data) -> Data {
+    var length = bytes.count
+    var prefix = Data()
+    repeat {
+        var byte = UInt8(length & 127)
+        length >>= 7
+        if length != 0 { byte |= 128 }
+        prefix.append(byte)
+    } while length != 0
+    return prefix + bytes
+}
+
+private func isResponseLimitExceeded(_ error: Error) -> Bool {
+    if case .responseLimitExceeded = error as? NetworkError { return true }
+    return false
+}
+
+extension SpaceCredentialManagerTests {
+    @Test("maximumArchiveBytes applies only to getRepo and is clamped to the STAR archive maximum")
+    func archiveResponseLimitsAreBounded() {
+        let base = NetworkResponseLimits(maximumExpansionRatio: 7, maximumDiagnosticBytes: 99)
+        let twentyMiB = 20 * 1_048_576
+        #expect(SpaceCredentialManager.archiveResponseLimits(nil, method: "getRepo", base: base) == nil)
+        for method in ["getRecord", "getLatestCommit", "listRepoOps", "getBlob", "listRepos"] {
+            #expect(SpaceCredentialManager.archiveResponseLimits(twentyMiB, method: method, base: base) == nil)
+        }
+        #expect(SpaceCredentialManager.archiveResponseLimits(twentyMiB, method: "getRepo", base: base) == NetworkResponseLimits(
+            maximumWireBytes: twentyMiB,
+            maximumDecodedBytes: twentyMiB,
+            maximumExpansionRatio: 7,
+            maximumDiagnosticBytes: 99
+        ))
+        let clamped = SpaceCredentialManager.archiveResponseLimits(.max, method: "getRepo", base: base)
+        #expect(clamped?.maximumWireBytes == SpaceSTAR.defaultMaximumArchiveBytes)
+        #expect(clamped?.maximumDecodedBytes == SpaceSTAR.defaultMaximumArchiveBytes)
+        #expect(SpaceCredentialManager.archiveResponseLimits(-1, method: "getRepo", base: base)?.maximumWireBytes == 0)
+    }
+
+    @Test("a verified getRepo archive above 10 MiB needs maximumArchiveBytes; the default limit is unchanged")
+    func largeArchiveNeedsExplicitLimit() async throws {
+        try await withSpaceTestSession {
+            let session = makeMockSession()
+            defer { session.invalidateAndCancel() }
+            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let repo = "did:plc:writer"
+            let rev = "3kbcq3p7ad422"
+            let kemKey = Crypto.P256.KeyAgreement.PrivateKey()
+            let kemDIDKey = try P256DIDKey(
+                publicKey: Crypto.P256.Signing.PublicKey(compressedRepresentation: kemKey.publicKey.compressedRepresentation)
+            ).value
+
+            // Eleven records just under 1 MiB each: about 11 MB, above the 10 MiB default.
+            var set = SpaceSetHash()
+            var records = Data()
+            for index in 0 ..< 11 {
+                let path = "com.example.drive.file/a\(index < 10 ? "0" : "")\(index)"
+                let value = try DAGCBOR.encodeValue(["blob": Data(repeating: UInt8(index), count: 1_000_000)])
+                set.add(path: path, cid: CID.fromDAGCBOR(value).string)
+                records += starFrame(Data(path.utf8)) + starFrame(value)
+            }
+            let digest = set.digest
+            let metadata: [String: Any] = ["$type": "atproto-space-repo", "ver": 1, "repo": repo, "space": space.uriString(), "rev": rev, "data": digest]
+            let archive = try Data([0x2A, 0x6C, 1, 0]) + starFrame(DAGCBOR.encodeValue(metadata)) + records
+            #expect(archive.count > NetworkResponseLimits.default.maximumWireBytes)
+            let token = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970))
+
+            SpaceMockURLProtocol.setHandler { request in
+                let url = request.url!
+                if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
+                    return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
+                }
+                let want = try #require(request.value(forHTTPHeaderField: "Atproto-Space-Want-Mac"))
+                let share = try #require(want.components(separatedBy: "key_share=\"").last?.split(separator: "\"").first.map(String.init))
+                let secret = try SpaceMAC.decapsulate(privateKey: kemKey, keyShare: share)
+                let mac = try SpaceMAC.commit(sharedSecret: secret, space: space.uriString(), repo: repo, rev: rev, data: digest)
+                let headers = [
+                    "Content-Type": "application/octet-stream",
+                    "Atproto-Space-Mac": "type=\"atproto-space-repo\", ver=1, mac=:\(mac.base64EncodedString()):",
+                ]
+                return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!, archive)
+            }
+            defer { SpaceMockURLProtocol.setHandler(nil) }
+
+            let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+            let manager = SpaceCredentialManager(
+                client: client,
+                authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                urlSession: session,
+                delegationTokenProvider: { _ in "delegation" },
+                authorKEMKeyProvider: { _, _ in kemDIDKey }
+            )
+            let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getRepo?space=\(space.uriString())&repo=\(repo)"))
+
+            do {
+                _ = try await manager.get(url: url, space: space)
+                Issue.record("Expected the default 10 MiB limit to refuse the archive")
+            } catch {
+                #expect(isResponseLimitExceeded(error), "unexpected error \(error)")
+            }
+
+            let (data, response) = try await manager.get(url: url, space: space, maximumArchiveBytes: SpaceSTAR.defaultMaximumArchiveBytes)
+            #expect(response.statusCode == 200)
+            #expect(data == archive)
+
+            do {
+                _ = try await manager.get(url: url, space: space, maximumArchiveBytes: archive.count - 1)
+                Issue.record("Expected an explicit limit below the archive size to refuse it")
+            } catch {
+                #expect(isResponseLimitExceeded(error), "unexpected error \(error)")
+            }
+        }
+    }
+}
