@@ -553,6 +553,11 @@ public actor NetworkService: NetworkServiceProtocol {
     @TaskLocal private static var terminalHTTPErrorResponseRequest:
         HTTPErrorResponseRequestIdentity? = nil
 
+    /// Set only by `withResponseLimits(_:operation:)`, already
+    /// clamped. When present it replaces the service's response limits for
+    /// every request this task sends through a `NetworkService`.
+    @TaskLocal static var scopedResponseLimits: NetworkResponseLimits? = nil
+
     #if DEBUG
         private nonisolated(unsafe) static var networkTestProtocolClasses: [AnyClass]?
         private static let networkTestProtocolClassesLock = NSLock()
@@ -1172,6 +1177,7 @@ public actor NetworkService: NetworkServiceProtocol {
                 requestToSend,
                 using: session,
                 delegate: sessionDelegate,
+                limits: Self.scopedResponseLimits,
                 onLaunch: { launchedCtx?.releaseAuthenticationLease() }
             )
             authCtx_simple?.releaseAuthenticationLease()
@@ -1262,6 +1268,7 @@ public actor NetworkService: NetworkServiceProtocol {
             )
 
         let policy = determineSecurityPolicy(for: requestURL)
+        let scopedLimits = Self.scopedResponseLimits
 
         var retryCount = 0
 
@@ -1348,7 +1355,7 @@ public actor NetworkService: NetworkServiceProtocol {
                 // request; stale-credential 401s are already scoped by the credential-bound proof.
                 let launchedCtx = authCtx
                 let releaseLease: @Sendable () -> Void = { launchedCtx?.releaseAuthenticationLease() }
-                let (data, response) = if !skipTokenRefresh {
+                let (data, response) = if !skipTokenRefresh, scopedLimits == nil {
                     try await requestDeduplicator.deduplicate(
                         request: request,
                         authIdentity: authIdentity,
@@ -1359,9 +1366,10 @@ public actor NetworkService: NetworkServiceProtocol {
                         )
                     }
                 } else {
-                    // Skip deduplication for refresh requests to avoid circular dependencies
+                    // Skip deduplication for refresh requests to avoid circular dependencies,
+                    // and for scoped response limits so no request shares another's limits.
                     try await Self.executeDataTask(
-                        requestToSend, using: session, delegate: sessionDelegate, onLaunch: releaseLease
+                        requestToSend, using: session, delegate: sessionDelegate, limits: scopedLimits, onLaunch: releaseLease
                     )
                 }
                 authCtx?.releaseAuthenticationLease()
@@ -1836,7 +1844,9 @@ public actor NetworkService: NetworkServiceProtocol {
             throw ExactAuthGeneratedRequestContinuityError()
         }
 
-        let (data, response) = try await Self.executeDataTask(prepared, using: exactAuthSession, delegate: exactAuthSessionDelegate)
+        let (data, response) = try await Self.executeDataTask(
+            prepared, using: exactAuthSession, delegate: exactAuthSessionDelegate, limits: Self.scopedResponseLimits
+        )
         authCtx?.releaseAuthenticationLease()
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse(description: "Received non-HTTP response")
@@ -1921,7 +1931,8 @@ public actor NetworkService: NetworkServiceProtocol {
         return try await Self.executeDataTask(
             sanitizedRequest,
             using: exactAuthSession,
-            delegate: exactAuthSessionDelegate
+            delegate: exactAuthSessionDelegate,
+            limits: Self.scopedResponseLimits
         )
     }
     private func isActiveExactAuthRequestScope(_ scope: ExactAuthGeneratedRequestScope) -> Bool {
@@ -2191,6 +2202,60 @@ public actor NetworkService: NetworkServiceProtocol {
                 additionalHeaders: additionalHeaders
             )
         }
+    }
+
+    /// The ceiling for every field of a scoped limit: 128 MiB, the same bound
+    /// as `SpaceSTAR.defaultMaximumArchiveBytes`.
+    static let maximumScopedResponseBytes = SpaceSTAR.defaultMaximumArchiveBytes
+
+    /// Runs `operation` with `limits` replacing the response limits of every
+    /// `NetworkService` request it sends, so one generated call can accept a
+    /// response above the default 10 MiB:
+    ///
+    /// ```swift
+    /// let bytes = SpaceSTAR.defaultMaximumArchiveBytes
+    /// let limits = NetworkResponseLimits(maximumWireBytes: bytes, maximumDecodedBytes: bytes)
+    /// let (code, output) = try await NetworkService.withResponseLimits(limits) {
+    ///     try await client.com.atproto.space.getBlob(input: input)
+    /// }
+    /// ```
+    ///
+    /// Each field of `limits` is clamped to `0 ... 128 MiB`
+    /// (`SpaceSTAR.defaultMaximumArchiveBytes`). The limits apply to requests
+    /// sent from this task and its child tasks until `operation` returns,
+    /// including any authentication refresh or retry those requests trigger,
+    /// and to unstructured tasks created inside `operation`, which inherit
+    /// task-local values. Detached tasks do not inherit them. Requests under a
+    /// scope are not deduplicated with other in-flight requests. All other
+    /// transport checks are unchanged. `SpaceCredentialManager` and
+    /// `SpaceHostResolver` do not read this scope; they take explicit limits.
+    ///
+    /// - Parameters:
+    ///   - limits: The response limits to apply, before clamping.
+    ///   - operation: The work whose requests use `limits`.
+    /// - Returns: The value `operation` returns.
+    public static func withResponseLimits<T: Sendable>(
+        _ limits: NetworkResponseLimits,
+        operation: @Sendable () async throws -> T
+    ) async rethrows -> T {
+        try await $scopedResponseLimits.withValue(clampedScopedResponseLimits(limits)) {
+            try await operation()
+        }
+    }
+
+    /// `limits` with every field clamped to `0 ... maximumScopedResponseBytes`.
+    /// Clamping the expansion ratio also keeps the decompression arithmetic
+    /// (`data.count * maximumExpansionRatio`) from overflowing.
+    static func clampedScopedResponseLimits(_ limits: NetworkResponseLimits) -> NetworkResponseLimits {
+        func clamp(_ value: Int) -> Int {
+            max(0, min(value, maximumScopedResponseBytes))
+        }
+        return NetworkResponseLimits(
+            maximumWireBytes: clamp(limits.maximumWireBytes),
+            maximumDecodedBytes: clamp(limits.maximumDecodedBytes),
+            maximumExpansionRatio: clamp(limits.maximumExpansionRatio),
+            maximumDiagnosticBytes: clamp(limits.maximumDiagnosticBytes)
+        )
     }
 
     /// Performs a network request (protocol compatibility method)

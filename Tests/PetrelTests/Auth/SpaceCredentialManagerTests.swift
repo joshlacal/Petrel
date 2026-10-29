@@ -1786,4 +1786,79 @@ extension SpaceCredentialManagerTests {
             }
         }
     }
+
+    @Test("maximumBlobBytes applies only to getBlob and is clamped to the STAR archive maximum")
+    func blobResponseLimitsAreBounded() {
+        let base = NetworkResponseLimits(maximumExpansionRatio: 7, maximumDiagnosticBytes: 99)
+        let twentyMiB = 20 * 1_048_576
+        #expect(SpaceCredentialManager.blobResponseLimits(nil, method: "getBlob", base: base) == nil)
+        for method in ["getRepo", "getRecord", "getLatestCommit", "listRepoOps", "listBlobs", "listRepos"] {
+            #expect(SpaceCredentialManager.blobResponseLimits(twentyMiB, method: method, base: base) == nil)
+        }
+        #expect(SpaceCredentialManager.blobResponseLimits(twentyMiB, method: "getBlob", base: base) == NetworkResponseLimits(
+            maximumWireBytes: twentyMiB,
+            maximumDecodedBytes: twentyMiB,
+            maximumExpansionRatio: 7,
+            maximumDiagnosticBytes: 99
+        ))
+        let clamped = SpaceCredentialManager.blobResponseLimits(.max, method: "getBlob", base: base)
+        #expect(clamped?.maximumWireBytes == SpaceSTAR.defaultMaximumArchiveBytes)
+        #expect(clamped?.maximumDecodedBytes == SpaceSTAR.defaultMaximumArchiveBytes)
+        #expect(SpaceCredentialManager.blobResponseLimits(-1, method: "getBlob", base: base)?.maximumWireBytes == 0)
+    }
+
+    @Test("a getBlob response above 10 MiB needs maximumBlobBytes; the default limit and maximumArchiveBytes do not raise it")
+    func largeBlobNeedsExplicitLimit() async throws {
+        try await withSpaceTestSession {
+            let session = makeMockSession()
+            defer { session.invalidateAndCancel() }
+            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let repo = "did:plc:writer"
+            let cid = CID.fromDAGCBOR(Data("large-blob".utf8)).string
+            let blob = Data(repeating: 0x5A, count: 11 * 1_048_576)
+            #expect(blob.count > NetworkResponseLimits.default.maximumWireBytes)
+            let token = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970))
+
+            SpaceMockURLProtocol.setHandler { request in
+                let url = request.url!
+                if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
+                    return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
+                }
+                guard url.lastPathComponent == "com.atproto.space.getBlob",
+                      request.value(forHTTPHeaderField: "Atproto-Space-Want-Mac") == nil
+                else {
+                    return (HTTPURLResponse(url: url, statusCode: 400, httpVersion: nil, headerFields: nil)!, Data())
+                }
+                let headers = ["Content-Type": "application/octet-stream"]
+                return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: headers)!, blob)
+            }
+            defer { SpaceMockURLProtocol.setHandler(nil) }
+
+            let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+            let manager = SpaceCredentialManager(
+                client: client,
+                authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                urlSession: session,
+                delegationTokenProvider: { _ in "delegation" },
+                authorKEMKeyProvider: { _, _ in
+                    Issue.record("getBlob needs no response MAC")
+                    throw SpaceVerificationError.missingKEMKey
+                }
+            )
+            let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?space=\(space.uriString())&repo=\(repo)&cid=\(cid)"))
+
+            for limits in [(nil, nil), (SpaceSTAR.defaultMaximumArchiveBytes, nil), (nil, blob.count - 1)] as [(Int?, Int?)] {
+                do {
+                    _ = try await manager.get(url: url, space: space, maximumArchiveBytes: limits.0, maximumBlobBytes: limits.1)
+                    Issue.record("Expected limits \(String(describing: limits)) to refuse the blob")
+                } catch {
+                    #expect(isResponseLimitExceeded(error), "unexpected error \(error)")
+                }
+            }
+
+            let (data, response) = try await manager.get(url: url, space: space, maximumBlobBytes: SpaceSTAR.defaultMaximumArchiveBytes)
+            #expect(response.statusCode == 200)
+            #expect(data == blob)
+        }
+    }
 }

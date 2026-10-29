@@ -581,6 +581,39 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         XCTAssertEqual(requestCount, 1)
     }
 
+    func testScopedResponseLimitsApplyToExactAuthRequests() async throws {
+        let large = Data(repeating: 0x41, count: 11 * 1_048_576)
+        let fixture = await makeFixture(headers: ["Content-Type": "application/octet-stream"], body: large)
+        let input = try ComAtprotoSpaceGetBlob.Parameters(
+            space: SpaceRef(uriString: "at://did:plc:exact/space/com.example.drive/self"),
+            repo: DID(didString: "did:plc:exact"),
+            cid: CID.fromDAGCBOR(Data("exact-auth-limit".utf8))
+        )
+
+        do {
+            _ = try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
+                try await fixture.client.com.atproto.space.getBlob(input: input)
+            }
+            XCTFail("Expected the default 10 MiB limit to refuse the response")
+        } catch let NetworkError.responseLimitExceeded(message) {
+            XCTAssertFalse(message.isEmpty)
+        }
+
+        let bytes = SpaceSTAR.defaultMaximumArchiveBytes
+        let result = try await NetworkService.withResponseLimits(
+            NetworkResponseLimits(maximumWireBytes: bytes, maximumDecodedBytes: bytes)
+        ) {
+            try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
+                try await fixture.client.com.atproto.space.getBlob(input: input)
+            }
+        }
+        guard case let .performed(value) = result else {
+            return XCTFail("Expected performed result")
+        }
+        XCTAssertEqual(value.responseCode, 200)
+        XCTAssertEqual(value.data?.data, large)
+    }
+
     private func makeFixture(
         host: String = "example.com",
         statusCode: Int = 200,
@@ -589,7 +622,8 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         preparedHeaders: [String: String] = [:],
         preparedURL: URL? = nil,
         prepareGate: AsyncGate? = nil,
-        responseGate: AsyncGate? = nil
+        responseGate: AsyncGate? = nil,
+        body: Data? = nil
     ) async -> Fixture {
         let url = URL(string: "https://\(host)")!
         let provider = ExactAuthProvider(
@@ -603,7 +637,7 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         let client = await ATProtoClient(baseURL: url)
         await client.networkService.setAuthenticationProvider(provider)
         let snapshot = await client.authContinuitySnapshot()
-        let transport = ExactAuthTransport(statusCode: statusCode, headers: headers, responseGate: responseGate)
+        let transport = ExactAuthTransport(statusCode: statusCode, headers: headers, responseGate: responseGate, body: body)
         ExactAuthURLProtocol.install(transport, forHost: host)
         return Fixture(client: client, provider: provider, transport: transport, snapshot: snapshot)
     }
@@ -781,13 +815,15 @@ private actor ExactAuthTransport {
     private let statusCode: Int
     private let headers: [String: String]
     private let responseGate: AsyncGate?
+    private let body: Data?
     private let requestEvent = AsyncEvent()
     private(set) var requests: [URLRequest] = []
 
-    init(statusCode: Int, headers: [String: String], responseGate: AsyncGate?) {
+    init(statusCode: Int, headers: [String: String], responseGate: AsyncGate?, body: Data? = nil) {
         self.statusCode = statusCode
         self.headers = headers
         self.responseGate = responseGate
+        self.body = body
     }
 
     func handle(_ request: URLRequest, protocolInstance: ExactAuthURLProtocol) async {
@@ -803,7 +839,7 @@ private actor ExactAuthTransport {
             httpVersion: "HTTP/1.1",
             headerFields: responseHeaders
         )!
-        let body = Data(#"{"availableUserDomains":["example"],"did":"did:web:example"}"#.utf8)
+        let body = body ?? Data(#"{"availableUserDomains":["example"],"did":"did:web:example"}"#.utf8)
         protocolInstance.client?.urlProtocol(protocolInstance, didReceive: response, cacheStoragePolicy: .notAllowed)
         protocolInstance.client?.urlProtocol(protocolInstance, didLoad: body)
         protocolInstance.client?.urlProtocolDidFinishLoading(protocolInstance)

@@ -367,6 +367,11 @@ public actor SpaceCredentialManager {
     ///     for that request and bounding STAR verification. Values above
     ///     `SpaceSTAR.defaultMaximumArchiveBytes` are clamped to it. Ignored for
     ///     other methods. `nil` keeps the default limits.
+    ///   - maximumBlobBytes: For `getBlob` only, the largest blob to accept,
+    ///     replacing the session's response limit (10 MiB by default) for that
+    ///     request. Values above `SpaceSTAR.defaultMaximumArchiveBytes`
+    ///     (128 MiB) are clamped to it. Ignored for other methods. `nil` keeps
+    ///     the default limits.
     ///
     /// A `401 CredentialRevoked` response drops the cached credential so it is
     /// never presented again; the response is returned to the caller unchanged
@@ -375,7 +380,8 @@ public actor SpaceCredentialManager {
         url: URL,
         space: SpaceRef,
         audience: String? = nil,
-        maximumArchiveBytes: Int? = nil
+        maximumArchiveBytes: Int? = nil,
+        maximumBlobBytes: Int? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         guard Self.isSecureOrLoopback(url) else {
             throw SpaceCredentialError.insecureURL(url.absoluteString)
@@ -390,11 +396,9 @@ public actor SpaceCredentialManager {
 
         let method = url.lastPathComponent.replacingOccurrences(of: "com.atproto.space.", with: "")
         let needsMAC = ["getLatestCommit", "getRepo", "listRepoOps", "getRecord"].contains(method)
-        let responseLimits = Self.archiveResponseLimits(
-            maximumArchiveBytes,
-            method: method,
-            base: sessionDelegate?.limits ?? .default
-        )
+        let baseLimits = sessionDelegate?.limits ?? .default
+        let responseLimits = Self.archiveResponseLimits(maximumArchiveBytes, method: method, base: baseLimits)
+            ?? Self.blobResponseLimits(maximumBlobBytes, method: method, base: baseLimits)
         for attempt in 0 ..< 2 {
             do {
                 let context: SpaceMAC.Encapsulation?
@@ -421,7 +425,23 @@ public actor SpaceCredentialManager {
         base: NetworkResponseLimits
     ) -> NetworkResponseLimits? {
         guard method == "getRepo", let maximumArchiveBytes else { return nil }
-        let bytes = max(0, min(maximumArchiveBytes, SpaceSTAR.defaultMaximumArchiveBytes))
+        return boundedResponseLimits(maximumArchiveBytes, base: base)
+    }
+
+    /// Per-request limits for a `getBlob` response of at most
+    /// `maximumBlobBytes`, clamped to `SpaceSTAR.defaultMaximumArchiveBytes`.
+    /// Nil (keep the session's limits) for other methods or without a value.
+    static func blobResponseLimits(
+        _ maximumBlobBytes: Int?,
+        method: String,
+        base: NetworkResponseLimits
+    ) -> NetworkResponseLimits? {
+        guard method == "getBlob", let maximumBlobBytes else { return nil }
+        return boundedResponseLimits(maximumBlobBytes, base: base)
+    }
+
+    private static func boundedResponseLimits(_ maximumBytes: Int, base: NetworkResponseLimits) -> NetworkResponseLimits {
+        let bytes = max(0, min(maximumBytes, SpaceSTAR.defaultMaximumArchiveBytes))
         return NetworkResponseLimits(
             maximumWireBytes: bytes,
             maximumDecodedBytes: bytes,
