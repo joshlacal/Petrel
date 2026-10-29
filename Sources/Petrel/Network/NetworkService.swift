@@ -2227,8 +2227,19 @@ public actor NetworkService: NetworkServiceProtocol {
     /// and to unstructured tasks created inside `operation`, which inherit
     /// task-local values. Detached tasks do not inherit them. Requests under a
     /// scope are not deduplicated with other in-flight requests. All other
-    /// transport checks are unchanged. `SpaceCredentialManager` and
-    /// `SpaceHostResolver` do not read this scope; they take explicit limits.
+    /// transport checks are unchanged.
+    ///
+    /// Requests that `SpaceCredentialManager` and `SpaceHostResolver` send on
+    /// their own sessions do not read this scope; they take explicit limits.
+    /// This covers the signed request of `SpaceCredentialManager.get` (use its
+    /// `maximumArchiveBytes` and `maximumBlobBytes`) and the
+    /// `getSpaceCredential` exchange. Work they run through a `NetworkService`
+    /// does read it: a credential exchange that starts inside a scope requests
+    /// its delegation token with the scoped limits, because the default
+    /// delegation-token provider is a generated
+    /// `com.atproto.space.getDelegationToken` call on the manager's
+    /// `ATProtoClient`. The same applies to any custom provider that sends
+    /// through a `NetworkService`.
     ///
     /// - Parameters:
     ///   - limits: The response limits to apply, before clamping.
