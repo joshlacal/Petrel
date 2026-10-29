@@ -27,9 +27,10 @@ private func makeB64URL(_ data: Data) -> String {
         .replacingOccurrences(of: "=", with: "")
 }
 
-private func makeMockCredentialJWT(exp: Int, sub: String = "did:plc:user123", iss: String = "did:plc:auth123") -> String {
+private func makeMockCredentialJWT(exp: Int, sub: String = "did:plc:user123", iss: String = "did:plc:auth123", iat: Int? = nil) -> String {
     let header = ##"{"alg":"ES256","typ":"JWT","kid":"#atproto"}"##
-    let payload = #"{"exp":\#(exp),"sub":"\#(sub)","iss":"\#(iss)"}"#
+    let issuedAt = iat.map { #","iat":\#($0)"# } ?? ""
+    let payload = #"{"exp":\#(exp)\#(issuedAt),"sub":"\#(sub)","iss":"\#(iss)"}"#
     let headerB64 = makeB64URL(Data(header.utf8))
     let payloadB64 = makeB64URL(Data(payload.utf8))
     let dummySig = makeB64URL(Data(repeating: 0x42, count: 64))
@@ -1369,6 +1370,122 @@ extension SpaceCredentialManagerTests {
                 }
             }
             SpaceMockURLProtocol.setHandler(nil)
+        }
+    }
+}
+
+// MARK: - Refresh margin (X1)
+
+extension SpaceCredentialManagerTests {
+    @Test("refresh deadline is exp less min(60 s, half the issued lifetime), bounded from local receipt")
+    func refreshDeadlineFollowsIssuedLifetime() {
+        let now = Date(timeIntervalSince1970: 1_800_000_000)
+        func deadline(lifetime: TimeInterval, issuerAhead: TimeInterval = 0, hasIssuedAt: Bool = true) -> TimeInterval {
+            let issuedAt = now.timeIntervalSince1970 + issuerAhead
+            let expiresAt = Date(timeIntervalSince1970: issuedAt + lifetime)
+            return SpaceCredentialManager.refreshDeadline(
+                expiresAt: expiresAt,
+                issuedAt: hasIssuedAt ? issuedAt : nil,
+                receivedAt: now
+            ).timeIntervalSince(now)
+        }
+        // Synchronized clocks: Swan conversation spaces (60 s), Swan default (300 s), reference default (600 s).
+        #expect(deadline(lifetime: 60) == 30)
+        #expect(deadline(lifetime: 300) == 240)
+        #expect(deadline(lifetime: 600) == 540)
+        #expect(deadline(lifetime: 10) == 5)
+        // Device clock 100 s behind the issuer: reuse stays within one lifetime of local receipt.
+        #expect(deadline(lifetime: 60, issuerAhead: 100) == 30)
+        // Device clock 100 s ahead of the issuer: the credential's exp is already nearer locally.
+        #expect(deadline(lifetime: 600, issuerAhead: -100) == 440)
+        // Without a usable iat, the previous flat 60 s margin applies.
+        #expect(deadline(lifetime: 60, hasIssuedAt: false) == 0)
+        let exp = now.addingTimeInterval(600)
+        for issuedAt in [exp.timeIntervalSince1970, exp.timeIntervalSince1970 + 1, .nan, .infinity] {
+            #expect(SpaceCredentialManager.refreshDeadline(expiresAt: exp, issuedAt: issuedAt, receivedAt: now) == exp.addingTimeInterval(-60))
+        }
+    }
+
+    @Test("a 60 s credential is reused across reads instead of exchanged per request")
+    func shortLivedCredentialIsReused() async throws {
+        try await withSpaceTestSession {
+            let session = makeMockSession()
+            defer { session.invalidateAndCancel() }
+            let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let exchangeCount = Mutex<Int>(0)
+
+            SpaceMockURLProtocol.setHandler { request in
+                if request.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                    exchangeCount.withLock { $0 += 1 }
+                    // Swan's conversation-space policy issues exp = iat + 60.
+                    let iat = Int(Date().timeIntervalSince1970)
+                    let jwt = makeMockCredentialJWT(exp: iat + 60, iat: iat)
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return try (resp, JSONEncoder().encode(["credential": jwt]))
+                }
+                let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                return (resp, Data("{}".utf8))
+            }
+            defer { SpaceMockURLProtocol.setHandler(nil) }
+
+            let manager = SpaceCredentialManager(
+                client: client,
+                authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                urlSession: session,
+                delegationTokenProvider: { _ in "mock-delegation-token" }
+            )
+            let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?repo=did:plc:writer"))
+
+            let first = try await manager.credential(for: space)
+            for _ in 0 ..< 3 {
+                let (_, response) = try await manager.get(url: url, space: space)
+                #expect(response.statusCode == 200)
+            }
+            let reused = try await manager.credential(for: space)
+            #expect(exchangeCount.withLock { $0 } == 1)
+            #expect(reused.keyRawRepresentation == first.keyRawRepresentation)
+            #expect(reused.refreshAt == first.expiresAt.addingTimeInterval(-30))
+        }
+    }
+
+    @Test("a credential inside its lifetime-derived margin is renewed with a fresh key")
+    func lifetimeMarginRenewal() async throws {
+        // (age, lifetime): a 60 s credential with 20 s left (margin 30 s) and a
+        // 600 s credential with 50 s left (margin 60 s).
+        for (age, lifetime) in [(40, 60), (550, 600)] {
+            try await withSpaceTestSession {
+                let session = makeMockSession()
+                defer { session.invalidateAndCancel() }
+                let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+                let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+                let exchangeCount = Mutex<Int>(0)
+
+                SpaceMockURLProtocol.setHandler { request in
+                    let current = exchangeCount.withLock { count -> Int in
+                        count += 1
+                        return count
+                    }
+                    let now = Int(Date().timeIntervalSince1970)
+                    let iat = current == 1 ? now - age : now
+                    let jwt = makeMockCredentialJWT(exp: iat + lifetime, iat: iat)
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return try (resp, JSONEncoder().encode(["credential": jwt]))
+                }
+                defer { SpaceMockURLProtocol.setHandler(nil) }
+
+                let manager = SpaceCredentialManager(
+                    client: client,
+                    authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                    urlSession: session,
+                    delegationTokenProvider: { _ in "mock-delegation-token" }
+                )
+                let first = try await manager.credential(for: space)
+                let renewed = try await manager.credential(for: space)
+                #expect(exchangeCount.withLock { $0 } == 2)
+                #expect(renewed.expiresAt > first.expiresAt)
+                #expect(renewed.keyRawRepresentation != first.keyRawRepresentation)
+            }
         }
     }
 }

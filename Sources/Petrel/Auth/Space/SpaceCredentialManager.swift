@@ -16,6 +16,9 @@ public struct SpaceCredential: Sendable {
     public let token: String
     public let expiresAt: Date
     public let keyRawRepresentation: Data
+    /// When the manager stops reusing this credential, fixed at exchange time
+    /// from the credential's own lifetime (see `SpaceCredentialManager.refreshDeadline`).
+    let refreshAt: Date
 }
 
 // MARK: - SpaceCredentialError
@@ -259,10 +262,11 @@ public actor SpaceCredentialManager {
     }
 
     /// Cached credential for the space, exchanging a fresh one (with a fresh
-    /// key) when absent or within 60s of the credential's own `exp`.
+    /// key) when absent or past its refresh deadline: the credential's own
+    /// `exp` less min(60 s, half its issued lifetime).
     public func credential(for space: SpaceRef) async throws -> SpaceCredential {
         let now = Date()
-        if let cached = cache[space], cached.expiresAt > now.addingTimeInterval(60) {
+        if let cached = cache[space], cached.refreshAt > now {
             return cached
         }
 
@@ -303,6 +307,22 @@ public actor SpaceCredentialManager {
             }
             throw error
         }
+    }
+
+    /// The time after which a credential is no longer reused. The margin
+    /// before `exp` is min(60 s, half the issued lifetime `exp - iat`), so a
+    /// 60 s credential is reused for 30 s rather than never. Reuse also ends
+    /// that margin before one lifetime after local receipt, so a device clock
+    /// behind the issuer's cannot extend it. Without a usable `iat`, the
+    /// margin is a flat 60 s.
+    static func refreshDeadline(expiresAt: Date, issuedAt: TimeInterval?, receivedAt: Date) -> Date {
+        let maximumMargin: TimeInterval = 60
+        guard let issuedAt, issuedAt.isFinite, issuedAt < expiresAt.timeIntervalSince1970 else {
+            return expiresAt.addingTimeInterval(-maximumMargin)
+        }
+        let lifetime = expiresAt.timeIntervalSince1970 - issuedAt
+        let margin = min(maximumMargin, lifetime / 2)
+        return min(expiresAt, receivedAt.addingTimeInterval(lifetime)).addingTimeInterval(-margin)
     }
 
     /// Drop cached credential (e.g. on SpaceDeleted).
@@ -472,6 +492,7 @@ public actor SpaceCredentialManager {
         } else {
             (data, response) = try await urlSession.data(for: request)
         }
+        let receivedAt = Date()
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SpaceCredentialError.invalidResponse
@@ -547,10 +568,19 @@ public actor SpaceCredentialManager {
             throw SpaceCredentialError.invalidToken("Credential has expired")
         }
         let expiresAt = Date(timeIntervalSince1970: expSeconds)
+        let issuedAt: TimeInterval?
+        if let num = payload["iat"] as? NSNumber {
+            issuedAt = num.doubleValue
+        } else if let intVal = payload["iat"] as? Int {
+            issuedAt = TimeInterval(intVal)
+        } else {
+            issuedAt = payload["iat"] as? Double
+        }
         return SpaceCredential(
             token: token,
             expiresAt: expiresAt,
-            keyRawRepresentation: ephemeralKey.rawRepresentation
+            keyRawRepresentation: ephemeralKey.rawRepresentation,
+            refreshAt: Self.refreshDeadline(expiresAt: expiresAt, issuedAt: issuedAt, receivedAt: receivedAt)
         )
     }
 

@@ -28,6 +28,7 @@ with a dated `0.2.0` heading only when the release tag is created.
 - `SpaceCredentialManager` binds space credentials with HTTP Message Signatures instead of Spaces DPoP. The `getSpaceCredential` exchange signs `Authorization` with the fresh key's `did:key` as `keyid`; `get(url:space:audience:)` sends `Authorization: Atproto-Space`, `Atproto-Space-Audience` (the `repo` DID, else the space authority DID), and a signature over both. A `401 CredentialRevoked` response drops the cached credential. Ordinary OAuth DPoP is unchanged.
 
 ### Fixed
+- `SpaceCredentialManager` reuses a cached space credential until its `exp` less min(60 s, half its issued lifetime `exp - iat`), bounded by that lifetime from local receipt. The previous flat 60 s margin never reused a 60 s credential, so every read repeated the delegation and credential exchange.
 - Generated wire discriminators preserve exact lexicon fragments, including underscore-bearing Bluemoji format identifiers.
 - Declared endpoint errors use exact protocol names instead of embedding descriptions in raw values.
 - DAG-CBOR decoding rejects invalid ATProto link CIDs and malformed/out-of-range numeric values without losing valid unpadded byte values.

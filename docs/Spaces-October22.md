@@ -28,6 +28,8 @@ This verifies the archive's internal digest and request identity. Authentication
 
 STAR records are limited to 1 MiB, metadata to 64 KiB, and the standalone verifier's default archive limit is 128 MiB. The credential manager retains its existing 10 MiB hardened network limit; this implementation buffers and verifies a complete response. These bounds are deliberate and do not establish large-repository capacity. Existing DAG-CBOR depth/node limits also apply.
 
+A cached credential is reused until its `exp` less a margin of min(60 s, half its issued lifetime `exp - iat`), and never past that margin before one lifetime after local receipt, so a device clock behind the issuer's cannot extend reuse. A 60 s credential is therefore reused for about 30 s. Without an `iat` claim the margin is 60 s. Each renewal exchanges a fresh credential bound to a fresh key.
+
 Only an exact structured `SpaceDeleted` error from the authority's credential exchange is classified as deletion. A body or message merely mentioning that text is not. `InvalidDelegationToken` at HTTP 400 is token rejection, not membership removal. Invalidation cancels acquisition, retires the credential generation, and discards responses that finish after that generation was invalidated. Callers remain responsible for purging their projections and caches, and for adopting a deliberately recreated Space as fresh state.
 
 ## Reproducible checks
