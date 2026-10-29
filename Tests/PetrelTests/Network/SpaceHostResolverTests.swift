@@ -371,6 +371,66 @@ struct SpaceHostResolverTests {
             try SpaceHostResolver.didDocumentURL(for: "did:web:example.com%3A99999:alice")
         }
     }
+
+    @Test("A per-call hardened session is invalidated after its call, releasing its delegate")
+    func perCallSessionReleasesItsDelegate() async throws {
+        let body = Data(#"{"ok":true}"#.utf8)
+        ResolverMockURLProtocol.setHandler(forHost: "127.0.0.1") { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, body)
+        }
+        defer { ResolverMockURLProtocol.setHandler(forHost: "127.0.0.1", nil) }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [ResolverMockURLProtocol.self]
+        let request = try URLRequest(url: #require(URL(string: "https://127.0.0.1/xrpc/com.example.ping")))
+
+        weak var weakSession: URLSession?
+        weak var weakDelegate: HardenedURLSessionDelegate?
+        let (data, response) = try await SpaceHostResolver.withPerCallHardenedSession(
+            configuration: config,
+            limits: .default
+        ) { session, delegate in
+            weakSession = session
+            weakDelegate = delegate
+            return try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+        }
+        #expect(data == body)
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(await isEventuallyReleased { weakSession == nil && weakDelegate == nil })
+
+        // A call that fails before sending anything releases its session too.
+        do {
+            try await SpaceHostResolver.withPerCallHardenedSession(
+                configuration: .ephemeral,
+                limits: .default
+            ) { (session, delegate) async throws -> Void in
+                weakSession = session
+                weakDelegate = delegate
+                throw URLError(.cancelled)
+            }
+            Issue.record("Expected the call to throw")
+        } catch {
+            #expect(error is URLError)
+        }
+        #expect(await isEventuallyReleased { weakSession == nil && weakDelegate == nil })
+    }
+}
+
+/// URLSession releases an invalidated session's delegate asynchronously, so
+/// release is polled for up to five seconds.
+private func isEventuallyReleased(_ released: () -> Bool) async -> Bool {
+    for _ in 0 ..< 500 {
+        if released() {
+            return true
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+    }
+    return released()
 }
 
 @Suite("Space author KEM key representations")

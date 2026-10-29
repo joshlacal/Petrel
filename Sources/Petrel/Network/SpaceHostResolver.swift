@@ -265,9 +265,26 @@ public actor SpaceHostResolver {
         _ request: URLRequest,
         limits: NetworkResponseLimits
     ) async throws -> (Data, URLResponse) {
+        try await withPerCallHardenedSession(configuration: .ephemeral, limits: limits) { session, delegate in
+            try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+        }
+    }
+
+    /// Runs `body` with a hardened session made for this call alone, then
+    /// invalidates the session. URLSession keeps a strong reference to its
+    /// delegate until it is invalidated, so a per-call session that is only
+    /// dropped leaks itself and its delegate on every call.
+    static func withPerCallHardenedSession<T>(
+        configuration: URLSessionConfiguration,
+        limits: NetworkResponseLimits,
+        _ body: (URLSession, HardenedURLSessionDelegate) async throws -> T
+    ) async rethrows -> T {
         let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
-        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-        return try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+        let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+        // Lets a request that `body` left running finish; nothing else holds
+        // this session, so no new request can start on it.
+        defer { session.finishTasksAndInvalidate() }
+        return try await body(session, delegate)
     }
 
     /// Fetches and decodes the DID document using the hardened network path.
@@ -321,9 +338,9 @@ public actor SpaceHostResolver {
                         config.protocolClasses = testClasses
                     }
                 #endif
-                let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
-                let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-                (data, response) = try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+                (data, response) = try await withPerCallHardenedSession(configuration: config, limits: limits) { [request] session, delegate in
+                    try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+                }
             }
         } catch {
             throw SpaceHostResolutionError.networkError(error.localizedDescription)
