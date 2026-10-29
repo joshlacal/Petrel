@@ -1490,6 +1490,50 @@ extension SpaceCredentialManagerTests {
     }
 }
 
+// MARK: - Session lifetime
+
+extension SpaceCredentialManagerTests {
+    @Test("A manager invalidates the session it created when released, never an injected one")
+    func managerReleasesOnlyItsOwnSession() async throws {
+        try await withSpaceTestSession {
+            let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+            weak var owned: HardenedURLSessionDelegate?
+            do {
+                let manager = SpaceCredentialManager(
+                    client: client,
+                    authorityHostProvider: { _ in URL(string: "https://space.test")! }
+                )
+                let delegate = await manager.sessionDelegate
+                #expect(delegate != nil)
+                owned = delegate
+            }
+            var released = false
+            for _ in 0 ..< 500 where !released {
+                released = owned == nil
+                if !released {
+                    try await Task.sleep(nanoseconds: 10_000_000)
+                }
+            }
+            #expect(released)
+
+            let injected = makeMockSession()
+            defer { injected.invalidateAndCancel() }
+            weak var injectedDelegate: HardenedURLSessionDelegate?
+            do {
+                let manager = SpaceCredentialManager(
+                    client: client,
+                    authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                    urlSession: injected
+                )
+                injectedDelegate = await manager.sessionDelegate
+            }
+            // Long enough for a wrongful invalidation to release the delegate.
+            try await Task.sleep(nanoseconds: 200_000_000)
+            #expect(injectedDelegate != nil)
+        }
+    }
+}
+
 // MARK: - Exchange error mapping (PET-2)
 
 extension SpaceCredentialManagerTests {

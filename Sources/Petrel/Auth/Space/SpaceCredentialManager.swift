@@ -201,7 +201,10 @@ public actor SpaceCredentialManager {
     private let client: ATProtoClient
     private let authorityHostProvider: SpaceAuthorityHostProvider
     private let urlSession: URLSession
-    private let sessionDelegate: HardenedURLSessionDelegate?
+    let sessionDelegate: HardenedURLSessionDelegate?
+    /// Set only when this manager created `urlSession`; invalidates it when
+    /// the manager is released. A caller's session stays the caller's.
+    private let ownedSession: OwnedSessionInvalidator?
     private let delegationTokenProvider: DelegationTokenProvider
     public typealias AuthorKEMKeyProvider = @Sendable (_ repo: String, _ forceRefresh: Bool) async throws -> String
     public typealias ClientAttestationProvider = @Sendable (SpaceRef) async throws -> String?
@@ -231,6 +234,7 @@ public actor SpaceCredentialManager {
         if let urlSession {
             self.urlSession = urlSession
             sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
+            ownedSession = nil
         } else {
             let config = URLSessionConfiguration.ephemeral
             #if DEBUG
@@ -240,7 +244,9 @@ public actor SpaceCredentialManager {
             #endif
             let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
             sessionDelegate = delegate
-            self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+            let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+            self.urlSession = session
+            ownedSession = OwnedSessionInvalidator(session)
         }
         self.delegationTokenProvider = delegationTokenProvider ?? { [client] space in
             let (_, output) = try await client.com.atproto.space.getDelegationToken(

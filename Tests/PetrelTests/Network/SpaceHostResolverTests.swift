@@ -419,6 +419,33 @@ struct SpaceHostResolverTests {
         }
         #expect(await isEventuallyReleased { weakSession == nil && weakDelegate == nil })
     }
+
+    @Test("A resolver invalidates the session it created when released, never an injected one")
+    func resolverReleasesOnlyItsOwnSession() async throws {
+        weak var owned: HardenedURLSessionDelegate?
+        do {
+            let resolver = SpaceHostResolver(didResolver: DummyDIDResolver())
+            let delegate = await resolver.sessionDelegate
+            #expect(delegate != nil)
+            owned = delegate
+        }
+        #expect(await isEventuallyReleased { owned == nil })
+
+        let injected = URLSession(
+            configuration: .ephemeral,
+            delegate: HardenedURLSessionDelegate(allowsRedirects: false),
+            delegateQueue: nil
+        )
+        defer { injected.invalidateAndCancel() }
+        weak var injectedDelegate: HardenedURLSessionDelegate?
+        do {
+            let resolver = SpaceHostResolver(didResolver: DummyDIDResolver(), urlSession: injected)
+            injectedDelegate = await resolver.sessionDelegate
+        }
+        // Long enough for a wrongful invalidation to release the delegate.
+        try await Task.sleep(nanoseconds: 200_000_000)
+        #expect(injectedDelegate != nil)
+    }
 }
 
 /// URLSession releases an invalidated session's delegate asynchronously, so

@@ -85,12 +85,35 @@ public enum SpaceHostResolutionError: Error, LocalizedError, Equatable, Sendable
     }
 }
 
+// MARK: - OwnedSessionInvalidator
+
+/// Invalidates a session its owner created, once the owner is released.
+/// URLSession keeps a strong reference to its delegate until it is
+/// invalidated, so an owner that only drops its session leaks the session
+/// and the delegate.
+final class OwnedSessionInvalidator {
+    private let session: URLSession
+
+    init(_ session: URLSession) {
+        self.session = session
+    }
+
+    deinit {
+        // Lets a request still running finish; with the owner gone, no new
+        // request can start on this session.
+        session.finishTasksAndInvalidate()
+    }
+}
+
 // MARK: - SpaceHostResolver
 
 public actor SpaceHostResolver {
     private let didResolver: any DIDResolving
     private let urlSession: URLSession
-    private let sessionDelegate: HardenedURLSessionDelegate?
+    let sessionDelegate: HardenedURLSessionDelegate?
+    /// Set only when this resolver created `urlSession`; invalidates it when
+    /// the resolver is released. A caller's session stays the caller's.
+    private let ownedSession: OwnedSessionInvalidator?
 
     public init(didResolver: any DIDResolving) {
         self.didResolver = didResolver
@@ -102,13 +125,16 @@ public actor SpaceHostResolver {
         #endif
         let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
         sessionDelegate = delegate
-        urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        urlSession = session
+        ownedSession = OwnedSessionInvalidator(session)
     }
 
     init(didResolver: any DIDResolving, urlSession: URLSession) {
         self.didResolver = didResolver
         self.urlSession = urlSession
         sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
+        ownedSession = nil
     }
 
     /// Resolves the space authority DID document and extracts endpoints.
