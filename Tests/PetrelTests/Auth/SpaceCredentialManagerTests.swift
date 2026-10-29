@@ -1489,3 +1489,93 @@ extension SpaceCredentialManagerTests {
         }
     }
 }
+
+// MARK: - Exchange error mapping (PET-2)
+
+extension SpaceCredentialManagerTests {
+    @Test("400 SpaceNotFound keeps its error name as an authorization refusal, never deletion, without a probe")
+    func exchangeClassifiesSpaceNotFound() async throws {
+        try await withSpaceTestSession {
+            let session = makeMockSession()
+            defer { session.invalidateAndCancel() }
+            let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let probes = Mutex<Int>(0)
+            for (status, body) in [
+                (400, #"{"error":"SpaceNotFound","message":"Space not found"}"#),
+                (400, #"{"error":"SpaceNotFound"}"#),
+                (500, #"{"error":"SpaceNotFound","message":"Space not found"}"#),
+            ] {
+                SpaceMockURLProtocol.setHandler { request in
+                    if request.url?.lastPathComponent == "com.atproto.server.describeServer" {
+                        probes.withLock { $0 += 1 }
+                        let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                        return (resp, Data(#"{"did":"did:web:space.test","version":"1"}"#.utf8))
+                    }
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, Data(body.utf8))
+                }
+                let manager = SpaceCredentialManager(
+                    client: client,
+                    authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                    urlSession: session,
+                    delegationTokenProvider: { _ in "mock-delegation-token" }
+                )
+                do {
+                    _ = try await manager.credential(for: space)
+                    Issue.record("Expected SpaceNotFound rejection for \(status) \(body)")
+                } catch let error as SpaceCredentialError {
+                    switch status {
+                    case 400 where body.contains("message"):
+                        #expect(error == .authorizationRefused(host: "space.test", error: "SpaceNotFound", message: "Space not found"))
+                        #expect(error.errorDescription == "Space not found at space.test (Space not found). The authority does not host this space, or the space is not public and no delegation token was sent; this does not mean it was deleted.")
+                    case 400:
+                        #expect(error == .authorizationRefused(host: "space.test", error: "SpaceNotFound", message: body))
+                    default:
+                        #expect(error == .exchangeFailed(statusCode: 500, message: "Space not found"))
+                    }
+                }
+            }
+            SpaceMockURLProtocol.setHandler(nil)
+            #expect(probes.withLock { $0 } == 0)
+        }
+    }
+
+    @Test("InvalidClientAttestation names the attestation, not the delegation token, and skips the token probe")
+    func exchangeClassifiesInvalidClientAttestation() async throws {
+        try await withSpaceTestSession {
+            let session = makeMockSession()
+            defer { session.invalidateAndCancel() }
+            let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let probes = Mutex<Int>(0)
+            for status in [400, 401] {
+                SpaceMockURLProtocol.setHandler { request in
+                    if request.url?.lastPathComponent == "com.atproto.server.describeServer" {
+                        probes.withLock { $0 += 1 }
+                        let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                        return (resp, Data(#"{"did":"did:web:space.test","version":"1"}"#.utf8))
+                    }
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, Data(#"{"error":"InvalidClientAttestation","message":"Client attestation has already been used"}"#.utf8))
+                }
+                let manager = SpaceCredentialManager(
+                    client: client,
+                    authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                    urlSession: session,
+                    delegationTokenProvider: { _ in "mock-delegation-token" },
+                    clientAttestationProvider: { _ in "mock-client-attestation" }
+                )
+                do {
+                    _ = try await manager.credential(for: space)
+                    Issue.record("Expected InvalidClientAttestation rejection for \(status)")
+                } catch let error as SpaceCredentialError {
+                    #expect(error == .tokenRejected(host: "space.test", error: "InvalidClientAttestation", message: "Client attestation has already been used", evidence: nil))
+                    #expect(error.errorDescription == "space.test rejected the client attestation as invalid (not an access denial; membership is unaffected).")
+                }
+            }
+            SpaceMockURLProtocol.setHandler(nil)
+            #expect(probes.withLock { $0 } == 0)
+        }
+    }
+}

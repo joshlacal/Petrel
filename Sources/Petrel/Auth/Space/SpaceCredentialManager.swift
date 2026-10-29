@@ -26,7 +26,15 @@ public struct SpaceCredential: Sendable {
 public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     case missingDelegationToken
     case spaceDeleted(host: String, message: String?)
+    /// The authority refused to issue a credential. `error` is the XRPC error
+    /// name, such as `UserNotAuthorized`, `AppNotAuthorized` or `NotAuthorized`
+    /// (or `HTTP 403`), or `SpaceNotFound` at HTTP 400: the authority does not
+    /// host the space or, without a delegation token, the space is not public.
+    /// None of these means the space was deleted.
     case authorizationRefused(host: String, error: String, message: String?)
+    /// The authority rejected a presented token as invalid: the delegation
+    /// token (`InvalidDelegationToken` and similar) or, when `error` is
+    /// `InvalidClientAttestation`, the client attestation. Not an access denial.
     case tokenRejected(host: String, error: String, message: String?, evidence: String? = nil)
     case exchangeFailed(statusCode: Int, message: String)
     case invalidToken(String)
@@ -45,15 +53,20 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
             }
             return "SpaceDeleted: The space was deleted by authority at \(host)"
         case let .authorizationRefused(host, error, message):
+            if error == "SpaceNotFound" {
+                let detail = message.map { $0.isEmpty ? "" : " (\($0))" } ?? ""
+                return "Space not found at \(host)\(detail). The authority does not host this space, or the space is not public and no delegation token was sent; this does not mean it was deleted."
+            }
             if let message, !message.isEmpty {
                 return "You no longer have access to this space (\(host) refused authorization: \(message))"
             }
             return "You no longer have access to this space (\(host) refused authorization: \(error))"
-        case let .tokenRejected(host, _, _, evidence):
+        case let .tokenRejected(host, error, _, evidence):
+            let subject = error == "InvalidClientAttestation" ? "client attestation" : "delegation token"
             if let evidence, !evidence.isEmpty {
-                return "\(host) rejected the delegation token as invalid (not an access denial; membership is unaffected). \(host) reports: \(evidence)."
+                return "\(host) rejected the \(subject) as invalid (not an access denial; membership is unaffected). \(host) reports: \(evidence)."
             }
-            return "\(host) rejected the delegation token as invalid (not an access denial; membership is unaffected)."
+            return "\(host) rejected the \(subject) as invalid (not an access denial; membership is unaffected)."
         case let .exchangeFailed(statusCode, message):
             return "Space credential exchange failed with status \(statusCode): \(message)"
         case let .invalidToken(reason):
@@ -510,10 +523,22 @@ public actor SpaceCredentialManager {
                 throw SpaceCredentialError.spaceDeleted(host: host, message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
             }
 
+            // Not a deletion: the authority does not host the space or, without
+            // a delegation token, the space is not public.
+            if httpResponse.statusCode == 400, errorName == "SpaceNotFound" {
+                throw SpaceCredentialError.authorizationRefused(host: host, error: "SpaceNotFound", message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
+            }
+
+            // An invalid client attestation says nothing about the delegation
+            // token, so it skips the token-failure evidence probe.
+            if httpResponse.statusCode == 400 || httpResponse.statusCode == 401, errorName == "InvalidClientAttestation" {
+                throw SpaceCredentialError.tokenRejected(host: host, error: "InvalidClientAttestation", message: serverMessage)
+            }
+
             let isTokenRejected = (httpResponse.statusCode == 400 && errorName == "InvalidDelegationToken") ||
                 (
                     (httpResponse.statusCode == 400 || httpResponse.statusCode == 401) &&
-                        ["InvalidToken", "ExpiredToken", "invalid_token", "InvalidClientAttestation"].contains(errorName ?? "")
+                        ["InvalidToken", "ExpiredToken", "invalid_token"].contains(errorName ?? "")
                 )
             if isTokenRejected {
                 let evidence = await probeServerEvidence(spaceHost: spaceHost)
