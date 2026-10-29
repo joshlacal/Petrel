@@ -28,9 +28,10 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     case spaceDeleted(host: String, message: String?)
     /// The authority refused to issue a credential. `error` is the XRPC error
     /// name, such as `UserNotAuthorized`, `AppNotAuthorized` or `NotAuthorized`
-    /// (or `HTTP 403`), or `SpaceNotFound` at HTTP 400: the authority does not
-    /// host the space or, without a delegation token, the space is not public.
-    /// None of these means the space was deleted.
+    /// (or `HTTP 403`), or `SpaceNotFound` at HTTP 400 (the reference host) or
+    /// 404 (Swan): the authority does not host the space or, without a
+    /// delegation token, the space is not public. None of these means the
+    /// space was deleted.
     case authorizationRefused(host: String, error: String, message: String?)
     /// The authority rejected a presented token as invalid: the delegation
     /// token (`InvalidDelegationToken` and similar) or, when `error` is
@@ -573,8 +574,9 @@ public actor SpaceCredentialManager {
             }
 
             // Not a deletion: the authority does not host the space or, without
-            // a delegation token, the space is not public.
-            if httpResponse.statusCode == 400, errorName == "SpaceNotFound" {
+            // a delegation token, the space is not public. The reference host
+            // answers 400 and Swan answers 404; both keep the error name.
+            if httpResponse.statusCode == 400 || httpResponse.statusCode == 404, errorName == "SpaceNotFound" {
                 throw SpaceCredentialError.authorizationRefused(host: host, error: "SpaceNotFound", message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
             }
 

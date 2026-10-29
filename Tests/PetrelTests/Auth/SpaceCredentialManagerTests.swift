@@ -1585,6 +1585,54 @@ extension SpaceCredentialManagerTests {
         }
     }
 
+    @Test("404 SpaceNotFound (Swan's status) keeps its error name like the reference's 400")
+    func exchangeClassifiesSpaceNotFoundAt404() async throws {
+        try await withSpaceTestSession {
+            let session = makeMockSession()
+            defer { session.invalidateAndCancel() }
+            let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
+            let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
+            let probes = Mutex<Int>(0)
+            for (body, expected) in [
+                (
+                    #"{"error":"SpaceNotFound","message":"Space not found"}"#,
+                    SpaceCredentialError.authorizationRefused(host: "space.test", error: "SpaceNotFound", message: "Space not found")
+                ),
+                // Swan's body: the name alone, so the raw body is the message.
+                (
+                    #"{"error":"SpaceNotFound"}"#,
+                    SpaceCredentialError.authorizationRefused(host: "space.test", error: "SpaceNotFound", message: #"{"error":"SpaceNotFound"}"#)
+                ),
+                // Without the name, a 404 is still an untyped exchange failure.
+                ("Not Found", SpaceCredentialError.exchangeFailed(statusCode: 404, message: "Not Found")),
+            ] {
+                SpaceMockURLProtocol.setHandler { request in
+                    if request.url?.lastPathComponent == "com.atproto.server.describeServer" {
+                        probes.withLock { $0 += 1 }
+                        let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                        return (resp, Data(#"{"did":"did:web:space.test","version":"1"}"#.utf8))
+                    }
+                    let resp = HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
+                    return (resp, Data(body.utf8))
+                }
+                let manager = SpaceCredentialManager(
+                    client: client,
+                    authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                    urlSession: session,
+                    delegationTokenProvider: { _ in "mock-delegation-token" }
+                )
+                do {
+                    _ = try await manager.credential(for: space)
+                    Issue.record("Expected a credential error for 404 \(body)")
+                } catch let error as SpaceCredentialError {
+                    #expect(error == expected)
+                }
+            }
+            SpaceMockURLProtocol.setHandler(nil)
+            #expect(probes.withLock { $0 } == 0)
+        }
+    }
+
     @Test("InvalidClientAttestation names the attestation, not the delegation token, and skips the token probe")
     func exchangeClassifiesInvalidClientAttestation() async throws {
         try await withSpaceTestSession {
