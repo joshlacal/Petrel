@@ -323,9 +323,27 @@ class ATProtoClient(val networkService: NetworkService) {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
+            val managedspace: Managedspace = Managedspace()
+
+            inner class Managedspace {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val memberspace: Memberspace = Memberspace()
+
+            inner class Memberspace {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
             val moderation: Moderation = Moderation()
 
             inner class Moderation {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+            val personalspace: Personalspace = Personalspace()
+
+            inner class Personalspace {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -338,12 +356,6 @@ class ATProtoClient(val networkService: NetworkService) {
             val server: Server = Server()
 
             inner class Server {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val simplespace: Simplespace = Simplespace()
-
-            inner class Simplespace {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 

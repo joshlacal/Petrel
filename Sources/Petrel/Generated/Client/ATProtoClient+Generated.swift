@@ -1315,11 +1315,44 @@ public actor ATProtoClient {
                 }
             }
 
+            public var managedspace: Managedspace {
+                Managedspace(networkService: networkService)
+            }
+
+            public struct Managedspace: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public var memberspace: Memberspace {
+                Memberspace(networkService: networkService)
+            }
+
+            public struct Memberspace: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
             public var moderation: Moderation {
                 Moderation(networkService: networkService)
             }
 
             public struct Moderation: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+
+            public var personalspace: Personalspace {
+                Personalspace(networkService: networkService)
+            }
+
+            public struct Personalspace: Sendable {
                 public let networkService: NetworkService
                 public init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1342,17 +1375,6 @@ public actor ATProtoClient {
             }
 
             public struct Server: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var simplespace: Simplespace {
-                Simplespace(networkService: networkService)
-            }
-
-            public struct Simplespace: Sendable {
                 public let networkService: NetworkService
                 public init(networkService: NetworkService) {
                     self.networkService = networkService

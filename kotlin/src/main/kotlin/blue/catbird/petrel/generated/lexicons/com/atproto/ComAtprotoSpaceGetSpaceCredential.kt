@@ -30,7 +30,7 @@ object ComAtprotoSpaceGetSpaceCredentialDefs {
         val credential: String    )
 
 sealed class ComAtprotoSpaceGetSpaceCredentialError(val name: String, val description: String?) {
-        object SpaceNotFound: ComAtprotoSpaceGetSpaceCredentialError("SpaceNotFound", null)
+        object SpaceNotFound: ComAtprotoSpaceGetSpaceCredentialError("SpaceNotFound", "The space does not exist. An authority may also answer this in place of UserNotAuthorized, so that a refusal does not disclose that the space exists to a user who may not read it.")
         object SpaceDeleted: ComAtprotoSpaceGetSpaceCredentialError("SpaceDeleted", null)
         object UserNotAuthorized: ComAtprotoSpaceGetSpaceCredentialError("UserNotAuthorized", "Refused on the basis of the requesting user.")
         object AppNotAuthorized: ComAtprotoSpaceGetSpaceCredentialError("AppNotAuthorized", "Refused on the basis of the requesting app.")

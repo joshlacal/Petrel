@@ -2047,7 +2047,9 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         sync_script = (REPOSITORY_ROOT / "Scripts" / "sync-standard-lexicons.sh").read_text(encoding="utf-8")
         self.assertIn("for ns in app chat com tools site; do", sync_script)
         self.assertIn("--exclude='/atproto/space/'", sync_script)
-        self.assertIn("--exclude='/atproto/simplespace/'", sync_script)
+        for namespace in ("memberspace", "managedspace", "personalspace"):
+            self.assertIn(f"--exclude='/atproto/{namespace}/'", sync_script)
+        self.assertNotIn("simplespace", sync_script)
         self.assertIn("--manifest generator/manifests/petrel-core.json", text)
         self.assertIn("--language both", text)
         self.assertIn(

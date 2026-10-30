@@ -2954,6 +2954,46 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["com.atproto.managedspace.policy"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoManagedspacePolicy(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoManagedspacePolicy: \(error)")
+                    return .decodeError("Error decoding ComAtprotoManagedspacePolicy: \(error)")
+                }
+            }
+
+            decoders["com.atproto.memberspace.listMembers#member"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoMemberspaceListMembers.Member(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoMemberspaceListMembers.Member: \(error)")
+                    return .decodeError("Error decoding ComAtprotoMemberspaceListMembers.Member: \(error)")
+                }
+            }
+
+            decoders["com.atproto.memberspace.member"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoMemberspaceMember(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoMemberspaceMember: \(error)")
+                    return .decodeError("Error decoding ComAtprotoMemberspaceMember: \(error)")
+                }
+            }
+
+            decoders["com.atproto.memberspace.policy"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoMemberspacePolicy(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoMemberspacePolicy: \(error)")
+                    return .decodeError("Error decoding ComAtprotoMemberspacePolicy: \(error)")
+                }
+            }
+
             decoders["com.atproto.moderation.createReport#modTool"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoModerationCreateReport.ModTool(from: decoder)
@@ -2961,6 +3001,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding ComAtprotoModerationCreateReport.ModTool: \(error)")
                     return .decodeError("Error decoding ComAtprotoModerationCreateReport.ModTool: \(error)")
+                }
+            }
+
+            decoders["com.atproto.personalspace.policy"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoPersonalspacePolicy(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoPersonalspacePolicy: \(error)")
+                    return .decodeError("Error decoding ComAtprotoPersonalspacePolicy: \(error)")
                 }
             }
 
@@ -3033,7 +3083,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoRepoDefs.CommitMeta: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk12(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.repo.listMissingBlobs#recordBlob"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoRepoListMissingBlobs.RecordBlob(from: decoder)
@@ -3083,9 +3135,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoServerCreateInviteCodes.AccountCodes: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk12(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.server.defs#inviteCode"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoServerDefs.InviteCode(from: decoder)
@@ -3133,66 +3183,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding ComAtprotoServerListAppPasswords.AppPassword: \(error)")
                     return .decodeError("Error decoding ComAtprotoServerListAppPasswords.AppPassword: \(error)")
-                }
-            }
-
-            decoders["com.atproto.simplespace.defs#publicPolicy"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoSimplespaceDefs.PublicPolicy(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoSimplespaceDefs.PublicPolicy: \(error)")
-                    return .decodeError("Error decoding ComAtprotoSimplespaceDefs.PublicPolicy: \(error)")
-                }
-            }
-
-            decoders["com.atproto.simplespace.defs#memberListPolicy"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoSimplespaceDefs.MemberListPolicy(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoSimplespaceDefs.MemberListPolicy: \(error)")
-                    return .decodeError("Error decoding ComAtprotoSimplespaceDefs.MemberListPolicy: \(error)")
-                }
-            }
-
-            decoders["com.atproto.simplespace.defs#managingAppPolicy"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoSimplespaceDefs.ManagingAppPolicy(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoSimplespaceDefs.ManagingAppPolicy: \(error)")
-                    return .decodeError("Error decoding ComAtprotoSimplespaceDefs.ManagingAppPolicy: \(error)")
-                }
-            }
-
-            decoders["com.atproto.simplespace.defs#open"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoSimplespaceDefs.Open(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoSimplespaceDefs.Open: \(error)")
-                    return .decodeError("Error decoding ComAtprotoSimplespaceDefs.Open: \(error)")
-                }
-            }
-
-            decoders["com.atproto.simplespace.defs#allowList"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoSimplespaceDefs.AllowList(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoSimplespaceDefs.AllowList: \(error)")
-                    return .decodeError("Error decoding ComAtprotoSimplespaceDefs.AllowList: \(error)")
-                }
-            }
-
-            decoders["com.atproto.simplespace.listMembers#member"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoSimplespaceListMembers.Member(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoSimplespaceListMembers.Member: \(error)")
-                    return .decodeError("Error decoding ComAtprotoSimplespaceListMembers.Member: \(error)")
                 }
             }
 
@@ -3303,6 +3293,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding ComAtprotoSpaceListSpaces.SpaceView: \(error)")
                     return .decodeError("Error decoding ComAtprotoSpaceListSpaces.SpaceView: \(error)")
+                }
+            }
+
+            decoders["com.atproto.space.policy"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoSpacePolicy(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoSpacePolicy: \(error)")
+                    return .decodeError("Error decoding ComAtprotoSpacePolicy: \(error)")
                 }
             }
 

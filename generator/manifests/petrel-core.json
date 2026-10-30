@@ -12,8 +12,8 @@
   },
   "swift": {
     "output": "Sources/Petrel/Generated",
-    "emit_server_contracts": ["com.atproto.space", "com.atproto.simplespace"],
-    "emit_xrpc_error_parsing": ["com.atproto.space", "com.atproto.simplespace"]
+    "emit_server_contracts": ["com.atproto.space", "com.atproto.memberspace", "com.atproto.managedspace", "com.atproto.personalspace"],
+    "emit_xrpc_error_parsing": ["com.atproto.space", "com.atproto.memberspace", "com.atproto.managedspace", "com.atproto.personalspace"]
   },
   "kotlin": {
     "output": "kotlin/src/main/kotlin/blue/catbird/petrel/generated"

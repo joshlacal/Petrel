@@ -25,7 +25,7 @@ class SpaceLexiconProvenanceTests(unittest.TestCase):
 
     def test_committed_corpus_matches_reviewed_bytes(self):
         PROVENANCE.verify_tree(ROOT / "generator/lexicons", self.manifest)
-        self.assertEqual(len(self.manifest["files"]), 30)
+        self.assertEqual(len(self.manifest["files"]), 39)
 
     def test_pin_alone_cannot_hide_changed_added_or_missing_schema(self):
         for mutation in ["changed", "extra", "missing"]:
