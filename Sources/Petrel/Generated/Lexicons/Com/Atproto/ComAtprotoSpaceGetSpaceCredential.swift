@@ -124,6 +124,7 @@ public enum ComAtprotoSpaceGetSpaceCredential {
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        /// The space does not exist. An authority may also answer this in place of UserNotAuthorized, so that a refusal does not disclose that the space exists to a user who may not read it.
         case spaceNotFound = "SpaceNotFound"
         case spaceDeleted = "SpaceDeleted"
         /// Refused on the basis of the requesting user.

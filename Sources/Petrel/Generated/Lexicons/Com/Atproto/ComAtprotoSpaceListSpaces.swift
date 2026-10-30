@@ -167,7 +167,7 @@ public enum ComAtprotoSpaceListSpaces {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - listSpaces
 
-    /// List the spaces the authenticated user holds a repo in (i.e. spaces the user has written data to), optionally filtered by type and/or authority DID. Note this is not 'spaces I'm a member of' — a member's PDS only tracks spaces its user has written to. Requires auth, implemented by PDS.
+    /// List the spaces the authenticated user holds a repo in (i.e. spaces the user has written data to) or is the authority of, optionally filtered by type and/or authority DID. Note this is not 'spaces I'm a member of' — a member's PDS only tracks spaces its user has written to. Requires auth, implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     ///
