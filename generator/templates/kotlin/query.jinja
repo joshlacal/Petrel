@@ -16,6 +16,18 @@ suspend fun {{ receiver_type }}.{{ function_name }}(
     val queryItems: List<Pair<String, String>>? = null
     {% endif %}
 
+    {% if output_is_binary %}
+    // Raw (non-JSON) body: fetch the bytes, then wrap them. The output wrapper
+    // is not JSON-decodable from a binary body.
+    val raw = client.networkService.performRequest<ByteArray>(
+        method = "GET",
+        endpoint = endpoint,
+        queryItems = queryItems,
+        headers = mapOf("Accept" to "{{ output_encoding | escapeStringLiteral }}"),
+        body = null
+    )
+    return ATProtoResponse(raw.responseCode, raw.data?.let { {{ output_type }}(it) }, raw.errorBody)
+    {% else %}
     return client.networkService.performRequest(
         method = "GET",
         endpoint = endpoint,
@@ -23,4 +35,5 @@ suspend fun {{ receiver_type }}.{{ function_name }}(
         headers = mapOf("Accept" to "{{ output_encoding | escapeStringLiteral }}"),
         body = null
     )
+    {% endif %}
 }

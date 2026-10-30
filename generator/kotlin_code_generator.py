@@ -437,6 +437,25 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
             class_name=self.class_name
         )
 
+    @staticmethod
+    def _is_binary_output(output_obj: Optional[Dict[str, Any]]) -> bool:
+        """True when the output is a raw (non-JSON) body.
+
+        Such outputs are emitted as a one-field wrapper holding `data: ByteArray`,
+        and the endpoint function must fetch the body as raw bytes and wrap it:
+        the wrapper class is not JSON-decodable from a binary body. Keep the
+        output builder and the query/procedure functions on this one predicate.
+        """
+        if not output_obj:
+            return False
+        encoding = output_obj.get('encoding', '')
+        output_schema = output_obj.get('schema', {})
+        if output_schema.get('type') == 'ref':
+            return False
+        return encoding == '*/*' or bool(
+            encoding and encoding != 'application/json' and not output_schema.get('properties')
+        )
+
     def generate_output(self, output_obj: Optional[Dict[str, Any]]) -> str:
         """Generate output data class."""
         if not output_obj:
@@ -456,7 +475,7 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
             )
 
         # Handle binary output
-        if encoding == '*/*' or (encoding and encoding != 'application/json' and not output_schema.get('properties')):
+        if self._is_binary_output(output_obj):
             properties = [{'name': 'data', 'type': 'ByteArray', 'optional': False, 'description': ''}]
         elif output_schema.get('properties'):
             properties = self.generate_properties(
@@ -583,7 +602,8 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
             output_type=output_type,
             endpoint=self.lexicon_id,
             description=self.description,
-            output_encoding=output_encoding
+            output_encoding=output_encoding,
+            output_is_binary=self._is_binary_output(self.main_def.get('output')),
         )
 
     def generate_procedure_function(self) -> str:
@@ -620,7 +640,8 @@ val spaceDeclaration = SpaceDeclarationDescriptor(
             is_blob_upload=is_blob_upload,
             is_binary_data=is_binary_data,
             input_encoding=input_encoding,
-            output_encoding=output_encoding
+            output_encoding=output_encoding,
+            output_is_binary=self._is_binary_output(self.main_def.get('output')),
         )
 
     def generate_subscription_function(self) -> str:
