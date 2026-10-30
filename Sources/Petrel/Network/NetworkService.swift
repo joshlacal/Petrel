@@ -304,6 +304,18 @@ public protocol AuthenticationProvider: Sendable {
     func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest)
         async throws -> (Data, HTTPURLResponse)
 
+    /// Handles a response using the immutable principal captured with its credential.
+    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest,
+                                    context: AuthContext?) async throws -> (Data, HTTPURLResponse)
+
+    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool
+
+    /// The callback is synchronous UI-only work under the gateway mutation gate.
+    func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool
+
     /// Updates the DPoP nonce for a URL, optionally scoped to a specific DID and DPoP key thumbprint (JKT)
     /// - Parameters:
     ///   - url: The URL to update the nonce for
@@ -311,6 +323,22 @@ public protocol AuthenticationProvider: Sendable {
     ///   - did: Optional DID that was used to authenticate the request
     ///   - jkt: Optional JWK thumbprint (key id) for DPoP key used to sign the request
     func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async
+}
+
+public extension AuthenticationProvider {
+    func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest,
+                                    context: AuthContext?) async throws -> (Data, HTTPURLResponse) {
+        try await handleUnauthorizedResponse(response, data: data, for: request)
+    }
+
+    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool { false }
+
+    func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool {
+        false
+    }
 }
 
 /// Protocol defining the interface for network services.
@@ -524,6 +552,11 @@ public actor NetworkService: NetworkServiceProtocol {
     /// request-scoped behavior.
     @TaskLocal private static var terminalHTTPErrorResponseRequest:
         HTTPErrorResponseRequestIdentity? = nil
+
+    /// Set only by `withResponseLimits(_:operation:)`, already
+    /// clamped. When present it replaces the service's response limits for
+    /// every request this task sends through a `NetworkService`.
+    @TaskLocal static var scopedResponseLimits: NetworkResponseLimits? = nil
 
     #if DEBUG
         private nonisolated(unsafe) static var networkTestProtocolClasses: [AnyClass]?
@@ -1007,8 +1040,22 @@ public actor NetworkService: NetworkServiceProtocol {
         return parseLabelerHeader(contentLabelers)
     }
 
-    /// Sets the authentication provider for authenticated requests
-    /// - Parameter provider: The authentication provider
+    /// Validates a queued gateway rejection against this provider's current storage.
+    public func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
+        guard gatewayMode, let authProvider else { return false }
+        return await authProvider.isCurrentGatewaySessionFailure(context)
+    }
+
+    /// Revalidates and consumes the rejection without releasing the provider's mutation gate.
+    public func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool {
+        guard gatewayMode, let authProvider else { return false }
+        return await authProvider.withCurrentGatewaySessionFailure(context, perform: perform)
+    }
+
+    /// Sets the authentication provider for authenticated requests.
     public func setAuthenticationProvider(_ provider: AuthenticationProvider) async {
         await requestDeduplicator.cancelAllRequests()
         if let continuityProvider = provider as? any AuthContinuityProviding,
@@ -1125,7 +1172,14 @@ public actor NetworkService: NetworkServiceProtocol {
         // Perform the request using the internal session
         do {
             LogManager.logRequest(requestToSend)
-            let (data, response) = try await Self.executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
+            let launchedCtx = authCtx_simple
+            let (data, response) = try await Self.executeDataTask(
+                requestToSend,
+                using: session,
+                delegate: sessionDelegate,
+                limits: Self.scopedResponseLimits,
+                onLaunch: { launchedCtx?.releaseAuthenticationLease() }
+            )
             authCtx_simple?.releaseAuthenticationLease()
 
             if let httpResponse = response as? HTTPURLResponse {
@@ -1214,6 +1268,7 @@ public actor NetworkService: NetworkServiceProtocol {
             )
 
         let policy = determineSecurityPolicy(for: requestURL)
+        let scopedLimits = Self.scopedResponseLimits
 
         var retryCount = 0
 
@@ -1291,14 +1346,31 @@ public actor NetworkService: NetworkServiceProtocol {
                 let request = requestToSend
 
                 // Use deduplicator for non-refresh requests to prevent concurrent identical calls
-                let authIdentity = authCtx?.did ?? request.value(forHTTPHeaderField: "Authorization")
-                let (data, response) = if !skipTokenRefresh {
-                    try await requestDeduplicator.deduplicate(request: request, authIdentity: authIdentity) { @Sendable [session, sessionDelegate] in
-                        return try await Self.executeDataTask(request, using: session, delegate: sessionDelegate)
+                // Gateway requests must stay distinct across same-DID bearer rotation.
+                let authIdentity = gatewayMode
+                    ? request.value(forHTTPHeaderField: "Authorization")
+                    : (authCtx?.did ?? request.value(forHTTPHeaderField: "Authorization"))
+                // The lifecycle lease only has to cover credential attachment through task launch.
+                // Holding it until the response arrives serializes every authenticated gateway
+                // request; stale-credential 401s are already scoped by the credential-bound proof.
+                let launchedCtx = authCtx
+                let releaseLease: @Sendable () -> Void = { launchedCtx?.releaseAuthenticationLease() }
+                let (data, response) = if !skipTokenRefresh, scopedLimits == nil {
+                    try await requestDeduplicator.deduplicate(
+                        request: request,
+                        authIdentity: authIdentity,
+                        onJoinExisting: releaseLease
+                    ) { @Sendable [session, sessionDelegate] in
+                        return try await Self.executeDataTask(
+                            request, using: session, delegate: sessionDelegate, onLaunch: releaseLease
+                        )
                     }
                 } else {
-                    // Skip deduplication for refresh requests to avoid circular dependencies
-                    try await Self.executeDataTask(requestToSend, using: session, delegate: sessionDelegate)
+                    // Skip deduplication for refresh requests to avoid circular dependencies,
+                    // and for scoped response limits so no request shares another's limits.
+                    try await Self.executeDataTask(
+                        requestToSend, using: session, delegate: sessionDelegate, limits: scopedLimits, onLaunch: releaseLease
+                    )
                 }
                 authCtx?.releaseAuthenticationLease()
 
@@ -1388,8 +1460,10 @@ public actor NetworkService: NetworkServiceProtocol {
                         )
                         let autoLogoutDID = authCtx?.did ?? ""
                         // Broadcast auto-logout event so UI can redirect to reauth
-                        Task {
-                            await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "401_no_auth_provider_or_url"))
+                        if !gatewayMode {
+                            Task {
+                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "401_no_auth_provider_or_url"))
+                            }
                         }
                         throw NetworkError.authenticationRequired // Cannot handle 401 without provider/URL
                     }
@@ -1418,46 +1492,29 @@ public actor NetworkService: NetworkServiceProtocol {
                         LogManager.logInfo("Network Service - Gateway mode: delegating 401 to auth provider")
                         do {
                             let (retryData, retryResponse) = try await authProvider.handleUnauthorizedResponse(
-                                httpResponse, data: decompressedData, for: requestToSend
+                                httpResponse, data: decompressedData, for: requestToSend, context: authCtx
                             )
                             return (retryData, retryResponse)
+                        } catch let rejection as ScopedGatewaySessionRejection {
+                            // Await delivery; do not create another unstructured event task.
+                            // Consumers still revalidate, since observers can suspend.
+                            if await authProvider.isCurrentGatewaySessionFailure(rejection.context) {
+                                await AuthEventBroadcaster.shared.broadcast(.gatewaySessionRejected(
+                                    context: rejection.context, reason: rejection.reason
+                                ))
+                            }
+                            throw NetworkError.authenticationRequired
                         } catch let gatewayError as ConfidentialGatewayStrategy.GatewayError {
                             LogManager.logError(
                                 "Network Service - Gateway mode: auth provider returned gateway error: \(gatewayError)"
                             )
 
-                            let reason: String? = {
-                                switch gatewayError {
-                                case .sessionExpired:
-                                    return "gateway_session_expired"
-                                case .invalidSession:
-                                    return "gateway_invalid_session"
-                                case .missingSession:
-                                    return "gateway_missing_session"
-                                case .authenticationRequired,
-                                     .invalidCallbackURL,
-                                     .invalidGatewayURL,
-                                     .networkError,
-                                     .upgradeTemporarilyUnavailable,
-                                     .upgradeFailed:
-                                    return nil
-                                }
-                            }()
-
-                            if let reason {
-                                let autoLogoutDID = authCtx?.did ?? ""
-                                Task {
-                                    await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: reason))
-                                }
-                            }
+                            // Without a credential-bound proof, this is a request failure,
+                            // never authority to invalidate whichever account is now active.
                             throw NetworkError.authenticationRequired
                         } catch {
                             LogManager.logError("Network Service - Gateway mode: auth provider failed to handle 401: \(error)")
-                            // Unknown gateway auth failure - still signal auto-logout as a fallback.
-                            let autoLogoutDID = authCtx?.did ?? ""
-                            Task {
-                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "gateway_401_unhandled_unknown"))
-                            }
+                            // Storage/transport/unknown errors cannot prove session expiry.
                             throw NetworkError.authenticationRequired
                         }
                     }
@@ -1787,7 +1844,9 @@ public actor NetworkService: NetworkServiceProtocol {
             throw ExactAuthGeneratedRequestContinuityError()
         }
 
-        let (data, response) = try await Self.executeDataTask(prepared, using: exactAuthSession, delegate: exactAuthSessionDelegate)
+        let (data, response) = try await Self.executeDataTask(
+            prepared, using: exactAuthSession, delegate: exactAuthSessionDelegate, limits: Self.scopedResponseLimits
+        )
         authCtx?.releaseAuthenticationLease()
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse(description: "Received non-HTTP response")
@@ -1807,10 +1866,13 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         return (data, httpResponse)
     }
+    /// `limits` replaces the delegate's response limits for this request only.
     static func executeDataTask(
         _ request: URLRequest,
         using targetSession: URLSession,
-        delegate: HardenedURLSessionDelegate
+        delegate: HardenedURLSessionDelegate,
+        limits: NetworkResponseLimits? = nil,
+        onLaunch: (@Sendable () -> Void)? = nil
     ) async throws -> (Data, URLResponse) {
         try Task.checkCancellation()
         guard let url = request.url, let host = url.host?.lowercased() else {
@@ -1830,11 +1892,12 @@ public actor NetworkService: NetworkServiceProtocol {
         let task = targetSession.dataTask(with: request)
         let rawResult: (Data, URLResponse) = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                delegate.contextManager.register(task) { result in
+                delegate.contextManager.register(task, limits: limits) { result in
                     continuation.resume(with: result)
                 }
                 delegate.contextManager.setApprovedAddresses(addresses, for: task)
                 task.resume()
+                onLaunch?()
                 if Task.isCancelled {
                     task.cancel()
                 }
@@ -1843,7 +1906,7 @@ public actor NetworkService: NetworkServiceProtocol {
             task.cancel()
         }
         return (
-            try ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: delegate.limits),
+            try ContentDecoding.normalizeResponse(rawResult.0, response: rawResult.1, limits: limits ?? delegate.limits),
             rawResult.1
         )
     }
@@ -1868,7 +1931,8 @@ public actor NetworkService: NetworkServiceProtocol {
         return try await Self.executeDataTask(
             sanitizedRequest,
             using: exactAuthSession,
-            delegate: exactAuthSessionDelegate
+            delegate: exactAuthSessionDelegate,
+            limits: Self.scopedResponseLimits
         )
     }
     private func isActiveExactAuthRequestScope(_ scope: ExactAuthGeneratedRequestScope) -> Bool {
@@ -2138,6 +2202,77 @@ public actor NetworkService: NetworkServiceProtocol {
                 additionalHeaders: additionalHeaders
             )
         }
+    }
+
+    /// The ceiling for every field of a scoped limit: 128 MiB, the same bound
+    /// as `SpaceSTAR.defaultMaximumArchiveBytes`.
+    static let maximumScopedResponseBytes = SpaceSTAR.defaultMaximumArchiveBytes
+
+    /// Runs `operation` with `limits` replacing the response limits of every
+    /// `NetworkService` request it sends, so one generated call can accept a
+    /// response above the default 10 MiB:
+    ///
+    /// ```swift
+    /// let bytes = SpaceSTAR.defaultMaximumArchiveBytes
+    /// let limits = NetworkResponseLimits(maximumWireBytes: bytes, maximumDecodedBytes: bytes)
+    /// let (code, output) = try await NetworkService.withResponseLimits(limits) {
+    ///     try await client.com.atproto.space.getBlob(input: input)
+    /// }
+    /// ```
+    ///
+    /// Each field of `limits` is clamped to `0 ... 128 MiB`
+    /// (`SpaceSTAR.defaultMaximumArchiveBytes`). The limits apply to requests
+    /// sent from this task and its child tasks until `operation` returns,
+    /// including any authentication refresh or retry those requests trigger,
+    /// and to unstructured tasks created inside `operation`, which inherit
+    /// task-local values. Detached tasks do not inherit them. Requests under a
+    /// scope are not deduplicated with other in-flight requests. All other
+    /// transport checks are unchanged.
+    ///
+    /// Requests that `SpaceCredentialManager` and `SpaceHostResolver` send on
+    /// their own sessions do not read this scope. The `getSpaceCredential`
+    /// exchange passes no per-request limits, so it gets those of the
+    /// manager's session: `NetworkResponseLimits.default` (10 MiB) when the
+    /// manager created that session itself. The signed request of
+    /// `SpaceCredentialManager.get` also uses the session's limits, except
+    /// that its `maximumArchiveBytes` (for `getRepo`) and `maximumBlobBytes`
+    /// (for `getBlob`) replace the wire and decoded byte limits for that one
+    /// request. The static fetch methods of `SpaceHostResolver` take a
+    /// `limits` argument instead, and a resolver made with
+    /// `init(didResolver:)` fetches with `NetworkResponseLimits.default`.
+    /// Work these types run through a `NetworkService` does read the scope: a
+    /// credential exchange that starts inside a scope requests its delegation
+    /// token with the scoped limits, because the default delegation-token
+    /// provider is a generated `com.atproto.space.getDelegationToken` call on
+    /// the manager's `ATProtoClient`. The same applies to any custom provider
+    /// that sends through a `NetworkService`.
+    ///
+    /// - Parameters:
+    ///   - limits: The response limits to apply, before clamping.
+    ///   - operation: The work whose requests use `limits`.
+    /// - Returns: The value `operation` returns.
+    public static func withResponseLimits<T: Sendable>(
+        _ limits: NetworkResponseLimits,
+        operation: @Sendable () async throws -> T
+    ) async rethrows -> T {
+        try await $scopedResponseLimits.withValue(clampedScopedResponseLimits(limits)) {
+            try await operation()
+        }
+    }
+
+    /// `limits` with every field clamped to `0 ... maximumScopedResponseBytes`.
+    /// Clamping the expansion ratio also keeps the decompression arithmetic
+    /// (`data.count * maximumExpansionRatio`) from overflowing.
+    static func clampedScopedResponseLimits(_ limits: NetworkResponseLimits) -> NetworkResponseLimits {
+        func clamp(_ value: Int) -> Int {
+            max(0, min(value, maximumScopedResponseBytes))
+        }
+        return NetworkResponseLimits(
+            maximumWireBytes: clamp(limits.maximumWireBytes),
+            maximumDecodedBytes: clamp(limits.maximumDecodedBytes),
+            maximumExpansionRatio: clamp(limits.maximumExpansionRatio),
+            maximumDiagnosticBytes: clamp(limits.maximumDiagnosticBytes)
+        )
     }
 
     /// Performs a network request (protocol compatibility method)

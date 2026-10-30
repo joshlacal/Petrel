@@ -380,8 +380,11 @@ struct KeychainFailClosedTests {
             backend.failRetrieveMatching = { $0 == "gatewaySession.\(failClosedDID)" }
             KeychainManager.clearCache()
 
+            // Exercise a backing-store read rather than the saving actor's valid
+            // in-memory credential cache.
+            let reader = KeychainStorage(namespace: namespace)
             await #expect(throws: (any Error).self) {
-                try await storage.getGatewaySession(for: failClosedDID)
+                try await reader.getGatewaySession(for: failClosedDID)
             }
 
             backend.failRetrieveMatching = nil

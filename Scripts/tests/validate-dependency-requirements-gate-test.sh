@@ -112,6 +112,8 @@ EXTRA_REGISTRY_QUALIFIED_DUMP="$SCRATCH/extra-registry-qualified.json"
 DUPLICATE_KIND_DUMP="$SCRATCH/duplicate-kind.json"
 MULTI_ENTRY_DUMP="$SCRATCH/multi-entry.json"
 UNBOUNDED_REVIEWED_DUMP="$SCRATCH/unbounded-reviewed.json"
+EXACT_POLICY_DIR="$SCRATCH/exact-policy"
+/bin/mkdir -p "$EXACT_POLICY_DIR"
 /usr/bin/python3 -I - \
   "$BASE_DUMP" \
   "$WRONG_URL_DUMP" \
@@ -120,7 +122,8 @@ UNBOUNDED_REVIEWED_DUMP="$SCRATCH/unbounded-reviewed.json"
   "$EXTRA_REGISTRY_QUALIFIED_DUMP" \
   "$DUPLICATE_KIND_DUMP" \
   "$MULTI_ENTRY_DUMP" \
-  "$UNBOUNDED_REVIEWED_DUMP" <<'PY'
+  "$UNBOUNDED_REVIEWED_DUMP" \
+  "$EXACT_POLICY_DIR" <<'PY'
 import copy
 import json
 import sys
@@ -135,6 +138,7 @@ from pathlib import Path
     duplicate_kind_path,
     multi_entry_path,
     unbounded_path,
+    exact_policy_dir,
 ) = map(Path, sys.argv[1:])
 base = json.loads(base_path.read_text(encoding="utf-8"))
 
@@ -247,6 +251,57 @@ source_control(unbounded, "swiftcbor")["requirement"] = {
     "range": [{"lowerBound": "0.5.0", "upperBound": "1.0.0"}]
 }
 unbounded_path.write_text(json.dumps(unbounded), encoding="utf-8")
+
+# The reviewed exact dependency must not inherit the bounded-range policy,
+# accept another source/version, or bypass the generic pre-1.0 review gate.
+exact_requirements = {
+    "newer-version": {"exact": ["0.15.1"]},
+    "prerelease": {"exact": ["0.15.0-alpha.1"]},
+    "multiple-versions": {"exact": ["0.15.0", "0.15.1"]},
+    "empty-versions": {"exact": []},
+    "bounded-range": {
+        "range": [{"lowerBound": "0.15.0", "upperBound": "0.16.0"}]
+    },
+    "branch": {"branch": ["main"]},
+    "revision": {"revision": ["4c77c7384768acf1093d66ccaacf298d322b10b7"]},
+    "mixed-requirements": {"exact": ["0.15.0"], "branch": ["main"]},
+}
+for label, requirement in exact_requirements.items():
+    document = copy.deepcopy(base)
+    source_control(document, "secp256k1.swift")["requirement"] = requirement
+    (exact_policy_dir / f"{label}.json").write_text(
+        json.dumps(document), encoding="utf-8"
+    )
+
+exact_wrong_url = copy.deepcopy(base)
+source_control(exact_wrong_url, "secp256k1.swift")["location"] = {
+    "remote": [{"urlString": "https://example.invalid/secp256k1.swift.git"}]
+}
+(exact_policy_dir / "wrong-url.json").write_text(
+    json.dumps(exact_wrong_url), encoding="utf-8"
+)
+
+exact_registry = copy.deepcopy(base)
+for wrapper in exact_registry["dependencies"]:
+    entries = wrapper.get("sourceControl", [])
+    if len(entries) == 1 and entries[0].get("identity") == "secp256k1.swift":
+        entry = wrapper.pop("sourceControl")[0]
+        entry.pop("location")
+        wrapper["registry"] = [entry]
+(exact_policy_dir / "registry-substitution.json").write_text(
+    json.dumps(exact_registry), encoding="utf-8"
+)
+
+extra_exact = copy.deepcopy(base)
+unknown_exact = copy.deepcopy(source_control(base, "secp256k1.swift"))
+unknown_exact["identity"] = "unreviewed-exact-zero"
+unknown_exact["location"] = {
+    "remote": [{"urlString": "https://example.invalid/unreviewed-exact-zero.git"}]
+}
+extra_exact["dependencies"].append({"sourceControl": [unknown_exact]})
+(exact_policy_dir / "unreviewed-exact.json").write_text(
+    json.dumps(extra_exact), encoding="utf-8"
+)
 PY
 
 expect_semantic_failure() {
@@ -295,5 +350,25 @@ expect_semantic_failure \
   unbounded-reviewed \
   "$UNBOUNDED_REVIEWED_DUMP" \
   "swiftcbor requirement must be 0.6.0..<0.7.0"
+
+for label in newer-version prerelease multiple-versions empty-versions \
+  bounded-range branch revision mixed-requirements; do
+  expect_semantic_failure \
+    "exact-$label" \
+    "$EXACT_POLICY_DIR/$label.json" \
+    "secp256k1.swift requirement must be exact 0.15.0"
+done
+expect_semantic_failure \
+  exact-wrong-url \
+  "$EXACT_POLICY_DIR/wrong-url.json" \
+  "secp256k1.swift source URL must be https://github.com/GigaBitcoin/secp256k1.swift.git"
+expect_semantic_failure \
+  exact-registry-substitution \
+  "$EXACT_POLICY_DIR/registry-substitution.json" \
+  "missing direct dependency: secp256k1.swift"
+expect_semantic_failure \
+  unreviewed-exact \
+  "$EXACT_POLICY_DIR/unreviewed-exact.json" \
+  "unreviewed direct pre-1.0 dependency: unreviewed-exact-zero"
 
 echo "Petrel dependency requirement gate tests passed"

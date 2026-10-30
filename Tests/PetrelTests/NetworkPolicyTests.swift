@@ -12,16 +12,16 @@ import Testing
 @Suite("Network Policy, Recipient, Bounds and Logging Tests", .serialized)
 struct NetworkPolicyTests {
     @Test("Step 1: Recipient and destination exact-origin enforcement")
-    func recipientAndDestinationEnforcement() async throws {
+    func recipientAndDestinationEnforcement() throws {
         // Test RequestSecurityPolicy and ExactAuthRequestOrigin
-        let httpsURL = URL(string: "https://example.com:443/xrpc/test")!
+        let httpsURL = try #require(URL(string: "https://example.com:443/xrpc/test"))
         let origin = try #require(ExactAuthRequestOrigin(httpsURL))
         #expect(origin.scheme == "https")
         #expect(origin.host == "example.com")
         #expect(origin.effectivePort == 443)
 
         // WSS URL should normalize to https scheme and port 443 for origin equality
-        let wssURL = URL(string: "wss://example.com/xrpc/app.bsky.notification.subscribe")!
+        let wssURL = try #require(URL(string: "wss://example.com/xrpc/app.bsky.notification.subscribe"))
         let wssOrigin = try #require(ExactAuthRequestOrigin(wssURL))
         #expect(wssOrigin.scheme == "https")
         #expect(wssOrigin.host == "example.com")
@@ -43,9 +43,9 @@ struct NetworkPolicyTests {
         }
 
         // Reject cleartext HTTP / WS for non-loopback
-        let httpURL = URL(string: "http://example.com/xrpc/test")!
+        let httpURL = try #require(URL(string: "http://example.com/xrpc/test"))
         #expect(ExactAuthRequestOrigin(httpURL) == nil)
-        let wsURL = URL(string: "ws://example.com/xrpc/test")!
+        let wsURL = try #require(URL(string: "ws://example.com/xrpc/test"))
         #expect(ExactAuthRequestOrigin(wsURL) == nil)
 
         #expect(IPAddress.isPrivateOrReservedAddress("127.0.0.1") == true)
@@ -76,105 +76,106 @@ struct NetworkPolicyTests {
                 NetworkService.dnsResolverOverride = nil
             }
 
-        let delegate = HardenedURLSessionDelegate()
-        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
+            let delegate = HardenedURLSessionDelegate()
+            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
 
-        var origRequest = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
-        origRequest.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
-        origRequest.setValue("DPoP secret_dpop", forHTTPHeaderField: "DPoP")
-        origRequest.setValue("cookie_val", forHTTPHeaderField: "Cookie")
-        origRequest.setValue("did:plc:123", forHTTPHeaderField: "atproto-proxy")
+            var origRequest = URLRequest(url: URL(string: "https://pds.example.com/xrpc/test")!)
+            origRequest.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
+            origRequest.setValue("DPoP secret_dpop", forHTTPHeaderField: "DPoP")
+            origRequest.setValue("cookie_val", forHTTPHeaderField: "Cookie")
+            origRequest.setValue("did:plc:123", forHTTPHeaderField: "atproto-proxy")
 
-        let task = session.dataTask(with: origRequest)
+            let task = session.dataTask(with: origRequest)
 
-        let redirectResponse = HTTPURLResponse(
-            url: URL(string: "https://pds.example.com/xrpc/test")!,
-            statusCode: 302,
-            httpVersion: "HTTP/1.1",
-            headerFields: ["Location": "https://attacker.example.com/xrpc/test"]
-        )!
+            let redirectResponse = HTTPURLResponse(
+                url: URL(string: "https://pds.example.com/xrpc/test")!,
+                statusCode: 302,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Location": "https://attacker.example.com/xrpc/test"]
+            )!
 
-        var targetRequest = URLRequest(url: URL(string: "https://attacker.example.com/xrpc/test")!)
-        targetRequest.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
-        targetRequest.setValue("DPoP secret_dpop", forHTTPHeaderField: "DPoP")
-        targetRequest.setValue("cookie_val", forHTTPHeaderField: "Cookie")
-        targetRequest.setValue("did:plc:123", forHTTPHeaderField: "atproto-proxy")
+            var targetRequest = URLRequest(url: URL(string: "https://attacker.example.com/xrpc/test")!)
+            targetRequest.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
+            targetRequest.setValue("DPoP secret_dpop", forHTTPHeaderField: "DPoP")
+            targetRequest.setValue("cookie_val", forHTTPHeaderField: "Cookie")
+            targetRequest.setValue("did:plc:123", forHTTPHeaderField: "atproto-proxy")
 
-        let redirectedBarrier = AsyncBarrier()
-        let finalHolder = Mutex<URLRequest?>(nil)
+            let redirectedBarrier = AsyncBarrier()
+            let finalHolder = Mutex<URLRequest?>(nil)
 
-        delegate.urlSession(
-            session,
-            task: task,
-            willPerformHTTPRedirection: redirectResponse,
-            newRequest: targetRequest
-        ) { req in
-            finalHolder.withLock { $0 = req }
-            redirectedBarrier.signal()
-        }
+            delegate.urlSession(
+                session,
+                task: task,
+                willPerformHTTPRedirection: redirectResponse,
+                newRequest: targetRequest
+            ) { req in
+                finalHolder.withLock { $0 = req }
+                redirectedBarrier.signal()
+            }
 
-        try await redirectedBarrier.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
-        let redirected = try #require(finalHolder.withLock { $0 })
-        #expect(redirected.value(forHTTPHeaderField: "Authorization") == nil)
-        #expect(redirected.value(forHTTPHeaderField: "DPoP") == nil)
-        #expect(redirected.value(forHTTPHeaderField: "Cookie") == nil)
-        #expect(redirected.value(forHTTPHeaderField: "atproto-proxy") == nil)
+            try await redirectedBarrier.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
+            let redirected = try #require(finalHolder.withLock { $0 })
+            #expect(redirected.value(forHTTPHeaderField: "Authorization") == nil)
+            #expect(redirected.value(forHTTPHeaderField: "DPoP") == nil)
+            #expect(redirected.value(forHTTPHeaderField: "Cookie") == nil)
+            #expect(redirected.value(forHTTPHeaderField: "atproto-proxy") == nil)
 
-        // 2. Redirect to a hostname resolving to private IP must be refused (nil)
-        let privateRedirectResp = HTTPURLResponse(
-            url: URL(string: "https://pds.example.com/xrpc/test")!,
-            statusCode: 302,
-            httpVersion: "HTTP/1.1",
-            headerFields: ["Location": "https://private-redirect.example.com/xrpc/test"]
-        )!
-        let privateTargetReq = URLRequest(url: URL(string: "https://private-redirect.example.com/xrpc/test")!)
-        let privateBarrier = AsyncBarrier()
-        let privateHolder = Mutex<URLRequest?>(nil)
-        delegate.urlSession(
-            session,
-            task: session.dataTask(with: origRequest),
-            willPerformHTTPRedirection: privateRedirectResp,
-            newRequest: privateTargetReq
-        ) { req in
-            privateHolder.withLock { $0 = req }
-            privateBarrier.signal()
-        }
-        try await privateBarrier.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
-        #expect(privateHolder.withLock { $0 } == nil)
+            // 2. Redirect to a hostname resolving to private IP must be refused (nil)
+            let privateRedirectResp = HTTPURLResponse(
+                url: URL(string: "https://pds.example.com/xrpc/test")!,
+                statusCode: 302,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Location": "https://private-redirect.example.com/xrpc/test"]
+            )!
+            let privateTargetReq = URLRequest(url: URL(string: "https://private-redirect.example.com/xrpc/test")!)
+            let privateBarrier = AsyncBarrier()
+            let privateHolder = Mutex<URLRequest?>(nil)
+            delegate.urlSession(
+                session,
+                task: session.dataTask(with: origRequest),
+                willPerformHTTPRedirection: privateRedirectResp,
+                newRequest: privateTargetReq
+            ) { req in
+                privateHolder.withLock { $0 = req }
+                privateBarrier.signal()
+            }
+            try await privateBarrier.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
+            #expect(privateHolder.withLock { $0 } == nil)
 
-        // 3. Cleartext redirect to remote destination must be refused (nil)
-        let cleartextOrig = HTTPURLResponse(
-            url: URL(string: "http://a.example/test")!,
-            statusCode: 302,
-            httpVersion: "HTTP/1.1",
-            headerFields: ["Location": "http://b.example/test"]
-        )!
-        let cleartextReq = URLRequest(url: URL(string: "http://b.example/test")!)
-        let barrier2 = AsyncBarrier()
-        let holder2 = Mutex<URLRequest?>(nil)
-        delegate.urlSession(
-            session,
-            task: session.dataTask(with: URLRequest(url: URL(string: "http://a.example/test")!)),
-            willPerformHTTPRedirection: cleartextOrig,
-            newRequest: cleartextReq
-        ) { req in
-            holder2.withLock { $0 = req }
-            barrier2.signal()
-        }
-        #expect(holder2.withLock { $0 } == nil)
+            // 3. Cleartext redirect to remote destination must be refused (nil)
+            let cleartextOrig = HTTPURLResponse(
+                url: URL(string: "http://a.example/test")!,
+                statusCode: 302,
+                httpVersion: "HTTP/1.1",
+                headerFields: ["Location": "http://b.example/test"]
+            )!
+            let cleartextReq = URLRequest(url: URL(string: "http://b.example/test")!)
+            let barrier2 = AsyncBarrier()
+            let holder2 = Mutex<URLRequest?>(nil)
+            delegate.urlSession(
+                session,
+                task: session.dataTask(with: URLRequest(url: URL(string: "http://a.example/test")!)),
+                willPerformHTTPRedirection: cleartextOrig,
+                newRequest: cleartextReq
+            ) { req in
+                holder2.withLock { $0 = req }
+                barrier2.signal()
+            }
+            #expect(holder2.withLock { $0 } == nil)
         }
     }
+
     @Test("Step 3 & N1-N3 & N1-M4: Remote cleartext is rejected, loopback cleartext is admitted, private IPs rejected")
     func cleartextAndLoopbackValidation() async throws {
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        // Remote http is rejected
-        await #expect(throws: NetworkError.self) {
-            let remoteHTTPReq = URLRequest(url: URL(string: "http://remote.example.com/xrpc/test")!)
-            _ = try await service.request(remoteHTTPReq)
-        }
-        // Loopback http is permitted for local development
         try await withSerializedStorageOverrideTest {
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            // Remote http is rejected
+            await #expect(throws: NetworkError.self) {
+                let remoteHTTPReq = try URLRequest(url: #require(URL(string: "http://remote.example.com/xrpc/test")))
+                _ = try await service.request(remoteHTTPReq)
+            }
+            // Loopback http is permitted for local development
             NetworkService.dnsResolverOverride = { host in
                 if host == "localhost" {
                     return ["127.0.0.1"]
@@ -193,32 +194,35 @@ struct NetworkPolicyTests {
                 queryItems: nil
             )
             #expect(localReq.url != nil)
-        }
-        await #expect(throws: NetworkError.self) {
-            let privateReq = URLRequest(url: URL(string: "http://10.0.0.1/xrpc/test")!)
-            _ = try await service.request(privateReq)
+            await #expect(throws: NetworkError.self) {
+                let privateReq = try URLRequest(url: #require(URL(string: "http://10.0.0.1/xrpc/test")))
+                _ = try await service.request(privateReq)
+            }
         }
     }
 
     @Test("Step 3 & N1-C3: prepareStreamingRequest validates destination against private IP")
     func prepareStreamingRequestValidation() async throws {
-        NetworkService.dnsResolverOverride = { host in
-            if host == "internal.evil.example" {
-                return ["10.0.0.1"]
+        try await withSerializedStorageOverrideTest {
+            NetworkService.dnsResolverOverride = { host in
+                if host == "internal.evil.example" {
+                    return ["10.0.0.1"]
+                }
+                return nil
             }
-            return nil
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-        }
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        let req = URLRequest(url: URL(string: "https://internal.evil.example/xrpc/com.atproto.sync.subscribeRepos")!)
-        await #expect(throws: NetworkError.self) {
-            _ = try await service.prepareStreamingRequest(req)
+            defer {
+                NetworkService.dnsResolverOverride = nil
+            }
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            let req = try URLRequest(url: #require(URL(string: "https://internal.evil.example/xrpc/com.atproto.sync.subscribeRepos")))
+            await #expect(throws: NetworkError.self) {
+                _ = try await service.prepareStreamingRequest(req)
+            }
         }
     }
 
     // MARK: - Step 5 & 6: URLProtocol-backed Transport Scenarios
+
     private func withPolicyTransport<T>(
         dnsResolver: @escaping @Sendable (String) -> [String]? = { host in
             if host == "localhost" || host == "127.0.0.1" || host == "::1" {
@@ -241,7 +245,6 @@ struct NetworkPolicyTests {
         }
     }
 
-
     @Test("Transport scenario (a): Real gzip-framed 200 response decodes to expected JSON")
     func transportGzipResponseDecoding() async throws {
         try await withPolicyTransport {
@@ -257,7 +260,7 @@ struct NetworkPolicyTests {
                     headerFields: [
                         "Content-Type": "application/json",
                         "Content-Encoding": "gzip",
-                        "Content-Length": "\(gzipData.count)"
+                        "Content-Length": "\(gzipData.count)",
                     ]
                 )!
                 return (response, gzipData)
@@ -281,7 +284,7 @@ struct NetworkPolicyTests {
                     httpVersion: "HTTP/1.1",
                     headerFields: [
                         "Content-Type": "application/json",
-                        "Content-Length": "20971520" // 20 MB (exceeds default 10 MB limit)
+                        "Content-Length": "20971520", // 20 MB (exceeds default 10 MB limit)
                     ]
                 )!
                 return (response, Data())
@@ -312,7 +315,7 @@ struct NetworkPolicyTests {
                     httpVersion: "HTTP/1.1",
                     headerFields: [
                         "Content-Type": "application/json",
-                        "Transfer-Encoding": "chunked"
+                        "Transfer-Encoding": "chunked",
                     ]
                 )!
                 return (response, validBody)
@@ -333,7 +336,7 @@ struct NetworkPolicyTests {
                     httpVersion: "HTTP/1.1",
                     headerFields: [
                         "Content-Type": "application/octet-stream",
-                        "Transfer-Encoding": "chunked"
+                        "Transfer-Encoding": "chunked",
                     ]
                 )!
                 return (response, oversizedBody)
@@ -351,90 +354,161 @@ struct NetworkPolicyTests {
         }
     }
 
-    @Test("Transport scenario (d): Same-origin redirect completes with approved target addresses and retained credentials")
-    func transportSameOriginRedirectPreservesCredentialsAndApprovesTarget() async throws {
-        try await withPolicyTransport {
-            let finalBody = Data(#"{"step":2}"#.utf8)
-            PolicyTestURLProtocol.register(host: "pds.example.com") { req in
-                if req.url?.path == "/xrpc/step1" {
-                    let redirectResp = HTTPURLResponse(
-                        url: req.url!,
-                        statusCode: 302,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: ["Location": "https://pds.example.com/xrpc/step2"]
-                    )!
-                    return (redirectResp, Data())
-                } else {
-                    let successResp = HTTPURLResponse(
-                        url: req.url!,
-                        statusCode: 200,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: ["Content-Type": "application/json"]
-                    )!
-                    return (successResp, finalBody)
-                }
+    /// URLProtocolClient's redirect callback traps in FoundationNetworking.
+    /// Exercise real HTTP redirects on every platform instead of simulating that
+    /// unsupported seam, while retaining the production session/delegate policy.
+    private func withLoopbackPolicyTransport<T>(_ body: () async throws -> T) async throws -> T {
+        try await withSerializedStorageOverrideTest {
+            NetworkService.setNetworkTestProtocolClasses(nil)
+            NetworkService.dnsResolverOverride = nil
+            defer {
+                NetworkService.setNetworkTestProtocolClasses(nil)
+                NetworkService.dnsResolverOverride = nil
             }
+            return try await body()
+        }
+    }
 
-            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-            var req = URLRequest(url: URL(string: "https://pds.example.com/xrpc/step1")!)
-            req.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
-            req.setValue("DPoP proof_token", forHTTPHeaderField: "DPoP")
-            req.setValue("session=abc", forHTTPHeaderField: "Cookie")
+    @Test("Transport scenario (d): Loopback HTTP redirect follows without forwarding credentials")
+    func transportLoopbackRedirectFollowsWithoutForwardingCredentials() async throws {
+        try await withLoopbackPolicyTransport {
+            let finalBody = Data(#"{"step":2}"#.utf8)
+            let server = try PolicyLoopbackHTTPServer { request in
+                if request.path == "/xrpc/step1" {
+                    return .init(statusCode: 302, headers: ["Location": "/xrpc/step2"])
+                }
+                return .init(headers: ["Content-Type": "application/json"], body: finalBody)
+            }
+            defer { server.stop() }
 
-            let (data, response) = try await service.performRequest(req)
+            let service = NetworkService(baseURL: server.baseURL)
+            var request = URLRequest(url: server.baseURL.appendingPathComponent("xrpc/step1"))
+            request.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
+            request.setValue("DPoP proof_token", forHTTPHeaderField: "DPoP")
+            request.setValue("session=abc", forHTTPHeaderField: "Cookie")
+
+            let (data, response) = try await service.performRequest(request)
             #expect(response.statusCode == 200)
             #expect(data == finalBody)
+            #expect(server.requests.count == 2)
+            let secondRequest = try #require(server.requests.last)
+            #expect(secondRequest.path == "/xrpc/step2")
+            // HTTP loopback is admitted for development but is not an
+            // authenticated HTTPS origin, even when the host/port are unchanged.
+            #expect(server.requests.first?.headers["authorization"] == "Bearer secret_token")
+            #expect(server.requests.first?.headers["dpop"] == "DPoP proof_token")
+            #expect(server.requests.first?.headers["cookie"] == "session=abc")
+            #expect(secondRequest.headers["authorization"] == nil)
+            #expect(secondRequest.headers["dpop"] == nil)
+            #expect(secondRequest.headers["cookie"] == nil)
+        }
+    }
 
-            let captured = PolicyTestURLProtocol.requests
-            #expect(captured.count == 2)
-            let secondReq = try #require(captured.last)
-            #expect(secondReq.url?.path == "/xrpc/step2")
-            #expect(secondReq.value(forHTTPHeaderField: "Authorization") == "Bearer secret_token")
-            #expect(secondReq.value(forHTTPHeaderField: "DPoP") == "DPoP proof_token")
-            #expect(secondReq.value(forHTTPHeaderField: "Cookie") == "session=abc")
+    @Test("HTTPS same-origin redirect delegate preserves credentials and approves target addresses")
+    func sameOriginHTTPSRedirectDelegatePreservesCredentials() async throws {
+        try await withSerializedStorageOverrideTest {
+            NetworkService.dnsResolverOverride = { host in
+                host == "pds.example.com" ? ["93.184.216.34"] : nil
+            }
+            defer { NetworkService.dnsResolverOverride = nil }
+            let delegate = HardenedURLSessionDelegate()
+            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            var original = URLRequest(url: URL(string: "https://pds.example.com/xrpc/step1")!)
+            original.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
+            original.setValue("DPoP proof_token", forHTTPHeaderField: "DPoP")
+            original.setValue("session=abc", forHTTPHeaderField: "Cookie")
+            var target = original
+            target.url = URL(string: "https://pds.example.com/xrpc/step2")!
+            let response = try #require(HTTPURLResponse(
+                url: original.url!, statusCode: 302, httpVersion: "HTTP/1.1",
+                headerFields: ["Location": target.url!.absoluteString]
+            ))
+            let task = session.dataTask(with: original)
+            let barrier = AsyncBarrier()
+            let result = Mutex<URLRequest?>(nil)
+            // This is direct HTTPS delegate coverage, not a TLS transport test.
+            delegate.urlSession(session, task: task, willPerformHTTPRedirection: response, newRequest: target) { request in
+                result.withLock { $0 = request }
+                barrier.signal()
+            }
+            try await barrier.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
+            let redirected = try #require(result.withLock { $0 })
+            #expect(redirected.url == target.url)
+            #expect(redirected.value(forHTTPHeaderField: "Authorization") == "Bearer secret_token")
+            #expect(redirected.value(forHTTPHeaderField: "DPoP") == "DPoP proof_token")
+            #expect(redirected.value(forHTTPHeaderField: "Cookie") == "session=abc")
+            #expect(delegate.contextManager.getContext(for: task).approvedAddresses == ["93.184.216.34"])
+            #expect(delegate.contextManager.getContext(for: task).redirectCount == 1)
         }
     }
 
     @Test("Transport scenario (e): Cross-origin redirect completes with Authorization, DPoP, and Cookie stripped")
     func transportCrossOriginRedirectStripsCredentials() async throws {
-        try await withPolicyTransport {
+        try await withLoopbackPolicyTransport {
             let finalBody = Data(#"{"redirected":true}"#.utf8)
-            PolicyTestURLProtocol.register(host: "pds.example.com") { req in
-                let redirectResp = HTTPURLResponse(
-                    url: req.url!,
-                    statusCode: 302,
-                    httpVersion: "HTTP/1.1",
-                    headerFields: ["Location": "https://cdn.example.com/xrpc/target"]
-                )!
-                return (redirectResp, Data())
+            let target = try PolicyLoopbackHTTPServer { _ in
+                .init(headers: ["Content-Type": "application/json"], body: finalBody)
             }
-            PolicyTestURLProtocol.register(host: "cdn.example.com") { req in
-                let successResp = HTTPURLResponse(
-                    url: req.url!,
-                    statusCode: 200,
-                    httpVersion: "HTTP/1.1",
-                    headerFields: ["Content-Type": "application/json"]
-                )!
-                return (successResp, finalBody)
+            defer { target.stop() }
+            let targetURL = target.baseURL.appendingPathComponent("xrpc/target")
+            let source = try PolicyLoopbackHTTPServer { _ in
+                .init(statusCode: 302, headers: ["Location": targetURL.absoluteString])
             }
+            defer { source.stop() }
 
-            let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-            var req = URLRequest(url: URL(string: "https://pds.example.com/xrpc/step1")!)
-            req.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
-            req.setValue("DPoP proof_token", forHTTPHeaderField: "DPoP")
-            req.setValue("session=abc", forHTTPHeaderField: "Cookie")
+            // Different ephemeral ports are different origins, even on loopback.
+            #expect(source.baseURL.port != target.baseURL.port)
+            let service = NetworkService(baseURL: source.baseURL)
+            var request = URLRequest(url: source.baseURL.appendingPathComponent("xrpc/step1"))
+            request.setValue("Bearer secret_token", forHTTPHeaderField: "Authorization")
+            request.setValue("DPoP proof_token", forHTTPHeaderField: "DPoP")
+            request.setValue("session=abc", forHTTPHeaderField: "Cookie")
 
-            let (data, response) = try await service.performRequest(req)
+            let (data, response) = try await service.performRequest(request)
             #expect(response.statusCode == 200)
             #expect(data == finalBody)
+            #expect(source.requests.count == 1)
+            #expect(source.requests.first?.headers["authorization"] == "Bearer secret_token")
+            #expect(source.requests.first?.headers["dpop"] == "DPoP proof_token")
+            #expect(source.requests.first?.headers["cookie"] == "session=abc")
+            #expect(target.requests.count == 1)
+            let targetRequest = try #require(target.requests.first)
+            #expect(targetRequest.path == "/xrpc/target")
+            #expect(targetRequest.headers["authorization"] == nil)
+            #expect(targetRequest.headers["dpop"] == nil)
+            #expect(targetRequest.headers["cookie"] == nil)
+        }
+    }
 
-            let captured = PolicyTestURLProtocol.requests
-            #expect(captured.count == 2)
-            let secondReq = try #require(captured.last)
-            #expect(secondReq.url?.host == "cdn.example.com")
-            #expect(secondReq.value(forHTTPHeaderField: "Authorization") == nil)
-            #expect(secondReq.value(forHTTPHeaderField: "DPoP") == nil)
-            #expect(secondReq.value(forHTTPHeaderField: "Cookie") == nil)
+    @Test("Exact-auth transport refuses real same-origin and cross-origin redirects", arguments: [false, true])
+    func transportExactAuthRefusesRedirect(crossOrigin: Bool) async throws {
+        try await withLoopbackPolicyTransport {
+            let target = try PolicyLoopbackHTTPServer { _ in
+                .init(body: Data("must not reach target".utf8))
+            }
+            defer { target.stop() }
+            let location = crossOrigin
+                ? target.baseURL.appendingPathComponent("xrpc/target").absoluteString
+                : "/xrpc/target"
+            let source = try PolicyLoopbackHTTPServer { _ in
+                .init(statusCode: 302, headers: ["Location": location])
+            }
+            defer { source.stop() }
+
+            let delegate = HardenedURLSessionDelegate(allowsRedirects: false)
+            let configuration = URLSessionConfiguration.ephemeral
+            configuration.timeoutIntervalForRequest = 5
+            let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            var request = URLRequest(url: source.baseURL.appendingPathComponent("xrpc/step1"))
+            request.setValue("Bearer exact_scope_token", forHTTPHeaderField: "Authorization")
+
+            let (_, response) = try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+            #expect((response as? HTTPURLResponse)?.statusCode == 302)
+            #expect(source.requests.count == 1)
+            #expect(source.requests.first?.path == "/xrpc/step1")
+            #expect(target.requests.isEmpty)
         }
     }
 
@@ -455,15 +529,19 @@ struct NetworkPolicyTests {
                 func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {
                     throw AuthError.noActiveAccount
                 }
+
                 func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (URLRequest, AuthContext) {
                     throw AuthError.noActiveAccount
                 }
+
                 func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
                     throw AuthError.noActiveAccount
                 }
+
                 func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
                     throw AuthError.noActiveAccount
                 }
+
                 func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {}
             }
 
@@ -491,9 +569,9 @@ struct NetworkPolicyTests {
     @Test("Credential attachment propagates CancellationError from refreshTokenIfNeeded and prepareAuthenticatedRequestWithContext")
     func credentialAttachmentPropagatesCancellation() async throws {
         try await withPolicyTransport {
-            /// Auth provider that fails at a chosen step. `.prepareAfterRelease` parks inside
-            /// `prepareAuthenticatedRequestWithContext` (signalling `entered`) until `release`
-            /// is signalled, so a test can cancel the surrounding Task mid-flight.
+            // Auth provider that fails at a chosen step. `.prepareAfterRelease` parks inside
+            // `prepareAuthenticatedRequestWithContext` (signalling `entered`) until `release`
+            // is signalled, so a test can cancel the surrounding Task mid-flight.
             final class FailingAuthProvider: AuthenticationProvider, @unchecked Sendable {
                 enum Failure {
                     case refresh
@@ -511,7 +589,10 @@ struct NetworkPolicyTests {
                     self.error = error
                 }
 
-                func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest { request }
+                func prepareAuthenticatedRequest(_ request: URLRequest) async throws -> URLRequest {
+                    request
+                }
+
                 func prepareAuthenticatedRequestWithContext(_ request: URLRequest) async throws -> (URLRequest, AuthContext) {
                     switch failure {
                     case .refresh:
@@ -524,11 +605,16 @@ struct NetworkPolicyTests {
                         throw error
                     }
                 }
+
                 func refreshTokenIfNeeded() async throws -> TokenRefreshResult {
                     if case .refresh = failure { throw error }
                     return .stillValid
                 }
-                func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse) { (data, response) }
+
+                func handleUnauthorizedResponse(_ response: HTTPURLResponse, data: Data, for request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+                    (data, response)
+                }
+
                 func updateDPoPNonce(for url: URL, from headers: [String: String], did: String?, jkt: String?) async {}
             }
 
@@ -575,28 +661,30 @@ struct NetworkPolicyTests {
 
     @Test("Step 7 & N1-N1 & N1-N2: WebSocket subscription admitted for wss and requires auth for authorized origin")
     func subscriptionWSSAdmission() async throws {
-        let service = NetworkService(baseURL: URL(string: "https://pds.example.com")!)
-        NetworkService.dnsResolverOverride = { host in
-            if host == "pds.example.com" {
-                return ["93.184.216.34"]
+        try await withSerializedStorageOverrideTest {
+            let service = try NetworkService(baseURL: #require(URL(string: "https://pds.example.com")))
+            NetworkService.dnsResolverOverride = { host in
+                if host == "pds.example.com" {
+                    return ["93.184.216.34"]
+                }
+                return nil
             }
-            return nil
-        }
-        defer {
-            NetworkService.dnsResolverOverride = nil
-        }
-        let policy = await service.determineSecurityPolicy(for: URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")!)
-        if case let .authenticated(recipient) = policy {
-            #expect(recipient.host == "pds.example.com")
-            #expect(recipient.scheme == "https")
-        } else {
-            Issue.record("Expected authenticated policy for authorized origin WebSocket subscription")
+            defer {
+                NetworkService.dnsResolverOverride = nil
+            }
+            let policy = try await service.determineSecurityPolicy(for: #require(URL(string: "wss://pds.example.com/xrpc/com.atproto.sync.subscribeRepos")))
+            if case let .authenticated(recipient) = policy {
+                #expect(recipient.host == "pds.example.com")
+                #expect(recipient.scheme == "https")
+            } else {
+                Issue.record("Expected authenticated policy for authorized origin WebSocket subscription")
+            }
         }
     }
 
     @Test("Step 8 & N1-N5: LogManager sanitizes userinfo, fragments, handles, tokens, and query values")
-    func logManagerQuerySanitization() {
-        let url = URL(string: "https://user:password@alice.bsky.social/oauth/authorize?response_type=code&client_id=myclient&code=secret123&state=xyz789&handle=alice.bsky.social&email=alice@example.com#access_token=token123")!
+    func logManagerQuerySanitization() throws {
+        let url = try #require(URL(string: "https://user:password@alice.bsky.social/oauth/authorize?response_type=code&client_id=myclient&code=secret123&state=xyz789&handle=alice.bsky.social&email=alice@example.com#access_token=token123"))
         let sanitized = LogManager.sanitizeURLForLogging(url)
         #expect(!sanitized.contains("user"))
         #expect(!sanitized.contains("password"))
@@ -610,7 +698,7 @@ struct NetworkPolicyTests {
         #expect(sanitized.contains("client_id"))
         #expect(sanitized.hasPrefix("/oauth/authorize"))
 
-        let didURL = URL(string: "https://plc.directory/did:plc:12345/data?limit=50&cursor=abc&secret=hush")!
+        let didURL = try #require(URL(string: "https://plc.directory/did:plc:12345/data?limit=50&cursor=abc&secret=hush"))
         let sanitizedDID = LogManager.sanitizeURLForLogging(didURL)
         #expect(!sanitizedDID.contains("plc.directory"))
         #expect(!sanitizedDID.contains("50"))
@@ -625,85 +713,91 @@ struct NetworkPolicyTests {
     // 10.15, fatalErrors at runtime), so the stub-based rebinding test only exists
     // on platforms where the initializer works.
     #if canImport(Darwin) && !os(macOS)
-    @Test("DNS answer change causes request failure (SSRF / TOCTOU mitigation)")
-    func dnsRebindingRejection() async throws {
-        let delegate = HardenedURLSessionDelegate()
-        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-        defer { session.invalidateAndCancel() }
+        @Test("DNS answer change causes request failure (SSRF / TOCTOU mitigation)")
+        func dnsRebindingRejection() throws {
+            let delegate = HardenedURLSessionDelegate()
+            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
 
-        let task = session.dataTask(with: URLRequest(url: URL(string: "https://rebinding.example.com/xrpc/test")!))
+            let task = try session.dataTask(with: URLRequest(url: #require(URL(string: "https://rebinding.example.com/xrpc/test"))))
 
-        // Simulate metrics collection with connection to private address (DNS rebinding at connection time)
-        final class StubTransactionMetrics: URLSessionTaskTransactionMetrics, @unchecked Sendable {
-            private let stubRemoteAddress: String?
-            init(remoteAddress: String?) {
-                self.stubRemoteAddress = remoteAddress
-                super.init()
+            // Simulate metrics collection with connection to private address (DNS rebinding at connection time)
+            final class StubTransactionMetrics: URLSessionTaskTransactionMetrics, @unchecked Sendable {
+                private let stubRemoteAddress: String?
+                init(remoteAddress: String?) {
+                    stubRemoteAddress = remoteAddress
+                    super.init()
+                }
+
+                override var remoteAddress: String? {
+                    stubRemoteAddress
+                }
             }
-            override var remoteAddress: String? { stubRemoteAddress }
-        }
 
-        final class StubTaskMetrics: URLSessionTaskMetrics, @unchecked Sendable {
-            private let stubTransactions: [URLSessionTaskTransactionMetrics]
-            init(transactions: [URLSessionTaskTransactionMetrics]) {
-                self.stubTransactions = transactions
-                super.init()
+            final class StubTaskMetrics: URLSessionTaskMetrics, @unchecked Sendable {
+                private let stubTransactions: [URLSessionTaskTransactionMetrics]
+                init(transactions: [URLSessionTaskTransactionMetrics]) {
+                    stubTransactions = transactions
+                    super.init()
+                }
+
+                override var transactionMetrics: [URLSessionTaskTransactionMetrics] {
+                    stubTransactions
+                }
             }
-            override var transactionMetrics: [URLSessionTaskTransactionMetrics] { stubTransactions }
+
+            let metrics = StubTaskMetrics(transactions: [StubTransactionMetrics(remoteAddress: "127.0.0.1:443")])
+            delegate.urlSession(session, task: task, didFinishCollecting: metrics)
+
+            let isViolation = delegate.contextManager.isSecurityViolation(for: task)
+            #expect(isViolation, "Expected connection to 127.0.0.1 to be flagged as security violation")
+            #expect(delegate.contextManager.hasAnySecurityViolation())
         }
-
-        let metrics = StubTaskMetrics(transactions: [StubTransactionMetrics(remoteAddress: "127.0.0.1:443")])
-        delegate.urlSession(session, task: task, didFinishCollecting: metrics)
-
-        let isViolation = delegate.contextManager.isSecurityViolation(for: task)
-        #expect(isViolation, "Expected connection to 127.0.0.1 to be flagged as security violation")
-        #expect(delegate.contextManager.hasAnySecurityViolation())
-    }
     #endif
     @Test("Transport DNS resolver rejects public-to-private rebinding")
     func transportResolverRejectsPrivateRebinding() {
-        let approved: Set<String> = ["93.184.216.34"]
+        let approved: Set = ["93.184.216.34"]
         #expect(!HardenedURLSessionDelegate.transportAddressesAreApproved(["10.0.0.1"], approved: approved))
     }
 
     @Test("Transport DNS resolver rejects public-to-different-public rebinding (disjoint)")
     func transportResolverRejectsDisjointPublicRebinding() {
-        let approved: Set<String> = ["93.184.216.34"]
+        let approved: Set = ["93.184.216.34"]
         #expect(!HardenedURLSessionDelegate.transportAddressesAreApproved(["198.51.100.7"], approved: approved))
     }
 
     @Test("Transport DNS resolver accepts intersecting public address rotation")
     func transportResolverAcceptsIntersectingPublicRotation() {
-        let approved: Set<String> = ["93.184.216.34", "93.184.216.35"]
+        let approved: Set = ["93.184.216.34", "93.184.216.35"]
         #expect(HardenedURLSessionDelegate.transportAddressesAreApproved(["93.184.216.35", "93.184.216.36"], approved: approved))
     }
 }
 
 private func makeGzipPayload(_ uncompressed: Data) -> Data {
     #if canImport(Compression)
-    var compressedBuffer = Data(count: uncompressed.count + 64)
-    let compressedSize = compressedBuffer.withUnsafeMutableBytes { dst in
-        uncompressed.withUnsafeBytes { src in
-            compression_encode_buffer(
-                dst.baseAddress!.assumingMemoryBound(to: UInt8.self),
-                dst.count,
-                src.baseAddress!.assumingMemoryBound(to: UInt8.self),
-                src.count,
-                nil,
-                COMPRESSION_ZLIB
-            )
+        var compressedBuffer = Data(count: uncompressed.count + 64)
+        let compressedSize = compressedBuffer.withUnsafeMutableBytes { dst in
+            uncompressed.withUnsafeBytes { src in
+                compression_encode_buffer(
+                    dst.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                    dst.count,
+                    src.baseAddress!.assumingMemoryBound(to: UInt8.self),
+                    src.count,
+                    nil,
+                    COMPRESSION_ZLIB
+                )
+            }
         }
-    }
-    let rawDeflate = compressedBuffer.prefix(compressedSize)
-    var gzipData = Data([0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03])
-    gzipData.append(rawDeflate)
-    let size = UInt32(uncompressed.count).littleEndian
-    let crc: UInt32 = 0
-    withUnsafeBytes(of: crc) { gzipData.append(contentsOf: $0) }
-    withUnsafeBytes(of: size) { gzipData.append(contentsOf: $0) }
-    return gzipData
+        let rawDeflate = compressedBuffer.prefix(compressedSize)
+        var gzipData = Data([0x1F, 0x8B, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x03])
+        gzipData.append(rawDeflate)
+        let size = UInt32(uncompressed.count).littleEndian
+        let crc: UInt32 = 0
+        withUnsafeBytes(of: crc) { gzipData.append(contentsOf: $0) }
+        withUnsafeBytes(of: size) { gzipData.append(contentsOf: $0) }
+        return gzipData
     #else
-    return uncompressed
+        return uncompressed
     #endif
 }
 
@@ -756,13 +850,10 @@ private final class PolicyTestURLProtocol: URLProtocol {
         Task {
             let proto = box.value
             if let (response, data) = await handler(proto.request) {
-                if (300 ..< 400).contains(response.statusCode),
-                   let location = response.allHeaderFields["Location"] as? String,
-                   let redirectURL = URL(string: location, relativeTo: proto.request.url)
-                {
-                    var redirectReq = proto.request
-                    redirectReq.url = redirectURL
-                    proto.client?.urlProtocol(proto, wasRedirectedTo: redirectReq, redirectResponse: response)
+                if (300 ..< 400).contains(response.statusCode) {
+                    // Redirect coverage belongs to the real loopback fixture;
+                    // FoundationNetworking cannot forward URLProtocol redirects.
+                    proto.client?.urlProtocol(proto, didFailWithError: URLError(.unsupportedURL))
                     return
                 }
                 proto.client?.urlProtocol(proto, didReceive: response, cacheStoragePolicy: .notAllowed)
@@ -780,12 +871,14 @@ private final class PolicyTestURLProtocol: URLProtocol {
 // Older toolchains require the explicit conformance for strict-concurrency;
 // newer SDKs mark URLProtocol's inherited Sendable unavailable and warn on it.
 #if compiler(<6.2)
-extension PolicyTestURLProtocol: @unchecked Sendable {}
+    extension PolicyTestURLProtocol: @unchecked Sendable {}
 #endif
 
 /// Carries a non-Sendable value across a task boundary in tests where the
 /// URLProtocol machinery guarantees exclusive access.
 private final class UncheckedSendableBox<T>: @unchecked Sendable {
     let value: T
-    init(_ value: T) { self.value = value }
+    init(_ value: T) {
+        self.value = value
+    }
 }

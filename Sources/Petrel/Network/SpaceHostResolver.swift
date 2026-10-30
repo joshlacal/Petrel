@@ -4,6 +4,7 @@
 //
 
 import Foundation
+import PetrelCrypto
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
@@ -11,11 +12,9 @@ import Foundation
 // MARK: - SpaceAuthorityEndpoints
 
 public struct SpaceAuthorityEndpoints: Sendable, Equatable {
-    /// Space host XRPC endpoint (service `#atproto_space_host`, falling back
-    /// to `#atproto_pds` per spec §Space authority).
+    /// The authority account's `#atproto_pds` XRPC endpoint.
     public let spaceHost: URL
-    /// Verification method id used for credential signatures
-    /// (`#atproto_space` falling back to `#atproto`).
+    /// October 22 credentials always identify the `#atproto` signing key.
     public let signingKeyFragment: String
 
     public init(spaceHost: URL, signingKeyFragment: String) {
@@ -27,49 +26,30 @@ public struct SpaceAuthorityEndpoints: Sendable, Equatable {
 // MARK: - Extraction
 
 extension SpaceAuthorityEndpoints {
-    /// Pure extraction per spec: #atproto_space_host → #atproto_pds fallback;
-    /// #atproto_space → #atproto fallback. Throws if no host at all.
+    /// Dedicated legacy Space services/keys are ignored. Throws without a PDS.
     /// Filters candidates to authenticated-request-safe absolute hosts (https or loopback http).
     public static func extract(from doc: DIDDocument) throws -> SpaceAuthorityEndpoints {
-        let spaceHostURL = doc.service.lazy
-            .filter { service in
-                service.id == "#atproto_space_host" || service.id.hasSuffix("#atproto_space_host")
-            }
-            .compactMap { service -> URL? in
-                guard let url = URL(string: service.serviceEndpoint),
-                      isSecureOrLoopback(url) else {
-                    return nil
-                }
-                return url
-            }
-            .first
-
         let pdsURL = doc.service.lazy
             .filter { service in
-                service.id == "#atproto_pds" || service.id.hasSuffix("#atproto_pds")
+                service.id == "#atproto_pds" || service.id == doc.id + "#atproto_pds"
             }
             .compactMap { service -> URL? in
                 guard let url = URL(string: service.serviceEndpoint),
-                      isSecureOrLoopback(url) else {
+                      isSecureOrLoopback(url)
+                else {
                     return nil
                 }
                 return url
             }
             .first
 
-        guard let hostURL = spaceHostURL ?? pdsURL else {
+        guard let hostURL = pdsURL else {
             throw SpaceHostResolutionError.missingSpaceHostEndpoint(doc.id)
         }
 
-        let hasSpaceKey = doc.verificationMethod.contains { vm in
-            vm.id == "#atproto_space" || vm.id.hasSuffix("#atproto_space")
-        }
-
-        let signingKeyFragment = hasSpaceKey ? "#atproto_space" : "#atproto"
-
         return SpaceAuthorityEndpoints(
             spaceHost: hostURL,
-            signingKeyFragment: signingKeyFragment
+            signingKeyFragment: "#atproto"
         )
     }
 
@@ -105,31 +85,58 @@ public enum SpaceHostResolutionError: Error, LocalizedError, Equatable, Sendable
     }
 }
 
+// MARK: - OwnedSessionInvalidator
+
+/// Invalidates a session its owner created, once the owner is released.
+/// URLSession keeps a strong reference to its delegate until it is
+/// invalidated, so an owner that only drops its session leaks the session
+/// and the delegate.
+final class OwnedSessionInvalidator {
+    private let session: URLSession
+
+    init(_ session: URLSession) {
+        self.session = session
+    }
+
+    deinit {
+        // Lets a request still running finish; with the owner gone, no new
+        // request can start on this session.
+        session.finishTasksAndInvalidate()
+    }
+}
+
 // MARK: - SpaceHostResolver
 
 public actor SpaceHostResolver {
     private let didResolver: any DIDResolving
     private let urlSession: URLSession
-    private let sessionDelegate: HardenedURLSessionDelegate?
+    let sessionDelegate: HardenedURLSessionDelegate?
+    /// Set only when this resolver created `urlSession`; invalidates it when
+    /// the resolver is released. A caller's session stays the caller's.
+    private let ownedSession: OwnedSessionInvalidator?
 
     public init(didResolver: any DIDResolving) {
         self.didResolver = didResolver
         let config = URLSessionConfiguration.ephemeral
         #if DEBUG
-        if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
-            config.protocolClasses = testClasses
-        }
+            if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
+                config.protocolClasses = testClasses
+            }
         #endif
         let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
-        self.sessionDelegate = delegate
-        self.urlSession = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        sessionDelegate = delegate
+        let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
+        urlSession = session
+        ownedSession = OwnedSessionInvalidator(session)
     }
 
     init(didResolver: any DIDResolving, urlSession: URLSession) {
         self.didResolver = didResolver
         self.urlSession = urlSession
-        self.sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
+        sessionDelegate = urlSession.delegate as? HardenedURLSessionDelegate
+        ownedSession = nil
     }
+
     /// Resolves the space authority DID document and extracts endpoints.
     public func resolve(authorityDID: String) async throws -> SpaceAuthorityEndpoints {
         let doc = try await fetchDIDDocument(for: authorityDID)
@@ -161,7 +168,8 @@ public actor SpaceHostResolver {
             let authorityParts = rawAuthority.components(separatedBy: "%3A")
             guard (1 ... 2).contains(authorityParts.count),
                   !authorityParts[0].contains("%"),
-                  !authorityParts[0].contains("/") else {
+                  !authorityParts[0].contains("/")
+            else {
                 throw SpaceHostResolutionError.invalidDID(did)
             }
             let host = authorityParts[0]
@@ -172,7 +180,8 @@ public actor SpaceHostResolver {
             if authorityParts.count == 2 {
                 let portStr = authorityParts[1]
                 guard !portStr.isEmpty, !portStr.contains("%"), !portStr.contains("/"),
-                      let portNum = Int(portStr), (1 ... 65535).contains(portNum) else {
+                      let portNum = Int(portStr), (1 ... 65535).contains(portNum)
+                else {
                     throw SpaceHostResolutionError.invalidDID(did)
                 }
                 port = portNum
@@ -196,7 +205,8 @@ public actor SpaceHostResolver {
                           rawSegment != ".",
                           rawSegment != "..",
                           !rawSegment.contains("/"),
-                          rawSegment.unicodeScalars.allSatisfy({ allowedPercentEncodedPathSegmentCharacters.contains($0) }) else {
+                          rawSegment.unicodeScalars.allSatisfy({ allowedPercentEncodedPathSegmentCharacters.contains($0) })
+                    else {
                         throw SpaceHostResolutionError.invalidDID(did)
                     }
                     guard let decoded = rawSegment.removingPercentEncoding,
@@ -204,7 +214,8 @@ public actor SpaceHostResolver {
                           decoded != ".",
                           decoded != "..",
                           !decoded.contains("/"),
-                          !decoded.contains("\\") else {
+                          !decoded.contains("\\")
+                    else {
                         throw SpaceHostResolutionError.invalidDID(did)
                     }
                     rawSegments.append(rawSegment)
@@ -230,18 +241,19 @@ public actor SpaceHostResolver {
         fixtureSession: URLSession? = nil
     ) async throws -> (Data, HTTPURLResponse) {
         guard url.scheme == "https", let host = url.host,
-              url.user == nil, url.password == nil, url.fragment == nil else {
+              url.user == nil, url.password == nil, url.fragment == nil
+        else {
             throw SpaceHostResolutionError.networkError("Invalid public service endpoint")
         }
         #if DEBUG && canImport(Network) && canImport(Security)
-        let fixture = DebugFixtureTransport.current
-        let fixtureAllowed = fixture?.permits(url) == true
+            let fixture = DebugFixtureTransport.current
+            let fixtureAllowed = fixture?.permits(url) == true
         #else
-        let fixtureAllowed = false
+            let fixtureAllowed = false
         #endif
         guard fixtureAllowed || (
             host != "localhost" && host != "127.0.0.1" && host != "::1" &&
-            (url.port == nil || url.port == 443)
+                (url.port == nil || url.port == 443)
         ) else {
             throw SpaceHostResolutionError.networkError("Public service endpoint is not allowed")
         }
@@ -258,17 +270,18 @@ public actor SpaceHostResolver {
         // Release and Linux builds have no fixture transport, so `fixtureAllowed` is the literal
         // `false` there and an unguarded fixture branch is dead code the warning gate rejects.
         #if DEBUG && canImport(Network) && canImport(Security)
-        if fixtureAllowed, let fixtureSession {
-            (data, response) = try await fixtureSession.data(for: request)
-        } else {
-            (data, response) = try await fetchThroughHardenedSession(request, limits: limits)
-        }
+            if fixtureAllowed, let fixtureSession {
+                (data, response) = try await fixtureSession.data(for: request)
+            } else {
+                (data, response) = try await fetchThroughHardenedSession(request, limits: limits)
+            }
         #else
-        (data, response) = try await fetchThroughHardenedSession(request, limits: limits)
+            (data, response) = try await fetchThroughHardenedSession(request, limits: limits)
         #endif
         guard let http = response as? HTTPURLResponse,
               data.count <= limits.maximumDecodedBytes,
-              http.url == url else {
+              http.url == url
+        else {
             throw SpaceHostResolutionError.networkError("Invalid public service response")
         }
         return (data, http)
@@ -278,9 +291,26 @@ public actor SpaceHostResolver {
         _ request: URLRequest,
         limits: NetworkResponseLimits
     ) async throws -> (Data, URLResponse) {
+        try await withPerCallHardenedSession(configuration: .ephemeral, limits: limits) { session, delegate in
+            try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+        }
+    }
+
+    /// Runs `body` with a hardened session made for this call alone, then
+    /// invalidates the session. URLSession keeps a strong reference to its
+    /// delegate until it is invalidated, so a per-call session that is only
+    /// dropped leaks itself and its delegate on every call.
+    static func withPerCallHardenedSession<T>(
+        configuration: URLSessionConfiguration,
+        limits: NetworkResponseLimits,
+        _ body: (URLSession, HardenedURLSessionDelegate) async throws -> T
+    ) async rethrows -> T {
         let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
-        let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
-        return try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+        let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+        // Lets a request that `body` left running finish; nothing else holds
+        // this session, so no new request can start on it.
+        defer { session.finishTasksAndInvalidate() }
+        return try await body(session, delegate)
     }
 
     /// Fetches and decodes the DID document using the hardened network path.
@@ -301,9 +331,9 @@ public actor SpaceHostResolver {
     ) async throws -> DIDDocument {
         let url = try didDocumentURL(for: did)
         #if DEBUG && canImport(Network) && canImport(Security)
-        let fixtureAllowed = DebugFixtureTransport.current?.permits(url) == true
+            let fixtureAllowed = DebugFixtureTransport.current?.permits(url) == true
         #else
-        let fixtureAllowed = false
+            let fixtureAllowed = false
         #endif
         if !fixtureAllowed {
             guard try await NetworkService.validateURL(url) else {
@@ -330,13 +360,13 @@ public actor SpaceHostResolver {
             } else {
                 let config = URLSessionConfiguration.ephemeral
                 #if DEBUG
-                if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
-                    config.protocolClasses = testClasses
-                }
+                    if let testClasses = NetworkService.getNetworkTestProtocolClasses() {
+                        config.protocolClasses = testClasses
+                    }
                 #endif
-                let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
-                let session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-                (data, response) = try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+                (data, response) = try await withPerCallHardenedSession(configuration: config, limits: limits) { [request] session, delegate in
+                    try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+                }
             }
         } catch {
             throw SpaceHostResolutionError.networkError(error.localizedDescription)
@@ -360,5 +390,30 @@ public actor SpaceHostResolver {
 
     public func fetchDIDDocument(for did: String) async throws -> DIDDocument {
         try await Self.fetchDIDDocument(for: did, urlSession: urlSession, sessionDelegate: sessionDelegate)
+    }
+}
+
+public extension SpaceHostResolver {
+    /// Resolve the author's sole P-256 KEM method from the exact account DID.
+    /// PLC can publish the legacy raw-point representation as well as Multikey.
+    static func authorKEMKey(from document: DIDDocument, expectedDID: String) throws -> String {
+        let candidates = document.verificationMethod.filter {
+            $0.id == "#atproto_kem" || $0.id == expectedDID + "#atproto_kem"
+        }
+        guard document.id == expectedDID, candidates.count == 1,
+              let method = candidates.first, method.controller == expectedDID
+        else {
+            throw SpaceVerificationError.missingKEMKey
+        }
+        switch method.type {
+        case "Multikey":
+            return try P256DIDKey("did:key:" + method.publicKeyMultibase).value
+        case "EcdsaSecp256r1VerificationKey2019":
+            let key = try PLCDIDKeyCodec.decodeLegacyMultibase(method.publicKeyMultibase, curve: .p256)
+            guard case .p256 = key else { throw SpaceVerificationError.missingKEMKey }
+            return key.didKey
+        default:
+            throw SpaceVerificationError.missingKEMKey
+        }
     }
 }

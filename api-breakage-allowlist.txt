@@ -115,3 +115,102 @@ API breakage: constructor AppBskyUnspeccedGetTrends.Output.init(trends:) has bee
 API breakage: constructor AppBskyUnspeccedGetTrendsSkeleton.Output.init(trends:) has been removed
 API breakage: constructor AppBskyVideoDefs.JobStatus.init(jobId:did:state:progress:blob:error:message:) has been removed
 API breakage: constructor ComAtprotoServerDescribeServer.Output.init(inviteCodeRequired:phoneVerificationRequired:availableUserDomains:links:contact:did:) has been removed
+API breakage: enumelement AuthEvent.gatewaySessionRejected has been added as a new enum case
+API breakage: enumelement AuthError.invalidClientMetadata has been added as a new enum case
+API breakage: enumelement AuthError.nativeClientNoneAuthRequired has been added as a new enum case
+API breakage: enumelement AuthError.oauthFlowStateUnavailable has been added as a new enum case
+API breakage: func ATProtoLink.isEqual(to:) has parameter 0 type change from any Petrel.ATProtocolCodable to any Petrel.ATProtocolValue
+API breakage: protocol ATProtocolCodable has generic signature change from <Self : Petrel.DAGCBORDecodable, Self : Petrel.DAGCBOREncodable, Self : Swift.Decodable, Self : Swift.Encodable, Self : Swift.Sendable> to <Self : PetrelCore.DAGCBORDecodable, Self : PetrelCore.DAGCBOREncodable, Self : Swift.Decodable, Self : Swift.Encodable, Self : Swift.Sendable>
+API breakage: enumelement NetworkError.streamOverflow has been added as a new enum case
+API breakage: enumelement NetworkError.responseLimitExceeded has been added as a new enum case
+API breakage: enumelement NetworkError.metadataStrippingFailed has been added as a new enum case
+API breakage: constructor AppBskyActorDefs.StatusView.init(uri:cid:status:record:embed:labels:expiresAt:isActive:isDisabled:) has parameter 1 type change from Petrel.CID? to PetrelCore.CID?
+API breakage: constructor AppBskyFeedDefs.ReasonRepost.init(by:uri:cid:indexedAt:) has parameter 2 type change from Petrel.CID? to PetrelCore.CID?
+API breakage: constructor AppBskyFeedDefs.ThreadgateView.init(uri:cid:record:lists:) has parameter 1 type change from Petrel.CID? to PetrelCore.CID?
+API breakage: constructor ComAtprotoLabelDefs.Label.init(ver:src:uri:cid:val:neg:cts:exp:sig:) has parameter 3 type change from Petrel.CID? to PetrelCore.CID?
+API breakage: constructor ComAtprotoSyncSubscribeRepos.Commit.init(seq:rebase:tooBig:repo:commit:rev:since:blocks:ops:blobs:prevData:time:) has parameter 10 type change from Petrel.CID? to PetrelCore.CID?
+API breakage: var ComAtprotoSyncSubscribeRepos.RepoOp.cid has declared type change from Petrel.CID to PetrelCore.CID?
+API breakage: accessor ComAtprotoSyncSubscribeRepos.RepoOp.cid.Get() has return type change from Petrel.CID to PetrelCore.CID?
+API breakage: constructor ComAtprotoSyncSubscribeRepos.RepoOp.init(action:path:cid:prev:) has parameter 2 type change from Petrel.CID to PetrelCore.CID?
+API breakage: constructor ComAtprotoSyncSubscribeRepos.RepoOp.init(action:path:cid:prev:) has parameter 3 type change from Petrel.CID? to PetrelCore.CID?
+API breakage: func Array.toCBORValue() has generic signature change from <Element where Element : Petrel.DAGCBOREncodable> to <Element where Element : PetrelCore.DAGCBOREncodable>
+API breakage: extension Int has removed conformance to ASN1IntegerRepresentable
+API breakage: extension Int has removed conformance to BERImplicitlyTaggable
+API breakage: extension Int has removed conformance to BERParseable
+API breakage: extension Int has removed conformance to BERSerializable
+API breakage: extension Int has removed conformance to DERImplicitlyTaggable
+API breakage: extension Int has removed conformance to DERParseable
+API breakage: extension Int has removed conformance to DERSerializable
+API breakage: extension Bool has removed conformance to BERImplicitlyTaggable
+API breakage: extension Bool has removed conformance to BERParseable
+API breakage: extension Bool has removed conformance to BERSerializable
+API breakage: extension Bool has removed conformance to DERImplicitlyTaggable
+API breakage: extension Bool has removed conformance to DERParseable
+API breakage: extension Bool has removed conformance to DERSerializable
+API breakage: enum CARReaderError has been removed
+API breakage: class CARReader has been removed
+API breakage: constructor OAuthState.init(stateToken:codeVerifier:createdAt:initialIdentifier:targetPDSURL:ephemeralDPoPKey:parResponseNonce:bskyAppViewDID:bskyChatDID:) has been removed
+API breakage: protocol DAGCBOREncodable has been removed
+API breakage: protocol DAGCBORDecodable has been removed
+API breakage: typealias DAGCBORCodable has been removed
+API breakage: enum DAGCBORError has been removed
+API breakage: func CIDCodec.toCBORValue() has been removed
+API breakage: enumelement CIDCodec.raw has been removed
+API breakage: enumelement CIDCodec.dagPB has been removed
+API breakage: enumelement CIDCodec.dagCBOR has been removed
+API breakage: enumelement CIDCodec.gitRaw has been removed
+API breakage: enumelement CIDCodec.identity has been removed
+API breakage: constructor CIDCodec.init(rawValue:) has been removed
+API breakage: typealias CIDCodec.RawValue has been removed
+API breakage: var CIDCodec.rawValue has been removed
+API breakage: func Multihash.toCBORValue() has been removed
+API breakage: var Multihash.sha1Code has been removed
+API breakage: var Multihash.sha1Length has been removed
+API breakage: var Multihash.sha256Code has been removed
+API breakage: var Multihash.sha256Length has been removed
+API breakage: var Multihash.sha512Code has been removed
+API breakage: var Multihash.sha512Length has been removed
+API breakage: var Multihash.blake2b256Code has been removed
+API breakage: var Multihash.blake2b256Length has been removed
+API breakage: var Multihash.algorithmName has been removed
+API breakage: var Multihash.algorithm has been removed
+API breakage: var Multihash.length has been removed
+API breakage: var Multihash.digest has been removed
+API breakage: constructor Multihash.init(algorithm:length:digest:) has been removed
+API breakage: var Multihash.bytes has been removed
+API breakage: func Multihash.sha256(_:) has been removed
+API breakage: func Multihash.encode(to:) has been removed
+API breakage: func Multihash.hash(into:) has been removed
+API breakage: var Multihash.hashValue has been removed
+API breakage: constructor Multihash.init(from:) has been removed
+API breakage: var ATProtoLink.cid has been removed
+API breakage: constructor ATProtoLink.init(cid:) has been removed
+API breakage: constructor ATProtoLink.init(cidString:) has been removed
+API breakage: constructor ATProtoLink.init(from:) has been removed
+API breakage: func ATProtoLink.encode(to:) has been removed
+API breakage: func ATProtoLink.hash(into:) has been removed
+API breakage: func ATProtoLink.toCBORValue() has been removed
+API breakage: var ATProtoLink.hashValue has been removed
+API breakage: var CID.codec has been removed
+API breakage: var CID.multihash has been removed
+API breakage: constructor CID.init(codec:multihash:) has been removed
+API breakage: var CID.bytes has been removed
+API breakage: var CID.string has been removed
+API breakage: var CID.description has been removed
+API breakage: func CID.fromDAGCBOR(_:) has been removed
+API breakage: func CID.fromBlob(_:) has been removed
+API breakage: enum CID.CIDParseError has been removed
+API breakage: func CID.parse(_:) has been removed
+API breakage: constructor CID.init(bytes:) has been removed
+API breakage: constructor CID.init(from:) has been removed
+API breakage: func CID.encode(to:) has been removed
+API breakage: func CID.toCBORValue() has been removed
+API breakage: func CID.hash(into:) has been removed
+API breakage: var CID.hashValue has been removed
+API breakage: class DAGCBOR has been removed
+API breakage: func base32Encode(_:) has been removed
+API breakage: func base32Decode(_:) has been removed
+API breakage: struct OrderedCBORMap has been removed
+API breakage: constructor AppBskyFeedDefs.ViewerState.init(repost:like:bookmarked:threadMuted:replyDisabled:embeddingDisabled:pinned:) has been removed
+API breakage: constructor NetworkService.init(baseURL:authService:) has been removed
+API breakage: func Data.hexDump() has been removed

@@ -1,0 +1,194 @@
+{
+  "baseline_tag": "0.1.0",
+  "baseline_commit": "02de350792158ffc9f2ad9902ac61f101ea84bca",
+  "observed_runtime_commit": "e115236537041a900ec971be05185a70cca73e8a",
+  "ci_job": "https://github.com/joshlacal/Petrel/actions/runs/40049515308/job/120738797956",
+  "ci_xcode_version": "26.6",
+  "ci_xcode_build": "17F113",
+  "ci_job_log_sha256": "f47c41669530480f87ac91167f1ddce6ec77e190e00f730a5289fba13a738acb",
+  "existing_allowlist_entries_preserved": 117,
+  "new_exact_entries": 99,
+  "groups": {
+    "module-relocation": {
+      "count": 72,
+      "diagnostics": [
+        "API breakage: protocol ATProtocolCodable has generic signature change from <Self : Petrel.DAGCBORDecodable, Self : Petrel.DAGCBOREncodable, Self : Swift.Decodable, Self : Swift.Encodable, Self : Swift.Sendable> to <Self : PetrelCore.DAGCBORDecodable, Self : PetrelCore.DAGCBOREncodable, Self : Swift.Decodable, Self : Swift.Encodable, Self : Swift.Sendable>",
+        "API breakage: constructor AppBskyActorDefs.StatusView.init(uri:cid:status:record:embed:labels:expiresAt:isActive:isDisabled:) has parameter 1 type change from Petrel.CID? to PetrelCore.CID?",
+        "API breakage: constructor AppBskyFeedDefs.ReasonRepost.init(by:uri:cid:indexedAt:) has parameter 2 type change from Petrel.CID? to PetrelCore.CID?",
+        "API breakage: constructor AppBskyFeedDefs.ThreadgateView.init(uri:cid:record:lists:) has parameter 1 type change from Petrel.CID? to PetrelCore.CID?",
+        "API breakage: constructor ComAtprotoLabelDefs.Label.init(ver:src:uri:cid:val:neg:cts:exp:sig:) has parameter 3 type change from Petrel.CID? to PetrelCore.CID?",
+        "API breakage: constructor ComAtprotoSyncSubscribeRepos.Commit.init(seq:rebase:tooBig:repo:commit:rev:since:blocks:ops:blobs:prevData:time:) has parameter 10 type change from Petrel.CID? to PetrelCore.CID?",
+        "API breakage: constructor ComAtprotoSyncSubscribeRepos.RepoOp.init(action:path:cid:prev:) has parameter 3 type change from Petrel.CID? to PetrelCore.CID?",
+        "API breakage: func Array.toCBORValue() has generic signature change from <Element where Element : Petrel.DAGCBOREncodable> to <Element where Element : PetrelCore.DAGCBOREncodable>",
+        "API breakage: enum CARReaderError has been removed",
+        "API breakage: class CARReader has been removed",
+        "API breakage: protocol DAGCBOREncodable has been removed",
+        "API breakage: protocol DAGCBORDecodable has been removed",
+        "API breakage: typealias DAGCBORCodable has been removed",
+        "API breakage: enum DAGCBORError has been removed",
+        "API breakage: func CIDCodec.toCBORValue() has been removed",
+        "API breakage: enumelement CIDCodec.raw has been removed",
+        "API breakage: enumelement CIDCodec.dagPB has been removed",
+        "API breakage: enumelement CIDCodec.dagCBOR has been removed",
+        "API breakage: enumelement CIDCodec.gitRaw has been removed",
+        "API breakage: enumelement CIDCodec.identity has been removed",
+        "API breakage: constructor CIDCodec.init(rawValue:) has been removed",
+        "API breakage: typealias CIDCodec.RawValue has been removed",
+        "API breakage: var CIDCodec.rawValue has been removed",
+        "API breakage: func Multihash.toCBORValue() has been removed",
+        "API breakage: var Multihash.sha1Code has been removed",
+        "API breakage: var Multihash.sha1Length has been removed",
+        "API breakage: var Multihash.sha256Code has been removed",
+        "API breakage: var Multihash.sha256Length has been removed",
+        "API breakage: var Multihash.sha512Code has been removed",
+        "API breakage: var Multihash.sha512Length has been removed",
+        "API breakage: var Multihash.blake2b256Code has been removed",
+        "API breakage: var Multihash.blake2b256Length has been removed",
+        "API breakage: var Multihash.algorithmName has been removed",
+        "API breakage: var Multihash.algorithm has been removed",
+        "API breakage: var Multihash.length has been removed",
+        "API breakage: var Multihash.digest has been removed",
+        "API breakage: constructor Multihash.init(algorithm:length:digest:) has been removed",
+        "API breakage: var Multihash.bytes has been removed",
+        "API breakage: func Multihash.sha256(_:) has been removed",
+        "API breakage: func Multihash.encode(to:) has been removed",
+        "API breakage: func Multihash.hash(into:) has been removed",
+        "API breakage: var Multihash.hashValue has been removed",
+        "API breakage: constructor Multihash.init(from:) has been removed",
+        "API breakage: var ATProtoLink.cid has been removed",
+        "API breakage: constructor ATProtoLink.init(cid:) has been removed",
+        "API breakage: constructor ATProtoLink.init(cidString:) has been removed",
+        "API breakage: constructor ATProtoLink.init(from:) has been removed",
+        "API breakage: func ATProtoLink.encode(to:) has been removed",
+        "API breakage: func ATProtoLink.hash(into:) has been removed",
+        "API breakage: func ATProtoLink.toCBORValue() has been removed",
+        "API breakage: var ATProtoLink.hashValue has been removed",
+        "API breakage: var CID.codec has been removed",
+        "API breakage: var CID.multihash has been removed",
+        "API breakage: constructor CID.init(codec:multihash:) has been removed",
+        "API breakage: var CID.bytes has been removed",
+        "API breakage: var CID.string has been removed",
+        "API breakage: var CID.description has been removed",
+        "API breakage: func CID.fromDAGCBOR(_:) has been removed",
+        "API breakage: func CID.fromBlob(_:) has been removed",
+        "API breakage: enum CID.CIDParseError has been removed",
+        "API breakage: func CID.parse(_:) has been removed",
+        "API breakage: constructor CID.init(bytes:) has been removed",
+        "API breakage: constructor CID.init(from:) has been removed",
+        "API breakage: func CID.encode(to:) has been removed",
+        "API breakage: func CID.toCBORValue() has been removed",
+        "API breakage: func CID.hash(into:) has been removed",
+        "API breakage: var CID.hashValue has been removed",
+        "API breakage: class DAGCBOR has been removed",
+        "API breakage: func base32Encode(_:) has been removed",
+        "API breakage: func base32Decode(_:) has been removed",
+        "API breakage: struct OrderedCBORMap has been removed",
+        "API breakage: func Data.hexDump() has been removed"
+      ]
+    },
+    "repoop-cid-optionality": {
+      "count": 3,
+      "diagnostics": [
+        "API breakage: var ComAtprotoSyncSubscribeRepos.RepoOp.cid has declared type change from Petrel.CID to PetrelCore.CID?",
+        "API breakage: accessor ComAtprotoSyncSubscribeRepos.RepoOp.cid.Get() has return type change from Petrel.CID to PetrelCore.CID?",
+        "API breakage: constructor ComAtprotoSyncSubscribeRepos.RepoOp.init(action:path:cid:prev:) has parameter 2 type change from Petrel.CID to PetrelCore.CID?"
+      ]
+    },
+    "swift-asn1-transitive-conformances": {
+      "count": 13,
+      "diagnostics": [
+        "API breakage: extension Int has removed conformance to ASN1IntegerRepresentable",
+        "API breakage: extension Int has removed conformance to BERImplicitlyTaggable",
+        "API breakage: extension Int has removed conformance to BERParseable",
+        "API breakage: extension Int has removed conformance to BERSerializable",
+        "API breakage: extension Int has removed conformance to DERImplicitlyTaggable",
+        "API breakage: extension Int has removed conformance to DERParseable",
+        "API breakage: extension Int has removed conformance to DERSerializable",
+        "API breakage: extension Bool has removed conformance to BERImplicitlyTaggable",
+        "API breakage: extension Bool has removed conformance to BERParseable",
+        "API breakage: extension Bool has removed conformance to BERSerializable",
+        "API breakage: extension Bool has removed conformance to DERImplicitlyTaggable",
+        "API breakage: extension Bool has removed conformance to DERParseable",
+        "API breakage: extension Bool has removed conformance to DERSerializable"
+      ]
+    },
+    "authentication": {
+      "count": 4,
+      "diagnostics": [
+        "API breakage: enumelement AuthEvent.gatewaySessionRejected has been added as a new enum case",
+        "API breakage: enumelement AuthError.invalidClientMetadata has been added as a new enum case",
+        "API breakage: enumelement AuthError.nativeClientNoneAuthRequired has been added as a new enum case",
+        "API breakage: enumelement AuthError.oauthFlowStateUnavailable has been added as a new enum case"
+      ]
+    },
+    "networking": {
+      "count": 3,
+      "diagnostics": [
+        "API breakage: enumelement NetworkError.streamOverflow has been added as a new enum case",
+        "API breakage: enumelement NetworkError.responseLimitExceeded has been added as a new enum case",
+        "API breakage: enumelement NetworkError.metadataStrippingFailed has been added as a new enum case"
+      ]
+    },
+    "viewer-state-initializer": {
+      "count": 1,
+      "diagnostics": [
+        "API breakage: constructor AppBskyFeedDefs.ViewerState.init(repost:like:bookmarked:threadMuted:replyDisabled:embeddingDisabled:pinned:) has been removed"
+      ]
+    },
+    "existing-equality-overload": {
+      "count": 1,
+      "diagnostics": [
+        "API breakage: func ATProtoLink.isEqual(to:) has parameter 0 type change from any Petrel.ATProtocolCodable to any Petrel.ATProtocolValue"
+      ]
+    },
+    "oauth-state-initializer": {
+      "count": 1,
+      "diagnostics": [
+        "API breakage: constructor OAuthState.init(stateToken:codeVerifier:createdAt:initialIdentifier:targetPDSURL:ephemeralDPoPKey:parResponseNonce:bskyAppViewDID:bskyChatDID:) has been removed"
+      ]
+    },
+    "network-service-initializer": {
+      "count": 1,
+      "diagnostics": [
+        "API breakage: constructor NetworkService.init(baseURL:authService:) has been removed"
+      ]
+    }
+  },
+  "qualification": "Reviewed exact SwiftPM API diagnostics for migration from the historical 0.1.0 baseline, not a comparison against the latest published 1.x release. Source compilation evidence is not ABI, old-toolchain, runtime, or production qualification. New PetrelCore module was skipped by the baseline comparator; the migration guide separately covers its added error cases.",
+  "provenance_commits": {
+    "module_extraction": "96b9b32366adba92938f69c763c5683eb1b87b28",
+    "existing_equality_overload_restoration": "7548402f5edaa97552ab7ad0a1d00d14c60e6129",
+    "jose_swift_removal": "9b21cc578a372c16232a768bbee5ff1b04879545",
+    "required_nullable_generator_correction": "d011ccf0029457434e659ec48c8024baa7b5c4e4",
+    "prior_repoop_cid_optionality_review": "2319638391ea8829c8737b60e285b8c6a116b324",
+    "invalid_client_metadata_error": "74bdffd960a92b7305940bb89aa2262897999fc2",
+    "native_client_and_missing_state_errors": "ca7e5a10777fb6eb0bf508532bd0f6ecdf447a1e",
+    "gateway_session_rejection_event": "290ab1e03e3d7f26edcc166c198e96f1323e1137",
+    "atomic_gateway_rejection_proof": "89140e1aa1f41eead969732da87354b9732879c4",
+    "oauth_callback_bindings": "210f66b1f6eff43f5504071c0affdd31966f68e6",
+    "network_bounds": "078f742e1c7f520ef90ded9e8dc73ef9612ed6ad",
+    "metadata_stripping_error": "28d9ac26d153f2078dab65c1d026a1d35e0b166d",
+    "known_likers_schema": "dce416b9f56f6c28e8339abdce0a82766d6a19ad",
+    "known_likers_projection": "bf1f27567e5d49b0a8ca5d7ead2c6ea0ef9a2575",
+    "parser_security_changes": "6788fd6705b6ec910435cd7119f235277aade779"
+  },
+  "source_probe": {
+    "toolchain": "Apple Swift 6.4, macOS 27",
+    "result": "consumer object compilation passed with warnings as errors",
+    "binary_compatibility": false,
+    "runtime_execution": false
+  },
+  "expected_failed_source_probes": [
+    "0.1.0-old-init-references.swift",
+    "0.1.0-repoop-nonoptional.swift",
+    "0.1.0-old-enum-switches.swift"
+  ],
+  "swift_asn1_direct_dependency_probe": {
+    "revision": "f70225981241859eb4aa1a18a75531d26637c8cc",
+    "dependency_checkout_clean_before_and_after": true,
+    "int_bool_conformance_assertions": 13,
+    "result": "standalone consumer object compilation passed with warnings as errors",
+    "toolchain": "Apple Swift 6.4, macOS 27",
+    "initial_without_direct_dependency": "import SwiftASN1 failed because its module was absent from Petrel build products"
+  }
+}

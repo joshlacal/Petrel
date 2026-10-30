@@ -1,24 +1,6 @@
 #!/usr/bin/env bash
-# Petrel/Scripts/vendor-space-lexicons.sh
-# Vendors com.atproto.space + com.atproto.simplespace lexicons from a pinned
-# SHA of bluesky-social/atproto (permissioned-data branch). Re-run with a new
-# SHA on upstream Thursday alpha drops.
+# Update generator/provenance/spaces.json only after reviewing a new release.
+# Checkpoint owned work with jj before invoking this script.
 set -euo pipefail
-SHA="${1:?usage: vendor-space-lexicons.sh <atproto-commit-sha>}"
-if [[ ! "$SHA" =~ ^[0-9a-fA-F]{40}$ ]]; then
-  echo "Error: Commit SHA must be a full 40-character hexadecimal commit hash (got: '$SHA')" >&2
-  exit 1
-fi
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TMP="$(mktemp -d)"
-trap 'rm -rf "$TMP"' EXIT
-curl -fsSL "https://github.com/bluesky-social/atproto/archive/${SHA}.tar.gz" \
-  | tar -xz -C "$TMP" --strip-components=1 \
-      "atproto-${SHA}/lexicons/com/atproto/space" \
-      "atproto-${SHA}/lexicons/com/atproto/simplespace"
-for ns in space simplespace; do
-  rm -rf "$ROOT/generator/lexicons/com/atproto/$ns"
-  cp -R "$TMP/lexicons/com/atproto/$ns" "$ROOT/generator/lexicons/com/atproto/$ns"
-done
-echo "$SHA" > "$ROOT/generator/lexicons/com/atproto/space/.pin"
-echo "Vendored space lexicons at $SHA"
+exec "${PETREL_PYTHON:-python3}" "$ROOT/Scripts/space_lexicon_provenance.py" vendor "$@"

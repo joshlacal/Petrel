@@ -7,17 +7,36 @@ public enum ComAtprotoSpaceGetSpaceCredential {
     public static let typeIdentifier = "com.atproto.space.getSpaceCredential"
     public struct Input: ATProtocolCodable {
         public let space: SpaceRef
+        public let credentialKid: String
+        public let delegationToken: String?
         public let clientAttestation: String?
 
         /// Standard public initializer
-        public init(space: SpaceRef, clientAttestation: String? = nil) {
+        public init(space: SpaceRef, credentialKid: String, delegationToken: String? = nil, clientAttestation: String? = nil) {
             self.space = space
+            self.credentialKid = credentialKid
+            self.delegationToken = delegationToken
             self.clientAttestation = clientAttestation
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             space = try container.decode(SpaceRef.self, forKey: .space)
+            credentialKid = try container.decode(String.self, forKey: .credentialKid)
+            if container.contains(.delegationToken) {
+                guard try !container.decodeNil(forKey: .delegationToken) else {
+                    throw DecodingError.valueNotFound(
+                        String.self,
+                        DecodingError.Context(
+                            codingPath: container.codingPath,
+                            debugDescription: "Property 'delegationToken' must not be null"
+                        )
+                    )
+                }
+                delegationToken = try container.decode(String.self, forKey: .delegationToken)
+            } else {
+                delegationToken = nil
+            }
             if container.contains(.clientAttestation) {
                 guard try !container.decodeNil(forKey: .clientAttestation) else {
                     throw DecodingError.valueNotFound(
@@ -37,6 +56,8 @@ public enum ComAtprotoSpaceGetSpaceCredential {
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(space, forKey: .space)
+            try container.encode(credentialKid, forKey: .credentialKid)
+            try container.encodeIfPresent(delegationToken, forKey: .delegationToken)
             try container.encodeIfPresent(clientAttestation, forKey: .clientAttestation)
         }
 
@@ -44,6 +65,12 @@ public enum ComAtprotoSpaceGetSpaceCredential {
             var map = OrderedCBORMap()
             let spaceValue = try space.toCBORValue()
             map = map.adding(key: "space", value: spaceValue)
+            let credentialKidValue = try credentialKid.toCBORValue()
+            map = map.adding(key: "credentialKid", value: credentialKidValue)
+            if let value = delegationToken {
+                let delegationTokenValue = try value.toCBORValue()
+                map = map.adding(key: "delegationToken", value: delegationTokenValue)
+            }
             if let value = clientAttestation {
                 let clientAttestationValue = try value.toCBORValue()
                 map = map.adding(key: "clientAttestation", value: clientAttestationValue)
@@ -53,6 +80,8 @@ public enum ComAtprotoSpaceGetSpaceCredential {
 
         private enum CodingKeys: String, CodingKey {
             case space
+            case credentialKid
+            case delegationToken
             case clientAttestation
         }
     }
@@ -139,7 +168,7 @@ public enum ComAtprotoSpaceGetSpaceCredential {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - getSpaceCredential
 
-    // Exchange a delegation token for a space credential. Called on the space authority, with the delegation token as the request's authorization token and a DPoP proof signed by the key to bind the credential to. The resulting space credential reads repos across the space. Requires a delegation token and DPoP proof, plus a client attestation when the space gates on app identity.
+    // Request a space credential. Called on the space authority. A delegation token is required when the space gates on the user. A client attestation is required when the space gates on app identity. A space that requires neither offers public access. The resulting space credential reads repos across the space.
     //
     // - Parameter input: The input parameters for the request
 

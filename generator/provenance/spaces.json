@@ -1,0 +1,42 @@
+{
+  "repository": "https://github.com/bluesky-social/atproto",
+  "commit": "ac0c9f15392f6f0298d71dc52aa88c05036150be",
+  "archive_url": "https://codeload.github.com/bluesky-social/atproto/tar.gz/ac0c9f15392f6f0298d71dc52aa88c05036150be",
+  "archive_sha256": "eae029a70a3adf0f7d6241814d5a91d55bf6768e8f4cd00196870c911df57eb5",
+  "namespaces": [
+    "com/atproto/space",
+    "com/atproto/simplespace"
+  ],
+  "files": {
+    "com/atproto/simplespace/checkUserAccess.json": "98b13acc7124a23539416e5f10e44ef82a9773e6cbfca556cfa9b184d9b3daf1",
+    "com/atproto/simplespace/createSpace.json": "36d260eae7230f543c5d88c2d33f101dd6150e297a9027507bce362a1cbec037",
+    "com/atproto/simplespace/defs.json": "1c6bb8cf29f10df44f03f9d0f9961f78aa8facc74128ebf1683d506994598a93",
+    "com/atproto/simplespace/deleteSpace.json": "40ea7fea66edf5c1a2d4ebac2b94ebeb8f4e4581001a8da99c183d1d8438e4a3",
+    "com/atproto/simplespace/getSpace.json": "c64924d2f593f060a413456d31676593e06fb62d654e3a714293f66602a743e0",
+    "com/atproto/simplespace/listMembers.json": "adb2cf5bf797014a1ba23cc35582412a72c845773249a6fb75b5db0db47d0b55",
+    "com/atproto/simplespace/putMember.json": "be30c3c1f70f409d01d747979d72a264439edc933619cc5f74f4dc418ae59b1e",
+    "com/atproto/simplespace/removeMember.json": "523dee8ba74d3f23b106202c81ee6c642d23deddc53484c1bae6289a2cc358ac",
+    "com/atproto/simplespace/updateSpace.json": "2ae30f59f41ab69423a03c61de48b34481b8592e632d063a9dca80aa224abddd",
+    "com/atproto/space/applyWrites.json": "a427fb59ba3625dd55dd9a987f86bc0274e13d7be3a512ed4bcfa36946de6e21",
+    "com/atproto/space/createRecord.json": "ae41c1082f071567ec04e8ff2f5874ddd4f9a3c6f076fb20cab798330e034c34",
+    "com/atproto/space/defs.json": "bd98dc5731a5677a98c308b104c4c282639f6dd5946b3966563181f0a91ae17d",
+    "com/atproto/space/deleteRecord.json": "2f495df6d02cec8998f2371b2eaf182aae6159e3dbb0f7633f5935409a5a8bb5",
+    "com/atproto/space/getBlob.json": "b9d7274f27bdeaeb921e10a5a332a74a62b02a6a389b3afb426bdfaa6cf685dd",
+    "com/atproto/space/getDelegationToken.json": "5c1cd08d6dcf4e21c79b21ab020bad4f231b97ab404a06b9e610fe08a27bca97",
+    "com/atproto/space/getLatestCommit.json": "419c3951b4dcceb6e1c3c8a1bdd595630169bf16b0a305d820816e16864a1ad2",
+    "com/atproto/space/getRecord.json": "a22375b00040cf2c98cffe0520d8229233a9d06917ccb616fbb23854a4e72aa8",
+    "com/atproto/space/getRepo.json": "34bc1ecded2d467aff0e869142be29c21179b9e2f27452c6208fa6fc3cc25f7f",
+    "com/atproto/space/getSpaceCredential.json": "48b352dbb9b37f6b605bac3336042c07336371bc4d0d3f5cf8f1b5156574d601",
+    "com/atproto/space/listBlobs.json": "1e3ce6040ef6103a5c4d02b84823879f4784db41420b1bcf4441a08ee27101ed",
+    "com/atproto/space/listRecords.json": "16bf03392724ecfe77ffe7db693aa301e7e5346fb9fad1c276a15e7d8b98db57",
+    "com/atproto/space/listRepoOps.json": "7a606139f8456353a4b162d40d0319024ee07fd633955e1f6be643861a77aa96",
+    "com/atproto/space/listRepos.json": "9dc3beedb2451eb2cb2db3f0ba29d4c21d10f44985355df6e7fc599433e4009e",
+    "com/atproto/space/listSpaces.json": "b10db2321de10cdc783804f7d8882ec99e4e76f417283e462f74624dd314d5b8",
+    "com/atproto/space/notifyCredentialRevoked.json": "db181622dfceb534b08a0713a39725f13874d27d49d748e815f1f8a3b815d13e",
+    "com/atproto/space/notifySpaceDeleted.json": "def6a8c23cb6c0b8512c9234680bbc77917a92cc269363ee211ada5b5d6f5c6c",
+    "com/atproto/space/notifyWrite.json": "33edaaae3254c59c40382d92c29b7ec5b6c8e4d1c63f1d2f23c94d22548b6379",
+    "com/atproto/space/putRecord.json": "9b1bbb8d731a064aaa6c7e35196e30169e910fb45a59e782a988bc9457b2d4ce",
+    "com/atproto/space/registerNotify.json": "13ffde5c8489ef361f48213aa26adb85a0aed3563d2700db493b1a3781150be7",
+    "com/atproto/space/unregisterNotify.json": "664486878c89c42f7d38fbf1cd14c1b285c6a650e6735650bfafcd4ca09d9c2e"
+  }
+}

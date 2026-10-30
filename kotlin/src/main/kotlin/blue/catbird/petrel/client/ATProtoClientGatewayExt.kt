@@ -62,8 +62,8 @@ fun ATProtoClient.configureGateway(
     // encrypted store. Without this hook, a UUID that Redis has evicted
     // produces an infinite stream of 401s because the client keeps re-sending
     // the same dead bearer on every XRPC call.
-    networkService.unauthorizedHandler = { host, body ->
-        strategy.handleUnauthorizedResponse(host, body)
+    networkService.unauthorizedHandler = { host, authorization, body ->
+        strategy.handleUnauthorizedResponse(host, authorization, body)
     }
     return strategy
 }

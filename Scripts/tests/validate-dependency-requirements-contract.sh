@@ -34,6 +34,15 @@ expected = {
         "0.8.0",
     ),
 }
+# PetrelCrypto's existing ES256K/PLC implementation uses this exact release.
+# Keep its source and requirement separate from the reviewed bounded ranges;
+# accepting a newer version or a range requires another explicit policy review.
+expected_exact = {
+    "secp256k1.swift": (
+        "https://github.com/GigaBitcoin/secp256k1.swift.git",
+        "0.15.0",
+    ),
+}
 
 direct_dependencies = dump.get("dependencies", [])
 if not isinstance(direct_dependencies, list):
@@ -81,7 +90,7 @@ def contains_pre_one_version(value):
     return version is not None and version.group(1) == "0"
 
 
-for identity, (expected_url, expected_lower, expected_upper) in expected.items():
+def reviewed_dependency(identity, expected_url):
     dependency = dependencies.get(identity)
     if dependency is None:
         raise SystemExit(f"missing direct dependency: {identity}")
@@ -92,6 +101,11 @@ for identity, (expected_url, expected_lower, expected_upper) in expected.items()
         raise SystemExit(
             f"{identity} source URL must be {expected_url}; got {actual_location!r}"
         )
+    return dependency
+
+
+for identity, (expected_url, expected_lower, expected_upper) in expected.items():
+    dependency = reviewed_dependency(identity, expected_url)
 
     requirement = dependency.get("requirement", {})
     ranges = requirement.get("range", [])
@@ -109,11 +123,22 @@ for identity, (expected_url, expected_lower, expected_upper) in expected.items()
             f"{actual_lower}..<{actual_upper}"
         )
 
+for identity, (expected_url, expected_version) in expected_exact.items():
+    dependency = reviewed_dependency(identity, expected_url)
+    requirement = dependency.get("requirement", {})
+    if requirement != {"exact": [expected_version]}:
+        raise SystemExit(
+            f"{identity} requirement must be exact {expected_version}; "
+            f"got {requirement!r}"
+        )
+
 for dependency_kind, entry in direct_entries:
     if not contains_pre_one_version(entry.get("requirement", {})):
         continue
     identity = entry["identity"]
-    if dependency_kind != "sourceControl" or identity not in expected:
+    if dependency_kind != "sourceControl" or (
+        identity not in expected and identity not in expected_exact
+    ):
         raise SystemExit(f"unreviewed direct pre-1.0 dependency: {identity}")
 
 print("Petrel dependency requirement contract passed")

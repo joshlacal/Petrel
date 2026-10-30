@@ -255,6 +255,12 @@ private final class AsyncSerialGate: @unchecked Sendable {
     private var waiters: [CheckedContinuation<Void, Never>] = []
     private var isLocked = false
 
+    #if DEBUG
+        var waitingCountForTesting: Int {
+            lock.withLock { waiters.count }
+        }
+    #endif
+
     func acquire() async {
         await withCheckedContinuation { continuation in
             lock.lock()
@@ -308,6 +314,18 @@ public actor KeychainStorage {
     }
     private var gatewaySessionCache: [String: GatewaySessionCacheEntry] = [:]
     private static let gatewayMutationCoordinator = GatewaySessionMutationCoordinator()
+
+    #if DEBUG
+        private var gatewaySessionFailureValidatedHookForTesting: (@Sendable () async -> Void)?
+
+        func setGatewaySessionFailureValidatedHookForTesting(_ hook: (@Sendable () async -> Void)?) {
+            gatewaySessionFailureValidatedHookForTesting = hook
+        }
+
+        func gatewayMutationWaitingCountForTesting() -> Int {
+            Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey).waitingCountForTesting
+        }
+    #endif
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
     private struct PendingSessionState {
@@ -841,6 +859,74 @@ public actor KeychainStorage {
         return true
     }
 
+    /// Produces an invalidation proof only for the exact selected credential.
+    /// Keep the post-mutation generation inside the same gate as the CAS.
+    func recordGatewaySessionFailure(
+        ifMatches expectedSession: String, for did: String, deleteMatchingSession: Bool
+    ) async throws -> GatewaySessionFailureContext? {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+        guard try await readExactCurrentDID() == did,
+              try await readExactPerDIDGatewaySession(for: did) == expectedSession else {
+            return nil
+        }
+        if deleteMatchingSession {
+            try await deleteGatewaySessionInternal(for: did)
+        }
+        let scope = accountScopeDID(for: did)
+        return GatewaySessionFailureContext(
+            did: did, storageScope: scope,
+            generation: AccountMutationHub.shared.generation(for: scope),
+            expectedSession: deleteMatchingSession ? nil : expectedSession
+        )
+    }
+
+    func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+        return await isCurrentGatewaySessionFailureLocked(context)
+    }
+
+    /// Keep the same process-local gate held through the MainActor hop and UI callback.
+    /// The callback cannot await SDK work or cleanup that would reacquire this gate.
+    func withCurrentGatewaySessionFailure(
+        _ context: GatewaySessionFailureContext,
+        perform: @MainActor @Sendable () -> Void
+    ) async -> Bool {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+        guard !Task.isCancelled, await isCurrentGatewaySessionFailureLocked(context) else { return false }
+        #if DEBUG
+            if let hook = gatewaySessionFailureValidatedHookForTesting { await hook() }
+        #endif
+        return await MainActor.run {
+            // Non-credential account metadata mutations can advance the same generation
+            // without taking the gateway gate; catch those before consuming the proof.
+            guard !Task.isCancelled,
+                  AccountMutationHub.shared.generation(for: context.storageScope) == context.generation
+            else { return false }
+            perform()
+            return true
+        }
+    }
+
+    private func isCurrentGatewaySessionFailureLocked(_ context: GatewaySessionFailureContext) async -> Bool {
+        let scope = accountScopeDID(for: context.did)
+        guard scope == context.storageScope,
+              AccountMutationHub.shared.generation(for: scope) == context.generation else { return false }
+        do {
+            guard try await readExactCurrentDID() == context.did else { return false }
+            let session = try await readExactPerDIDGatewaySession(for: context.did)
+            return context.matchesSession(session)
+                && AccountMutationHub.shared.generation(for: scope) == context.generation
+        } catch {
+            return false
+        }
+    }
+
     private func deleteGatewaySessionInternal(for did: String) async throws {
         let key = makeKey("gatewaySession", did: did)
         let continuityTicket = await beginAuthContinuityMutation()
@@ -911,6 +997,24 @@ public actor KeychainStorage {
             throw error
         }
     }
+    /// Snapshot the exact stored selector and bearer before pending-candidate recovery.
+    /// Cached actor values cannot establish whether the persisted old anchor is usable.
+    /// The gate serializes this snapshot with same-process selector/session mutations;
+    /// candidate promotion still performs its own authoritative CAS after the request.
+    func readGatewayCandidateRecoveryState(
+        for did: String
+    ) async throws -> (currentDID: String?, session: String?) {
+        let gate = Self.gatewayMutationCoordinator.gate(for: gatewayMutationScopeKey)
+        await gate.acquire()
+        defer { gate.release() }
+
+        // Subsequent recovery checks must not reuse an older actor-cache anchor.
+        gatewaySessionCache.removeValue(forKey: did)
+        let currentDID = try await readExactCurrentDID()
+        guard currentDID == did else { return (currentDID, nil) }
+        return (currentDID, try await readExactPerDIDGatewaySession(for: did))
+    }
+
     /// Reads the selector directly using authoritative (cache-bypassing) keychain reads.
     private func readExactCurrentDID() async throws -> String? {
         let key = makeKey("currentDID")

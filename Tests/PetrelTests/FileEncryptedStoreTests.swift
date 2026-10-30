@@ -5,8 +5,8 @@
         import Crypto
     #endif
     import Foundation
-    import Synchronization
     @testable import Petrel
+    import Synchronization
     import Testing
 
     @Suite("File-encrypted secure storage")
@@ -14,8 +14,7 @@
         private static func createSafeTestDirectory(prefix: String) -> URL {
             let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first
                 ?? URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".petrel-test-storage")
-            let dir = base.appendingPathComponent("\(prefix)-\(UUID().uuidString)")
-            return dir
+            return base.appendingPathComponent("\(prefix)-\(UUID().uuidString)")
         }
 
         private func withStore<T>(
@@ -27,7 +26,7 @@
                 storageDirectory: requestedDirectory,
                 masterKey: SymmetricKey(size: .bits256)
             )
-            let directory = effectiveDirectory(requestedDirectory)
+            let directory = requestedDirectory
             defer {
                 for key in ["token", "missing"] {
                     try? FileManager.default.removeItem(
@@ -37,22 +36,6 @@
                 try? FileManager.default.removeItem(at: requestedDirectory)
             }
             return try body(store, directory, namespace)
-        }
-        private func effectiveDirectory(_ requestedDirectory: URL) -> URL {
-            #if os(Linux)
-                // Linux currently resolves the configured/default secrets directory even
-                // when tests supply storageDirectory. Mirror that selection without
-                // mutating process-wide environment shared by concurrently running tests.
-                if let configured = ProcessInfo.processInfo.environment["PETREL_SECRETS_DIR"] {
-                    return URL(fileURLWithPath: configured)
-                }
-                if let home = ProcessInfo.processInfo.environment["HOME"] {
-                    return URL(fileURLWithPath: home).appendingPathComponent(".petrel-secrets")
-                }
-                return URL(fileURLWithPath: "/tmp/.petrel-secrets")
-            #else
-                return requestedDirectory
-            #endif
         }
 
         private func storedFileURL(in directory: URL, key: String, namespace: String) -> URL {
@@ -111,12 +94,11 @@
                 masterKey: SymmetricKey(size: .bits256)
             )
             let namespace = "petrel-file-store-concurrency-\(UUID().uuidString)"
-            let effectiveDirectory = effectiveDirectory(directory)
             defer {
                 for index in 0 ..< 32 {
                     try? FileManager.default.removeItem(
                         at: storedFileURL(
-                            in: effectiveDirectory,
+                            in: directory,
                             key: "token-\(index)",
                             namespace: namespace
                         )

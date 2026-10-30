@@ -3,9 +3,9 @@ import Petrel
 @testable import PetrelLoad
 import Testing
 #if canImport(Darwin)
-import Darwin
+    import Darwin
 #elseif canImport(Glibc)
-import Glibc
+    import Glibc
 #endif
 @Suite("PetrelLoad CLI")
 struct PetrelLoadCLITests {
@@ -325,7 +325,7 @@ struct PetrelLoadCLITests {
 
         pipe.fileHandleForWriting.write(Data(part1.utf8))
 
-        let writingTask = Task { @Sendable () -> Void in
+        let writingTask = Task { @Sendable () in
             try? await Task.sleep(nanoseconds: 30_000_000)
             pipe.fileHandleForWriting.write(Data(part2.utf8))
             try? pipe.fileHandleForWriting.close()
@@ -402,14 +402,14 @@ struct PetrelLoadCLITests {
         var initialTermios = termios()
         #expect(tcgetattr(slaveFD, &initialTermios) == 0)
         #if canImport(Darwin)
-        let initialEchoOn = (initialTermios.c_lflag & UInt(ECHO)) != 0
+            let initialEchoOn = (initialTermios.c_lflag & UInt(ECHO)) != 0
         #else
-        let initialEchoOn = (initialTermios.c_lflag & tcflag_t(ECHO)) != 0
+            let initialEchoOn = (initialTermios.c_lflag & tcflag_t(ECHO)) != 0
         #endif
         #expect(initialEchoOn)
         let secret = "correct-horse-battery-staple-4647"
         let targetMasterFD = masterFD
-        let writerTask = Task { @Sendable () -> Void in
+        let writerTask = Task { @Sendable () in
             try await Task.sleep(nanoseconds: 50_000_000) // 50ms to allow tcsetattr to apply no-echo
             let writeData = "\(secret)\n"
             _ = writeData.utf8CString.withUnsafeBufferPointer { ptr in
@@ -424,9 +424,9 @@ struct PetrelLoadCLITests {
         var postTermios = termios()
         #expect(tcgetattr(slaveFD, &postTermios) == 0)
         #if canImport(Darwin)
-        let postEchoOn = (postTermios.c_lflag & UInt(ECHO)) != 0
+            let postEchoOn = (postTermios.c_lflag & UInt(ECHO)) != 0
         #else
-        let postEchoOn = (postTermios.c_lflag & tcflag_t(ECHO)) != 0
+            let postEchoOn = (postTermios.c_lflag & tcflag_t(ECHO)) != 0
         #endif
         #expect(postEchoOn)
 
@@ -435,21 +435,29 @@ struct PetrelLoadCLITests {
         var buffer = [UInt8](repeating: 0, count: 1024)
         let bytesRead = read(masterFD, &buffer, buffer.count)
         if bytesRead > 0 {
-            let echoed = String(decoding: buffer[0..<bytesRead], as: UTF8.self)
+            let echoed = String(decoding: buffer[0 ..< bytesRead], as: UTF8.self)
             #expect(!echoed.contains(secret))
         }
 
-        // EOF read
-        close(masterFD)
-        masterFD = -1
+        // Send the terminal's EOF character while retaining the peer. Linux
+        // tears down terminal attributes when the master closes, so inspecting
+        // echo after a hangup tests an unavailable terminal rather than cleanup.
+        let eofCharacter = withUnsafeBytes(of: initialTermios.c_cc) { $0[Int(VEOF)] }
+        let eofWriter = Task { @Sendable () throws -> Int in
+            try await Task.sleep(nanoseconds: 50_000_000)
+            var byte = eofCharacter
+            return withUnsafePointer(to: &byte) { write(targetMasterFD, $0, 1) }
+        }
         let eofResult = try PetrelLoadCLI.readSecret(from: slaveFD)
+        let eofBytesWritten = try await eofWriter.value
+        #expect(eofBytesWritten == 1)
         #expect(eofResult == nil)
         var postEofTermios = termios()
         #expect(tcgetattr(slaveFD, &postEofTermios) == 0)
         #if canImport(Darwin)
-        #expect((postEofTermios.c_lflag & UInt(ECHO)) != 0)
+            #expect((postEofTermios.c_lflag & UInt(ECHO)) != 0)
         #else
-        #expect((postEofTermios.c_lflag & tcflag_t(ECHO)) != 0)
+            #expect((postEofTermios.c_lflag & tcflag_t(ECHO)) != 0)
         #endif
 
         // Piped non-TTY read
@@ -495,9 +503,9 @@ struct PetrelLoadCLITests {
         var postTermios = termios()
         #expect(tcgetattr(slaveFD, &postTermios) == 0)
         #if canImport(Darwin)
-        let echoOn = (postTermios.c_lflag & UInt(ECHO)) != 0
+            let echoOn = (postTermios.c_lflag & UInt(ECHO)) != 0
         #else
-        let echoOn = (postTermios.c_lflag & tcflag_t(ECHO)) != 0
+            let echoOn = (postTermios.c_lflag & tcflag_t(ECHO)) != 0
         #endif
         #expect(echoOn)
     }

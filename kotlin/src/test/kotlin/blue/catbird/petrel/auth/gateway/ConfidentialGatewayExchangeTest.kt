@@ -20,10 +20,12 @@ import kotlin.test.assertFalse
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.test.runTest
+import kotlinx.coroutines.withTimeout
 
 class ConfidentialGatewayExchangeTest {
     private val callbackUrl = "https://catbird.blue/oauth/callback"
@@ -243,6 +245,24 @@ class ConfidentialGatewayExchangeTest {
     }
 
     @Test
+    fun `caller cancellation propagates and does not install credentials`() = runTest {
+        val client = HttpClient(MockEngine {
+            delay(60_000)
+            respond("{}", HttpStatusCode.OK)
+        })
+        val strategy = strategy(httpClient = client, requestTimeoutMillis = 10_000)
+        strategy.startOAuthFlow()
+
+        assertFailsWith<CancellationException> {
+            withTimeout(50) {
+                strategy.handleOAuthCallback("$callbackUrl?code=$code")
+            }
+        }
+        assertNull(strategyStorage.getCurrentDid())
+        assertNull(strategyNetworkService.authorizationHeader)
+    }
+
+    @Test
     fun `simultaneous callbacks consume nonce once and send one exchange request`() = runTest {
         val exchangeStarted = CompletableDeferred<Unit>()
         val releaseExchange = CompletableDeferred<Unit>()
@@ -291,6 +311,53 @@ class ConfidentialGatewayExchangeTest {
                 strategy(callbackUrl = invalid)
             }
         }
+    }
+
+    @Test
+    fun `starting new login during exchange invalidates older in-flight callback commit`() = runTest {
+        val exchangeStarted = CompletableDeferred<Unit>()
+        val releaseExchange = CompletableDeferred<Unit>()
+        val client = HttpClient(MockEngine { request ->
+            when (request.url.encodedPath) {
+                "/auth/exchange" -> {
+                    exchangeStarted.complete(Unit)
+                    releaseExchange.await()
+                    respond(
+                        content = "{\"session_id\":\"$sessionId\"}",
+                        status = HttpStatusCode.OK,
+                        headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                    )
+                }
+                "/auth/session" -> respond(
+                    content = "{\"did\":\"did:plc:alice\"}",
+                    status = HttpStatusCode.OK,
+                    headers = headersOf(HttpHeaders.ContentType, "application/json"),
+                )
+                else -> error("unexpected request ${request.url}")
+            }
+        })
+        val strategy = strategy(httpClient = client)
+        strategy.startOAuthFlow("alice")
+
+        val callbackDeferred = async {
+            runCatching { strategy.handleOAuthCallback("$callbackUrl?code=$code") }
+        }
+
+        // Wait until exchange is in flight
+        exchangeStarted.await()
+
+        // User starts a new login flow, advancing the lifecycle generation
+        strategy.startOAuthFlow("bob")
+
+        // Resume exchange
+        releaseExchange.complete(Unit)
+
+        val result = callbackDeferred.await()
+        assertTrue(result.isFailure, "Older callback must fail commit")
+        assertTrue(result.exceptionOrNull() is GatewayException.InvalidSession)
+        assertNull(strategyStorage.getCurrentDid(), "Superseded session must not be committed to currentAccount")
+        assertNull(strategyNetworkService.authorizationHeader, "Superseded session must not be committed to networkService")
+        assertNull(strategyStorage.getSession("did:plc:alice"), "Superseded session must not be saved in storage")
     }
 
     private lateinit var strategyStorage: InMemoryGatewaySessionStorage

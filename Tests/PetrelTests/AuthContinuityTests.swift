@@ -229,6 +229,7 @@ final class AuthContinuityTests: XCTestCase {
         let account = Account(did: did, handle: "continuity.example", pdsURL: gatewayURL)
         let accountManager = MockAccountManager(account: account)
         try await storage.saveGatewaySession("gateway-session", for: did)
+        try await storage.saveCurrentDID(did)
         let manager = try AuthManager(
             mode: .gateway,
             storage: storage,
@@ -281,6 +282,7 @@ final class AuthContinuityTests: XCTestCase {
         let account = Account(did: did, handle: "continuity.example", pdsURL: gatewayURL)
         let accountManager = MockAccountManager(account: account)
         try await storage.saveGatewaySession("gateway-session", for: did)
+        try await storage.saveCurrentDID(did)
         let manager = try AuthManager(
             mode: .gateway,
             storage: storage,

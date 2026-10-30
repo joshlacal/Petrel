@@ -3,6 +3,8 @@ import Petrel
 @testable import PetrelLoad
 import Testing
 
+/// Keep Swift Testing tests that replace the process-global observer registry in
+/// this suite. Other suites can still emit events, so callbacks filter their own.
 @Suite("Auth event JSONL integration", .serialized)
 struct AuthEventJSONLIntegrationTests {
     @Test("Awaited registration and drain preserve an immediately logged incident")
@@ -15,6 +17,7 @@ struct AuthEventJSONLIntegrationTests {
         await PetrelAuthEvents.removeAllObservers()
         let writer = try AuthEventJSONLWriter(fileURL: fileURL)
         await PetrelAuthEvents.addObserverAndWait { event in
+            guard event == .logoutNoAutoSwitch(did: "did:plc:drain-test") else { return }
             try? await writer.write(event)
         }
 
@@ -41,6 +44,7 @@ struct AuthEventJSONLIntegrationTests {
         await PetrelAuthEvents.removeAllObservers()
         let recorder = AuthEventRecorder()
         await PetrelAuthEvents.addObserverAndWait { event in
+            guard event == .logoutNoAutoSwitch(did: "did:plc:self-drain") else { return }
             await PetrelAuthEvents.drain()
             await recorder.record(event)
         }
@@ -60,6 +64,9 @@ struct AuthEventJSONLIntegrationTests {
         await PetrelAuthEvents.removeAllObservers()
         let recorder = AuthEventRecorder()
         await PetrelAuthEvents.addObserverAndWait { event in
+            guard event == .logoutNoAutoSwitch(did: "did:plc:first")
+                || event == .logoutNoAutoSwitch(did: "did:plc:second")
+            else { return }
             await recorder.record(event)
             await PetrelAuthEvents.removeAllObservers()
         }
@@ -83,11 +90,17 @@ struct AuthEventJSONLIntegrationTests {
     func observerRemovalAffectsOnlyFutureBroadcasts() async {
         await PetrelAuthEvents.removeAllObservers()
         let recorder = ObserverCallRecorder()
-        await PetrelAuthEvents.addObserverAndWait { _ in
+        await PetrelAuthEvents.addObserverAndWait { event in
+            guard event == .logoutNoAutoSwitch(did: "did:plc:first-snapshot")
+                || event == .logoutNoAutoSwitch(did: "did:plc:future")
+            else { return }
             await recorder.record("removing observer")
             await PetrelAuthEvents.removeAllObservers()
         }
-        await PetrelAuthEvents.addObserverAndWait { _ in
+        await PetrelAuthEvents.addObserverAndWait { event in
+            guard event == .logoutNoAutoSwitch(did: "did:plc:first-snapshot")
+                || event == .logoutNoAutoSwitch(did: "did:plc:future")
+            else { return }
             await recorder.record("snapshot observer")
         }
 
@@ -114,6 +127,7 @@ struct AuthEventJSONLIntegrationTests {
         let first = AuthEvent.logoutNoAutoSwitch(did: "did:plc:fifo-first")
         let second = AuthEvent.logoutNoAutoSwitch(did: "did:plc:fifo-second")
         await PetrelAuthEvents.addObserverAndWait { event in
+            guard event == first || event == second else { return }
             await recorder.record(event)
             if event == first {
                 await gate.hold()
@@ -147,6 +161,7 @@ struct AuthEventJSONLIntegrationTests {
         let recorder = AuthEventRecorder()
         let completionRecorder = ObserverCallRecorder()
         await PetrelAuthEvents.addObserverAndWait { event in
+            guard event == .logoutNoAutoSwitch(did: "did:plc:cancelled-drain") else { return }
             await recorder.record(event)
             await deliveryGate.hold()
         }
@@ -173,6 +188,33 @@ struct AuthEventJSONLIntegrationTests {
 
         #expect(await recorder.events == [.logoutNoAutoSwitch(did: "did:plc:cancelled-drain")])
         #expect(await completionRecorder.calls == ["drained"])
+        await PetrelAuthEvents.removeAllObservers()
+    }
+
+    @Test("Unrepresentable incidents are not delivered to typed observers")
+    func unrepresentableIncidentBroadcastIsSuppressed() async {
+        await PetrelAuthEvents.removeAllObservers()
+        let recorder = AuthEventRecorder()
+        await PetrelAuthEvents.addObserverAndWait { event in
+            await recorder.record(event)
+        }
+
+        // Unique to this test: the broadcast bus is global, so suites running in
+        // parallel deliver their own incidents to this observer. Only an event
+        // carrying this DID would prove the unrepresentable incident leaked through.
+        let did = "did:plc:unrepresentable-incident-probe"
+        LogManager.logAuthIncident(
+            "InvalidGrantWithValidToken",
+            details: [
+                "did": did,
+                "tokenExpiresIn": "3600.0",
+                "description": "session preserved",
+            ]
+        )
+        await PetrelAuthEvents.drain()
+
+        let leaked = await recorder.events.filter { String(describing: $0).contains(did) }
+        #expect(leaked.isEmpty)
         await PetrelAuthEvents.removeAllObservers()
     }
 

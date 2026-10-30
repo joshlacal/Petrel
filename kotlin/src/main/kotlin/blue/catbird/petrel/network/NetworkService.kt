@@ -19,6 +19,7 @@ import java.io.ByteArrayOutputStream
 import java.io.InputStream
 import java.util.zip.GZIPInputStream
 import java.util.zip.InflaterInputStream
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.ExperimentalSerializationApi
@@ -254,7 +255,7 @@ open class NetworkService(
      * continues to return the 401 to the caller — the handler's only job is
      * to keep persistent auth state consistent with the server's verdict.
      */
-    var unauthorizedHandler: (suspend (host: String?, body: ByteArray) -> Unit)? = null
+    var unauthorizedHandler: (suspend (host: String?, authorization: String?, body: ByteArray) -> Unit)? = null
 
     /**
      * Provider for default headers attached to outgoing requests (e.g. atproto-accept-labelers).
@@ -322,24 +323,31 @@ open class NetworkService(
         val isOriginAuthorized = authorizedOrigin?.matches(targetUrl) == true
         val shouldAttachAuth = isOriginAuthorized && (targetOrigin.isSecure || targetOrigin.isLoopback)
 
+        val explicitAuthHeader = headers.entries.firstOrNull { it.key.equals(HttpHeaders.Authorization, ignoreCase = true) }?.value
+        val effectiveAuth = if (shouldAttachAuth) {
+            explicitAuthHeader ?: authorizationHeader
+        } else {
+            null
+        }
+
         try {
             return client.prepareRequest(targetUrlString) {
                 this.method = HttpMethod.parse(method)
 
-                // Inject stored auth header if origin is authorized and no explicit Authorization provided
-                if (shouldAttachAuth && !headers.containsKey("Authorization") && authorizationHeader != null) {
-                    header("Authorization", authorizationHeader!!)
+                // Inject stored/explicit auth header using exact captured value and origin check
+                if (effectiveAuth != null) {
+                    header(HttpHeaders.Authorization, effectiveAuth)
                 }
 
                 defaultHeadersProvider?.invoke()?.forEach { (key, value) ->
-                    if (!headers.containsKey(key)) {
+                    if (!headers.keys.any { it.equals(key, ignoreCase = true) }) {
                         header(key, value)
                     }
                 }
 
                 headers.forEach { (key, value) ->
-                    if (key.equals("Authorization", ignoreCase = true) && !shouldAttachAuth) {
-                        // Strip cross-origin authorization
+                    if (key.equals(HttpHeaders.Authorization, ignoreCase = true)) {
+                        // Handled above via effectiveAuth (with origin check & exact captured value)
                     } else {
                         header(key, value)
                     }
@@ -382,6 +390,7 @@ open class NetworkService(
                             ATProtoResponse(statusCode, data)
                         }
                     } catch (e: Exception) {
+                        if (e is CancellationException) throw e
                         System.err.println("[NetworkService] Processing failed for $endpoint: ${e.message}")
                         ATProtoResponse(statusCode, null)
                     }
@@ -399,8 +408,12 @@ open class NetworkService(
                     if (statusCode == 401) {
                         unauthorizedHandler?.let { handler ->
                             try {
-                                handler(baseUrlHost, errorText?.toByteArray() ?: ByteArray(0))
-                            } catch (_: Throwable) {
+                                val actualRequest = response.request
+                                val actualHost = actualRequest.url.host
+                                val actualAuthorization = actualRequest.headers[HttpHeaders.Authorization]
+                                handler(actualHost, actualAuthorization, errorText?.toByteArray() ?: ByteArray(0))
+                            } catch (e: Throwable) {
+                                if (e is CancellationException) throw e
                                 // no-op; classifier always throws, that's the contract
                             }
                         }
@@ -409,6 +422,7 @@ open class NetworkService(
                 }
             }
         } catch (e: Exception) {
+            if (e is CancellationException) throw e
             // Network error or security policy refusal
             return ATProtoResponse(0, null)
         }

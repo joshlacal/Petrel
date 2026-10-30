@@ -5,15 +5,23 @@
 
 import Foundation
 #if canImport(FoundationNetworking)
-  import FoundationNetworking
+    import FoundationNetworking
 #endif
-import Testing
 @testable import Petrel
+import Testing
 
 private final class DummyDIDResolver: DIDResolving, @unchecked Sendable {
-    func resolveHandleToDID(handle: String) async throws -> String { "did:plc:123" }
-    func resolveDIDToPDSURL(did: String) async throws -> URL { URL(string: "https://pds.test")! }
-    func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) { ("user.test", URL(string: "https://pds.test")!) }
+    func resolveHandleToDID(handle: String) async throws -> String {
+        "did:plc:123"
+    }
+
+    func resolveDIDToPDSURL(did: String) async throws -> URL {
+        URL(string: "https://pds.test")!
+    }
+
+    func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
+        ("user.test", URL(string: "https://pds.test")!)
+    }
 }
 
 private final class ResolverMockURLProtocol: URLProtocol {
@@ -30,8 +38,13 @@ private final class ResolverMockURLProtocol: URLProtocol {
         }
     }
 
-    override class func canInit(with request: URLRequest) -> Bool { true }
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest { request }
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
 
     override func startLoading() {
         guard let host = request.url?.host else {
@@ -95,17 +108,17 @@ struct SpaceHostResolverTests {
         return URLSession(configuration: config)
     }
 
-    @Test("prefers #atproto_space_host over #atproto_pds")
+    @Test("ignores legacy #atproto_space_host in favor of #atproto_pds")
     func prefersSpaceHost() throws {
         let d = doc(
             services: [
                 ("#atproto_pds", "https://pds.test"),
-                ("#atproto_space_host", "https://space.test")
+                ("#atproto_space_host", "https://space.test"),
             ],
             verificationMethods: ["#atproto"]
         )
         let e = try SpaceAuthorityEndpoints.extract(from: d)
-        #expect(e.spaceHost == URL(string: "https://space.test")!)
+        #expect(e.spaceHost == URL(string: "https://pds.test")!)
     }
 
     @Test("falls back to #atproto_pds when no space host")
@@ -117,13 +130,13 @@ struct SpaceHostResolverTests {
         #expect(try SpaceAuthorityEndpoints.extract(from: d).spaceHost == URL(string: "https://pds.test")!)
     }
 
-    @Test("prefers #atproto_space key, falls back to #atproto")
+    @Test("ignores legacy signing keys")
     func keyFallback() throws {
         let withKey = doc(
             services: [("#atproto_pds", "https://pds.test")],
             verificationMethods: ["#atproto", "#atproto_space"]
         )
-        #expect(try SpaceAuthorityEndpoints.extract(from: withKey).signingKeyFragment == "#atproto_space")
+        #expect(try SpaceAuthorityEndpoints.extract(from: withKey).signingKeyFragment == "#atproto")
 
         let without = doc(
             services: [("#atproto_pds", "https://pds.test")],
@@ -136,14 +149,14 @@ struct SpaceHostResolverTests {
     func fullIdMatching() throws {
         let d = doc(
             services: [
-                ("did:plc:123#atproto_pds", "https://pds.test"),
-                ("did:plc:123#atproto_space_host", "https://space.test")
+                ("did:example:123#atproto_pds", "https://pds.test"),
+                ("did:plc:123#atproto_space_host", "https://space.test"),
             ],
             verificationMethods: ["did:plc:123#atproto", "did:plc:123#atproto_space"]
         )
         let e = try SpaceAuthorityEndpoints.extract(from: d)
-        #expect(e.spaceHost == URL(string: "https://space.test")!)
-        #expect(e.signingKeyFragment == "#atproto_space")
+        #expect(e.spaceHost == URL(string: "https://pds.test")!)
+        #expect(e.signingKeyFragment == "#atproto")
     }
 
     @Test("throws when document has no usable service endpoint")
@@ -151,12 +164,13 @@ struct SpaceHostResolverTests {
         let d = doc(services: [], verificationMethods: ["#atproto"])
         #expect(throws: (any Error).self) { try SpaceAuthorityEndpoints.extract(from: d) }
     }
+
     @Test("falls back to #atproto_pds when #atproto_space_host endpoint is unparseable")
     func fallbackWhenSpaceHostEndpointIsInvalid() throws {
         let d = doc(
             services: [
                 ("#atproto_space_host", ""),
-                ("#atproto_pds", "https://pds.test")
+                ("#atproto_pds", "https://pds.test"),
             ],
             verificationMethods: ["#atproto"]
         )
@@ -169,7 +183,7 @@ struct SpaceHostResolverTests {
         let d = doc(
             services: [
                 ("#atproto_space_host", "http://insecure-space.example.com"),
-                ("#atproto_pds", "https://pds.example.com")
+                ("#atproto_pds", "https://pds.example.com"),
             ],
             verificationMethods: ["#atproto"]
         )
@@ -177,17 +191,17 @@ struct SpaceHostResolverTests {
         #expect(e.spaceHost == URL(string: "https://pds.example.com")!)
     }
 
-    @Test("accepts loopback http for #atproto_space_host")
+    @Test("ignores legacy loopback space service")
     func acceptsLoopbackHTTP() throws {
         let d = doc(
             services: [
                 ("#atproto_space_host", "http://127.0.0.1:8080"),
-                ("#atproto_pds", "https://pds.example.com")
+                ("#atproto_pds", "https://pds.example.com"),
             ],
             verificationMethods: ["#atproto"]
         )
         let e = try SpaceAuthorityEndpoints.extract(from: d)
-        #expect(e.spaceHost == URL(string: "http://127.0.0.1:8080")!)
+        #expect(e.spaceHost == URL(string: "https://pds.example.com")!)
     }
 
     @Test("throws when service matches type but not #atproto_space_host or #atproto_pds id")
@@ -202,14 +216,14 @@ struct SpaceHostResolverTests {
                     type: "Multikey",
                     controller: "did:example:123",
                     publicKeyMultibase: "zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPqiYBme"
-                )
+                ),
             ],
             service: [
                 Service(
                     id: "#custom_service",
                     type: "AtprotoPersonalDataServer",
                     serviceEndpoint: "https://pds.test"
-                )
+                ),
             ]
         )
         #expect(throws: (any Error).self) { try SpaceAuthorityEndpoints.extract(from: d) }
@@ -247,7 +261,7 @@ struct SpaceHostResolverTests {
             ],
             "service": [
                 {
-                    "id": "#atproto_space_host",
+                    "id": "#atproto_pds",
                     "type": "AtprotoSpaceHost",
                     "serviceEndpoint": "https://space.plc.test"
                 }
@@ -272,7 +286,7 @@ struct SpaceHostResolverTests {
         )
         let endpoints = try await resolver.resolve(authorityDID: "did:plc:test12345")
         #expect(endpoints.spaceHost == URL(string: "https://space.plc.test")!)
-        #expect(endpoints.signingKeyFragment == "#atproto_space")
+        #expect(endpoints.signingKeyFragment == "#atproto")
     }
 
     @Test("SpaceHostResolver actor resolves did:web DID document over network")
@@ -321,11 +335,11 @@ struct SpaceHostResolverTests {
     }
 
     @Test("SpaceAuthorityEndpoints.isSecureOrLoopback rejects https with no host")
-    func isSecureOrLoopbackNoHost() {
-        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https://example.com")!) == true)
-        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https:")!) == false)
-        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https://")!) == false)
-        #expect(SpaceAuthorityEndpoints.isSecureOrLoopback(URL(string: "https:///path")!) == false)
+    func isSecureOrLoopbackNoHost() throws {
+        #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https://example.com"))) == true)
+        #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https:"))) == false)
+        #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https://"))) == false)
+        #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https:///path"))) == false)
     }
 
     @Test("SpaceHostResolver.didDocumentURL validates did:web paths and rejects path traversal")
@@ -356,5 +370,130 @@ struct SpaceHostResolverTests {
         #expect(throws: SpaceHostResolutionError.self) {
             try SpaceHostResolver.didDocumentURL(for: "did:web:example.com%3A99999:alice")
         }
+    }
+
+    @Test("A per-call hardened session is invalidated after its call, releasing its delegate")
+    func perCallSessionReleasesItsDelegate() async throws {
+        let body = Data(#"{"ok":true}"#.utf8)
+        ResolverMockURLProtocol.setHandler(forHost: "127.0.0.1") { request in
+            let response = HTTPURLResponse(
+                url: request.url!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: ["Content-Type": "application/json"]
+            )!
+            return (response, body)
+        }
+        defer { ResolverMockURLProtocol.setHandler(forHost: "127.0.0.1", nil) }
+        let config = URLSessionConfiguration.ephemeral
+        config.protocolClasses = [ResolverMockURLProtocol.self]
+        let request = try URLRequest(url: #require(URL(string: "https://127.0.0.1/xrpc/com.example.ping")))
+
+        weak var weakSession: URLSession?
+        weak var weakDelegate: HardenedURLSessionDelegate?
+        let (data, response) = try await SpaceHostResolver.withPerCallHardenedSession(
+            configuration: config,
+            limits: .default
+        ) { session, delegate in
+            weakSession = session
+            weakDelegate = delegate
+            return try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+        }
+        #expect(data == body)
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        #expect(await isEventuallyReleased { weakSession == nil && weakDelegate == nil })
+
+        // A call that fails before sending anything releases its session too.
+        do {
+            try await SpaceHostResolver.withPerCallHardenedSession(
+                configuration: .ephemeral,
+                limits: .default
+            ) { (session, delegate) async throws -> Void in
+                weakSession = session
+                weakDelegate = delegate
+                throw URLError(.cancelled)
+            }
+            Issue.record("Expected the call to throw")
+        } catch {
+            #expect(error is URLError)
+        }
+        #expect(await isEventuallyReleased { weakSession == nil && weakDelegate == nil })
+    }
+
+    @Test("A resolver invalidates the session it created when released, never an injected one")
+    func resolverReleasesOnlyItsOwnSession() async throws {
+        weak var owned: HardenedURLSessionDelegate?
+        do {
+            let resolver = SpaceHostResolver(didResolver: DummyDIDResolver())
+            let delegate = await resolver.sessionDelegate
+            #expect(delegate != nil)
+            owned = delegate
+        }
+        #expect(await isEventuallyReleased { owned == nil })
+
+        let injected = URLSession(
+            configuration: .ephemeral,
+            delegate: HardenedURLSessionDelegate(allowsRedirects: false),
+            delegateQueue: nil
+        )
+        defer { injected.invalidateAndCancel() }
+        weak var injectedDelegate: HardenedURLSessionDelegate?
+        do {
+            let resolver = SpaceHostResolver(didResolver: DummyDIDResolver(), urlSession: injected)
+            injectedDelegate = await resolver.sessionDelegate
+        }
+        // Long enough for a wrongful invalidation to release the delegate.
+        try await Task.sleep(nanoseconds: 200_000_000)
+        #expect(injectedDelegate != nil)
+    }
+}
+
+/// URLSession releases an invalidated session's delegate asynchronously, so
+/// release is polled for up to five seconds.
+private func isEventuallyReleased(_ released: () -> Bool) async -> Bool {
+    for _ in 0 ..< 500 {
+        if released() {
+            return true
+        }
+        try? await Task.sleep(nanoseconds: 10_000_000)
+    }
+    return released()
+}
+
+@Suite("Space author KEM key representations")
+struct SpaceAuthorKEMKeyTests {
+    private let did = "did:example:author"
+    /// SEC1 uncompressed P-256 point captured from the pinned TypeScript PLC lab.
+    private let legacy = "zNpRHmahHk2CgHtnsGscfUtaihjkpeHYrumpa7jpdhzf5SJUXHQDjE4dyvtDcdjSs3dJ1mNiTw3xLcUXqauy5WNBP"
+
+    @Test("PLC legacy and Multikey representations resolve to the same P-256 key")
+    func supportedRepresentations() throws {
+        let key = try PLCDIDKeyCodec.decodeLegacyMultibase(legacy, curve: .p256)
+        for (type, bytes) in [("EcdsaSecp256r1VerificationKey2019", legacy), ("Multikey", String(key.didKey.dropFirst("did:key:".count)))] {
+            let method = VerificationMethod(id: "#atproto_kem", type: type, controller: did, publicKeyMultibase: bytes)
+            #expect(try SpaceHostResolver.authorKEMKey(from: DIDDocument(id: did, verificationMethod: [method]), expectedDID: did) == key.didKey)
+        }
+    }
+
+    @Test("Duplicate methods, controllers, curve labels and malformed points fail closed")
+    func rejectedRepresentations() throws {
+        let good = VerificationMethod(id: "#atproto_kem", type: "EcdsaSecp256r1VerificationKey2019", controller: did, publicKeyMultibase: legacy)
+        let full = VerificationMethod(id: did + "#atproto_kem", type: good.type, controller: did, publicKeyMultibase: legacy)
+        for methods in [[], [good, full], [VerificationMethod(id: good.id, type: good.type, controller: "did:example:other", publicKeyMultibase: legacy)], [VerificationMethod(id: good.id, type: "EcdsaSecp256k1VerificationKey2019", controller: did, publicKeyMultibase: legacy)], [VerificationMethod(id: good.id, type: "Multikey", controller: did, publicKeyMultibase: legacy)], [VerificationMethod(id: good.id, type: good.type, controller: did, publicKeyMultibase: "z111")]] {
+            #expect(throws: (any Error).self) { try SpaceHostResolver.authorKEMKey(from: DIDDocument(id: did, verificationMethod: methods), expectedDID: did) }
+        }
+        #expect(throws: (any Error).self) { try SpaceHostResolver.authorKEMKey(from: DIDDocument(id: "did:example:other", verificationMethod: [good]), expectedDID: did) }
+    }
+
+    @Test("Read the independent pinned PLC's actual KEM document", .enabled(if: ProcessInfo.processInfo.environment["PETREL_SPACE_PLC_TEST_URL"] != nil))
+    func independentPLC() async throws {
+        let url = try #require(URL(string: ProcessInfo.processInfo.environment["PETREL_SPACE_PLC_TEST_URL"] ?? ""))
+        let (bytes, response) = try await URLSession.shared.data(from: url)
+        #expect((response as? HTTPURLResponse)?.statusCode == 200)
+        let document = try JSONDecoder().decode(DIDDocument.self, from: bytes)
+        let resolved = try SpaceHostResolver.authorKEMKey(from: document, expectedDID: document.id)
+        let encapsulated = try SpaceMAC.encapsulate(authorKey: resolved)
+        #expect(encapsulated.sharedSecret.count == 32)
+        #expect(encapsulated.keyShare.hasPrefix("did:key:z"))
     }
 }

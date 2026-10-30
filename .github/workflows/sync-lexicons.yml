@@ -77,9 +77,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          for ns in app chat com tools site; do
-            rsync -a --delete "/tmp/atproto/lexicons/$ns/" "generator/lexicons/$ns/"
-          done
+          Scripts/sync-standard-lexicons.sh /tmp/atproto/lexicons
       - name: Regenerate the Swift and Kotlin projections
         shell: bash
         run: |

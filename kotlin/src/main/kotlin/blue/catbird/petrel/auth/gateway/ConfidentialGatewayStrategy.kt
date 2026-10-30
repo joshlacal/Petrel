@@ -18,15 +18,17 @@ import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.utils.io.readRemaining
+import java.net.SocketTimeoutException
 import java.net.URI
 import java.security.SecureRandom
 import java.util.Base64
 import java.util.logging.Logger
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.io.readByteArray
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -150,9 +152,11 @@ class ConfidentialGatewayStrategy(
     /** Serializes all mutations of storage / currentAccount / networkService fields. */
     private val mutex = Mutex()
 
+    /** Strategy lifecycle generation; invalidates stale callbacks, logouts, and account switches. */
+    private var lifecycleGeneration: Long = 0L
+
     /** A login nonce deliberately has no persistence beyond this process. */
     private var pendingBrowserNonce: String? = null
-
     /** Shared lenient JSON parser — created once per strategy instance. */
     private val json: Json = Json {
         ignoreUnknownKeys = true
@@ -184,8 +188,10 @@ class ConfidentialGatewayStrategy(
     private suspend fun buildLoginUrl(optionalKey: String, optionalValue: String?): String {
         val nonceBytes = newSecureNonce()
         val nonce = Base64.getUrlEncoder().withoutPadding().encodeToString(nonceBytes)
-        mutex.withLock { pendingBrowserNonce = nonce }
-
+        mutex.withLock {
+            pendingBrowserNonce = nonce
+            lifecycleGeneration++
+        }
         val builder = URLBuilder(gatewayUrl).apply {
             encodedPathSegments = listOf("auth", "login")
             parameters.clear()
@@ -206,9 +212,11 @@ class ConfidentialGatewayStrategy(
         val code = parseCallbackCode(callbackUrl)
         // Consume before the first suspension/network boundary. A failed or
         // cancelled exchange can never retry with the same browser binding.
-        val browserNonce = mutex.withLock {
-            pendingBrowserNonce.also { pendingBrowserNonce = null }
-        } ?: throw GatewayException.InvalidCallbackUrl()
+        val (browserNonce, capturedGeneration) = mutex.withLock {
+            val nonce = pendingBrowserNonce.also { pendingBrowserNonce = null }
+                ?: throw GatewayException.InvalidCallbackUrl()
+            nonce to lifecycleGeneration
+        }
         val sessionId = exchangeCode(code, browserNonce)
 
         // Fetch session details FIRST so we key the local save by the server-
@@ -216,6 +224,10 @@ class ConfidentialGatewayStrategy(
         val info = fetchSessionFromGateway(sessionId)
 
         mutex.withLock {
+            if (capturedGeneration != lifecycleGeneration) {
+                logger.warning("Gateway callback aborted: lifecycle generation changed from $capturedGeneration to $lifecycleGeneration")
+                throw GatewayException.InvalidSession()
+            }
             storage.saveSession(info.did, sessionId)
             currentAccount.setCurrentDid(info.did)
             // Keep NetworkService in lockstep so every subsequent XRPC call
@@ -223,8 +235,8 @@ class ConfidentialGatewayStrategy(
             networkService.authorizedOrigin = NetworkOrigin.fromUrl(gatewayUrl)
             networkService.authenticatedDID = info.did
             networkService.authorizationHeader = "Bearer $sessionId"
+            lifecycleGeneration++
         }
-
         logger.info("Gateway session established for DID ${info.did.take(20)}…")
         return GatewayCallbackResult(
             did = info.did,
@@ -239,18 +251,22 @@ class ConfidentialGatewayStrategy(
      */
     suspend fun logout() {
         logger.info("Gateway logout initiated")
-        val did = runCatching { currentAccount.getCurrentDid() }
-            .onFailure { logCleanupFailure("read current account", it) }
-            .getOrNull()
-        try {
-            val session = if (did != null) {
-                runCatching { storage.getSession(did) }
+        val (did, session, logoutGeneration) = mutex.withLock {
+            val d = runCatching { currentAccount.getCurrentDid() }
+                .onFailure { logCleanupFailure("read current account", it) }
+                .getOrNull()
+            val s = if (d != null) {
+                runCatching { storage.getSession(d) }
                     .onFailure { logCleanupFailure("read gateway session", it) }
                     .getOrNull()
             } else {
                 logger.warning("No current account set; clearing any stale local credentials")
-                null
+                extractToken(networkService.authorizationHeader)
             }
+            lifecycleGeneration++
+            Triple(d, s, lifecycleGeneration)
+        }
+        try {
             if (session != null) {
                 val logoutUrl = composeGatewayUrl("/auth/logout")
                 try {
@@ -262,6 +278,7 @@ class ConfidentialGatewayStrategy(
                         logger.warning("Gateway logout returned HTTP ${response.status.value}")
                     }
                 } catch (t: Throwable) {
+                    if (t is CancellationException) throw t
                     // Don't fail logout if gateway is unreachable.
                     logger.warning("Gateway logout request failed; clearing local state")
                 }
@@ -269,7 +286,7 @@ class ConfidentialGatewayStrategy(
                 logger.info("No gateway session for selected DID; clearing local state")
             }
         } finally {
-            clearLogoutState(did)
+            clearLogoutState(did, session, logoutGeneration)
         }
         logger.info("Gateway logout complete")
     }
@@ -290,6 +307,7 @@ class ConfidentialGatewayStrategy(
      */
     suspend fun restoreSession(did: String): String? = mutex.withLock {
         val sessionId = storage.getSession(did) ?: return@withLock null
+        lifecycleGeneration++
         currentAccount.setCurrentDid(did)
         networkService.authorizedOrigin = NetworkOrigin.fromUrl(gatewayUrl)
         networkService.authenticatedDID = did
@@ -303,8 +321,19 @@ class ConfidentialGatewayStrategy(
      * or [GatewayException.MissingSession] if no session is stored locally.
      */
     suspend fun checkSession(): GatewaySessionResponse {
-        val sessionId = currentSessionId()
-        return fetchSessionFromGateway(sessionId)
+        val (boundDid, boundToken) = mutex.withLock {
+            val did = currentAccount.getCurrentDid()
+                ?: throw GatewayException.MissingSession()
+            val token = storage.getSession(did)
+                ?: throw GatewayException.MissingSession()
+            did to token
+        }
+        return try {
+            fetchSessionFromGateway(boundToken)
+        } catch (e: GatewayException.SessionExpired) {
+            clearGatewaySessionIfMatching(boundDid, boundToken)
+            throw e
+        }
     }
 
     // --------------------------------------------------------------------
@@ -365,15 +394,21 @@ class ConfidentialGatewayStrategy(
      */
     suspend fun handleUnauthorizedResponse(
         requestHost: String?,
+        authorization: String?,
         responseBody: ByteArray,
     ): Nothing {
         if (requestHost != null && requestHost == gatewayHost) {
             when (val disposition = classifyUnauthorizedGatewayResponse(responseBody)) {
                 is UnauthorizedDisposition.Terminal -> {
                     logger.warning(
-                        "Gateway returned terminal auth error (${disposition.reason}) — clearing local session",
+                        "Gateway returned terminal auth error (${disposition.reason}) — evaluating local session",
                     )
-                    clearCurrentGatewaySession()
+                    val requestToken = extractToken(authorization)
+                    if (requestToken == null) {
+                        logger.warning("Terminal 401 received without request authorization — skipping session eviction")
+                    } else {
+                        clearMatchingGatewaySessions(requestToken)
+                    }
                     throw GatewayException.SessionExpired()
                 }
 
@@ -472,37 +507,111 @@ class ConfidentialGatewayStrategy(
         return UnauthorizedDisposition.Transient("unknown_401")
     }
 
-    private suspend fun clearLogoutState(did: String?) = mutex.withLock {
+    private suspend fun clearLogoutState(
+        did: String?,
+        session: String?,
+        logoutGeneration: Long,
+    ) = mutex.withLock {
         try {
             if (did != null) {
-                runCatching { storage.deleteSession(did) }
-                    .onFailure { logCleanupFailure("delete gateway session", it) }
+                val stored = runCatching { storage.getSession(did) }
+                    .onFailure { logCleanupFailure("read gateway session during logout", it) }
+                    .getOrNull()
+                if (stored != null && (session == null || stored == session)) {
+                    runCatching { storage.deleteSession(did) }
+                        .onFailure { logCleanupFailure("delete gateway session", it) }
+                }
             }
-            runCatching { currentAccount.setCurrentDid(null) }
-                .onFailure { logCleanupFailure("clear current account", it) }
+            if (logoutGeneration == lifecycleGeneration) {
+                runCatching { currentAccount.setCurrentDid(null) }
+                    .onFailure { logCleanupFailure("clear current account", it) }
+            }
         } finally {
-            networkService.authenticatedDID = null
-            networkService.authorizationHeader = null
+            if (logoutGeneration == lifecycleGeneration) {
+                networkService.authenticatedDID = null
+                networkService.authorizationHeader = null
+            } else {
+                val currentHeaderToken = extractToken(networkService.authorizationHeader)
+                val headerMatches = session != null && currentHeaderToken == session
+                val didMatches = did != null && networkService.authenticatedDID == did
+                if (headerMatches && didMatches) {
+                    networkService.authenticatedDID = null
+                    networkService.authorizationHeader = null
+                }
+            }
         }
     }
 
-    private suspend fun clearCurrentGatewaySession() = mutex.withLock {
-        val did = runCatching { currentAccount.getCurrentDid() }
-            .onFailure { logCleanupFailure("read current account during 401 handling", it) }
+    private suspend fun clearGatewaySessionIfMatching(boundDid: String, boundToken: String) = mutex.withLock {
+        val storedSession = runCatching { storage.getSession(boundDid) }
+            .onFailure { logCleanupFailure("read gateway session during 401 handling", it) }
             .getOrNull()
+        if (storedSession == null || storedSession != boundToken) {
+            logger.warning("Stored session for $boundDid no longer matches bound session — preserving session")
+            return@withLock
+        }
+
+        lifecycleGeneration++
         try {
-            if (did == null) {
-                logger.warning("No current account available while clearing gateway session")
-            } else {
+            runCatching { storage.deleteSession(boundDid) }
+                .onFailure { logCleanupFailure("delete gateway session during 401 handling", it) }
+        } finally {
+            if (networkService.authenticatedDID == boundDid &&
+                extractToken(networkService.authorizationHeader) == boundToken
+            ) {
+                networkService.authenticatedDID = null
+                networkService.authorizationHeader = null
+            }
+            runCatching { onSessionInvalidated?.invoke(boundDid) }
+        }
+    }
+
+    private suspend fun clearMatchingGatewaySessions(requestToken: String) = mutex.withLock {
+        val candidateDids = runCatching {
+            val all = storage.getAllDids()
+            val current = currentAccount.getCurrentDid()
+            if (current != null && current !in all) all + current else all
+        }.getOrDefault(listOfNotNull(runCatching { currentAccount.getCurrentDid() }.getOrNull()))
+
+        val matchingDids = candidateDids.filter { did ->
+            runCatching { storage.getSession(did) }.getOrNull() == requestToken
+        }
+
+        if (matchingDids.isEmpty()) {
+            logger.warning("No stored session matched request token — preserving session")
+            return@withLock
+        }
+
+        lifecycleGeneration++
+        for (did in matchingDids) {
+            try {
                 runCatching { storage.deleteSession(did) }
                     .onFailure { logCleanupFailure("delete gateway session during 401 handling", it) }
-            }
-        } finally {
-            networkService.authenticatedDID = null
-            networkService.authorizationHeader = null
-            if (did != null) {
+            } finally {
+                if (networkService.authenticatedDID == did &&
+                    extractToken(networkService.authorizationHeader) == requestToken
+                ) {
+                    networkService.authenticatedDID = null
+                    networkService.authorizationHeader = null
+                }
                 runCatching { onSessionInvalidated?.invoke(did) }
             }
+        }
+    }
+
+    private fun extractToken(authorization: String?): String? {
+        if (authorization.isNullOrBlank()) return null
+        val trimmed = authorization.trim()
+        val spaceIndex = trimmed.indexOf(' ')
+        return if (spaceIndex > 0) {
+            val scheme = trimmed.substring(0, spaceIndex)
+            if (scheme.equals("Bearer", ignoreCase = true) || scheme.equals("DPoP", ignoreCase = true)) {
+                trimmed.substring(spaceIndex + 1).trim().ifEmpty { null }
+            } else {
+                trimmed
+            }
+        } else {
+            trimmed
         }
     }
 
@@ -536,7 +645,7 @@ class ConfidentialGatewayStrategy(
     private suspend fun exchangeCode(code: String, browserNonce: String): String {
         val response = try {
             withContext(Dispatchers.IO) {
-                withTimeout(requestTimeoutMillis) {
+                withTimeoutOrNull(requestTimeoutMillis) {
                     http.post(composeGatewayUrl("/auth/exchange")) {
                         header("Origin", callback.origin)
                         header("Content-Type", "application/json")
@@ -549,17 +658,22 @@ class ConfidentialGatewayStrategy(
                         )
                     }
                 }
-            }
+            } ?: throw SocketTimeoutException("Gateway exchange timed out after ${requestTimeoutMillis}ms")
         } catch (t: Throwable) {
+            if (t is CancellationException) throw t
             throw GatewayException.NetworkError(t)
         }
         if (response.status != HttpStatusCode.OK) throw GatewayException.InvalidSession()
-        val payload = runCatching {
+        val payload = try {
             json.decodeFromString(
                 GatewayExchangeResponse.serializer(),
                 readBoundedBody(response, MAX_EXCHANGE_RESPONSE_BYTES),
             )
-        }.getOrElse { throw GatewayException.InvalidSession() }
+        } catch (t: Throwable) {
+            if (t is CancellationException) throw t
+            if (t is SocketTimeoutException) throw GatewayException.NetworkError(t)
+            throw GatewayException.InvalidSession()
+        }
         return payload.session_id.takeIf(::isValidSessionId)
             ?: throw GatewayException.InvalidSession()
     }
@@ -569,37 +683,62 @@ class ConfidentialGatewayStrategy(
         val url = composeGatewayUrl("/auth/session")
         val response: HttpResponse = try {
             withContext(Dispatchers.IO) {
-                withTimeout(requestTimeoutMillis) {
+                withTimeoutOrNull(requestTimeoutMillis) {
                     http.get(url) {
                         header("Authorization", "Bearer $sessionId")
                         header("Accept", "application/json")
                     }
                 }
-            }
+            } ?: throw SocketTimeoutException("Gateway session fetch timed out after ${requestTimeoutMillis}ms")
         } catch (t: Throwable) {
+            if (t is CancellationException) throw t
             throw GatewayException.NetworkError(t)
         }
 
         return when (response.status) {
             HttpStatusCode.OK -> {
-                val text = runCatching {
+                val text = try {
                     readBoundedBody(response, MAX_SESSION_RESPONSE_BYTES)
-                }.getOrNull()
-                    ?: throw GatewayException.InvalidSession()
+                } catch (t: Throwable) {
+                    if (t is CancellationException) throw t
+                    if (t is SocketTimeoutException) throw GatewayException.NetworkError(t)
+                    throw GatewayException.InvalidSession()
+                }
                 try {
                     json.decodeFromString(GatewaySessionResponse.serializer(), text)
                 } catch (_: Throwable) {
                     throw GatewayException.InvalidSession()
                 }
             }
-            HttpStatusCode.Unauthorized -> throw GatewayException.SessionExpired()
+            HttpStatusCode.Unauthorized -> {
+                val bodyBytes = try {
+                    readBoundedBody(response, MAX_SESSION_RESPONSE_BYTES).encodeToByteArray()
+                } catch (t: Throwable) {
+                    if (t is CancellationException) throw t
+                    ByteArray(0)
+                }
+                when (val disposition = classifyUnauthorizedGatewayResponse(bodyBytes)) {
+                    is UnauthorizedDisposition.Terminal -> {
+                        logger.warning(
+                            "Gateway /auth/session returned terminal auth error (${disposition.reason})",
+                        )
+                        throw GatewayException.SessionExpired()
+                    }
+                    is UnauthorizedDisposition.Transient -> {
+                        logger.warning(
+                            "Gateway /auth/session returned transient auth error (${disposition.reason})",
+                        )
+                        throw GatewayException.AuthenticationRequired()
+                    }
+                }
+            }
             else -> throw GatewayException.InvalidSession()
         }
     }
 
     private suspend fun readBoundedBody(response: HttpResponse, maxBytes: Long): String {
         return withContext(Dispatchers.IO) {
-            withTimeout(requestTimeoutMillis) {
+            withTimeoutOrNull(requestTimeoutMillis) {
                 val declaredLength = response.headers[HttpHeaders.ContentLength]?.toLongOrNull()
                 if (declaredLength != null && declaredLength > maxBytes) {
                     throw IllegalArgumentException("Gateway response exceeded size limit")
@@ -610,7 +749,7 @@ class ConfidentialGatewayStrategy(
                     throw IllegalArgumentException("Gateway response exceeded size limit")
                 }
                 bytes.decodeToString()
-            }
+            } ?: throw SocketTimeoutException("Gateway response read timed out after ${requestTimeoutMillis}ms")
         }
     }
 

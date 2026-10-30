@@ -73,8 +73,19 @@ let package = Package(
         ),
 
         .target(
+            name: "CPetrelBLAKE3",
+            exclude: ["README.md", "LICENSE_CC0", "LICENSE_A2LLVM", "LICENSE_A2"],
+            publicHeadersPath: "include",
+            cSettings: [
+                .define("BLAKE3_NO_SSE2"), .define("BLAKE3_NO_SSE41"),
+                .define("BLAKE3_NO_AVX2"), .define("BLAKE3_NO_AVX512"),
+                .define("BLAKE3_USE_NEON", to: "0"),
+            ]
+        ),
+        .target(
             name: "PetrelCrypto",
             dependencies: [
+                "CPetrelBLAKE3",
                 .product(name: "Crypto", package: "swift-crypto"),
                 .product(name: "secp256k1", package: "secp256k1.swift"),
             ],

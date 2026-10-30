@@ -2043,7 +2043,11 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
             '"$PETREL_PYTHON" run.py',
             text,
         )
-        self.assertIn("for ns in app chat com tools site; do", text)
+        self.assertIn("Scripts/sync-standard-lexicons.sh /tmp/atproto/lexicons", text)
+        sync_script = (REPOSITORY_ROOT / "Scripts" / "sync-standard-lexicons.sh").read_text(encoding="utf-8")
+        self.assertIn("for ns in app chat com tools site; do", sync_script)
+        self.assertIn("--exclude='/atproto/space/'", sync_script)
+        self.assertIn("--exclude='/atproto/simplespace/'", sync_script)
         self.assertIn("--manifest generator/manifests/petrel-core.json", text)
         self.assertIn("--language both", text)
         self.assertIn(
@@ -2052,7 +2056,7 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         )
         self.assertLess(
             text.index("Scripts/bootstrap-release-tools.sh"),
-            text.index("rsync -a --delete"),
+            text.index("Scripts/sync-standard-lexicons.sh /tmp/atproto/lexicons"),
         )
         lines = text.splitlines()
         add_paths_index = lines.index("          add-paths: |")

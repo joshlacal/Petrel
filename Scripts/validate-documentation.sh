@@ -87,6 +87,7 @@ typecheck_documentation_examples() {
                     -sdk "$macos_sdk" \
                     -target "$target" \
                     -I "$example_bin_path/Modules" \
+                    -Xcc -fmodule-map-file="$example_bin_path/CPetrelBLAKE3.build/module.modulemap" \
                     -Xcc -fmodule-map-file="$example_bin_path/CAsyncDNSResolver.build/module.modulemap" \
                     -Xcc -fmodule-map-file="$example_bin_path/secp256k1_bindings.build/module.modulemap" \
                     -Xcc -I \

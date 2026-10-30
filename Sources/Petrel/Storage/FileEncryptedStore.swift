@@ -72,7 +72,7 @@
             }
         }
 
-        internal struct Operations: @unchecked Sendable {
+        struct Operations: @unchecked Sendable {
             let rename: (String, String) -> Int32
             let unlink: (String) -> Int32
 
@@ -134,23 +134,25 @@
             self.logSink = logSink
             // Resolve directory
             let directory: URL
-            #if os(Linux)
-                if let envDir = ProcessInfo.processInfo.environment["PETREL_SECRETS_DIR"], !envDir.isEmpty {
-                    directory = URL(fileURLWithPath: envDir)
-                } else if let home = ProcessInfo.processInfo.environment["HOME"], !home.isEmpty {
-                    directory = URL(fileURLWithPath: home).appendingPathComponent(".petrel-secrets")
-                } else {
-                    throw FileEncryptedStoreError.invalidConfiguration
-                }
-            #else
-                if let storageDirectory = storageDirectory {
-                    directory = storageDirectory
-                } else if let envDir = ProcessInfo.processInfo.environment["PETREL_SECRETS_DIR"], !envDir.isEmpty {
-                    directory = URL(fileURLWithPath: envDir)
-                } else {
-                    directory = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".petrel-secrets")
-                }
-            #endif
+            if let storageDirectory {
+                directory = storageDirectory
+            } else {
+                #if os(Linux)
+                    if let envDir = ProcessInfo.processInfo.environment["PETREL_SECRETS_DIR"], !envDir.isEmpty {
+                        directory = URL(fileURLWithPath: envDir)
+                    } else if let home = ProcessInfo.processInfo.environment["HOME"], !home.isEmpty {
+                        directory = URL(fileURLWithPath: home).appendingPathComponent(".petrel-secrets")
+                    } else {
+                        throw FileEncryptedStoreError.invalidConfiguration
+                    }
+                #else
+                    if let envDir = ProcessInfo.processInfo.environment["PETREL_SECRETS_DIR"], !envDir.isEmpty {
+                        directory = URL(fileURLWithPath: envDir)
+                    } else {
+                        directory = URL(fileURLWithPath: NSHomeDirectory()).appendingPathComponent(".petrel-secrets")
+                    }
+                #endif
+            }
 
             let standardizedPath = directory.standardizedFileURL.path
 
@@ -162,7 +164,7 @@
             } else {
                 // If path does not exist yet, resolve the closest existing ancestor
                 var current = standardizedPath
-                while !FileManager.default.fileExists(atPath: current) && current != "/" && !current.isEmpty {
+                while !FileManager.default.fileExists(atPath: current), current != "/", !current.isEmpty {
                     current = (current as NSString).deletingLastPathComponent
                 }
                 if let resolved = realpath(current, nil) {
@@ -178,7 +180,8 @@
             let tempPrefixes = ["/tmp", "/private/tmp", "/var/tmp"]
             for prefix in tempPrefixes {
                 if standardizedPath == prefix || standardizedPath.hasPrefix(prefix + "/") ||
-                   canonicalPath == prefix || canonicalPath.hasPrefix(prefix + "/") {
+                    canonicalPath == prefix || canonicalPath.hasPrefix(prefix + "/")
+                {
                     throw FileEncryptedStoreError.insecureDirectoryPath
                 }
             }
@@ -296,7 +299,8 @@
             }
             guard (fileStat.st_mode & S_IFMT) != S_IFLNK,
                   fileStat.st_uid == getuid(),
-                  (fileStat.st_mode & 0o077) == 0 else {
+                  (fileStat.st_mode & 0o077) == 0
+            else {
                 throw FileEncryptedStoreError.insecurePermissions
             }
             let combined = try Data(contentsOf: url)

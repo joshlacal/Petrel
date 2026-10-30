@@ -76,13 +76,13 @@ class GatewaySessionObservationTest {
     }
 
     @Test
-    fun `session check reports expiry without taking ownership of local invalidation`() = runTest {
+    fun `ambiguous session check 401 retains credentials without notifying invalidation`() = runTest {
         val fixture = fixture(HttpClient(MockEngine { respond("", HttpStatusCode.Unauthorized) }))
         fixture.use {
             val invalidated = mutableListOf<String>()
             it.client.onSessionInvalidated = invalidated::add
 
-            assertFailsWith<GatewayException.SessionExpired> { it.client.gatewayCheckSession() }
+            assertFailsWith<GatewayException.AuthenticationRequired> { it.client.gatewayCheckSession() }
 
             assertEquals(emptyList(), invalidated)
             assertSessionRetained(it)
@@ -116,7 +116,7 @@ class GatewaySessionObservationTest {
 
             assertFailsWith<GatewayException.SessionExpired> {
                 it.strategy.handleUnauthorizedResponse(
-                    "api.catbird.blue", """{"error":"invalid_session"}""".encodeToByteArray(),
+                    "api.catbird.blue", "Bearer $sessionId", """{"error":"invalid_session"}""".encodeToByteArray(),
                 )
             }
 
@@ -140,7 +140,7 @@ class GatewaySessionObservationTest {
             )
             for ((host, body) in responses) {
                 assertFailsWith<GatewayException.AuthenticationRequired> {
-                    it.strategy.handleUnauthorizedResponse(host, body.encodeToByteArray())
+                    it.strategy.handleUnauthorizedResponse(host, "Bearer $sessionId", body.encodeToByteArray())
                 }
                 assertSessionRetained(it)
             }
@@ -160,7 +160,7 @@ class GatewaySessionObservationTest {
 
             assertFailsWith<GatewayException.SessionExpired> {
                 it.strategy.handleUnauthorizedResponse(
-                    "api.catbird.blue", """{"error":"invalid_session"}""".encodeToByteArray(),
+                    "api.catbird.blue", "Bearer $sessionId", """{"error":"invalid_session"}""".encodeToByteArray(),
                 )
             }
 

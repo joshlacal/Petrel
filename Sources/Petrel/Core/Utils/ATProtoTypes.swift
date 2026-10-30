@@ -593,14 +593,22 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             && query == otherURI.query && fragment == otherURI.fragment && isDID == otherURI.isDID
     }
 
+    // URI components are immutable, so the captured spelling cannot become stale.
+    // Preserve escaping for record fidelity checks without changing URL construction.
+    private var serializedString: String {
+        guard let originalString, Self.detectScheme(in: originalString) != nil else {
+            return uriString()
+        }
+        return originalString
+    }
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        let uriString = self.uriString()
-        try container.encode(uriString)
+        try container.encode(serializedString)
     }
 
     public func toCBORValue() throws -> Any {
-        return uriString()
+        return serializedString
     }
 }
 
