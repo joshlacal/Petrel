@@ -7,7 +7,8 @@ DESTINATION="${2:-$ROOT/generator/lexicons}"
 PYTHON="${PETREL_PYTHON:-python3}"
 "$PYTHON" "$ROOT/Scripts/space_lexicon_provenance.py" verify --lexicons "$DESTINATION"
 for ns in app chat com tools site; do
-  rsync -a --delete --exclude='/atproto/space/' --exclude='/atproto/simplespace/' \
+  rsync -a --delete --exclude='/atproto/space/' --exclude='/atproto/memberspace/' \
+    --exclude='/atproto/managedspace/' --exclude='/atproto/personalspace/' \
     "$SOURCE/$ns/" "$DESTINATION/$ns/"
 done
 "$PYTHON" "$ROOT/Scripts/space_lexicon_provenance.py" verify --lexicons "$DESTINATION"
