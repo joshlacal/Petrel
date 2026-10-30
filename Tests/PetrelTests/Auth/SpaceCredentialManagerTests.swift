@@ -1572,7 +1572,7 @@ extension SpaceCredentialManagerTests {
                     switch status {
                     case 400 where body.contains("message"):
                         #expect(error == .authorizationRefused(host: "space.test", error: "SpaceNotFound", message: "Space not found"))
-                        #expect(error.errorDescription == "Space not found at space.test (Space not found). The authority does not host this space, or the space is not public and no delegation token was sent; this does not mean it was deleted.")
+                        #expect(error.errorDescription == "Space not found or not authorized at space.test (Space not found). The authority does not host this space, does not authorize this user, or the space is not public and no delegation token was sent; this does not mean it was deleted.")
                     case 400:
                         #expect(error == .authorizationRefused(host: "space.test", error: "SpaceNotFound", message: body))
                     default:

@@ -29,7 +29,9 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
     /// The authority refused to issue a credential. `error` is the XRPC error
     /// name, such as `UserNotAuthorized`, `AppNotAuthorized` or `NotAuthorized`
     /// (or `HTTP 403`), or `SpaceNotFound` at HTTP 400 (the reference host) or
-    /// 404 (Swan): the authority does not host the space or, without a
+    /// 404 (Swan), which means "not found or not authorized": the authority
+    /// does not host the space, does not authorize this user (an authority may
+    /// answer `SpaceNotFound` in place of `UserNotAuthorized`), or, without a
     /// delegation token, the space is not public. None of these means the
     /// space was deleted.
     case authorizationRefused(host: String, error: String, message: String?)
@@ -56,7 +58,7 @@ public enum SpaceCredentialError: Error, LocalizedError, Equatable, Sendable {
         case let .authorizationRefused(host, error, message):
             if error == "SpaceNotFound" {
                 let detail = message.map { $0.isEmpty ? "" : " (\($0))" } ?? ""
-                return "Space not found at \(host)\(detail). The authority does not host this space, or the space is not public and no delegation token was sent; this does not mean it was deleted."
+                return "Space not found or not authorized at \(host)\(detail). The authority does not host this space, does not authorize this user, or the space is not public and no delegation token was sent; this does not mean it was deleted."
             }
             if let message, !message.isEmpty {
                 return "You no longer have access to this space (\(host) refused authorization: \(message))"
@@ -593,8 +595,10 @@ public actor SpaceCredentialManager {
                 throw SpaceCredentialError.spaceDeleted(host: host, message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
             }
 
-            // Not a deletion: the authority does not host the space or, without
-            // a delegation token, the space is not public. The reference host
+            // Not a deletion: "not found or not authorized". The authority does
+            // not host the space, does not authorize this user (it may answer
+            // SpaceNotFound in place of UserNotAuthorized), or, without a
+            // delegation token, the space is not public. The reference host
             // answers 400 and Swan answers 404; both keep the error name.
             if httpResponse.statusCode == 400 || httpResponse.statusCode == 404, errorName == "SpaceNotFound" {
                 throw SpaceCredentialError.authorizationRefused(host: host, error: "SpaceNotFound", message: serverMessage ?? (rawBody.isEmpty ? nil : rawBody))
