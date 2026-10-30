@@ -3,9 +3,9 @@ import kotlinx.benchmark.gradle.JvmBenchmarkTarget
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
-    kotlin("plugin.allopen") version "2.0.21"
+    kotlin("plugin.allopen")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlinx.benchmark") version "0.4.13"
+    id("org.jetbrains.kotlinx.benchmark") version "0.5.0"
     `maven-publish`
 }
 
@@ -31,30 +31,30 @@ dependencies {
     implementation(kotlin("stdlib"))
 
     // Compose runtime (required for Compose compiler stability metadata)
-    implementation("androidx.compose.runtime:runtime:1.8.3")
+    implementation("androidx.compose.runtime:runtime:1.12.1")
 
     // Kotlin Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
     // Kotlin Serialization for JSON and CBOR (DAG-CBOR WebSocket frames)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.12.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.12.0")
 
     // Ktor client for HTTP networking
-    implementation("io.ktor:ktor-client-core:3.0.2")
-    implementation("io.ktor:ktor-client-cio:3.0.2") // CIO engine
-    implementation("io.ktor:ktor-client-content-negotiation:3.0.2")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.2")
-    implementation("io.ktor:ktor-client-logging:3.0.2")
-    implementation("io.ktor:ktor-client-websockets:3.0.2")
+    implementation("io.ktor:ktor-client-core:3.6.0")
+    implementation("io.ktor:ktor-client-cio:3.6.0") // CIO engine
+    implementation("io.ktor:ktor-client-content-negotiation:3.6.0")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.0")
+    implementation("io.ktor:ktor-client-logging:3.6.0")
+    implementation("io.ktor:ktor-client-websockets:3.6.0")
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
-    testImplementation("io.ktor:ktor-client-mock:3.0.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("io.ktor:ktor-client-mock:3.6.0")
 
     // Benchmark runtime
-    "benchmarkImplementation"("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.13")
+    "benchmarkImplementation"("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.5.0")
 }
 
 kotlin {

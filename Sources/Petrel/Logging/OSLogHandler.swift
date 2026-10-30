@@ -52,6 +52,18 @@
             osLogger = os.Logger(subsystem: label, category: category)
         }
 
+        public func log(event: Logging.LogEvent) {
+            log(
+                level: event.level,
+                message: event.message,
+                metadata: event.metadata,
+                source: event.source,
+                file: event.file,
+                function: event.function,
+                line: event.line
+            )
+        }
+
         public func log(
             level: Logging.Logger.Level,
             message: Logging.Logger.Message,

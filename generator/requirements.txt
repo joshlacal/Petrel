@@ -1,3 +1,3 @@
-jinja2
-aiofiles
-orjson
+# Use the reviewed, hashed generator environment for local and CI generation.
+--require-hashes
+-r requirements-release.lock

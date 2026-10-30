@@ -1,7 +1,7 @@
 import Crypto
 import Foundation
 @testable import PetrelCrypto
-import secp256k1
+import P256K
 import XCTest
 
 final class ServiceJWTTests: XCTestCase {
@@ -59,7 +59,7 @@ final class ServiceJWTTests: XCTestCase {
     // MARK: - Mint & Inspect & Verify (ES256K)
 
     func testES256KMintInspectAndVerifyRoundTrip() throws {
-        let secpKey = try secp256k1.Signing.PrivateKey()
+        let secpKey = try P256K.Signing.PrivateKey()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let token = try ServiceJWT.mint(
             issuer: issuerWeb,
@@ -364,7 +364,7 @@ final class ServiceJWTTests: XCTestCase {
     }
 
     func testWrongCurveVerificationIsRejected() throws {
-        let secpKey = try secp256k1.Signing.PrivateKey()
+        let secpKey = try P256K.Signing.PrivateKey()
         let es256kToken = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
@@ -713,7 +713,7 @@ final class ServiceJWTTests: XCTestCase {
         }
 
         // ES256K mint with requestBodyDigest
-        let secpKey = try secp256k1.Signing.PrivateKey()
+        let secpKey = try P256K.Signing.PrivateKey()
         let verifierSecp = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.dataRepresentation)
         let tokenSecp = try ServiceJWT.mint(
             issuer: issuerPLC,

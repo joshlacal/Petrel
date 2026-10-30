@@ -36,6 +36,7 @@ typecheck_documentation_examples() {
         oauth-authentication.swift \
         oauth-callback.swift \
         package-manifest.swift \
+        readme-encrypted-credentials.swift \
         readme-oauth.swift \
         readme-package-manifest.swift \
         readme-public-profile.swift)
@@ -89,7 +90,7 @@ typecheck_documentation_examples() {
                     -I "$example_bin_path/Modules" \
                     -Xcc -fmodule-map-file="$example_bin_path/CPetrelBLAKE3.build/module.modulemap" \
                     -Xcc -fmodule-map-file="$example_bin_path/CAsyncDNSResolver.build/module.modulemap" \
-                    -Xcc -fmodule-map-file="$example_bin_path/secp256k1_bindings.build/module.modulemap" \
+                    -Xcc -fmodule-map-file="$example_bin_path/libsecp256k1.build/module.modulemap" \
                     -Xcc -I \
                     -Xcc "$scratch_path/checkouts/swift-async-dns-resolver/Sources/CAsyncDNSResolver/include" \
                     "$example"
@@ -101,10 +102,11 @@ typecheck_documentation_examples() {
 # SwiftPM #10285 makes Swift 6.4's default SwiftBuild path misclassify .docc
 # catalogs. The native path keeps the catalog discoverable until the upstream
 # fix lands: https://github.com/swiftlang/swift-package-manager/issues/10285
-if [[ ${RELEASE_TOOLCHAIN_LANE:-} == local-validation &&
-      ${RELEASE_SWIFT_VERSION:-} == 6.4 &&
-      ${RELEASE_XCODE_VERSION:-} == 27.0 &&
-      ${RELEASE_XCODE_BUILD:-} == 27A5218g ]]; then
+if [[ ${RELEASE_SWIFT_VERSION:-} == 6.4 &&
+      ( ${RELEASE_TOOLCHAIN_LANE:-} == local-stable ||
+        ( ${RELEASE_TOOLCHAIN_LANE:-} == local-validation &&
+          ${RELEASE_XCODE_VERSION:-} == 27.0 &&
+          ${RELEASE_XCODE_BUILD:-} == 27A5218g ) ) ]]; then
     validate_documentation --build-system native
 else
     validate_documentation

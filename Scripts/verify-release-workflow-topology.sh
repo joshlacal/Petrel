@@ -174,12 +174,12 @@ workflow_control_fingerprints = {
 end
 
 expected_action_pins = {
-  "actions/checkout" => "34e114876b0b11c390a56381ad16ebd13914f8d5", # v4.3.1
-  "actions/setup-python" => "a26af69be951a213d495a4c3e4e4022e16d87065", # v5.6.0
-  "actions/setup-java" => "c1e323688fd81a25caa38c78aa6df2d33d3e20d9", # v4.8.0
-  "gradle/actions/setup-gradle" => "748248ddd2a24f49513d8f472f81c3a07d4d50e1", # v4.4.4
-  "peter-evans/create-pull-request" => "22a9089034f40e5a961c8808d113e2c98fb63676", # v7.0.11
-  "anthropics/claude-code-action" => "1298632ce7736903d02a1435002705aa2a594a6c", # v1.0.175
+  "actions/checkout" => "3d3c42e5aac5ba805825da76410c181273ba90b1", # v7.0.1
+  "actions/setup-python" => "6d4fd22b20465ccc0f7354476588e8df7c9ca0e0", # v7.1.0
+  "actions/setup-java" => "b843ebf9b913146b38da2eaa7aeddf76074ae1ad", # v6.1.0
+  "gradle/actions/setup-gradle" => "3f5f9adaf7d9fecd50b5935e54106014257a94e6", # v6.4.0
+  "peter-evans/create-pull-request" => "5f6978faf089d4d20b00c7766989d076bb2fc7f1", # v8.1.1
+  "anthropics/claude-code-action" => "925afb53776cf1a2b738c6bdbed37b4d4000ef13", # v1.0.262
 }
 loaded_workflows = {}
 workflow_paths = Dir.glob([
@@ -274,7 +274,7 @@ fail!("claude-code-review.yml must use the exact reviewed job permissions") unle
   claude_review_job["permissions"] == expected_claude_permissions
 expected_checkout_step = {
   "name" => "Checkout repository",
-  "uses" => "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5",
+  "uses" => "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1",
   "with" => {"fetch-depth" => 1, "persist-credentials" => false},
 }
 claude_review_steps = claude_review_job.fetch("steps")
@@ -285,7 +285,7 @@ fail!("claude-code-review.yml step inventory must be exact") unless
     claude_review_steps.fetch(1).slice("name", "id", "uses") == {
       "name" => "Run Claude Code Review",
       "id" => "claude-review",
-      "uses" => "anthropics/claude-code-action@1298632ce7736903d02a1435002705aa2a594a6c",
+      "uses" => "anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13",
     }
 expected_claude_review_inputs = {
   "claude_code_oauth_token" => "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
@@ -333,7 +333,7 @@ fail!("claude.yml step inventory must be exact") unless
     interactive_claude_steps.fetch(1).slice("name", "id", "uses") == {
       "name" => "Run Claude Code",
       "id" => "claude",
-      "uses" => "anthropics/claude-code-action@1298632ce7736903d02a1435002705aa2a594a6c",
+      "uses" => "anthropics/claude-code-action@925afb53776cf1a2b738c6bdbed37b4d4000ef13",
     }
 expected_interactive_claude_inputs = {
   "claude_code_oauth_token" => "${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}",
@@ -408,8 +408,8 @@ fail!("tag guard run body is missing") unless tag_guard_run.is_a?(String)
   fail!("tag guard is missing #{required.inspect}") unless tag_guard_run.include?(required)
 end
 
-expected_checkout = "actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5"
-expected_setup_python = "actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065"
+expected_checkout = "actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1"
+expected_setup_python = "actions/setup-python@6d4fd22b20465ccc0f7354476588e8df7c9ca0e0"
 
 jobs.each do |job_name, job|
   steps = job["steps"]
@@ -587,9 +587,9 @@ BASH
 # matching cannot enumerate; the reviewed build step is validated in full below.
 expected_other_step_fingerprints = {
   "release" => [
-    [nil, "c65f56c49a3c60ab4b32db846bbbe9c6adbe219ad18ad3ed536607646e09b893"],
+    [nil, "3facce523aa8a0e29a937485282e18e07e2907c45914b4ce7745b674c765f3b7"],
     ["Verify release workflow topology", "c6a141e807793165b1fc9aebb21638b4e1fa353d80e5665eb2cd942207841d23"],
-    [nil, "8ab62dfbc944c92aa4e154d38a5d08610976cddfad2947379f289a780e4e5206"],
+    [nil, "e2130b47c91c3882e523d8b0e6a882423ff99e03647b66009bf3cec2bb4f1d84"],
     ["Select and verify stable Xcode", "15a5f87efdd4340fbd074edd46e061f0a64aed62295a3649cd9da95dec0f6794"],
     ["Validate bounded dependency requirements", "bf334e37ae97804ac15ad186b867d758f1bacb6c5063c1edec589bb5c9d4bc4c"],
     ["Bootstrap locked generator and release tools", "c5795d8ed5ead5b43ae4f3b71e9ff4702e1462bf7925f159d9363eeb28402e0c"],
@@ -598,7 +598,7 @@ expected_other_step_fingerprints = {
     ["Diagnose API compatibility against exact 0.1.0", "e1a5d999d2c19b7cf931236e6fc421aa224af5379355257f254cd786fc08ebce"],
   ],
   "Swift compatibility" => [
-    [nil, "c65f56c49a3c60ab4b32db846bbbe9c6adbe219ad18ad3ed536607646e09b893"],
+    [nil, "3facce523aa8a0e29a937485282e18e07e2907c45914b4ce7745b674c765f3b7"],
     ["Select and verify stable Xcode", "8803b99e5bf8a298edfc72ee540b0df979535657b20f60be8bc609368c0a11be"],
     ["Validate bounded dependency requirements", "7e0b66384a3edb57d48fb803d5cb694c870457950bbd10388befe913d8c781ca"],
   ],
@@ -659,9 +659,9 @@ expected_macos_job_names = {
     if [[ $RELEASE_TOOLCHAIN_LANE == minimum ]]; then
       SDK_PATH=$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-path)
       test -d "$SDK_PATH"
-      test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = '18.4'
+      test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = '26.0'
       "$RELEASE_SWIFT" build \
-        --scratch-path .build/xcode163-iphoneos-cross \
+        --scratch-path .build/xcode2601-iphoneos-cross \
         --triple arm64-apple-ios18.0 \
         --sdk "$SDK_PATH"
     else
@@ -674,9 +674,9 @@ expected_macos_job_names = {
   cardinality_fragments = [
     'SDK_PATH=$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-path)',
     'test -d "$SDK_PATH"',
-    'test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = \'18.4\'',
+    'test "$("$RELEASE_XCRUN" --sdk iphoneos --show-sdk-version)" = \'26.0\'',
     "  \"$RELEASE_SWIFT\" build \\\n",
-    '--scratch-path .build/xcode163-iphoneos-cross',
+    '--scratch-path .build/xcode2601-iphoneos-cross',
     '--triple arm64-apple-ios18.0',
     '--sdk "$SDK_PATH"',
     'Scripts/verify-owned-warnings.sh ios-simulator -- "$RELEASE_XCODEBUILD"',
@@ -730,14 +730,14 @@ expected_minimum_apple_tuple = {
   "runner" => "macos-15",
   "selection" => "pinned-minimum",
   "evidence-class" => "stable-release",
-  "developer-dir" => "/Applications/Xcode_16.3.app/Contents/Developer",
-  "xcode-version" => "16.3",
-  "xcode-build" => "16E140",
+  "developer-dir" => "/Applications/Xcode_26.0.1.app/Contents/Developer",
+  "xcode-version" => "26.0.1",
+  "xcode-build" => "17A400",
   "deployment-target" => "18.0",
-  "ios-runtime" => "18.4",
-  "watchos-runtime" => "11.4",
-  "tvos-runtime" => "18.4",
-  "visionos-runtime" => "2.4",
+  "ios-runtime" => "26.0",
+  "watchos-runtime" => "26.0",
+  "tvos-runtime" => "26.0",
+  "visionos-runtime" => "26.0",
 }
 expected_newest_stable_apple_tuple = {
   "lane" => "newest-stable",
@@ -757,7 +757,7 @@ expected_newest_stable_apple_tuple = {
   ["release", rows.fetch(0)],
   ["Swift compatibility", swift_rows.fetch(0)],
 ].each do |label, minimum_row|
-  fail!("#{label} minimum Apple toolchain tuple must be exact Xcode 16.3") unless
+  fail!("#{label} minimum Apple toolchain tuple must be exact Xcode 26.0.1") unless
     minimum_row == expected_minimum_apple_tuple
 end
 [
@@ -769,42 +769,42 @@ end
 end
 
 [
-  ["release matrix", source, "xcode-build: '16E140'", 1],
-  ["Swift compatibility matrix", swift_source, "xcode-build: '16E140'", 1],
-  ["release tagged consumer", source, "export RELEASE_XCODE_BUILD='16E140'", 1],
-  ["DocC", docc_source, "export RELEASE_XCODE_BUILD='16E140'", 1],
+  ["release matrix", source, "xcode-build: '17A400'", 1],
+  ["Swift compatibility matrix", swift_source, "xcode-build: '17A400'", 1],
+  ["release tagged consumer", source, "export RELEASE_XCODE_BUILD='17A400'", 1],
+  ["DocC", docc_source, "export RELEASE_XCODE_BUILD='17A400'", 1],
 ].each do |label, workflow_source, required, count|
-  fail!("#{label} must source-quote Xcode build identity '16E140'") unless
+  fail!("#{label} must source-quote Xcode build identity '17A400'") unless
     workflow_source.scan(required).length == count
 end
 
 expected_minimum_exports = [
-  "export RELEASE_DEVELOPER_DIR=/Applications/Xcode_16.3.app/Contents/Developer",
-  "export RELEASE_XCODE_VERSION=16.3",
-  "export RELEASE_XCODE_BUILD='16E140'",
-  "export RELEASE_IOS_RUNTIME=18.4",
-  "export RELEASE_WATCHOS_RUNTIME=11.4",
-  "export RELEASE_TVOS_RUNTIME=18.4",
-  "export RELEASE_VISIONOS_RUNTIME=2.4",
+  "export RELEASE_DEVELOPER_DIR=/Applications/Xcode_26.0.1.app/Contents/Developer",
+  "export RELEASE_XCODE_VERSION=26.0.1",
+  "export RELEASE_XCODE_BUILD='17A400'",
+  "export RELEASE_IOS_RUNTIME=26.0",
+  "export RELEASE_WATCHOS_RUNTIME=26.0",
+  "export RELEASE_TVOS_RUNTIME=26.0",
+  "export RELEASE_VISIONOS_RUNTIME=26.0",
 ]
 [["DocC", validate_run_source]].each do |label, run_source|
   expected_minimum_exports.each do |required|
-    fail!("#{label} minimum Apple toolchain tuple must be exact Xcode 16.3") unless
+    fail!("#{label} minimum Apple toolchain tuple must be exact Xcode 26.0.1") unless
       run_source.scan(required).length == 1
   end
 end
 
 expected_activation_tuple = [
-  '$RELEASE_DEVELOPER_DIR != /Applications/Xcode_16.3.app/Contents/Developer',
-  '$RELEASE_XCODE_VERSION != 16.3',
-  '$RELEASE_XCODE_BUILD != 16E140',
-  '${RELEASE_IOS_RUNTIME:-} != 18.4',
-  '${RELEASE_WATCHOS_RUNTIME:-} != 11.4',
-  '${RELEASE_TVOS_RUNTIME:-} != 18.4',
-  '${RELEASE_VISIONOS_RUNTIME:-} != 2.4',
+  '$RELEASE_DEVELOPER_DIR != /Applications/Xcode_26.0.1.app/Contents/Developer',
+  '$RELEASE_XCODE_VERSION != 26.0.1',
+  '$RELEASE_XCODE_BUILD != 17A400',
+  '${RELEASE_IOS_RUNTIME:-} != 26.0',
+  '${RELEASE_WATCHOS_RUNTIME:-} != 26.0',
+  '${RELEASE_TVOS_RUNTIME:-} != 26.0',
+  '${RELEASE_VISIONOS_RUNTIME:-} != 26.0',
 ]
 expected_activation_tuple.each do |required|
-  fail!("activation minimum Apple toolchain tuple must be exact Xcode 16.3") unless
+  fail!("activation minimum Apple toolchain tuple must be exact Xcode 26.0.1") unless
     activation_source.scan(required).length == 1
 end
 
@@ -836,7 +836,7 @@ end
   end
 end
 
-expected_container = "swift:6.1.2-jammy@sha256:5910655d205a5a54b0b9efdf72c4066a8de1932513fdc81793e2544b5d5a0709"
+expected_container = "swift:6.4.1-noble@sha256:19cbe56bdaec1918f7cf5fdeba42b9bd55bdd8a6149c9990d0e0e3a89a127d63"
 fail!("linux container is not the pinned Swift image") unless linux["container"] == expected_container
 
 consumer = "Tests/ReleaseConsumers/PetrelURLConsumer"
@@ -854,7 +854,7 @@ tagged_run_source = tagged_steps.map do |step|
   step.is_a?(Hash) ? step.fetch("run", "") : ""
 end.join("\n")
 expected_minimum_exports.each do |required|
-  fail!("tagged clean consumer minimum Apple toolchain tuple must be exact Xcode 16.3") unless
+  fail!("tagged clean consumer minimum Apple toolchain tuple must be exact Xcode 26.0.1") unless
     tagged_run_source.scan(required).length == 1
 end
 [
@@ -871,9 +871,9 @@ end
 # messages, while these canonical fingerprints cover every remaining parsed
 # workflow, job, and step control surface without depending on shell spellings.
 complete_workflow_fingerprints = {
-  "release" => "dd02351762f5fe09559ea09c022e1db8e3495039c6c6492d21fbf952d000a45d",
-  "Swift compatibility" => "a79abc7627a6d4db03844deed88739a9e8b2ffb3e3c53f3e27e6527621e24599",
-  "DocC" => "c30190bbe4dbf04d1797b218953fd2a118e5ba6a847c774e296fcdd2c6b8b128",
+  "release" => "71285cfcc70a152c0434617ea28d849e8ef48e5a72f69e47dd0e203875f4b2cb",
+  "Swift compatibility" => "cacf89cb8fcffbf83072d1056f171b1df1bfa4bba2421c659e7111cdfd53e982",
+  "DocC" => "019f3c0e0e08d80803a7b7922a6c36df0374f01c01af233d8525a809fbe21c39",
 }
 [
   ["release", workflow],

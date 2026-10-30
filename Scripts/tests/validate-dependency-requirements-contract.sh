@@ -30,17 +30,17 @@ expected = {
     ),
     "swift-async-dns-resolver": (
         "https://github.com/apple/swift-async-dns-resolver",
-        "0.7.0",
         "0.8.0",
+        "0.9.0",
     ),
 }
-# PetrelCrypto's existing ES256K/PLC implementation uses this exact release.
+# PetrelCrypto's ES256K/PLC implementation was migrated to P256K 0.24.0.
 # Keep its source and requirement separate from the reviewed bounded ranges;
 # accepting a newer version or a range requires another explicit policy review.
 expected_exact = {
-    "secp256k1.swift": (
-        "https://github.com/GigaBitcoin/secp256k1.swift.git",
-        "0.15.0",
+    "swift-secp256k1": (
+        "https://github.com/21-DOT-DEV/swift-secp256k1.git",
+        "0.24.0",
     ),
 }
 

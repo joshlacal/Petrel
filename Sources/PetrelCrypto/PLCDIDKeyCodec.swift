@@ -1,6 +1,6 @@
 import Crypto
 import Foundation
-import secp256k1
+import P256K
 
 /// The PLC wire format uses `did:key` multicodec values for both the local
 /// P-256 identity and the pinned TypeScript PDS's secp256k1 identity. Keep the
@@ -70,7 +70,7 @@ public enum PLCDIDKeyCodec {
         }
         let point = Data(decoded.dropFirst(2))
         do {
-            _ = try secp256k1.Signing.PublicKey(
+            _ = try P256K.Signing.PublicKey(
                 dataRepresentation: point,
                 format: .compressed
             )
@@ -134,7 +134,7 @@ public enum PLCDIDKeyCodec {
                 throw PetrelCryptoError.invalidIdentifier("secp256k1 legacy verification method")
             }
             do {
-                _ = try secp256k1.Signing.PublicKey(
+                _ = try P256K.Signing.PublicKey(
                     dataRepresentation: compressed, format: .compressed
                 )
             } catch {

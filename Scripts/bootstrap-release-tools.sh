@@ -12,10 +12,10 @@ MINT_REPOSITORY=https://github.com/yonaskolb/Mint.git
 MINT_TAG=refs/tags/0.18.0
 MINT_COMMIT=7bc67a0b925b949c8becc327bc08f56eeadc0051
 SWIFTFORMAT_REPOSITORY=https://github.com/nicklockwood/SwiftFormat.git
-SWIFTFORMAT_TAG=refs/tags/0.61.1
-SWIFTFORMAT_COMMIT=a5fa7a6a57abeb834df1b3fa43ea9133137d5ade
-SWIFTFORMAT_SPEC=nicklockwood/SwiftFormat@0.61.1
-SWIFTFORMAT_STAMP="$TOOLS_ROOT/swiftformat-0.61.1.commit"
+SWIFTFORMAT_TAG=refs/tags/0.64.1
+SWIFTFORMAT_COMMIT=f53853b330ff8dc61f92d489df57bf5c33491c5b
+SWIFTFORMAT_SPEC=nicklockwood/SwiftFormat@0.64.1
+SWIFTFORMAT_STAMP="$TOOLS_ROOT/swiftformat-0.64.1.commit"
 
 [[ -n ${RELEASE_SWIFT:-} && -x $RELEASE_SWIFT ]] || {
   echo "activate Scripts/activate-release-toolchain.sh before bootstrapping release tools" >&2
@@ -113,8 +113,8 @@ swiftformat_version=$(
   "$RELEASE_MINT" run --executable swiftformat "$SWIFTFORMAT_SPEC" --version |
     /usr/bin/tr -d '\r\n'
 )
-[[ $swiftformat_version == 0.61.1 ]] || {
-  echo "installed SwiftFormat is not exactly 0.61.1" >&2
+[[ $swiftformat_version == 0.64.1 ]] || {
+  echo "installed SwiftFormat is not exactly 0.64.1" >&2
   exit 1
 }
 if [[ ! -e $SWIFTFORMAT_STAMP ]]; then

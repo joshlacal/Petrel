@@ -255,27 +255,27 @@ unbounded_path.write_text(json.dumps(unbounded), encoding="utf-8")
 # The reviewed exact dependency must not inherit the bounded-range policy,
 # accept another source/version, or bypass the generic pre-1.0 review gate.
 exact_requirements = {
-    "newer-version": {"exact": ["0.15.1"]},
-    "prerelease": {"exact": ["0.15.0-alpha.1"]},
-    "multiple-versions": {"exact": ["0.15.0", "0.15.1"]},
+    "newer-version": {"exact": ["0.24.1"]},
+    "prerelease": {"exact": ["0.24.0-alpha.1"]},
+    "multiple-versions": {"exact": ["0.24.0", "0.24.1"]},
     "empty-versions": {"exact": []},
     "bounded-range": {
-        "range": [{"lowerBound": "0.15.0", "upperBound": "0.16.0"}]
+        "range": [{"lowerBound": "0.24.0", "upperBound": "0.25.0"}]
     },
     "branch": {"branch": ["main"]},
     "revision": {"revision": ["4c77c7384768acf1093d66ccaacf298d322b10b7"]},
-    "mixed-requirements": {"exact": ["0.15.0"], "branch": ["main"]},
+    "mixed-requirements": {"exact": ["0.24.0"], "branch": ["main"]},
 }
 for label, requirement in exact_requirements.items():
     document = copy.deepcopy(base)
-    source_control(document, "secp256k1.swift")["requirement"] = requirement
+    source_control(document, "swift-secp256k1")["requirement"] = requirement
     (exact_policy_dir / f"{label}.json").write_text(
         json.dumps(document), encoding="utf-8"
     )
 
 exact_wrong_url = copy.deepcopy(base)
-source_control(exact_wrong_url, "secp256k1.swift")["location"] = {
-    "remote": [{"urlString": "https://example.invalid/secp256k1.swift.git"}]
+source_control(exact_wrong_url, "swift-secp256k1")["location"] = {
+    "remote": [{"urlString": "https://example.invalid/swift-secp256k1.git"}]
 }
 (exact_policy_dir / "wrong-url.json").write_text(
     json.dumps(exact_wrong_url), encoding="utf-8"
@@ -284,7 +284,7 @@ source_control(exact_wrong_url, "secp256k1.swift")["location"] = {
 exact_registry = copy.deepcopy(base)
 for wrapper in exact_registry["dependencies"]:
     entries = wrapper.get("sourceControl", [])
-    if len(entries) == 1 and entries[0].get("identity") == "secp256k1.swift":
+    if len(entries) == 1 and entries[0].get("identity") == "swift-secp256k1":
         entry = wrapper.pop("sourceControl")[0]
         entry.pop("location")
         wrapper["registry"] = [entry]
@@ -293,7 +293,7 @@ for wrapper in exact_registry["dependencies"]:
 )
 
 extra_exact = copy.deepcopy(base)
-unknown_exact = copy.deepcopy(source_control(base, "secp256k1.swift"))
+unknown_exact = copy.deepcopy(source_control(base, "swift-secp256k1"))
 unknown_exact["identity"] = "unreviewed-exact-zero"
 unknown_exact["location"] = {
     "remote": [{"urlString": "https://example.invalid/unreviewed-exact-zero.git"}]
@@ -356,16 +356,16 @@ for label in newer-version prerelease multiple-versions empty-versions \
   expect_semantic_failure \
     "exact-$label" \
     "$EXACT_POLICY_DIR/$label.json" \
-    "secp256k1.swift requirement must be exact 0.15.0"
+    "swift-secp256k1 requirement must be exact 0.24.0"
 done
 expect_semantic_failure \
   exact-wrong-url \
   "$EXACT_POLICY_DIR/wrong-url.json" \
-  "secp256k1.swift source URL must be https://github.com/GigaBitcoin/secp256k1.swift.git"
+  "swift-secp256k1 source URL must be https://github.com/21-DOT-DEV/swift-secp256k1.git"
 expect_semantic_failure \
   exact-registry-substitution \
   "$EXACT_POLICY_DIR/registry-substitution.json" \
-  "missing direct dependency: secp256k1.swift"
+  "missing direct dependency: swift-secp256k1"
 expect_semantic_failure \
   unreviewed-exact \
   "$EXACT_POLICY_DIR/unreviewed-exact.json" \

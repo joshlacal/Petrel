@@ -57,5 +57,5 @@ fi
 "$PETREL_PYTHON" run.py \
   --manifest generator/manifests/petrel-core.json \
   --language swift
-"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \
+"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.64.1 \
   Sources/Petrel/Generated

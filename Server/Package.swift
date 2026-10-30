@@ -1,4 +1,4 @@
-// swift-tools-version: 6.1
+// swift-tools-version: 6.2
 import PackageDescription
 
 let package = Package(
@@ -10,10 +10,10 @@ let package = Package(
     .library(name: "PetrelCABServerCore", targets: ["PetrelCABServerCore"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.25.0"),
+    .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.28.0"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
-    .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
-    .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
+    .package(url: "https://github.com/apple/swift-log.git", from: "1.16.2"),
+    .package(url: "https://github.com/apple/swift-crypto.git", from: "5.0.3"),
     .package(name: "Petrel", path: ".."),
   ],
   targets: [

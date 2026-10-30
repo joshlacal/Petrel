@@ -1,7 +1,7 @@
 import Crypto
 import Foundation
 @testable import PetrelCrypto
-import secp256k1
+import P256K
 import XCTest
 
 final class PetrelCryptoTests: XCTestCase {
@@ -128,11 +128,11 @@ final class PetrelCryptoTests: XCTestCase {
         XCTAssertThrowsError(try verifier.verify(signature: sig, signingInput: msg, algorithm: "ES256K"))
 
         // secp256k1 key verification
-        let secpKey = try secp256k1.Signing.PrivateKey()
+        let secpKey = try P256K.Signing.PrivateKey()
         let secpPubBytes = secpKey.publicKey.dataRepresentation
         let secpVerifier = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpPubBytes)
 
-        let compactSig = try secpKey.signature(for: msg)
+        let compactSig = secpKey.signature(for: msg)
         // Verify compact representation
         XCTAssertTrue(try secpVerifier.verify(
             signature: compactSig.compactRepresentation,
