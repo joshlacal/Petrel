@@ -94,6 +94,18 @@ class SwiftWarningFreeGenerationTests(unittest.TestCase):
                 equality_end = union.index("public func isEqual", equality_start)
                 self.assertNotIn("default:", union[equality_start:equality_end])
 
+    def test_main_object_without_properties_compiles_without_unused_values(self):
+        generated = self.render("com/atproto/personalspace/policy.json")
+
+        self.assertIn("_ = try decoder.container(keyedBy: CodingKeys.self)", generated)
+        self.assertIn("_ = encoder.container(keyedBy: CodingKeys.self)", generated)
+        self.assertIn("return other is Self", generated)
+        self.assertIn("private enum CodingKeys: CodingKey {", generated)
+        self.assertNotIn("let container =", generated)
+        self.assertNotIn("var container =", generated)
+        self.assertNotIn("guard let other", generated)
+        self.assertNotIn("CodingKeys: String, CodingKey", generated)
+
 
 if __name__ == "__main__":
     unittest.main()

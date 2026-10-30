@@ -11,7 +11,11 @@
         }
 
         public init(from decoder: Decoder) throws {
+            {%- if properties %}
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            {%- else %}
+            _ = try decoder.container(keyedBy: CodingKeys.self)
+            {%- endif %}
             {%- for prop in properties %}
             {%- if prop.required_nullable %}
             guard container.contains(.{{ prop.name|sanitizeKeyword }}) else {
@@ -43,7 +47,11 @@
         }
 
         public func encode(to encoder: Encoder) throws {
+            {%- if properties %}
             var container = encoder.container(keyedBy: CodingKeys.self)
+            {%- else %}
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            {%- endif %}
             {%- for prop in properties %}
             {% if prop.required_nullable -%}
             try container.encode({{ prop.name|sanitizeKeyword }}, forKey: .{{ prop.name|sanitizeKeyword }})
@@ -70,6 +78,7 @@
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
+            {%- if properties %}
             guard let other = other as? Self else { return false }
             {%- for prop in properties %}
             if {{ prop.name|sanitizeKeyword }} != other.{{ prop.name|sanitizeKeyword }} {
@@ -77,6 +86,9 @@
             }
             {%- endfor %}
             return true
+            {%- else %}
+            return other is Self
+            {%- endif %}
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -110,7 +122,7 @@
         {% include 'strictRefDecoding.jinja' %}
         {%- endif %}
 
-        private enum CodingKeys: String, CodingKey {
+        private enum CodingKeys: {% if properties %}String, {% endif %}CodingKey {
             {%- for prop in properties %}
             case {{ prop.name|sanitizeKeyword }}
             {%- endfor %}
