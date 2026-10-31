@@ -416,4 +416,32 @@ public extension SpaceHostResolver {
             throw SpaceVerificationError.missingKEMKey
         }
     }
+
+    /// Resolve the authority's sole `#atproto` signing verification method from the exact account DID.
+    /// Supports both Multikey (`P-256` and `secp256k1`) and legacy W3C verification method encodings.
+    static func authoritySigningKey(
+        from document: DIDDocument,
+        expectedDID: String
+    ) throws -> ATProtoJWTVerificationKey {
+        let candidates = document.verificationMethod.filter {
+            $0.id == "#atproto" || $0.id == expectedDID + "#atproto"
+        }
+        guard document.id == expectedDID, candidates.count == 1,
+              let method = candidates.first, method.controller == expectedDID
+        else {
+            throw SpaceVerificationError.missingSigningKey
+        }
+        let plcKey: PLCDIDVerificationKey
+        switch method.type {
+        case "Multikey":
+            plcKey = try PLCDIDKeyCodec.decode("did:key:" + method.publicKeyMultibase)
+        case "EcdsaSecp256r1VerificationKey2019":
+            plcKey = try PLCDIDKeyCodec.decodeLegacyMultibase(method.publicKeyMultibase, curve: .p256)
+        case "EcdsaSecp256k1VerificationKey2019":
+            plcKey = try PLCDIDKeyCodec.decodeLegacyMultibase(method.publicKeyMultibase, curve: .secp256k1)
+        default:
+            throw SpaceVerificationError.missingSigningKey
+        }
+        return ATProtoJWTVerificationKey(plcKey)
+    }
 }

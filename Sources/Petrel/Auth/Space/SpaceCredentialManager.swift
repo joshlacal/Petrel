@@ -197,10 +197,11 @@ public actor SpaceCredentialManager {
     public typealias DelegationTokenProvider = @Sendable (SpaceRef) async throws -> String
 
     /// Provider that resolves a space authority DID to its space host XRPC endpoint URL.
-    ///
-    /// Note: SpaceAuthorityHostProvider returns only URL (spaceHost). SpaceAuthorityEndpoints.signingKeyFragment
-    /// has no consumer today; a future credential-signature verifier may want it.
     public typealias SpaceAuthorityHostProvider = @Sendable (String) async throws -> URL
+    public typealias AuthorKEMKeyProvider = @Sendable (_ repo: String, _ forceRefresh: Bool) async throws -> String
+    public typealias AuthoritySigningKeyProvider = @Sendable (_ authorityDID: String, _ forceRefresh: Bool) async throws -> ATProtoJWTVerificationKey
+    public typealias ClientAttestationProvider = @Sendable (SpaceRef) async throws -> String?
+
     private let client: ATProtoClient
     private let authorityHostProvider: SpaceAuthorityHostProvider
     private let urlSession: URLSession
@@ -209,12 +210,13 @@ public actor SpaceCredentialManager {
     /// the manager is released. A caller's session stays the caller's.
     private let ownedSession: OwnedSessionInvalidator?
     private let delegationTokenProvider: DelegationTokenProvider
-    public typealias AuthorKEMKeyProvider = @Sendable (_ repo: String, _ forceRefresh: Bool) async throws -> String
-    public typealias ClientAttestationProvider = @Sendable (SpaceRef) async throws -> String?
     private let authorKEMKeyProvider: AuthorKEMKeyProvider
+    private let customAuthoritySigningKeyProvider: AuthoritySigningKeyProvider?
+    private let authorityDIDDocumentFetcher: (@Sendable (String) async throws -> DIDDocument)?
     private let clientAttestationProvider: ClientAttestationProvider?
 
     private var cache: [SpaceRef: SpaceCredential] = [:]
+    private var authoritySigningKeys: [String: ATProtoJWTVerificationKey] = [:]
     private var inFlight: [SpaceRef: Task<SpaceCredential, Error>] = [:]
     private var generations: [SpaceRef: UInt64] = [:]
 
@@ -225,10 +227,35 @@ public actor SpaceCredentialManager {
         urlSession: URLSession? = nil,
         delegationTokenProvider: DelegationTokenProvider? = nil,
         authorKEMKeyProvider: AuthorKEMKeyProvider? = nil,
+        authoritySigningKeyProvider: AuthoritySigningKeyProvider? = nil,
         clientAttestationProvider: ClientAttestationProvider? = nil
+    ) {
+        self.init(
+            client: client,
+            authorityHostProvider: authorityHostProvider,
+            urlSession: urlSession,
+            delegationTokenProvider: delegationTokenProvider,
+            authorKEMKeyProvider: authorKEMKeyProvider,
+            authoritySigningKeyProvider: authoritySigningKeyProvider,
+            authorityDIDDocumentFetcher: nil,
+            clientAttestationProvider: clientAttestationProvider
+        )
+    }
+
+    private init(
+        client: ATProtoClient,
+        authorityHostProvider: @escaping SpaceAuthorityHostProvider,
+        urlSession: URLSession?,
+        delegationTokenProvider: DelegationTokenProvider?,
+        authorKEMKeyProvider: AuthorKEMKeyProvider?,
+        authoritySigningKeyProvider: AuthoritySigningKeyProvider?,
+        authorityDIDDocumentFetcher: (@Sendable (String) async throws -> DIDDocument)?,
+        clientAttestationProvider: ClientAttestationProvider?
     ) {
         self.client = client
         self.clientAttestationProvider = clientAttestationProvider
+        self.customAuthoritySigningKeyProvider = authoritySigningKeyProvider
+        self.authorityDIDDocumentFetcher = authorityDIDDocumentFetcher
         self.authorKEMKeyProvider = authorKEMKeyProvider ?? { repo, _ in
             let document = try await SpaceHostResolver.fetchDIDDocument(for: repo)
             return try SpaceHostResolver.authorKEMKey(from: document, expectedDID: repo)
@@ -262,13 +289,14 @@ public actor SpaceCredentialManager {
         }
     }
 
-    /// Compatibility initializer delegating authority host resolution to `SpaceHostResolver`.
+    /// Compatibility initializer delegating authority host and DID resolution to `SpaceHostResolver`.
     public init(
         client: ATProtoClient,
         resolver: SpaceHostResolver,
         urlSession: URLSession? = nil,
         delegationTokenProvider: DelegationTokenProvider? = nil,
         authorKEMKeyProvider: AuthorKEMKeyProvider? = nil,
+        authoritySigningKeyProvider: AuthoritySigningKeyProvider? = nil,
         clientAttestationProvider: ClientAttestationProvider? = nil
     ) {
         self.init(
@@ -279,6 +307,10 @@ public actor SpaceCredentialManager {
             urlSession: urlSession,
             delegationTokenProvider: delegationTokenProvider,
             authorKEMKeyProvider: authorKEMKeyProvider,
+            authoritySigningKeyProvider: authoritySigningKeyProvider,
+            authorityDIDDocumentFetcher: { did in
+                try await resolver.fetchDIDDocument(for: did)
+            },
             clientAttestationProvider: clientAttestationProvider
         )
     }
@@ -560,9 +592,10 @@ public actor SpaceCredentialManager {
         var request = URLRequest(url: exchangeURL)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        let requestedCredentialKid = SpaceHTTPSignature.keyID(for: ephemeralKey)
         let input = try ComAtprotoSpaceGetSpaceCredential.Input(
             space: space,
-            credentialKid: SpaceHTTPSignature.keyID(for: ephemeralKey),
+            credentialKid: requestedCredentialKid,
             delegationToken: delegationToken,
             clientAttestation: await clientAttestationProvider?(space)
         )
@@ -641,46 +674,183 @@ public actor SpaceCredentialManager {
         }
 
         let output = try JSONDecoder().decode(ComAtprotoSpaceGetSpaceCredential.Output.self, from: data)
-        let token = output.credential
+        return try await verifyIssuedCredential(
+            token: output.credential,
+            space: space,
+            authorityDID: authorityDID,
+            expectedCredentialKid: requestedCredentialKid,
+            ephemeralKey: ephemeralKey,
+            receivedAt: receivedAt
+        )
+    }
 
-        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
-        guard parts.count == 3 else { throw SpaceCredentialError.invalidToken("Malformed JWT") }
-        let syntheticHeaderJWT = "e30.\(parts[0]).x"
-        let header = try SpaceCredentialJWT.payload(ofJWT: syntheticHeaderJWT)
-        guard header["kid"] as? String == "#atproto" else { throw SpaceCredentialError.invalidToken("Credential kid must be #atproto") }
-        let payload = try SpaceCredentialJWT.payload(ofJWT: token)
-        guard let expValue = payload["exp"] else {
-            throw SpaceCredentialError.invalidToken("Missing exp claim in credential JWT")
+    private struct VerifiedCredentialHeader: Decodable {
+        let alg: String
+        let typ: String
+        let kid: String
+    }
+
+    private struct VerifiedCredentialClaims: Decodable {
+        struct Confirmation: Decodable {
+            let kid: String
         }
 
-        let expSeconds: TimeInterval
-        if let num = expValue as? NSNumber {
-            expSeconds = num.doubleValue
-        } else if let intVal = expValue as? Int {
-            expSeconds = TimeInterval(intVal)
-        } else if let doubleVal = expValue as? Double {
-            expSeconds = doubleVal
+        let iss: String
+        let sub: String
+        let iat: Int64
+        let exp: Int64
+        let jti: String
+        let cnf: Confirmation
+    }
+
+    private func resolveAuthoritySigningKey(
+        for authorityDID: String,
+        forceRefresh: Bool
+    ) async throws -> ATProtoJWTVerificationKey {
+        if let customAuthoritySigningKeyProvider {
+            return try await customAuthoritySigningKeyProvider(authorityDID, forceRefresh)
+        }
+        if !forceRefresh, let cached = authoritySigningKeys[authorityDID] {
+            return cached
+        }
+        let document: DIDDocument
+        if let authorityDIDDocumentFetcher {
+            document = try await authorityDIDDocumentFetcher(authorityDID)
         } else {
-            throw SpaceCredentialError.invalidToken("Invalid exp claim type in credential JWT")
+            document = try await SpaceHostResolver.fetchDIDDocument(
+                for: authorityDID,
+                urlSession: urlSession,
+                sessionDelegate: sessionDelegate
+            )
+        }
+        let key = try SpaceHostResolver.authoritySigningKey(from: document, expectedDID: authorityDID)
+        authoritySigningKeys[authorityDID] = key
+        return key
+    }
+
+    private func verifyIssuedCredential(
+        token: String,
+        space: SpaceRef,
+        authorityDID: String,
+        expectedCredentialKid: String,
+        ephemeralKey: P256.Signing.PrivateKey,
+        receivedAt: Date
+    ) async throws -> SpaceCredential {
+        guard !token.isEmpty, token.utf8.count <= 8 * 1024 else {
+            throw SpaceCredentialError.invalidToken("Credential JWT exceeds size bounds")
+        }
+        let parts = token.split(separator: ".", omittingEmptySubsequences: false)
+        guard parts.count == 3,
+              !parts[0].isEmpty,
+              !parts[1].isEmpty,
+              !parts[2].isEmpty
+        else {
+            throw SpaceCredentialError.invalidToken("Malformed JWT")
         }
 
-        guard expSeconds.isFinite, expSeconds > Date().timeIntervalSince1970 else {
+        guard let headerData = try? JWTBase64URL.decode(String(parts[0]), maxBytes: 4 * 1024),
+              let payloadData = try? JWTBase64URL.decode(String(parts[1]), maxBytes: 4 * 1024),
+              let signatureData = try? JWTBase64URL.decode(String(parts[2]), maxBytes: 64),
+              signatureData.count == 64
+        else {
+            throw SpaceCredentialError.invalidToken("Malformed base64url segment in credential JWT")
+        }
+
+        guard let rawHeader = (try? JSONSerialization.jsonObject(with: headerData)) as? [String: Any],
+              rawHeader["jwk"] == nil,
+              rawHeader["crit"] == nil,
+              rawHeader["b64"] == nil,
+              rawHeader["x5c"] == nil,
+              rawHeader["jku"] == nil,
+              let header = try? JSONDecoder().decode(VerifiedCredentialHeader.self, from: headerData)
+        else {
+            throw SpaceCredentialError.invalidToken("Invalid JOSE header in credential JWT")
+        }
+
+        guard header.alg == "ES256" || header.alg == "ES256K" else {
+            throw SpaceCredentialError.invalidToken("Unsupported credential JWT algorithm: \(header.alg)")
+        }
+        guard header.typ == "atproto-space-credential+jwt" else {
+            throw SpaceCredentialError.invalidToken("Credential typ must be atproto-space-credential+jwt")
+        }
+        guard header.kid == "#atproto" || header.kid == "\(authorityDID)#atproto" else {
+            throw SpaceCredentialError.invalidToken("Credential kid must be #atproto")
+        }
+
+        guard let rawPayload = (try? JSONSerialization.jsonObject(with: payloadData)) as? [String: Any],
+              rawPayload["aud"] == nil,
+              let claims = try? JSONDecoder().decode(VerifiedCredentialClaims.self, from: payloadData)
+        else {
+            throw SpaceCredentialError.invalidToken("Malformed or forbidden claims in credential JWT")
+        }
+
+        guard claims.iss == authorityDID else {
+            throw SpaceCredentialError.invalidToken("Credential issuer does not match space authority")
+        }
+        guard claims.sub == space.uriString() else {
+            throw SpaceCredentialError.invalidToken("Credential subject does not match requested space")
+        }
+        guard claims.cnf.kid == expectedCredentialKid,
+              (try? P256DIDKey(claims.cnf.kid)) != nil
+        else {
+            throw SpaceCredentialError.invalidToken("Credential cnf.kid does not match holder key")
+        }
+        guard !claims.jti.isEmpty,
+              claims.jti.utf8.count <= 512,
+              claims.jti.utf8.allSatisfy({ $0 >= 0x20 && $0 != 0x7f })
+        else {
+            throw SpaceCredentialError.invalidToken("Invalid jti claim in credential JWT")
+        }
+
+        let nowSeconds = receivedAt.timeIntervalSince1970
+        let expSeconds = TimeInterval(claims.exp)
+        let iatSeconds = TimeInterval(claims.iat)
+        guard expSeconds.isFinite, expSeconds > nowSeconds else {
             throw SpaceCredentialError.invalidToken("Credential has expired")
         }
-        let expiresAt = Date(timeIntervalSince1970: expSeconds)
-        let issuedAt: TimeInterval?
-        if let num = payload["iat"] as? NSNumber {
-            issuedAt = num.doubleValue
-        } else if let intVal = payload["iat"] as? Int {
-            issuedAt = TimeInterval(intVal)
-        } else {
-            issuedAt = payload["iat"] as? Double
+        guard iatSeconds.isFinite,
+              claims.exp > claims.iat,
+              claims.exp - claims.iat <= 3600,
+              iatSeconds <= nowSeconds + 60
+        else {
+            throw SpaceCredentialError.invalidToken("Invalid credential lifetime or iat claim")
         }
+
+        let signingInput = Data("\(parts[0]).\(parts[1])".utf8)
+        var signatureVerified = false
+        for attempt in 0 ..< 2 {
+            do {
+                let verificationKey = try await resolveAuthoritySigningKey(
+                    for: authorityDID,
+                    forceRefresh: attempt > 0
+                )
+                if (try? verificationKey.verify(
+                    signature: signatureData,
+                    signingInput: signingInput,
+                    algorithm: header.alg
+                )) == true {
+                    signatureVerified = true
+                    break
+                }
+            } catch {
+                if attempt == 0 {
+                    continue
+                }
+                throw SpaceCredentialError.invalidToken(
+                    "Unable to verify credential signature for \(authorityDID): \(error.localizedDescription)"
+                )
+            }
+        }
+        guard signatureVerified else {
+            throw SpaceCredentialError.invalidToken("Credential JWT signature verification failed")
+        }
+
+        let expiresAt = Date(timeIntervalSince1970: expSeconds)
         return SpaceCredential(
             token: token,
             expiresAt: expiresAt,
             keyRawRepresentation: ephemeralKey.rawRepresentation,
-            refreshAt: Self.refreshDeadline(expiresAt: expiresAt, issuedAt: issuedAt, receivedAt: receivedAt)
+            refreshAt: Self.refreshDeadline(expiresAt: expiresAt, issuedAt: iatSeconds, receivedAt: receivedAt)
         )
     }
 
