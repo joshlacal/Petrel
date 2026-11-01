@@ -177,7 +177,8 @@ class PermissionedDataGenerationTests(unittest.TestCase):
 
     def test_kotlin_space_primary_type_emits_descriptor(self):
         generated = KotlinCodeGenerator(SPACE_LEXICON).convert()
-        self.assertIn("data class SpaceDeclarationDescriptor", generated)
+        self.assertIn("object ComAtprotoSimplespaceSpaceDefs {", generated)
+        self.assertIn("    data class SpaceDeclarationDescriptor", generated)
         self.assertIn('nsid = "com.atproto.simplespace.space"', generated)
 
     def test_server_contracts_are_opt_in_and_typed(self):
