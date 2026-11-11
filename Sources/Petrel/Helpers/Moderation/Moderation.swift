@@ -389,21 +389,15 @@ public enum Moderation {
             )
 
         case let .appBskyEmbedRecordWithMediaView(view):
-            // quote post with media
-            guard case let .appBskyEmbedRecordViewRecord(record) = view.record.record else {
-                return []
-            }
-            let embedAuthor = record.author
-
-            // quoted post text
-            if let quoted = postRecord(record.value) {
-                let matches = match(
-                    quoted.text,
-                    facets: quoted.facets,
-                    tags: quoted.tags,
-                    languages: languageTags(quoted),
-                    actor: embedAuthor
-                )
+            // quote post with media: the quoted post (text and its own
+            // attachments) when it could be loaded, then the media attached
+            // beside it, which is checked even when the quote is deleted,
+            // blocked or detached. (The TypeScript reference checks only the
+            // quoted text, and nothing at all when the quote is unavailable.)
+            if case let .appBskyEmbedRecordViewRecord(record) = view.record.record,
+               let quoted = postRecord(record.value)
+            {
+                let matches = matchQuotedPost(quoted, author: record.author, match: match, firstMatch: firstMatch)
                 if !matches.isEmpty { return matches }
             }
 

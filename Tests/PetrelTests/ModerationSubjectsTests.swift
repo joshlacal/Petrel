@@ -477,6 +477,67 @@ struct ModerationSubjectsTests {
         #expect(try Moderation.moderatePost(post, options: options(mutedWords: [word])).causes.isEmpty)
     }
 
+    @Test("Muted words in media next to a quote are found when the quoted post is deleted, blocked or detached")
+    func mutedWordsInMediaBesideUnavailableQuote() throws {
+        let unavailable: [String: JSONObject] = [
+            "not found": [
+                "$type": "app.bsky.embed.record#viewNotFound",
+                "uri": "at://did:web:carla.test/app.bsky.feed.post/fake",
+                "notFound": true,
+            ],
+            "blocked": [
+                "$type": "app.bsky.embed.record#viewBlocked",
+                "uri": "at://did:web:carla.test/app.bsky.feed.post/fake",
+                "blocked": true,
+                "author": ["did": "did:web:carla.test"] as JSONObject,
+            ],
+            "detached": [
+                "$type": "app.bsky.embed.record#viewDetached",
+                "uri": "at://did:web:carla.test/app.bsky.feed.post/fake",
+                "detached": true,
+            ],
+        ]
+        for (kind, quoted) in unavailable {
+            let post = try ModerationMock.postView(
+                record: ModerationMock.post(text: "fine"),
+                author: bob,
+                embed: [
+                    "$type": "app.bsky.embed.recordWithMedia#view",
+                    "record": ["$type": "app.bsky.embed.record#view", "record": quoted] as JSONObject,
+                    "media": externalView(title: "a badword card", description: ""),
+                ]
+            )
+            #expect(try mutedWordPredicates(post) == ["badword"], "quoted post \(kind)")
+        }
+    }
+
+    @Test("Muted words in the quoted post's own attachments are found when media is added beside the quote")
+    func mutedWordsInQuotedAttachmentsBesideMedia() throws {
+        let carla = ModerationMock.profile(handle: "carla.test")
+        let quotedEmbeds: [String: JSONObject] = [
+            "image alt text": imagesRecord(["a badword here"]),
+            "link card": [
+                "$type": "app.bsky.embed.external",
+                "external": ["uri": "https://example.test", "title": "A badword", "description": "d"] as JSONObject,
+            ],
+        ]
+        for (kind, quotedEmbed) in quotedEmbeds {
+            let post = try ModerationMock.postView(
+                record: ModerationMock.post(text: "fine"),
+                author: bob,
+                embed: [
+                    "$type": "app.bsky.embed.recordWithMedia#view",
+                    "record": ModerationMock.embedRecordView(
+                        record: ModerationMock.post(text: "fine", embed: quotedEmbed),
+                        author: carla
+                    ),
+                    "media": externalView(title: "Title", description: "Description"),
+                ]
+            )
+            #expect(try mutedWordPredicates(post) == ["badword"], "quoted \(kind)")
+        }
+    }
+
     @Test("Muted words in media next to a quote follow the author who attached it, not the quoted one")
     func mutedWordsUseOuterAuthorForMediaBesideQuote() throws {
         let followedCarla = ModerationMock.profile(
