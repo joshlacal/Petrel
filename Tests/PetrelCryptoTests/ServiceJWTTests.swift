@@ -685,41 +685,46 @@ final class ServiceJWTTests: XCTestCase {
     func testClaimPresenceNegatives() throws {
         let headerData = try JSONEncoder().encode(["alg": "ES256", "typ": "JWT"])
         let verifier = ATProtoJWTVerificationKey.p256(p256Key.publicKey)
+        // A pinned clock inside the tokens' validity, so each case can only
+        // fail for the reason named.
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
+        let lxm = "\"lxm\":\"app.bsky.actor.getProfile\""
 
-        // Missing iss
-        let noIssJSON = "{\"aud\":\"\(audience)\",\"exp\":1700000060,\"lxm\":\"app.bsky.actor.getProfile\",\"jti\":\"no-iss\"}"
-        let noIssInput = "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(Data(noIssJSON.utf8)))"
-        let noIssSig = try P256WireSignature.sign(Data(noIssInput.utf8), using: p256Key)
-        let noIssToken = "\(noIssInput).\(JWTBase64URL.encode(noIssSig))"
-        XCTAssertThrowsError(try ServiceJWT.verify(noIssToken, publicKey: verifier))
+        func signed(_ claimsJSON: String) throws -> String {
+            let input = "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(Data(claimsJSON.utf8)))"
+            let signature = try P256WireSignature.sign(Data(input.utf8), using: p256Key)
+            return "\(input).\(JWTBase64URL.encode(signature))"
+        }
 
-        // Empty iss
-        let emptyIssJSON = "{\"iss\":\"\",\"aud\":\"\(audience)\",\"exp\":1700000060,\"lxm\":\"app.bsky.actor.getProfile\",\"jti\":\"empty-iss\"}"
-        let emptyIssInput = "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(Data(emptyIssJSON.utf8)))"
-        let emptyIssSig = try P256WireSignature.sign(Data(emptyIssInput.utf8), using: p256Key)
-        let emptyIssToken = "\(emptyIssInput).\(JWTBase64URL.encode(emptyIssSig))"
-        XCTAssertThrowsError(try ServiceJWT.verify(emptyIssToken, publicKey: verifier))
+        // The control: all three required claims present verifies.
+        XCTAssertNoThrow(try ServiceJWT.verify(
+            signed("{\"iss\":\"\(issuerPLC)\",\"aud\":\"\(audience)\",\"exp\":1700000060,\(lxm),\"jti\":\"ok\"}"),
+            publicKey: verifier,
+            now: now
+        ))
 
-        // Missing aud
-        let noAudJSON = "{\"iss\":\"\(issuerPLC)\",\"exp\":1700000060,\"lxm\":\"app.bsky.actor.getProfile\",\"jti\":\"no-aud\"}"
-        let noAudInput = "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(Data(noAudJSON.utf8)))"
-        let noAudSig = try P256WireSignature.sign(Data(noAudInput.utf8), using: p256Key)
-        let noAudToken = "\(noAudInput).\(JWTBase64URL.encode(noAudSig))"
-        XCTAssertThrowsError(try ServiceJWT.verify(noAudToken, publicKey: verifier))
+        // A required claim that is absent does not decode.
+        for (name, claims) in [
+            ("iss", "{\"aud\":\"\(audience)\",\"exp\":1700000060,\(lxm),\"jti\":\"no-iss\"}"),
+            ("aud", "{\"iss\":\"\(issuerPLC)\",\"exp\":1700000060,\(lxm),\"jti\":\"no-aud\"}"),
+            ("exp", "{\"iss\":\"\(issuerPLC)\",\"aud\":\"\(audience)\",\(lxm),\"jti\":\"no-exp\"}"),
+        ] {
+            XCTAssertThrowsError(try ServiceJWT.verify(signed(claims), publicKey: verifier, now: now), name) { error in
+                XCTAssertEqual(error as? PetrelCryptoError, .malformed("invalid JSON"), name)
+            }
+        }
 
-        // Empty aud
-        let emptyAudJSON = "{\"iss\":\"\(issuerPLC)\",\"aud\":\"\",\"exp\":1700000060,\"lxm\":\"app.bsky.actor.getProfile\",\"jti\":\"empty-aud\"}"
-        let emptyAudInput = "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(Data(emptyAudJSON.utf8)))"
-        let emptyAudSig = try P256WireSignature.sign(Data(emptyAudInput.utf8), using: p256Key)
-        let emptyAudToken = "\(emptyAudInput).\(JWTBase64URL.encode(emptyAudSig))"
-        XCTAssertThrowsError(try ServiceJWT.verify(emptyAudToken, publicKey: verifier))
-
-        // Missing exp
-        let noExpJSON = "{\"iss\":\"\(issuerPLC)\",\"aud\":\"\(audience)\",\"lxm\":\"app.bsky.actor.getProfile\",\"jti\":\"no-exp\"}"
-        let noExpInput = "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(Data(noExpJSON.utf8)))"
-        let noExpSig = try P256WireSignature.sign(Data(noExpInput.utf8), using: p256Key)
-        let noExpToken = "\(noExpInput).\(JWTBase64URL.encode(noExpSig))"
-        XCTAssertThrowsError(try ServiceJWT.verify(noExpToken, publicKey: verifier))
+        // A required claim that is present but empty is not a service token.
+        for (name, claims) in [
+            ("iss", "{\"iss\":\"\",\"aud\":\"\(audience)\",\"exp\":1700000060,\(lxm),\"jti\":\"empty-iss\"}"),
+            ("aud", "{\"iss\":\"\(issuerPLC)\",\"aud\":\"\",\"exp\":1700000060,\(lxm),\"jti\":\"empty-aud\"}"),
+        ] {
+            XCTAssertThrowsError(try ServiceJWT.verify(signed(claims), publicKey: verifier, now: now), name) { error in
+                XCTAssertEqual(
+                    error as? PetrelCryptoError, .unauthorized("service authentication token is invalid"), name
+                )
+            }
+        }
     }
 
     // MARK: - Request Body Digest ("req") Claim Tests
