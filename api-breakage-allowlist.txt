@@ -102,6 +102,13 @@ API breakage: constructor ComAtprotoSyncSubscribeRepos.RepoOp.init(action:path:c
 API breakage: var AppBskyDraftCreateDraft.Output.id has declared type change from Swift.String to Petrel.TID
 API breakage: accessor AppBskyDraftCreateDraft.Output.id.Get() has return type change from Swift.String to Petrel.TID
 API breakage: constructor AppBskyDraftCreateDraft.Output.init(id:) has parameter 0 type change from Swift.String to Petrel.TID
+API breakage: enumelement ATProtocolError.invalidDID has been added as a new enum case
+API breakage: enumelement ATProtocolError.invalidHandle has been added as a new enum case
+API breakage: enumelement ATProtocolError.invalidNSID has been added as a new enum case
+API breakage: enumelement ATProtocolError.invalidRecordKey has been added as a new enum case
+API breakage: enumelement ATProtocolError.invalidDatetime has been added as a new enum case
+API breakage: enumelement ATProtocolError.invalidLanguage has been added as a new enum case
+API breakage: enumelement ATProtocolError.invalidCID has been added as a new enum case
 API breakage: constructor Session.init(accessToken:refreshToken:createdAt:expiresIn:tokenType:did:) has been removed
 API breakage: constructor AppBskyActorDefs.ViewerState.init(muted:mutedByList:blockedBy:blocking:blockingByList:following:followedBy:knownFollowers:activitySubscription:) has been removed
 API breakage: constructor AppBskyGraphGetFollowers.Parameters.init(actor:limit:cursor:) has been removed
