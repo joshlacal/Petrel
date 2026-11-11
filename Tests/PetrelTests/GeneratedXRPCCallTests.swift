@@ -253,6 +253,243 @@ final class GeneratedXRPCCallTests: XCTestCase {
         }
     }
 
+    // MARK: - Untyped calls (lex-7)
+
+    func testUntypedQuerySendsParametersAndReturnsBodyAndHeaders() async throws {
+        XRPCStubURLProtocol.install(
+            status: 200,
+            body: #"{"$type":"com.example.widget.defs#thing","name":"left","count":2}"#,
+            headers: ["atproto-repo-rev": "3lqz2zlqr5c2x", "atproto-content-labelers": "did:plc:labeler1;redact, did:plc:labeler2"]
+        )
+
+        let response = try await NetworkService(baseURL: baseURL).xrpcQuery(
+            "com.example.widget.getThing",
+            parameters: [
+                URLQueryItem(name: "id", value: "3jwdwj2ctlk26"),
+                URLQueryItem(name: "tag", value: "a+b"),
+                URLQueryItem(name: "tag", value: "c"),
+            ]
+        )
+
+        let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.httpMethod, "GET")
+        XCTAssertEqual(request.url?.path, "/xrpc/com.example.widget.getThing")
+        XCTAssertEqual(request.url?.query(percentEncoded: true), "id=3jwdwj2ctlk26&tag=a%2Bb&tag=c")
+
+        XCTAssertEqual(response.statusCode, 200)
+        XCTAssertEqual(response.metadata.repoRev, "3lqz2zlqr5c2x")
+        XCTAssertEqual(
+            response.metadata.contentLabelers,
+            [XRPCLabeler(did: "did:plc:labeler1", redact: true), XRPCLabeler(did: "did:plc:labeler2")]
+        )
+        guard case let .unknownType(type, .object(fields)) = try response.json() else {
+            return XCTFail("expected an untyped object with its $type")
+        }
+        XCTAssertEqual(type, "com.example.widget.defs#thing")
+        XCTAssertEqual(fields["name"], .string("left"))
+        XCTAssertEqual(fields["count"], .number(2))
+
+        struct Thing: Decodable, Equatable {
+            let name: String
+            let count: Int
+        }
+        XCTAssertEqual(try response.decode(Thing.self), Thing(name: "left", count: 2))
+    }
+
+    func testUntypedProcedureSendsJSONAndBinaryBodies() async throws {
+        let service = NetworkService(baseURL: baseURL)
+
+        XRPCStubURLProtocol.install(status: 200, body: #"{"ok":true}"#)
+        _ = try await service.xrpcProcedure(
+            "com.example.widget.createThing",
+            body: .json(encoding: ["name": "left"])
+        )
+        var request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.httpMethod, "POST")
+        XCTAssertEqual(request.url?.path, "/xrpc/com.example.widget.createThing")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+        XCTAssertEqual(XRPCStubURLProtocol.lastBody, Data(#"{"name":"left"}"#.utf8))
+
+        let bytes = Data([0x00, 0xFF, 0x7F, 0x80])
+        XRPCStubURLProtocol.install(status: 200, body: "")
+        let response = try await service.xrpcProcedure(
+            "com.example.widget.uploadThing",
+            parameters: [URLQueryItem(name: "name", value: "left.bin")],
+            body: .bytes(bytes, contentType: "application/x-widget")
+        )
+        request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.url?.query, "name=left.bin")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/x-widget")
+        XCTAssertEqual(XRPCStubURLProtocol.lastBody, bytes)
+        XCTAssertEqual(response.body, Data())
+    }
+
+    func testUntypedCallThrowsTheErrorEnvelope() async throws {
+        XRPCStubURLProtocol.install(status: 400, body: #"{"error":"ThingNotFound","message":"no such thing"}"#)
+
+        do {
+            _ = try await NetworkService(baseURL: baseURL).xrpcQuery("com.example.widget.getThing")
+            XCTFail("a 400 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "ThingNotFound")
+            XCTAssertEqual(error.message, "no such thing")
+            XCTAssertEqual(error.statusCode, 400)
+        }
+    }
+
+    func testUntypedCallRejectsAnythingThatIsNotAnNSID() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: "{}")
+
+        for invalid in ["getThing", "com.example/../../admin", "com.example.get thing", ""] {
+            do {
+                _ = try await NetworkService(baseURL: baseURL).xrpcQuery(invalid)
+                XCTFail("'\(invalid)' is not an NSID and must be rejected")
+            } catch is ATProtoXRPCError {
+                XCTFail("'\(invalid)' reached the network")
+            } catch {}
+        }
+        XCTAssertNil(XRPCStubURLProtocol.lastRequest)
+    }
+
+    // MARK: - Per-call options and response metadata (lex-8)
+
+    func testCallOptionsSetHeadersProxyAndLabelersForOneUntypedCall() async throws {
+        let service = NetworkService(baseURL: baseURL)
+        await service.setServiceDID("did:web:api.example.com#default_appview", for: "com.example")
+        XRPCStubURLProtocol.install(status: 200, body: "{}")
+
+        _ = try await service.xrpcQuery(
+            "com.example.widget.getThing",
+            options: XRPCCallOptions(
+                headers: ["X-Widget-Trace": "abc"],
+                proxy: "did:web:other.example.com#widget_view",
+                acceptLabelers: [XRPCLabeler(did: "did:plc:labeler1", redact: true), XRPCLabeler(did: "did:plc:labeler2")]
+            )
+        )
+        var request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Widget-Trace"), "abc")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "atproto-proxy"), "did:web:other.example.com#widget_view")
+        XCTAssertEqual(
+            request.value(forHTTPHeaderField: "atproto-accept-labelers"),
+            "did:plc:labeler1;redact, did:plc:labeler2"
+        )
+
+        // Without options the next call falls back to the client's routing and sends none
+        // of the per-call headers.
+        XRPCStubURLProtocol.install(status: 200, body: "{}")
+        _ = try await service.xrpcQuery("com.example.widget.getThing")
+        request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertNil(request.value(forHTTPHeaderField: "X-Widget-Trace"))
+        XCTAssertEqual(request.value(forHTTPHeaderField: "atproto-proxy"), "did:web:api.example.com#default_appview")
+        XCTAssertNil(request.value(forHTTPHeaderField: "atproto-accept-labelers"))
+    }
+
+    func testServiceOptionSendsOneCallToAnotherService() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: "{}")
+
+        _ = try await NetworkService(baseURL: baseURL).xrpcQuery(
+            "com.example.widget.getThing",
+            options: XRPCCallOptions(service: URL(string: "https://example.org")!)
+        )
+
+        let url = try XCTUnwrap(XRPCStubURLProtocol.lastRequest?.url)
+        XCTAssertEqual(url.host, "example.org")
+        XCTAssertEqual(url.path, "/xrpc/com.example.widget.getThing")
+    }
+
+    func testCallOptionsScopeAppliesToGeneratedCalls() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: #"{"feed":[]}"#)
+        let client = client()
+
+        _ = try await NetworkService.withCallOptions(
+            XRPCCallOptions(
+                headers: ["X-Widget-Trace": "abc"],
+                acceptLabelers: [XRPCLabeler(did: "did:plc:labeler1")]
+            )
+        ) {
+            try await client.bsky.feed.getTimeline(input: .init())
+        }
+
+        let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "X-Widget-Trace"), "abc")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "atproto-accept-labelers"), "did:plc:labeler1")
+    }
+
+    func testResponseMetadataOfAGeneratedCallIsReadable() async throws {
+        XRPCStubURLProtocol.install(
+            status: 200,
+            body: #"{"feed":[]}"#,
+            headers: [
+                "RateLimit-Limit": "3000",
+                "RateLimit-Remaining": "2999",
+                "RateLimit-Reset": "1767225600",
+                "atproto-repo-rev": "3lqz2zlqr5c2x",
+                "atproto-content-labelers": "did:plc:labeler1;redact",
+            ]
+        )
+        let client = client()
+
+        let (result, metadata) = try await NetworkService.withResponseMetadata {
+            try await client.bsky.feed.getTimeline(input: .init())
+        }
+
+        XCTAssertEqual(result.responseCode, 200)
+        XCTAssertEqual(metadata?.statusCode, 200)
+        XCTAssertEqual(metadata?.rateLimit?.remaining, 2999)
+        XCTAssertEqual(metadata?.repoRev, "3lqz2zlqr5c2x")
+        XCTAssertEqual(metadata?.contentLabelers, [XRPCLabeler(did: "did:plc:labeler1", redact: true)])
+    }
+
+    // MARK: - Retries (lex-18)
+
+    /// A procedure may have been applied before a gateway failed; sending it again could
+    /// apply it twice.
+    func testProcedureIsNotRetriedOnAServerError() async throws {
+        XRPCStubURLProtocol.install(status: 502, body: #"{"error":"UpstreamFailure"}"#)
+
+        do {
+            _ = try await NetworkService(baseURL: baseURL).xrpcProcedure(
+                "com.example.widget.createThing",
+                body: .json(encoding: ["name": "left"])
+            )
+            XCTFail("a 502 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "UpstreamFailure")
+            XCTAssertEqual(error.statusCode, 502)
+        }
+        XCTAssertEqual(XRPCStubURLProtocol.requestCount, 1)
+    }
+
+    /// XRPC specification: 501 means the endpoint is not implemented; do not retry.
+    func testNotImplementedIsNotRetried() async throws {
+        XRPCStubURLProtocol.install(status: 501, body: #"{"error":"MethodNotImplemented"}"#)
+
+        do {
+            _ = try await NetworkService(baseURL: baseURL).xrpcQuery("com.example.widget.getThing")
+            XCTFail("a 501 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "MethodNotImplemented")
+        }
+        XCTAssertEqual(XRPCStubURLProtocol.requestCount, 1)
+    }
+
+    /// A query is safe to repeat; the delay is the one the server asks for.
+    func testQueryIsRetriedOnAServerErrorHonouringRetryAfter() async throws {
+        XRPCStubURLProtocol.install(status: 503, body: #"{"error":"NotEnoughResources"}"#, headers: ["Retry-After": "0"])
+
+        let started = Date()
+        do {
+            _ = try await NetworkService(baseURL: baseURL).xrpcQuery("com.example.widget.getThing")
+            XCTFail("a 503 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.statusCode, 503)
+            XCTAssertEqual(error.retryAfter, 0)
+        }
+        XCTAssertEqual(XRPCStubURLProtocol.requestCount, 3)
+        // Exponential backoff alone would have waited about six seconds.
+        XCTAssertLessThan(Date().timeIntervalSince(started), 2)
+    }
+
     // MARK: - Helpers
 
     private func getRecordParameters() throws -> ComAtprotoRepoGetRecord.Parameters {
@@ -276,9 +513,15 @@ final class XRPCStubURLProtocol: URLProtocol {
     private nonisolated(unsafe) static var stub: Stub?
     private nonisolated(unsafe) static var recordedRequest: URLRequest?
     private nonisolated(unsafe) static var recordedBody: Data?
+    private nonisolated(unsafe) static var recordedRequestCount = 0
 
     static var lastRequest: URLRequest? {
         lock.withLock { recordedRequest }
+    }
+
+    /// How many requests reached the transport since the last `install`.
+    static var requestCount: Int {
+        lock.withLock { recordedRequestCount }
     }
 
     /// The request body as it reached the transport.
@@ -293,6 +536,7 @@ final class XRPCStubURLProtocol: URLProtocol {
             stub = Stub(status: status, body: Data(body.utf8), headers: merged)
             recordedRequest = nil
             recordedBody = nil
+            recordedRequestCount = 0
         }
     }
 
@@ -317,6 +561,7 @@ final class XRPCStubURLProtocol: URLProtocol {
         let stub = Self.lock.withLock { () -> Stub? in
             Self.recordedRequest = request
             Self.recordedBody = body
+            Self.recordedRequestCount += 1
             return Self.stub
         }
         guard let stub,

@@ -564,6 +564,14 @@ public actor NetworkService: NetworkServiceProtocol {
     /// every request this task sends through a `NetworkService`.
     @TaskLocal static var scopedResponseLimits: NetworkResponseLimits? = nil
 
+    /// Set only by `withCallOptions(_:operation:)` and the untyped XRPC calls: headers,
+    /// proxy target, labelers and service that apply to the requests of one call.
+    @TaskLocal static var scopedCallOptions: XRPCCallOptions? = nil
+
+    /// Set only by `withResponseMetadata(_:)`: receives the status and headers of every
+    /// response a request of this task gets.
+    @TaskLocal static var responseMetadataCollector: XRPCResponseMetadataCollector? = nil
+
     #if DEBUG
         private nonisolated(unsafe) static var networkTestProtocolClasses: [AnyClass]?
         private static let networkTestProtocolClassesLock = NSLock()
@@ -1767,17 +1775,21 @@ public actor NetworkService: NetworkServiceProtocol {
                         "Network Service - Server error \(httpResponse.statusCode) for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL"). Retry \(retryCount + 1)/\(maxRetries)."
                     )
                     retryCount += 1
-                    if retryCount >= maxRetries {
+                    // 501 means the endpoint is not implemented: the XRPC specification says
+                    // not to retry. A request that is not a GET may have been processed
+                    // before the gateway failed, so sending it again could apply it twice.
+                    let mayRetry = httpResponse.statusCode != 501 && Self.isSafeToResend(requestToSend)
+                    if retryCount >= maxRetries || !mayRetry {
                         if returnsTerminalHTTPErrorResponses {
                             return (decompressedData, httpResponse)
                         }
                         throw NetworkError.responseError(statusCode: httpResponse.statusCode)
                     }
 
-                    // Enhanced exponential backoff with jitter
+                    // Exponential backoff with jitter, or the delay the server asked for.
                     let baseDelay = min(pow(2.0, Double(retryCount)), 8.0) // Cap at 8 seconds
                     let jitter = Double.random(in: 0.8 ... 1.2) // Add ±20% jitter
-                    let delaySeconds = baseDelay * jitter
+                    let delaySeconds = Self.retryAfterSeconds(in: httpResponse) ?? baseDelay * jitter
 
                     LogManager.logInfo(
                         "Network Service - Waiting \(String(format: "%.1f", delaySeconds))s before retry \(retryCount)/\(maxRetries)"
@@ -1800,8 +1812,12 @@ public actor NetworkService: NetworkServiceProtocol {
                     "Network Service - Network error: \(error.localizedDescription). Retry \(retryCount + 1)/\(maxRetries)."
                 )
                 retryCount += 1
-                if retryCount >= maxRetries {
-                    LogManager.logError("Network Service - Max retries reached for network error.")
+                // A failure to reach the host means nothing was sent, so any request can be
+                // retried. A timeout or a dropped connection may come after the server
+                // processed the request; only a GET is safe to send again then.
+                let neverSent = error.code == .cannotFindHost || error.code == .cannotConnectToHost
+                if retryCount >= maxRetries || !(neverSent || Self.isSafeToResend(currentRequest)) {
+                    LogManager.logError("Network Service - Not retrying after network error.")
                     throw NetworkError.requestFailed // Or map specific URLError codes
                 }
 
@@ -2229,9 +2245,9 @@ public actor NetworkService: NetworkServiceProtocol {
             url = absoluteURL
             components = URLComponents(url: url, resolvingAgainstBaseURL: true)
         } else {
-            // Relative endpoint to base URL
+            // Relative endpoint to base URL, or to the service a per-call option names.
             let xrpcPath = endpoint.starts(with: "/") ? "xrpc\(endpoint)" : "xrpc/\(endpoint)"
-            url = baseURL.appendingPathComponent(xrpcPath)
+            url = (Self.scopedCallOptions?.service ?? baseURL).appendingPathComponent(xrpcPath)
             components = URLComponents(url: url, resolvingAgainstBaseURL: true)
 
             // NOTE: Service DIDs (e.g., app.bsky -> did:web:api.bsky.app#bsky_appview) are
@@ -2300,6 +2316,25 @@ public actor NetworkService: NetworkServiceProtocol {
         return request
     }
 
+    /// Whether sending `request` a second time cannot change server state: XRPC queries
+    /// (GET) and HEAD requests. Procedures (POST) are not idempotent.
+    static func isSafeToResend(_ request: URLRequest) -> Bool {
+        let method = (request.httpMethod ?? "GET").uppercased()
+        return method == "GET" || method == "HEAD"
+    }
+
+    /// The delay a `Retry-After` header asks for, when it is a number of seconds, capped
+    /// at 30 seconds so a hostile or misconfigured server cannot park a caller.
+    static func retryAfterSeconds(in response: HTTPURLResponse) -> Double? {
+        guard let value = response.value(forHTTPHeaderField: "Retry-After"),
+              let seconds = Double(value.trimmingCharacters(in: .whitespaces)),
+              seconds >= 0
+        else {
+            return nil
+        }
+        return min(seconds, 30)
+    }
+
     /// Percent-encodes `+` in an already percent-encoded query string.
     ///
     /// `URLComponents.queryItems` leaves `+` literal, and servers that parse the
@@ -2319,10 +2354,17 @@ public actor NetworkService: NetworkServiceProtocol {
     public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, HTTPURLResponse
     ) {
-        let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: additionalHeaders)
+        // Per-call options apply to the service the call is addressed to, not to any other
+        // host a request of the same task reaches (an OAuth authorization server, say).
+        var headers = additionalHeaders
+        if let options = Self.scopedCallOptions, request.url?.host == (options.service ?? baseURL).host {
+            headers = options.requestHeaders(over: additionalHeaders)
+        }
+        let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: headers)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse(description: "Response is not an HTTP response")
         }
+        Self.responseMetadataCollector?.record(httpResponse)
         return (data, httpResponse)
     }
 
