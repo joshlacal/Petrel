@@ -328,9 +328,8 @@ struct ATProtoTypesTests {
             }
         }
 
-        @Test("RecordKey fallback validation")
-        func recordKeyFallbackValidation() {
-            // Test that the fallback validation works when regex fails
+        @Test("RecordKey accepts ordinary keys")
+        func recordKeyOrdinaryKeys() {
             #expect(throws: Never.self) {
                 try RecordKey(keyString: "valid123")
             }

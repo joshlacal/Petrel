@@ -57,14 +57,93 @@ extension CID: ATProtocolValue {
 }
 
 
-public enum ATProtocolError: Error {
+/// A string failed validation as an AT Protocol identifier or string format.
+///
+/// Each case names the format that was being parsed and carries a
+/// human-readable reason. The associated message is for logs and diagnostics;
+/// match on the case, not on its text.
+public enum ATProtocolError: Error, Equatable, Sendable {
+    /// Not a valid AT-URI (``ATProtocolURI``), space reference (``SpaceRef``) or
+    /// generic URI (``URI``).
     case invalidURI(String)
+    /// Not a valid timestamp identifier (``TID``).
     case invalidTID(String)
+    /// Not a valid DID (``DID``).
+    case invalidDID(String)
+    /// Not a valid handle (``Handle``).
+    case invalidHandle(String)
+    /// Not a valid namespaced identifier (``NSID``).
+    case invalidNSID(String)
+    /// Not a valid record key (``RecordKey``).
+    case invalidRecordKey(String)
+    /// Not a valid datetime (``ATProtocolDate``).
+    case invalidDatetime(String)
+    /// Not a valid BCP 47 language tag (``LanguageTag``, ``LanguageCodeContainer``).
+    case invalidLanguage(String)
+    /// Not a valid CID string (``CIDSyntax``).
+    case invalidCID(String)
+
+    /// The reason carried by the error.
+    public var message: String {
+        switch self {
+        case let .invalidURI(message), let .invalidTID(message), let .invalidDID(message),
+             let .invalidHandle(message), let .invalidNSID(message), let .invalidRecordKey(message),
+             let .invalidDatetime(message), let .invalidLanguage(message), let .invalidCID(message):
+            return message
+        }
+    }
+}
+
+extension ATProtocolError: LocalizedError {
+    public var errorDescription: String? {
+        message
+    }
 }
 
 // MARK: URIs
 
+/// An AT-URI (`at://…`), the Lexicon `at-uri` string format.
+///
+/// Parsing is strict. The public grammar is the "Restricted AT URI Syntax" of
+/// https://atproto.com/specs/at-uri-scheme:
+///
+///     at://AUTHORITY[/COLLECTION[/RKEY]]
+///
+/// where the authority is a ``DID`` or ``Handle``, the collection an ``NSID`` and
+/// the record key a ``RecordKey``. Trailing slashes, empty path segments, query
+/// strings, fragments, whitespace and anything over 8 KB are rejected.
+///
+/// A second, equally strict grammar addresses permissioned-data spaces and the
+/// records inside them (see ``SpaceRef``):
+///
+///     at://SPACE-DID/space/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]
+///
+/// It is not part of the published AT-URI specification. ``init(uriString:)``
+/// accepts both; pass ``Grammar/restricted`` to ``init(uriString:grammar:)`` or
+/// ``isValidATURI(_:grammar:)`` to accept the specification grammar only.
+///
+/// The string is kept exactly as written; ``normalized()`` returns the
+/// normalized form the specification describes.
+///
+/// ```swift
+/// let uri = try ATProtocolURI(uriString: "at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/app.bsky.feed.post/3jzfcijpj2z2a")
+/// uri.authority   // "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
+/// uri.collection  // "app.bsky.feed.post"
+/// uri.recordKey   // "3jzfcijpj2z2a"
+/// ```
 public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
+    /// Which AT-URI grammars a parse accepts.
+    public enum Grammar: Sendable {
+        /// Only the "Restricted AT URI Syntax" of the AT-URI specification:
+        /// `at://AUTHORITY[/COLLECTION[/RKEY]]`.
+        case restricted
+        /// The specification grammar, plus the permissioned-data space grammar
+        /// `at://SPACE-DID/space/SPACE-TYPE/SKEY[/AUTHOR-DID/COLLECTION/RKEY]`.
+        case restrictedOrSpace
+    }
+
+    /// The authority exactly as written: a DID or a handle. On a space URI this
+    /// is the DID that owns the space.
     public let authority: String
 
     /// The record's collection NSID. On a space URI this names the collection of
@@ -79,24 +158,28 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
     /// path segments the public grammar disallows, so they are parsed separately.
     public let isSpace: Bool
 
-    /// The DID of the space's authority. Non-nil only on a space URI whose
-    /// authority is a well-formed DID.
+    /// The DID of the space's authority. Non-nil exactly when ``isSpace`` is true.
     public let spaceDID: String?
 
-    /// The space's type NSID. Non-nil only on a space URI.
+    /// The space's type NSID. Non-nil exactly when ``isSpace`` is true.
     public let spaceType: String?
 
-    /// The space's own key — the third component of a space ref. Non-nil only on
-    /// a space URI.
+    /// The space's own key — the third component of a space ref. Non-nil exactly
+    /// when ``isSpace`` is true.
     public let skey: String?
 
     /// The DID of the account whose record this is. On a public URI that is the
-    /// authority itself; on a space URI the authority owns the space while the
-    /// record belongs to one of its members, so the two differ.
+    /// authority itself when it is a DID (`nil` for a handle authority); on a
+    /// space URI the authority owns the space while the record belongs to one of
+    /// its members, so this is the author segment, or `nil` when the URI names
+    /// the space rather than a record in it.
     public let authorDID: String?
 
     /// Store the original string to avoid recomputing
     private let originalString: String
+
+    /// The authority, parsed.
+    private let parsedAuthority: ATIdentifier
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -104,43 +187,58 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
         try self.init(uriString: uriString)
     }
 
+    /// Parses an AT-URI, accepting the specification grammar and the space
+    /// grammar. Throws ``ATProtocolError/invalidURI(_:)`` with the reason.
     public init(uriString: String) throws {
-        originalString = uriString
-
-        guard uriString.hasPrefix("at://"),
-              uriString.utf8.count <= 8192
-        else {
-            throw ATProtocolError.invalidURI("Invalid AT URI format or length")
-        }
-
-        // Safe string trimming with bounds checking
-        guard uriString.count > 5 else {
-            throw ATProtocolError.invalidURI("Invalid AT URI: too short")
-        }
-        let trimmedString = String(uriString.dropFirst(5)) // Remove "at://"
-        let components = trimmedString.split(separator: "/", omittingEmptySubsequences: false)
-
-        guard !components.isEmpty, !components[0].isEmpty else {
-            throw ATProtocolError.invalidURI("Invalid AT URI: missing or empty authority")
-        }
-
-        let authorityStr = String(components[0])
-        guard DID.isValidDID(authorityStr) || Handle.isValidHandle(authorityStr) else {
-            throw ATProtocolError.invalidURI("Invalid authority in AT URI: \(authorityStr)")
-        }
-
-        let parsed = try ATProtocolURI.parseSegments(components)
-        authority = parsed.authority
-        collection = parsed.collection
-        recordKey = parsed.recordKey
-        isSpace = parsed.isSpace
-        spaceDID = parsed.spaceDID
-        spaceType = parsed.spaceType
-        skey = parsed.skey
-        authorDID = parsed.authorDID
+        try self.init(uriString: uriString, grammar: .restrictedOrSpace)
     }
+
+    /// Parses an AT-URI under the given grammar. Throws
+    /// ``ATProtocolError/invalidURI(_:)`` with the reason.
+    public init(uriString: String, grammar: Grammar) throws {
+        switch ATProtocolURI.parse(uriString, grammar: grammar) {
+        case let .success(parsed):
+            originalString = uriString
+            authority = parsed.authority
+            parsedAuthority = parsed.parsedAuthority
+            collection = parsed.collection
+            recordKey = parsed.recordKey
+            isSpace = parsed.isSpace
+            spaceDID = parsed.spaceDID
+            spaceType = parsed.spaceType
+            skey = parsed.skey
+            authorDID = parsed.authorDID
+        case let .failure(failure):
+            throw ATProtocolError.invalidURI("Invalid AT-URI \(syntaxExcerpt(uriString)): \(failure.reason)")
+        }
+    }
+
+    /// Builds a public AT-URI from typed parts. Throws
+    /// ``ATProtocolError/invalidURI(_:)`` if a record key is given without a
+    /// collection, or the result would exceed 8 KB.
+    public init(authority: ATIdentifier, collection: NSID? = nil, recordKey: RecordKey? = nil) throws {
+        var string = "at://\(authority.wireValue)"
+        if let collection {
+            string += "/\(collection.nsidString())"
+            if let recordKey {
+                string += "/\(recordKey.value)"
+            }
+        } else if recordKey != nil {
+            throw ATProtocolError.invalidURI("Invalid AT-URI: a record key requires a collection")
+        }
+        try self.init(uriString: string, grammar: .restricted)
+    }
+
+    /// Whether `string` is a valid AT-URI under `grammar` (by default the
+    /// specification grammar plus the space grammar, as ``init(uriString:)``).
+    public static func isValidATURI(_ string: String, grammar: Grammar = .restrictedOrSpace) -> Bool {
+        if case .success = parse(string, grammar: grammar) { return true }
+        return false
+    }
+
     private struct ParsedURI {
         let authority: String
+        let parsedAuthority: ATIdentifier
         let collection: String?
         let recordKey: String?
         let isSpace: Bool
@@ -150,88 +248,164 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
         let authorDID: String?
     }
 
-    /// Assigns path segments to their roles, following `parsePath` in
-    /// `@atproto/syntax`. Two grammars share the `at://` scheme:
+    /// Splits and validates an AT-URI. Two grammars share the `at://` scheme:
     ///
-    ///     at://{authorDid}/{collection}/{rkey}                                        public
+    ///     at://{authority}[/{collection}[/{rkey}]]                                    public
     ///     at://{spaceDid}/space/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]  space
     ///
-    /// Assigning positionally without checking for the `space` marker reports the
-    /// marker as the collection and silently discards the space's `skey`, so the
-    /// two are separated here. `segments[0]` is the authority.
-    private static func parseSegments(_ segments: [Substring]) throws -> ParsedURI {
-        let authority = String(segments[0])
-        let path = segments.dropFirst().map(String.init)
+    /// `space` is not a valid NSID, so the first path segment tells them apart
+    /// without ambiguity.
+    private static func parse(_ uriString: String, grammar: Grammar) -> Result<ParsedURI, SyntaxFailure> {
+        let utf8 = uriString.utf8
+        guard utf8.count <= 8192 else { return .failure("longer than 8192 bytes") }
+        guard utf8.starts(with: "at://".utf8) else { return .failure("must start with \"at://\"") }
 
-        guard path.first == "space" else {
-            // Public AT URI: at://{authority}[/{collection}[/{rkey}]]
-            guard path.count <= 2 else {
-                throw ATProtocolError.invalidURI("Too many path segments in public AT URI")
+        // Split on the "/" byte. Splitting by Character would let a slash hide
+        // inside a grapheme cluster.
+        let segments = utf8.dropFirst(5)
+            .split(separator: SyntaxByte.slash, omittingEmptySubsequences: false)
+            .map { String(decoding: $0, as: UTF8.self) }
+
+        let authority = segments[0]
+        guard !authority.isEmpty else { return .failure("authority is missing") }
+        let parsedAuthority: ATIdentifier
+        if let did = try? DID(didString: authority) {
+            parsedAuthority = .did(did)
+        } else if let handle = try? Handle(handleString: authority) {
+            parsedAuthority = .handle(handle)
+        } else {
+            return .failure("authority is neither a DID nor a handle")
+        }
+
+        let path = Array(segments.dropFirst())
+        guard !path.contains(where: \.isEmpty) else {
+            return .failure("trailing slash or empty path segment")
+        }
+
+        if grammar == .restrictedOrSpace, path.first == "space" {
+            guard case .did = parsedAuthority else {
+                return .failure("the authority of a space URI must be a DID")
             }
-
-            let collectionName: String?
-            if path.count > 0 && !path[0].isEmpty {
-                guard NSID.isValidNSID(path[0]) else {
-                    throw ATProtocolError.invalidURI("Invalid collection NSID: \(path[0])")
+            guard path.count == 3 || path.count == 6 else {
+                return .failure(
+                    "a space URI is /space/{type}/{skey}, optionally followed by /{authorDid}/{collection}/{rkey}"
+                )
+            }
+            if let reason = ATProtoSyntax.nsidFailure(path[1]) {
+                return .failure("space type is not an NSID (\(reason))")
+            }
+            if let reason = ATProtoSyntax.recordKeyFailure(path[2]) {
+                return .failure("space key is not a record key (\(reason))")
+            }
+            if path.count == 6 {
+                if let reason = ATProtoSyntax.didFailure(path[3]) {
+                    return .failure("record author is not a DID (\(reason))")
                 }
-                collectionName = path[0]
-            } else {
-                collectionName = nil
-            }
-
-            let rkey: String?
-            if path.count > 1 && !path[1].isEmpty {
-                guard RecordKey.isValidRecordKey(path[1]) else {
-                    throw ATProtocolError.invalidURI("Invalid record key: \(path[1])")
+                if let reason = ATProtoSyntax.nsidFailure(path[4]) {
+                    return .failure("collection is not an NSID (\(reason))")
                 }
-                rkey = path[1]
-            } else {
-                rkey = nil
+                if let reason = ATProtoSyntax.recordKeyFailure(path[5]) {
+                    return .failure("record key is not valid (\(reason))")
+                }
             }
-
-            return ParsedURI(
+            return .success(ParsedURI(
                 authority: authority,
-                collection: collectionName,
-                recordKey: rkey,
-                isSpace: false,
-                spaceDID: nil,
-                spaceType: nil,
-                skey: nil,
-                authorDID: DID.isValidDID(authority) ? authority : nil
-            )
+                parsedAuthority: parsedAuthority,
+                collection: path.count == 6 ? path[4] : nil,
+                recordKey: path.count == 6 ? path[5] : nil,
+                isSpace: true,
+                spaceDID: authority,
+                spaceType: path[1],
+                skey: path[2],
+                authorDID: path.count == 6 ? path[3] : nil
+            ))
         }
 
-        // Space URI: at://{spaceDid}/space/{spaceType}/{skey}[/{authorDid}/{collection}/{rkey}]
-        let space = path.filter { !$0.isEmpty }
-        func segment(_ index: Int) -> String? {
-            return index < space.count ? space[index] : nil
+        guard path.count <= 2 else { return .failure("too many path segments") }
+        if path.count >= 1, let reason = ATProtoSyntax.nsidFailure(path[0]) {
+            return .failure("collection is not an NSID (\(reason))")
         }
-        let author = segment(3)
+        if path.count == 2, let reason = ATProtoSyntax.recordKeyFailure(path[1]) {
+            return .failure("record key is not valid (\(reason))")
+        }
 
-        return ParsedURI(
+        let authorDID: String?
+        if case .did = parsedAuthority {
+            authorDID = authority
+        } else {
+            authorDID = nil
+        }
+        return .success(ParsedURI(
             authority: authority,
-            collection: segment(4),
-            recordKey: segment(5),
-            isSpace: true,
-            spaceDID: DID.isValidDID(authority) ? authority : nil,
-            spaceType: segment(1).flatMap { NSID.isValidNSID($0) ? $0 : nil },
-            skey: segment(2),
-            authorDID: author.flatMap { DID.isValidDID($0) ? $0 : nil }
-        )
+            parsedAuthority: parsedAuthority,
+            collection: path.count >= 1 ? path[0] : nil,
+            recordKey: path.count == 2 ? path[1] : nil,
+            isSpace: false,
+            spaceDID: nil,
+            spaceType: nil,
+            skey: nil,
+            authorDID: authorDID
+        ))
+    }
+
+    /// The authority as a typed identifier.
+    public var authorityIdentifier: ATIdentifier {
+        parsedAuthority
+    }
+
+    /// The collection as a typed ``NSID``, when the URI has one.
+    public var collectionNSID: NSID? {
+        collection.flatMap { try? NSID(nsidString: $0) }
+    }
+
+    /// The record key as a typed ``RecordKey``, when the URI has one.
+    public var rkey: RecordKey? {
+        recordKey.flatMap { try? RecordKey(keyString: $0) }
     }
 
     /// The space this URI belongs to, whether it names the space itself or a
-    /// record within it. `nil` on a public URI, or on a space URI missing any of
-    /// the three parts a space ref requires.
+    /// record within it. `nil` on a public URI.
     public var spaceRef: SpaceRef? {
         guard isSpace, let spaceDID, let spaceType, let skey else { return nil }
         return try? SpaceRef(spaceDID: spaceDID, spaceType: spaceType, skey: skey)
+    }
+
+    /// The normalized form described by the AT-URI specification: a handle
+    /// authority in lower case and the domain-authority part of every NSID in
+    /// lower case. DIDs, NSID names and record keys are case-sensitive and are
+    /// left as written. Use this form for string equality and when writing a URI
+    /// into a record.
+    public func normalized() -> ATProtocolURI {
+        func normalizedNSID(_ nsid: String) -> String {
+            (try? NSID(nsidString: nsid).normalized.nsidString()) ?? nsid
+        }
+
+        var string = "at://\(parsedAuthority.stringValue())"
+        if isSpace, let spaceType, let skey {
+            string += "/space/\(normalizedNSID(spaceType))/\(skey)"
+            if let authorDID, let collection, let recordKey {
+                string += "/\(authorDID)/\(normalizedNSID(collection))/\(recordKey)"
+            }
+        } else if let collection {
+            string += "/\(normalizedNSID(collection))"
+            if let recordKey {
+                string += "/\(recordKey)"
+            }
+        }
+        // Lower-casing cannot invalidate a URI that has already parsed.
+        return (try? ATProtocolURI(uriString: string)) ?? self
+    }
+
+    /// Whether the URI is already in the form ``normalized()`` returns.
+    public var isNormalized: Bool {
+        normalized().originalString == originalString
     }
 
     public var description: String {
         return uriString()
     }
 
+    /// The URI exactly as it was written.
     public func uriString() -> String {
         // Return the original string if we have it
         return originalString
@@ -242,8 +416,7 @@ public struct ATProtocolURI: ATProtocolValue, CustomStringConvertible, QueryPara
             return false
         }
 
-        return authority == otherURI.authority && collection == otherURI.collection
-            && recordKey == otherURI.recordKey
+        return originalString == otherURI.originalString
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -294,20 +467,21 @@ public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameter
     /// `SpaceRef.parse` upstream, which requires its input to equal its own
     /// canonical serialisation.
     public init(uriString: String) throws {
-        guard uriString.hasPrefix("at://"),
-              uriString.utf8.count <= 8192
-        else {
+        let utf8 = uriString.utf8
+        guard utf8.starts(with: "at://".utf8), utf8.count <= 8192 else {
             throw ATProtocolError.invalidURI("Invalid space ref format or length")
         }
 
-        let segments = uriString.dropFirst(5).split(separator: "/", omittingEmptySubsequences: false)
+        let segments = utf8.dropFirst(5)
+            .split(separator: SyntaxByte.slash, omittingEmptySubsequences: false)
+            .map { String(decoding: $0, as: UTF8.self) }
         guard segments.count == 4, segments[1] == "space" else {
-            throw ATProtocolError.invalidURI("Invalid space ref: \(uriString)")
+            throw ATProtocolError.invalidURI("Invalid space ref: \(syntaxExcerpt(uriString))")
         }
 
-        let did = try DID(didString: String(segments[0]))
-        let nsid = try NSID(nsidString: String(segments[2]))
-        let rkey = try RecordKey(keyString: String(segments[3]))
+        let did = try DID(didString: segments[0])
+        let nsid = try NSID(nsidString: segments[2])
+        let rkey = try RecordKey(keyString: segments[3])
 
         self.spaceDID = did.didString()
         self.spaceType = nsid.nsidString()
@@ -359,88 +533,112 @@ public struct SpaceRef: ATProtocolValue, CustomStringConvertible, QueryParameter
         return uriString()
     }
 }
+
+/// A generic URI, the Lexicon `uri` string format.
+///
+/// The format is "flexible to any URI schema, following the generic RFC-3986"
+/// with a maximum length of 8 KB (https://atproto.com/specs/lexicon#uri). A
+/// string is accepted when it has
+///
+/// - an RFC 3986 scheme (a letter, then letters, digits, `+`, `-` or `.`)
+///   followed by `:`,
+/// - something after the scheme (and after `//` if present), and
+/// - no whitespace or control characters anywhere,
+///
+/// and is at most 8192 bytes. That covers `https:`, `at:`, `did:`, `dns:`,
+/// `ipfs:` and any other scheme, and matches the official `uri_syntax_*` interop
+/// vectors. Non-ASCII characters outside the scheme are tolerated, as they are
+/// by the reference implementation, because such links exist in published
+/// records.
+///
+/// The string is stored and re-encoded exactly as written: nothing is trimmed,
+/// re-escaped or replaced.
+///
+/// ```swift
+/// let link = try URI(validating: "https://example.com/path?q=1#top")
+/// link.scheme       // "https"
+/// link.authority    // "example.com"
+/// link.uriString()  // "https://example.com/path?q=1#top"
+/// URI.isValidURI("example.com")  // false: no scheme
+/// ```
+///
+/// ``init(uriString:)``, ``init(url:)`` and string literals do not validate, so
+/// that existing call sites keep compiling; a value built that way from a string
+/// that is not a URI reports `isValid() == false` and throws when encoded.
 public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible,
     ExpressibleByStringLiteral
 {
+    /// The scheme as written (`https`, `at`, `did`), or empty when the string has none.
     public let scheme: String
+    /// The host for hierarchical URIs, the DID method for `did:` URIs, the
+    /// AT-URI authority for `at:` URIs; empty when there is none.
     public let authority: String
+    /// The path, when there is one. For a `did:` URI, everything after the method.
     public let path: String?
+    /// The query, without the leading `?`.
     public let query: String?
+    /// The fragment, without the leading `#`.
     public let fragment: String?
+    /// Whether the scheme is `did`.
     public let isDID: Bool
+    /// The string this value was created from, exactly as written.
     public let originalString: String?
 
-    enum URIError: Error {
-        case invalidScheme
-        case invalidURI
-        case invalidDID
+    /// Whether `originalString` passed ``isValidURI(_:)`` when the value was created.
+    private let hasValidSyntax: Bool
+
+    /// Maximum length of a Lexicon `uri`, in bytes.
+    public static let maximumLength = 8192
+
+    /// Whether `string` has valid Lexicon `uri` syntax (see the type documentation).
+    public static func isValidURI(_ string: String) -> Bool {
+        ATProtoSyntax.uriFailure(string) == nil
+    }
+
+    /// Creates a URI, throwing ``ATProtocolError/invalidURI(_:)`` with the reason
+    /// if `uriString` does not have valid Lexicon `uri` syntax.
+    public init(validating uriString: String) throws {
+        if let reason = ATProtoSyntax.uriFailure(uriString) {
+            throw ATProtocolError.invalidURI("Invalid URI \(syntaxExcerpt(uriString)): \(reason)")
+        }
+        self.init(unchecked: uriString, hasValidSyntax: true)
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
-        let raw = try container.decode(String.self).trimmingCharacters(in: .whitespacesAndNewlines)
-
-        if raw.starts(with: "did:") {
-            isDID = true
-            let components = raw.split(separator: ":")
-            guard components.count >= 3 else { throw URIError.invalidDID }
-            scheme = String(components[0])
-            authority = String(components[1])
-            path = components.count > 2 ? components.dropFirst(2).joined(separator: ":") : nil
-            query = nil
-            fragment = nil
-            originalString = raw
-        } else if raw.starts(with: "at://") {
-            isDID = false
-            scheme = "at"
-            let afterPrefix = raw.dropFirst(5)
-            if let slashIndex = afterPrefix.firstIndex(of: "/") {
-                authority = String(afterPrefix[..<slashIndex])
-                let rem = String(afterPrefix[slashIndex...])
-                path = rem.isEmpty ? nil : rem
-            } else {
-                authority = String(afterPrefix)
-                path = nil
-            }
-            query = nil
-            fragment = nil
-            originalString = raw
-        } else {
-            // Defensive parse for non-DID URIs: reject obviously malformed strings like "//"
-            // Require a non-empty scheme and avoid passing bad input to URLComponents.
-            isDID = false
-            if raw.isEmpty || raw.hasPrefix("//") || URI.detectScheme(in: raw) == nil {
-                // Safe fallback to a benign invalid host
-                scheme = "https"
-                authority = "invalid.invalid"
-                path = nil
-                query = nil
-                fragment = nil
-                originalString = raw.isEmpty ? nil : raw
-            } else {
-                let comps = URLComponents(string: raw)
-                scheme = comps?.scheme ?? ""
-                authority = comps?.host ?? ""
-                path = comps?.path.isEmpty ?? true ? nil : comps?.path
-                query = comps?.query
-                fragment = comps?.fragment
-                originalString = raw
-            }
+        let raw = try container.decode(String.self)
+        if let reason = ATProtoSyntax.uriFailure(raw) {
+            throw DecodingError.dataCorrupted(
+                DecodingError.Context(
+                    codingPath: container.codingPath,
+                    debugDescription: "Invalid URI \(syntaxExcerpt(raw)): \(reason)",
+                    underlyingError: ATProtocolError.invalidURI("Invalid URI \(syntaxExcerpt(raw)): \(reason)")
+                )
+            )
         }
+        self.init(unchecked: raw, hasValidSyntax: true)
     }
 
+    /// Wraps `uriString` without validating it. The string is kept exactly as
+    /// given. If it is not a valid URI, ``isValid()`` is `false`, ``url`` is `nil`
+    /// and encoding the value throws. Prefer ``init(validating:)``.
     public init(uriString: String) {
-        let raw = uriString.trimmingCharacters(in: .whitespacesAndNewlines)
-        if raw.starts(with: "did:") {
+        self.init(unchecked: uriString, hasValidSyntax: ATProtoSyntax.uriFailure(uriString) == nil)
+    }
+
+    private init(unchecked raw: String, hasValidSyntax: Bool) {
+        originalString = raw
+        self.hasValidSyntax = hasValidSyntax
+
+        if raw.hasPrefix("did:") {
             isDID = true
-            let components = raw.split(separator: ":")
+            let components = raw.split(separator: ":", omittingEmptySubsequences: false)
             scheme = "did"
             authority = components.count > 1 ? String(components[1]) : ""
             path = components.count > 2 ? components.dropFirst(2).joined(separator: ":") : nil
             query = nil
             fragment = nil
-            originalString = raw
-        } else if raw.starts(with: "at://") {
+        } else if raw.hasPrefix("at://") {
             isDID = false
             scheme = "at"
             let afterPrefix = raw.dropFirst(5)
@@ -454,44 +652,90 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             }
             query = nil
             fragment = nil
-            originalString = raw
-        } else {
+        } else if let parts = URI.splitComponents(raw) {
             isDID = false
-            if raw.isEmpty || raw.hasPrefix("//") || URI.detectScheme(in: raw) == nil {
-                // Safe fallback
-                scheme = "https"
-                authority = "invalid.invalid"
-                path = nil
-                query = nil
-                fragment = nil
-                originalString = raw.isEmpty ? nil : raw
+            scheme = parts.scheme
+            authority = parts.host
+            path = parts.path
+            query = parts.query
+            fragment = parts.fragment
+        } else {
+            // No scheme: not a URI. Nothing is invented in its place.
+            isDID = false
+            scheme = ""
+            authority = ""
+            path = nil
+            query = nil
+            fragment = nil
+        }
+    }
+
+    private struct Components {
+        let scheme: String
+        let host: String
+        let path: String?
+        let query: String?
+        let fragment: String?
+    }
+
+    /// Splits a URI with a scheme into its RFC 3986 components (appendix B),
+    /// reducing the authority to its host. Returns `nil` when there is no scheme.
+    private static func splitComponents(_ raw: String) -> Components? {
+        guard let colon = raw.firstIndex(of: ":"), colon != raw.startIndex else { return nil }
+        let scheme = raw[..<colon]
+        guard let first = scheme.unicodeScalars.first, first.isASCII, first.properties.isAlphabetic,
+              scheme.unicodeScalars.allSatisfy({ scalar in
+                  scalar.isASCII
+                      && (scalar.properties.isAlphabetic || ("0" ... "9").contains(scalar)
+                          || scalar == "+" || scalar == "-" || scalar == ".")
+              })
+        else {
+            return nil
+        }
+
+        var rest = raw[raw.index(after: colon)...]
+        var fragment: String?
+        if let hash = rest.firstIndex(of: "#") {
+            fragment = String(rest[rest.index(after: hash)...])
+            rest = rest[..<hash]
+        }
+        var query: String?
+        if let mark = rest.firstIndex(of: "?") {
+            query = String(rest[rest.index(after: mark)...])
+            rest = rest[..<mark]
+        }
+
+        var host = ""
+        if rest.hasPrefix("//") {
+            let afterSlashes = rest.dropFirst(2)
+            let authorityEnd = afterSlashes.firstIndex(of: "/") ?? afterSlashes.endIndex
+            var authority = afterSlashes[..<authorityEnd]
+            rest = afterSlashes[authorityEnd...]
+            if let at = authority.lastIndex(of: "@") {
+                authority = authority[authority.index(after: at)...]
+            }
+            if authority.hasPrefix("["), let close = authority.firstIndex(of: "]") {
+                host = String(authority[...close])
+            } else if let portColon = authority.lastIndex(of: ":") {
+                host = String(authority[..<portColon])
             } else {
-                let comps = URLComponents(string: raw)
-                let defaultScheme = "https"
-                scheme = comps?.scheme ?? defaultScheme
-                authority = comps?.host ?? ""
-                path = comps?.path.isEmpty ?? true ? nil : comps?.path
-                query = comps?.query
-                fragment = comps?.fragment
-                originalString = raw
+                host = String(authority)
             }
         }
+
+        return Components(
+            scheme: String(scheme),
+            host: host,
+            path: rest.isEmpty ? nil : String(rest),
+            query: query,
+            fragment: fragment
+        )
     }
 
-    /// Detect a valid URI scheme prefix (e.g., https:, http:, ftp:, etc.)
-    private static func detectScheme(in s: String) -> String? {
-        // scheme = ALPHA *( ALPHA / DIGIT / "+" / "-" / "." ) ':'
-        // Use a lightweight regex
-        let pattern = "^[A-Za-z][A-Za-z0-9+.-]*:"
-        return s.range(of: pattern, options: .regularExpression).map { _ in String(s.prefix { $0 != ":" }) }
-    }
-
+    /// Whether this value has valid Lexicon `uri` syntax. Always `true` for a
+    /// decoded value and one created with ``init(validating:)``.
     public func isValid() -> Bool {
-        if isDID {
-            return scheme == "did" && !authority.isEmpty
-        } else {
-            return !scheme.isEmpty && !authority.isEmpty
-        }
+        hasValidSyntax
     }
 
     public func asQueryItem(name: String) -> URLQueryItem? {
@@ -501,84 +745,32 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         return URLQueryItem(name: name, value: uriString())
     }
 
+    /// The URI exactly as it was written.
     public func uriString() -> String {
-        if isDID {
-            var didString = "did:\(authority)"
-            if let path = path {
-                didString += ":\(path)"
-            }
-            return didString
-        } else if scheme == "at" {
-            if let originalString = originalString {
-                return originalString
-            }
-            var atString = "at://\(authority)"
-            if let path = path {
-                if !path.hasPrefix("/") {
-                    atString += "/"
-                }
-                atString += path
-            }
-            return atString
-        } else {
-            var components = URLComponents()
-            components.scheme = scheme.isEmpty ? nil : scheme
-            components.host = authority
-            components.path = path ?? ""
-            components.query = query
-            components.fragment = fragment
-            return components.string ?? "invalid-uri"
-        }
+        originalString ?? ""
     }
 
     /// Initializer to create URI from URL
     public init(url: URL) {
-        isDID = false
-        scheme = url.scheme ?? "https"
-        if scheme == "at" {
-            let raw = url.absoluteString
-            originalString = raw
-            let afterPrefix = raw.dropFirst(5)
-            if let slashIndex = afterPrefix.firstIndex(of: "/") {
-                authority = String(afterPrefix[..<slashIndex])
-                let rem = String(afterPrefix[slashIndex...])
-                path = rem.isEmpty ? nil : rem
-            } else {
-                authority = String(afterPrefix)
-                path = nil
-            }
-            query = url.query
-            fragment = url.fragment
-        } else {
-            authority = url.host ?? ""
-            path = url.path.isEmpty ? nil : url.path
-            query = url.query
-            fragment = url.fragment
-            originalString = url.absoluteString
-        }
+        self.init(uriString: url.absoluteString)
     }
 
-    /// Computed property to get URL from URI
+    /// The URI as a `URL`, or `nil` for a `did:` URI and for a value that is not
+    /// a valid URI.
     public var url: URL? {
-        guard !isDID else { return nil }
-        if scheme == "at" {
-            return URL(string: uriString())
-        }
-        var components = URLComponents()
-        components.scheme = scheme.isEmpty ? nil : scheme
-        components.host = authority
-        components.path = path ?? ""
-        components.query = query
-        components.fragment = fragment
-        return components.url
+        guard !isDID, isValid() else { return nil }
+        return URL(string: uriString())
     }
 
     public init(stringLiteral value: String) {
         self.init(uriString: value)
     }
 
+    /// Creates a URI, or returns `nil` if `description` does not have valid
+    /// Lexicon `uri` syntax.
     public init?(_ description: String) {
-        self.init(uriString: description)
+        guard ATProtoSyntax.uriFailure(description) == nil else { return nil }
+        self.init(unchecked: description, hasValidSyntax: true)
     }
 
     public var description: String {
@@ -593,22 +785,23 @@ public struct URI: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             && query == otherURI.query && fragment == otherURI.fragment && isDID == otherURI.isDID
     }
 
-    // URI components are immutable, so the captured spelling cannot become stale.
-    // Preserve escaping for record fidelity checks without changing URL construction.
-    private var serializedString: String {
-        guard let originalString, Self.detectScheme(in: originalString) != nil else {
-            return uriString()
+    /// The string to write, refusing to emit something that is not a URI.
+    private func checkedString() throws -> String {
+        let string = uriString()
+        guard hasValidSyntax else {
+            let reason = ATProtoSyntax.uriFailure(string) ?? "not a URI"
+            throw ATProtocolError.invalidURI("Refusing to encode an invalid URI \(syntaxExcerpt(string)): \(reason)")
         }
-        return originalString
+        return string
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(serializedString)
+        try container.encode(checkedString())
     }
 
     public func toCBORValue() throws -> Any {
-        return serializedString
+        return try checkedString()
     }
 }
 
@@ -818,19 +1011,42 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
 // MARK: - DID Identifier
 
+/// A decentralized identifier, the Lexicon `did` string format.
+///
+/// Validation follows "DID Identifier Syntax" in https://atproto.com/specs/did:
+/// lowercase `did:`, a method of one or more lowercase letters, then an
+/// identifier drawn from `A-Z a-z 0-9 . _ : % -` that does not end in `:` or
+/// `%`; at most 2048 characters. The check is byte-exact — no whitespace, line
+/// terminator or non-ASCII character is accepted anywhere — and DIDs are
+/// case-sensitive, so nothing is normalized.
+///
+/// Any DID method passes this syntax check, as the Lexicon specification
+/// requires. Use ``atprotoMethod`` or ``isAtprotoDID`` to ask whether a DID uses
+/// one of the two methods AT Protocol supports (`did:plc`, `did:web`) and meets
+/// the protocol's extra rules for it.
+///
+/// ```swift
+/// let did = try DID(didString: "did:plc:ewvi7nxzyoun6zhxrhs64oiz")
+/// did.method         // "plc"
+/// did.atprotoMethod  // .plc
+/// DID.isValidDID("did:plc:abc\n")  // false
+/// ```
 public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
+    /// The DID method (`plc`, `web`, `key`, …).
     public let method: String
+    /// The first colon-separated segment of the method-specific identifier.
     public let authority: String
+    /// Any further colon-separated segments of the method-specific identifier.
     public let segments: [String]
     private let originalString: String
 
-    /// Per https://atproto.com/specs/did the method must be lowercase letters, the
-    /// method-specific identifier allows [a-zA-Z0-9._:%-] (including empty colon-separated
-    /// segments), and the final character cannot be ":" or "%".
-    private static let didPattern = "^did:[a-z]+:[a-zA-Z0-9._:%-]*[a-zA-Z0-9._-]$"
-
-    /// Cached compiled regex - compiled once, reused forever
-    private static let didRegex: NSRegularExpression? = try? NSRegularExpression(pattern: didPattern, options: [])
+    /// The DID methods AT Protocol supports for account identity.
+    public enum AtprotoMethod: String, Sendable, CaseIterable {
+        /// `did:plc`, the self-authenticating method developed for atproto.
+        case plc
+        /// `did:web`, restricted in atproto to a bare hostname.
+        case web
+    }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -838,51 +1054,114 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         try self.init(didString: didString)
     }
 
+    /// Parses a DID, throwing ``ATProtocolError/invalidDID(_:)`` with the reason
+    /// if the syntax is not valid.
     public init(didString: String) throws {
+        if let reason = ATProtoSyntax.didFailure(didString) {
+            throw ATProtocolError.invalidDID("Invalid DID \(syntaxExcerpt(didString)): \(reason)")
+        }
         originalString = didString
 
-        guard didString.utf8.count <= 2048,
-              DID.isValidDID(didString)
-        else {
-            throw ATProtocolError.invalidURI("Invalid DID format or length")
-        }
+        // Validation guarantees a "did:" prefix, a non-empty method and a non-empty
+        // method-specific identifier, so there are always at least two components.
+        let components = didString.utf8.dropFirst(4)
+            .split(separator: SyntaxByte.colon, omittingEmptySubsequences: false)
+            .map { String(decoding: $0, as: UTF8.self) }
 
-        // The regex guarantees a "did:" prefix, a non-empty method, and at least one
-        // character of method-specific identifier (so components.count >= 2).
-        let components = didString.dropFirst(4).split(separator: ":", omittingEmptySubsequences: false)
-
-        method = String(components[0])
+        method = components[0]
         // The method-specific identifier may contain empty colon-separated segments
         // (e.g. "did:method::."), so the authority segment may legitimately be empty.
-        authority = components.count > 1 ? String(components[1]) : ""
-        segments = components.count > 2 ? components.dropFirst(2).map { String($0) } : []
+        authority = components.count > 1 ? components[1] : ""
+        segments = components.count > 2 ? Array(components.dropFirst(2)) : []
     }
 
-    /// Gate a space URI's authority and author on being well-formed DIDs, as the space grammar requires.
+    /// Builds a DID from its method and method-specific identifier, throwing
+    /// ``ATProtocolError/invalidDID(_:)`` if the result is not valid.
+    public init(method: String, identifier: String) throws {
+        try self.init(didString: "did:\(method):\(identifier)")
+    }
+
+    /// Whether `did` has valid DID syntax. Also gates a space URI's authority and
+    /// author, which the space grammar requires to be well-formed DIDs.
     public static func isValidDID(_ did: String) -> Bool {
-        guard !did.isEmpty, did.utf8.count <= 2048, did.allSatisfy({ $0.isASCII }) else {
-            return false
+        ATProtoSyntax.didFailure(did) == nil
+    }
+
+    /// Everything after `did:<method>:` — for `did:plc:abc` this is `abc`.
+    public var methodSpecificIdentifier: String {
+        String(originalString.utf8.dropFirst(5 + method.utf8.count)) ?? ""
+    }
+
+    /// The atproto-supported method this DID uses, or `nil` if the method is not
+    /// supported or the DID does not meet atproto's rules for that method:
+    ///
+    /// - `did:plc`: the identifier is exactly 24 base32 characters (`a-z`, `2-7`).
+    /// - `did:web`: a bare hostname with no path segments and no port; the
+    ///   hostname must be a valid handle-style domain outside the reserved
+    ///   top-level domains (``Handle/disallowedTLDs``). `localhost`, with an
+    ///   optional `%3A<port>`, is accepted for development.
+    ///
+    /// See "Blessed DID Methods" in https://atproto.com/specs/did.
+    public var atprotoMethod: AtprotoMethod? {
+        DID.atprotoMethod(of: originalString, allowLocalhost: true)
+    }
+
+    /// Whether this DID can identify an atproto account; see ``atprotoMethod``.
+    public var isAtprotoDID: Bool {
+        atprotoMethod != nil
+    }
+
+    /// Whether `did` is a syntactically valid DID that uses a method atproto
+    /// supports and meets atproto's rules for it; see ``atprotoMethod``.
+    ///
+    /// - Parameter allowLocalhost: Whether `did:web:localhost` (optionally with
+    ///   a port) is accepted. The specification allows it only in testing and
+    ///   development; pass `false` in production paths.
+    public static func isValidAtprotoDID(_ did: String, allowLocalhost: Bool = true) -> Bool {
+        atprotoMethod(of: did, allowLocalhost: allowLocalhost) != nil
+    }
+
+    private static func atprotoMethod(of did: String, allowLocalhost: Bool) -> AtprotoMethod? {
+        guard ATProtoSyntax.didFailure(did) == nil else { return nil }
+
+        if did.hasPrefix("did:plc:") {
+            let identifier = did.utf8.dropFirst(8)
+            let isBase32 = identifier.allSatisfy { SyntaxByte.isLower($0) || (0x32 ... 0x37).contains($0) }
+            return identifier.count == 24 && isBase32 ? .plc : nil
         }
 
-        guard let regex = didRegex else {
-            // Fallback validation without regex
-            return did.hasPrefix("did:") && did.count > 4
+        guard did.hasPrefix("did:web:") else { return nil }
+        let identifier = String(did.utf8.dropFirst(8)) ?? ""
+        // A colon after the prefix separates path segments, which atproto does not allow.
+        guard !identifier.contains(":") else { return nil }
+
+        var host = identifier
+        var hasPort = false
+        if let escape = identifier.range(of: "%3A", options: .caseInsensitive) {
+            let port = identifier[escape.upperBound...]
+            guard !port.isEmpty, port.utf8.allSatisfy(SyntaxByte.isDigit) else { return nil }
+            host = String(identifier[..<escape.lowerBound])
+            hasPort = true
         }
 
-        let range = NSRange(location: 0, length: did.utf16.count)
-        return regex.firstMatch(in: did, options: [], range: range) != nil
+        if host.lowercased() == "localhost" {
+            return allowLocalhost ? .web : nil
+        }
+        // A port is only allowed on localhost; the hostname itself follows the
+        // handle rules, including the reserved top-level domains.
+        guard !hasPort, ATProtoSyntax.handleFailure(host) == nil, Handle.isValidTLD(host.lowercased()) else {
+            return nil
+        }
+        return .web
     }
 
     public var description: String {
         return originalString
     }
 
+    /// The DID exactly as it was written.
     public func didString() -> String {
-        var didString = "did:\(method):\(authority)"
-        if !segments.isEmpty {
-            didString += ":" + segments.joined(separator: ":")
-        }
-        return didString
+        return originalString
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -890,8 +1169,7 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             return false
         }
 
-        return method == otherDID.method && authority == otherDID.authority
-            && segments == otherDID.segments
+        return originalString == otherDID.originalString
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -904,9 +1182,7 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(method)
-        hasher.combine(authority)
-        hasher.combine(segments)
+        hasher.combine(originalString)
     }
 
     public func toCBORValue() throws -> Any {
@@ -916,12 +1192,51 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
 
 // MARK: - Handle Identifier
 
+/// A handle (a DNS hostname naming an account), the Lexicon `handle` string format.
+///
+/// Validation follows "Handle Identifier Syntax" in
+/// https://atproto.com/specs/handle: ASCII letters, digits, hyphens and periods
+/// only; at least two labels of 1–63 characters, none starting or ending with a
+/// hyphen; a final label that starts with a letter; at most 253 characters. The
+/// check is byte-exact, so whitespace, line terminators and Unicode look-alikes
+/// are rejected.
+///
+/// Handles are case-insensitive and normalize to lower case: ``value`` is the
+/// normalized form and is what equality, hashing and query parameters use.
+/// ``wireValue`` keeps the handle as it was written, and is what is re-encoded,
+/// so decoding and re-encoding a record never changes its bytes.
+///
+/// Syntax validity is separate from policy. The reserved top-level domains
+/// (``disallowedTLDs``) are valid syntax but must not be registered or resolved;
+/// check ``hasDisallowedTLD``.
+///
+/// ```swift
+/// let handle = try Handle(handleString: "Alice.Example.COM")
+/// handle.value      // "alice.example.com"
+/// handle.wireValue  // "Alice.Example.COM"
+/// try Handle(handleString: "laptop.local").hasDisallowedTLD  // true
+/// ```
 public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
+    /// The handle normalized to lower case.
     public let value: String
+
+    /// The handle exactly as it was written, before normalization.
+    public let wireValue: String
+
     /// Upstream sentinel for unverified / invalid handle in identity resolution (matches @atproto/syntax INVALID_HANDLE).
     public static let invalid = "handle.invalid"
+    /// Same string as ``invalid``.
+    @available(*, deprecated, renamed: "invalid")
     public static let invalidHandle = "handle.invalid"
 
+    /// ``invalid`` as a typed handle: the placeholder shown when an account's
+    /// handle does not resolve back to its DID.
+    public static let invalidSentinel = Handle(validated: invalid)
+
+    /// Whether this is the `handle.invalid` placeholder rather than a real handle.
+    public var isInvalidSentinel: Bool {
+        value == Handle.invalid
+    }
 
     /// Registration-time restricted TLD suffixes (per upstream @atproto/syntax handle.ts: DISALLOWED_TLDS).
     /// Note: .test is explicitly allowed for testing/development.
@@ -966,68 +1281,39 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
         hasDisallowedTLD
     }
 
-    /// Per https://atproto.com/specs/handle the final segment (TLD) cannot start with a digit
-    private static let handlePattern =
-        "^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\\.)+[a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$"
-
-    /// Cached compiled regex - compiled once, reused forever
-    private static let handleRegex: NSRegularExpression? = try? NSRegularExpression(pattern: handlePattern, options: [])
-
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let handleString = try container.decode(String.self)
         try self.init(handleString: handleString)
     }
 
+    /// Parses a handle, throwing ``ATProtocolError/invalidHandle(_:)`` with the
+    /// reason if the syntax is not valid.
     public init(handleString: String) throws {
-        guard Handle.isValidHandle(handleString) else {
-            throw ATProtocolError.invalidURI("Invalid handle format: \(handleString)")
+        if let reason = ATProtoSyntax.handleFailure(handleString) {
+            throw ATProtocolError.invalidHandle("Invalid handle \(syntaxExcerpt(handleString)): \(reason)")
         }
+        self.init(validated: handleString)
+    }
 
+    /// Wraps a string already known to be a valid handle.
+    private init(validated handleString: String) {
+        wireValue = handleString
+        // Validated input is ASCII, so this is plain ASCII lower-casing.
         value = handleString.lowercased()
     }
 
+    /// Whether `handle` has valid handle syntax (in any letter case).
     public static func isValidHandle(_ handle: String) -> Bool {
-        // Basic validation before regex
-        guard !handle.isEmpty, handle.utf8.count <= 253 else {
-            return false
-        }
-
-        let lower = handle.lowercased()
-        let labels = lower.split(separator: ".", omittingEmptySubsequences: false)
-        guard labels.count >= 2 else {
-            return false
-        }
-
-        guard labels.allSatisfy({ label in
-            !label.isEmpty
-                && label.utf8.count <= 63
-                && label.first != "-"
-                && label.last != "-"
-                && label.utf8.allSatisfy({ ($0 >= 97 && $0 <= 122) || ($0 >= 48 && $0 <= 57) || $0 == 45 })
-        }) else {
-            return false
-        }
-
-        guard let tld = labels.last.map(String.init) else {
-            return false
-        }
-
-        guard let firstByte = tld.utf8.first, (firstByte >= 97 && firstByte <= 122) else {
-            return false
-        }
-
-
-        guard let regex = handleRegex else {
-            return true
-        }
-
-        let range = NSRange(location: 0, length: handle.utf16.count)
-        return regex.firstMatch(in: handle, options: [], range: range) != nil
+        ATProtoSyntax.handleFailure(handle) == nil
     }
 
     public var description: String {
         return value
+    }
+
+    public static func == (lhs: Handle, rhs: Handle) -> Bool {
+        lhs.value == rhs.value
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1040,7 +1326,7 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        try container.encode(value)
+        try container.encode(wireValue)
     }
 
     public func asQueryItem(name: String) -> URLQueryItem? {
@@ -1052,12 +1338,22 @@ public struct Handle: ATProtocolValue, CustomStringConvertible, QueryParameterCo
     }
 
     public func toCBORValue() throws -> Any {
-        return value
+        return wireValue
     }
 }
 
 // MARK: - AT Identifier (either Handle or DID)
 
+/// Either a ``DID`` or a ``Handle``, the Lexicon `at-identifier` string format.
+///
+/// The two cannot be confused: a DID always starts with `did:` and a handle
+/// cannot contain a colon. A string that starts with `did:` is parsed as a DID
+/// and anything else as a handle, each under its own rules.
+///
+/// ```swift
+/// let actor = try ATIdentifier(string: "atproto.com")   // .handle
+/// let other = try ATIdentifier(string: "did:web:example.com")  // .did
+/// ```
 public enum ATIdentifier: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     func asQueryItem(name: String) -> URLQueryItem? {
         return URLQueryItem(name: name, value: stringValue())
@@ -1069,16 +1365,13 @@ public enum ATIdentifier: ATProtocolValue, CustomStringConvertible, QueryParamet
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
         let string = try container.decode(String.self)
-
-        if string.starts(with: "did:") {
-            self = try .did(DID(didString: string))
-        } else {
-            self = try .handle(Handle(handleString: string))
-        }
+        try self.init(string: string)
     }
 
+    /// Parses a DID or a handle, throwing ``ATProtocolError/invalidDID(_:)`` or
+    /// ``ATProtocolError/invalidHandle(_:)`` accordingly.
     public init(string: String) throws {
-        if string.starts(with: "did:") {
+        if string.utf8.starts(with: "did:".utf8) {
             self = try .did(DID(didString: string))
         } else {
             self = try .handle(Handle(handleString: string))
@@ -1094,6 +1387,8 @@ public enum ATIdentifier: ATProtocolValue, CustomStringConvertible, QueryParamet
         }
     }
 
+    /// The identifier in normalized form: the DID as written, or the handle in
+    /// lower case.
     public func stringValue() -> String {
         switch self {
         case let .did(did):
@@ -1103,10 +1398,19 @@ public enum ATIdentifier: ATProtocolValue, CustomStringConvertible, QueryParamet
         }
     }
 
+    /// The identifier exactly as it was written; this is what is re-encoded.
+    public var wireValue: String {
+        switch self {
+        case let .did(did):
+            return did.didString()
+        case let .handle(handle):
+            return handle.wireValue
+        }
+    }
+
     public func encode(to encoder: Encoder) throws {
         var container = encoder.singleValueContainer()
-        // Just encode the string value directly
-        try container.encode(stringValue())
+        try container.encode(wireValue)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1126,20 +1430,34 @@ public enum ATIdentifier: ATProtocolValue, CustomStringConvertible, QueryParamet
 
     /// Add support for DAG-CBOR encoding
     public func toCBORValue() throws -> Any {
-        return stringValue()
+        return wireValue
     }
 }
 
 // MARK: - NSID (Namespaced Identifier)
 
+/// A namespaced identifier naming a Lexicon schema, the Lexicon `nsid` string format.
+///
+/// Validation follows "NSID Syntax" in https://atproto.com/specs/nsid: at least
+/// three period-separated segments of 1–63 characters; the leading segments (the
+/// reversed domain authority) use letters, digits and
+/// hyphens, never start or end with a hyphen, and the first starts with a
+/// letter; the final name segment is letters and digits only and starts with a
+/// letter; at most 317 characters in total. The check is byte-exact.
+///
+/// The domain authority is case-insensitive and normalizes to lower case; the
+/// name is case-sensitive. The string is stored as written — see ``normalized``.
+///
+/// ```swift
+/// let nsid = try NSID(nsidString: "app.bsky.feed.post")
+/// nsid.authority  // "app.bsky.feed"
+/// nsid.name       // "post"
+/// ```
 public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
+    /// The domain authority in the order written (`app.bsky.feed`).
     public let authority: String
+    /// The final name segment (`post`).
     public let name: String
-
-    private static let nsidPattern =
-        "^([a-zA-Z]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\\.[a-zA-Z][a-zA-Z0-9]{0,62}$"
-    /// Cached compiled regex - compiled once, reused forever
-    private static let nsidRegex: NSRegularExpression? = try? NSRegularExpression(pattern: nsidPattern, options: [])
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -1147,46 +1465,36 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
         try self.init(nsidString: nsidString)
     }
 
+    /// Parses an NSID, throwing ``ATProtocolError/invalidNSID(_:)`` with the
+    /// reason if the syntax is not valid.
     public init(nsidString: String) throws {
-        guard NSID.isValidNSID(nsidString) else {
-            throw ATProtocolError.invalidURI("Invalid NSID format: \(nsidString)")
+        if let reason = ATProtoSyntax.nsidFailure(nsidString) {
+            throw ATProtocolError.invalidNSID("Invalid NSID \(syntaxExcerpt(nsidString)): \(reason)")
         }
 
-        let components = nsidString.split(separator: ".")
-        guard !components.isEmpty else {
-            throw ATProtocolError.invalidURI("Invalid NSID: no components found")
-        }
-        name = String(components.last ?? "")
-        authority = components.count > 1 ? components.dropLast().joined(separator: ".") : ""
+        // Validation guarantees at least three non-empty segments.
+        let utf8 = nsidString.utf8
+        let lastDot = utf8.lastIndex(of: SyntaxByte.dot) ?? utf8.startIndex
+        authority = String(nsidString[..<lastDot])
+        name = String(nsidString[utf8.index(after: lastDot)...])
     }
 
-    /// Gate a space URI's type segment, as the space grammar requires.
+    /// Builds an NSID from its domain authority (`app.bsky.feed`) and name
+    /// (`post`), throwing ``ATProtocolError/invalidNSID(_:)`` if the result is
+    /// not valid.
+    public init(authority: String, name: String) throws {
+        try self.init(nsidString: "\(authority).\(name)")
+    }
+
+    /// Whether `nsid` has valid NSID syntax. Also gates a space URI's type segment.
     public static func isValidNSID(_ nsid: String) -> Bool {
-        // Basic validation before regex
-        guard !nsid.isEmpty, nsid.utf8.count <= 317, nsid.allSatisfy({ $0.isASCII }) else {
-            return false
-        }
+        ATProtoSyntax.nsidFailure(nsid) == nil
+    }
 
-        guard let regex = nsidRegex else {
-            // Fallback validation without regex
-            let components = nsid.split(separator: ".")
-            guard components.count >= 3,
-                  let first = components.first, let firstChar = first.first, firstChar.isLetter,
-                  let last = components.last, let lastFirstChar = last.first, lastFirstChar.isLetter,
-                  !last.contains("-") else {
-                return false
-            }
-            return components.allSatisfy { component in
-                guard let cFirst = component.first, (cFirst.isLetter || cFirst.isNumber),
-                      let cLast = component.last, (cLast.isLetter || cLast.isNumber) else {
-                    return false
-                }
-                return component.count <= 63 && component.allSatisfy { $0.isLetter || $0.isNumber || $0 == "-" }
-            }
-        }
-
-        let range = NSRange(location: 0, length: nsid.utf16.count)
-        return regex.firstMatch(in: nsid, options: [], range: range) != nil
+    /// The normalized form: domain authority in lower case, name unchanged.
+    public var normalized: NSID {
+        // Lower-casing ASCII letters cannot invalidate a valid NSID.
+        (try? NSID(nsidString: "\(authority.lowercased()).\(name)")) ?? self
     }
 
     public var description: String {
@@ -1197,13 +1505,15 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
         return "\(authority).\(name)"
     }
 
+    /// Protocol-level equality: the domain authority is compared without regard
+    /// to case, the name exactly. (`==` compares the strings as written.)
     public func isEqual(to other: any ATProtocolValue) -> Bool {
         guard let otherNSID = other as? NSID else {
             return false
         }
 
         return authority.lowercased() == otherNSID.authority.lowercased()
-            && name.lowercased() == otherNSID.name.lowercased()
+            && name == otherNSID.name
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -1217,7 +1527,7 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(authority.lowercased())
-        hasher.combine(name.lowercased())
+        hasher.combine(name)
     }
 
     public func toCBORValue() throws -> Any {
@@ -1227,14 +1537,19 @@ public struct NSID: ATProtocolValue, CustomStringConvertible, QueryParameterConv
 
 // MARK: - Record Key
 
+/// A record key, the Lexicon `record-key` string format.
+///
+/// Validation follows "Record Key Syntax" in
+/// https://atproto.com/specs/record-key: 1–512 characters from
+/// `A-Z a-z 0-9 . - _ : ~`, and not `.` or `..`. The check is byte-exact. Record
+/// keys are case-sensitive and are never normalized.
+///
+/// ```swift
+/// let key = try RecordKey(keyString: "3jzfcijpj2z2a")
+/// RecordKey.isValidRecordKey("self\n")  // false
+/// ```
 public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     public let value: String
-
-    /// Pattern for "any" record key format (https://atproto.com/specs/record-key allows "~")
-    private static let recordKeyPattern = "^[a-zA-Z0-9._:~-]+$"
-
-    /// Cached compiled regex - compiled once, reused forever
-    private static let recordKeyRegex: NSRegularExpression? = try? NSRegularExpression(pattern: recordKeyPattern, options: [])
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -1242,28 +1557,19 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
         try self.init(keyString: keyString)
     }
 
+    /// Parses a record key, throwing ``ATProtocolError/invalidRecordKey(_:)``
+    /// with the reason if the syntax is not valid.
     public init(keyString: String) throws {
-        guard RecordKey.isValidRecordKey(keyString) else {
-            throw ATProtocolError.invalidURI("Invalid record key format: \(keyString)")
+        if let reason = ATProtoSyntax.recordKeyFailure(keyString) {
+            throw ATProtocolError.invalidRecordKey("Invalid record key \(syntaxExcerpt(keyString)): \(reason)")
         }
 
         value = keyString
     }
+
+    /// Whether `key` has valid record-key syntax.
     public static func isValidRecordKey(_ key: String) -> Bool {
-        // Basic validation before regex
-        guard !key.isEmpty, key.utf8.count <= 512, key != ".", key != "..", key.allSatisfy({ $0.isASCII }) else {
-            return false
-        }
-
-        guard let regex = recordKeyRegex else {
-            // Fallback validation without regex
-            return key.allSatisfy { char in
-                char.isLetter || char.isNumber || "._:~-".contains(char)
-            }
-        }
-
-        let range = NSRange(location: 0, length: key.utf16.count)
-        return regex.firstMatch(in: key, options: [], range: range) != nil
+        ATProtoSyntax.recordKeyFailure(key) == nil
     }
 
     public var description: String {
@@ -1296,23 +1602,31 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
     }
 }
 
+// MARK: - TID (Timestamp Identifier)
+
+/// A timestamp identifier, the Lexicon `tid` string format.
+///
+/// A TID is a 64-bit integer written as 13 characters of the base32-sortable
+/// alphabet `234567abcdefghijklmnopqrstuvwxyz` (https://atproto.com/specs/tid).
+/// Thirteen characters carry 65 bits, so the first character is limited to
+/// `234567abcdefghij`. Within the integer, the top bit is zero in every
+/// generated TID, the next 53 bits are microseconds since the UNIX epoch and the
+/// low 10 bits are a clock identifier. TIDs sort the same way as strings and as
+/// integers, and therefore by time.
+///
+/// ```swift
+/// let tid = try TID(tidString: "3jzfcijpj2z2a")
+/// tid.timestampMicros  // microseconds since 1970
+/// tid.clockID          // 0...1023
+/// let next = await TIDGenerator.shared.nextTID()
+/// ```
 public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible, Comparable {
-    /// Timestamp in microseconds since epoch
-    private let timestamp: UInt64
-    /// Clock ID plus counter
-    private let clockId: UInt64
+    /// The 64-bit integer the 13 characters encode.
+    private let value: UInt64
     /// Original string representation
     private let originalString: String
 
-    /// Base32 sortable character set
-    private static let base32Chars = "234567abcdefghijklmnopqrstuvwxyz"
-
-    /// Fixed length of TID strings
-    private static let TID_LENGTH = 13
-
-    /// Valid first characters. Timestamp-based TIDs always lead with a digit; the
-    /// interop test fixtures treat letter-leading strings as invalid TIDs.
-    private static let validFirstChars = "234567"
+    private static let timestampMask: UInt64 = 0x1F_FFFF_FFFF_FFFF
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.singleValueContainer()
@@ -1321,50 +1635,44 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         try self.init(tidString: tidString)
     }
 
+    /// Parses a TID, throwing ``ATProtocolError/invalidTID(_:)`` with the reason
+    /// if the syntax is not valid.
     public init(tidString: String) throws {
-        // Validate TID format
-        guard tidString.count == Self.TID_LENGTH else {
-            throw ATProtocolError.invalidURI("Invalid TID string format: must be exactly 13 characters")
+        switch ATProtoSyntax.tidValue(tidString) {
+        case let .success(value):
+            self.value = value
+            originalString = tidString
+        case let .failure(failure):
+            throw ATProtocolError.invalidTID("Invalid TID \(syntaxExcerpt(tidString)): \(failure.reason)")
         }
-
-        // Validate characters (must be in base32 sortable charset)
-        for char in tidString {
-            if !Self.base32Chars.contains(char) {
-                throw ATProtocolError.invalidURI("Invalid TID string format: contains invalid characters")
-            }
-        }
-
-        // Validate first character (must be 2-7)
-        guard let firstChar = tidString.first,
-              Self.validFirstChars.contains(firstChar)
-        else {
-            throw ATProtocolError.invalidURI(
-                "Invalid TID string format: first character must be in 234567"
-            )
-        }
-
-        // Decode TID value
-        let tidValue = Self.decode(tidString)
-
-        // Extract timestamp and clock ID
-        // 53 bits for timestamp, 10 bits for clock ID
-        timestamp = (tidValue >> 10) & 0x1F_FFFF_FFFF_FFFF
-        clockId = tidValue & 0x3FF
-        originalString = tidString
     }
 
-    /// Decode a base32 string to a number
-    private static func decode(_ str: String) -> UInt64 {
-        var result: UInt64 = 0
-
-        for char in str {
-            if let index = base32Chars.firstIndex(of: char) {
-                let value = base32Chars.distance(from: base32Chars.startIndex, to: index)
-                result = result * 32 + UInt64(value)
-            }
+    /// Builds a TID from its parts, throwing ``ATProtocolError/invalidTID(_:)``
+    /// if the timestamp does not fit in 53 bits or the clock identifier in 10.
+    public init(timestampMicros: UInt64, clockID: UInt16) throws {
+        guard timestampMicros <= TID.timestampMask else {
+            throw ATProtocolError.invalidTID("Invalid TID: timestamp \(timestampMicros) does not fit in 53 bits")
         }
+        guard clockID < 1024 else {
+            throw ATProtocolError.invalidTID("Invalid TID: clock identifier \(clockID) is not in 0...1023")
+        }
+        self.init(timestampBits: timestampMicros, clockBits: UInt64(clockID))
+    }
 
-        return result
+    /// Builds a TID from parts the caller has already range-checked.
+    init(timestampBits: UInt64, clockBits: UInt64) {
+        value = (timestampBits & TID.timestampMask) << 10 | (clockBits & 0x3FF)
+        originalString = ATProtoSyntax.tidString(value)
+    }
+
+    /// Microseconds since the UNIX epoch (the 53-bit timestamp field).
+    public var timestampMicros: UInt64 {
+        (value >> 10) & TID.timestampMask
+    }
+
+    /// The 10-bit clock identifier (0–1023) of the generator that made this TID.
+    public var clockID: UInt16 {
+        UInt16(value & 0x3FF)
     }
 
     public var description: String {
@@ -1380,7 +1688,7 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
             return false
         }
 
-        return timestamp == otherTID.timestamp && clockId == otherTID.clockId
+        return value == otherTID.value
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -1392,43 +1700,30 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         return URLQueryItem(name: name, value: originalString)
     }
 
+    /// The timestamp as a `Date`.
     public var date: Date {
-        return Date(timeIntervalSince1970: TimeInterval(timestamp) / 1_000_000.0)
+        return Date(timeIntervalSince1970: TimeInterval(timestampMicros) / 1_000_000.0)
     }
 
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(timestamp)
-        hasher.combine(clockId)
+        hasher.combine(value)
     }
 
-    /// Comparable implementation for sorting
+    /// Orders TIDs by their integer value, which is also their string order.
     public static func < (lhs: TID, rhs: TID) -> Bool {
-        if lhs.timestamp != rhs.timestamp {
-            return lhs.timestamp < rhs.timestamp
-        }
-        return lhs.clockId < rhs.clockId
+        lhs.value < rhs.value
     }
 
-    /// Static validation method
+    /// Whether `str` has valid TID syntax.
     public static func isValid(_ str: String) -> Bool {
-        // Must be exactly 13 characters
-        guard str.count == TID_LENGTH else { return false }
+        if case .success = ATProtoSyntax.tidValue(str) { return true }
+        return false
+    }
 
-        // All characters must be in the base32 charset
-        for char in str {
-            if !base32Chars.contains(char) {
-                return false
-            }
-        }
-
-        // First character must be 2-7
-        guard let firstChar = str.first,
-              validFirstChars.contains(firstChar)
-        else {
-            return false
-        }
-
-        return true
+    /// Whether `tid` has valid TID syntax; same as ``isValid(_:)``, named like the
+    /// validators of the other identifier types.
+    public static func isValidTID(_ tid: String) -> Bool {
+        isValid(tid)
     }
 
     public func toCBORValue() throws -> Any {

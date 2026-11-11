@@ -31,15 +31,34 @@ struct URISerializationTests {
         try expectSerialized(URI(url: changed), equals: changed.absoluteString)
     }
 
-    @Test("Malformed and whitespace-trimmed inputs keep existing behavior")
-    func malformedURIBehavior() throws {
-        for raw in ["", "//", "missing-scheme"] {
-            let uri = URI(uriString: raw)
-            try expectSerialized(uri, equals: uri.uriString())
+    /// A string that is not a URI is never trimmed, repaired or replaced by a
+    /// placeholder: the non-validating initialiser keeps it as given and reports
+    /// it invalid, and every path that would write it out or read it in throws.
+    @Test("Malformed input is kept verbatim, reported invalid and never serialized", arguments: [
+        "", "//", "missing-scheme", " https://example.com/plain ", "https://example.com/plain\n",
+    ])
+    func malformedURIBehavior(_ raw: String) throws {
+        let uri = URI(uriString: raw)
+        #expect(!uri.isValid())
+        #expect(uri.uriString() == raw)
+        #expect(uri.url == nil)
+        #expect(uri.asQueryItem(name: "uri") == nil)
+        #expect(throws: (any Error).self) { try JSONEncoder().encode(uri) }
+        #expect(throws: ATProtocolError.self) { try uri.toCBORValue() }
+
+        #expect(URI(raw) == nil)
+        #expect(throws: ATProtocolError.self) { try URI(validating: raw) }
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(URI.self, from: JSONEncoder().encode(raw))
         }
+    }
+
+    @Test("A relative URL is not a URI")
+    func relativeURLIsNotAURI() throws {
         let relative = URI(url: try #require(URL(string: "relative/path")))
-        try expectSerialized(relative, equals: relative.uriString())
-        try expectSerialized(URI(uriString: " https://example.com/plain "), equals: "https://example.com/plain")
+        #expect(!relative.isValid())
+        #expect(relative.uriString() == "relative/path")
+        #expect(throws: (any Error).self) { try JSONEncoder().encode(relative) }
     }
 
     @Test("Aster post stays typed through thread, JSON cache, and DAG-CBOR decoding")

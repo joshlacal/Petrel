@@ -521,10 +521,14 @@ struct ATProtoInteropTests {
 
         @Test("TID Static Validation")
         func tidStaticValidation() {
+            // The first character may be any of 234567abcdefghij (tid.mdx, "TID Syntax").
             let validTIDs = [
                 "3jzfcijpj2z2a",
                 "7777777777777",
                 "3zzzzzzzzzzzz",
+                "2222222222222",
+                "abcdefghijklm",
+                "j777777777777",
             ]
 
             for tidString in validTIDs {
@@ -537,7 +541,9 @@ struct ATProtoInteropTests {
                 "1jzfcijpj2z2a", // Invalid first character
                 "3jzfcijpj2z2!", // Invalid character
                 "", // Empty
-                "abcdefghijklm", // Invalid characters
+                "kbcdefghijklm", // First character above "j"
+                "zzzzzzzzzzzzz", // First character above "j"
+                "3jzfcijpj2z2a\n", // Trailing line terminator
             ]
 
             for tidString in invalidTIDs {
