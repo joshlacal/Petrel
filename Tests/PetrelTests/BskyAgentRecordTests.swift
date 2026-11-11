@@ -328,6 +328,70 @@ struct BskyAgentEmbedTests {
             ["$type": "app.bsky.feed.threadgate#mentionRule"], ["$type": "app.bsky.feed.threadgate#followingRule"],
         ])
         expectRecord(puts[1].json?["record"]?["embeddingRules"], [["$type": "app.bsky.feed.postgate#disableRule"]])
+        #expect(puts.allSatisfy { $0.json?["swapRecord"] == .null })
+    }
+
+    @Test("changing a threadgate's rules keeps its hidden replies and other fields")
+    func threadgateKeepsHiddenReplies() async throws {
+        let pds = BskyFakePDS()
+        let agent = try await pds.server.makeAgent()
+        let post = try await agent.post(RichText(text: "gated"))
+        let rkey = try #require(post.uri.recordKey)
+        let hidden: BskyJSON = [.string("at://did:plc:bob/app.bsky.feed.post/3khidden")]
+        let cid = pds.seed("at://\(alice)/app.bsky.feed.threadgate/\(rkey)", [
+            "$type": "app.bsky.feed.threadgate",
+            "post": .string(post.uri.uriString()),
+            "allow": [["$type": "app.bsky.feed.threadgate#mentionRule"]],
+            "hiddenReplies": hidden,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "futureField": ["kept": true],
+        ])
+
+        try await agent.setThreadgate(for: post.uri, allow: [.appBskyFeedThreadgateFollowerRule(.init())])
+
+        let put = try #require(pds.server.requests(to: "com.atproto.repo.putRecord").last)
+        #expect(put.json?["swapRecord"] == .string(cid))
+        expectRecord(put.json?["record"], [
+            "$type": "app.bsky.feed.threadgate",
+            "post": .string(post.uri.uriString()),
+            "allow": [["$type": "app.bsky.feed.threadgate#followerRule"]],
+            "hiddenReplies": hidden,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+            "futureField": ["kept": true],
+        ])
+
+        // Opening replies to everyone drops `allow` and still keeps the hidden replies.
+        try await agent.setThreadgate(for: post.uri, allow: nil)
+        let reopened = try #require(pds.server.requests(to: "com.atproto.repo.putRecord").last)
+        #expect(reopened.json?["record"]?["allow"] == nil)
+        #expect(reopened.json?["record"]?["hiddenReplies"] == hidden)
+    }
+
+    @Test("changing a postgate's rules keeps its detached quotes")
+    func postgateKeepsDetachedQuotes() async throws {
+        let pds = BskyFakePDS()
+        let agent = try await pds.server.makeAgent()
+        let post = try await agent.post(RichText(text: "gated"))
+        let rkey = try #require(post.uri.recordKey)
+        let detached: BskyJSON = [.string("at://did:plc:bob/app.bsky.feed.post/3kquote")]
+        let cid = pds.seed("at://\(alice)/app.bsky.feed.postgate/\(rkey)", [
+            "$type": "app.bsky.feed.postgate",
+            "post": .string(post.uri.uriString()),
+            "detachedEmbeddingUris": detached,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+        ])
+
+        try await agent.setPostgate(for: post.uri, embeddingRules: [.appBskyFeedPostgateDisableRule(.init())])
+
+        let put = try #require(pds.server.requests(to: "com.atproto.repo.putRecord").last)
+        #expect(put.json?["swapRecord"] == .string(cid))
+        expectRecord(put.json?["record"], [
+            "$type": "app.bsky.feed.postgate",
+            "post": .string(post.uri.uriString()),
+            "embeddingRules": [["$type": "app.bsky.feed.postgate#disableRule"]],
+            "detachedEmbeddingUris": detached,
+            "createdAt": "2026-01-01T00:00:00.000Z",
+        ])
     }
 }
 

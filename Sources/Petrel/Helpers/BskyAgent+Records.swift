@@ -220,6 +220,47 @@ extension BskyAgent {
         return RawRecord(uri: uri, cid: json["cid"]?.stringValue, value: value)
     }
 
+    /// Rewrites the record at `rkey` in the signed-in repository from what is
+    /// stored there, on the condition that nobody changed it in between.
+    ///
+    /// `transform` receives the stored record (`nil` when there is none) and
+    /// returns the record to write. When another writer got there first the
+    /// record is read again and `transform` runs again, up to six times.
+    @discardableResult
+    func upsertRecordJSON(
+        collection: String,
+        rkey: String,
+        _ transform: (RawRecord?) async throws -> BskyJSON
+    ) async throws -> ComAtprotoRepoStrongRef {
+        let repo = try await did().didString()
+        let maxAttempts = 6
+
+        for _ in 0 ..< maxAttempts {
+            let existing = try await getRecordJSON(repo: repo, collection: collection, rkey: rkey)
+            let record = try await transform(existing)
+
+            let swap: RecordSwap
+            if let existing {
+                guard let ref = existing.strongRef else {
+                    throw BskyAgentError.invalidResponse(
+                        nsid: "com.atproto.repo.getRecord",
+                        reason: "Missing or malformed record CID"
+                    )
+                }
+                swap = .matches(ref.cid)
+            } else {
+                swap = .mustNotExist
+            }
+
+            do {
+                return try await putRecordJSON(record, collection: collection, rkey: rkey, swapRecord: swap)
+            } catch let error as BskyAgentError where error.xrpcErrorName == "InvalidSwap" {
+                continue
+            }
+        }
+        throw BskyAgentError.swapRetriesExhausted(attempts: maxAttempts)
+    }
+
     @discardableResult
     func putRecordJSON(
         _ record: BskyJSON,

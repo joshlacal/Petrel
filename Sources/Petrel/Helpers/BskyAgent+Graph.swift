@@ -212,11 +212,7 @@ public extension BskyAgent {
         _ update: @Sendable (AppBskyActorProfile?) async throws -> AppBskyActorProfile
     ) async throws -> ComAtprotoRepoStrongRef {
         let collection = AppBskyActorProfile.typeIdentifier
-        let repo = try await did().didString()
-        let maxAttempts = 6
-
-        for _ in 0 ..< maxAttempts {
-            let existing = try await getRecordJSON(repo: repo, collection: collection, rkey: "self")
+        return try await upsertRecordJSON(collection: collection, rkey: "self") { existing in
             let existingProfile = existing.flatMap { try? $0.value.decoded(as: AppBskyActorProfile.self) }
 
             let updated = try await update(existingProfile)
@@ -230,27 +226,8 @@ public extension BskyAgent {
                     record[key] = value
                 }
             }
-
-            let swap: RecordSwap
-            if let existing {
-                guard let ref = existing.strongRef else {
-                    throw BskyAgentError.invalidResponse(
-                        nsid: "com.atproto.repo.getRecord",
-                        reason: "Missing or malformed record CID"
-                    )
-                }
-                swap = .matches(ref.cid)
-            } else {
-                swap = .mustNotExist
-            }
-
-            do {
-                return try await putRecordJSON(record, collection: collection, rkey: "self", swapRecord: swap)
-            } catch let error as BskyAgentError where error.xrpcErrorName == "InvalidSwap" {
-                continue
-            }
+            return record
         }
-        throw BskyAgentError.swapRetriesExhausted(attempts: maxAttempts)
     }
 }
 

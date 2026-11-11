@@ -347,6 +347,12 @@ public extension BskyAgent {
     /// - Parameters:
     ///   - post: The post to gate. It must belong to the signed-in account.
     ///   - allow: Who may reply. An empty array means nobody; `nil` means everyone.
+    ///
+    /// An existing threadgate is updated in place: its hidden replies, its
+    /// creation time and any fields this SDK does not model are kept.
+    ///
+    /// - Throws: ``BskyAgentError/swapRetriesExhausted(attempts:)`` when the
+    ///   gate kept changing underneath the update.
     @discardableResult
     func setThreadgate(
         for post: ATProtocolURI,
@@ -354,7 +360,7 @@ public extension BskyAgent {
     ) async throws -> ComAtprotoRepoStrongRef {
         let location = try Self.recordLocation(post, expecting: AppBskyFeedPost.typeIdentifier)
         let record = AppBskyFeedThreadgate(post: post, allow: allow, createdAt: Self.now())
-        return try await putRecord(record, collection: AppBskyFeedThreadgate.typeIdentifier, rkey: location.rkey)
+        return try await updateGate(record, collection: AppBskyFeedThreadgate.typeIdentifier, rkey: location.rkey, ruleKey: "allow")
     }
 
     /// Restricts how one of the account's posts may be embedded
@@ -363,6 +369,12 @@ public extension BskyAgent {
     /// - Parameters:
     ///   - post: The post to gate. It must belong to the signed-in account.
     ///   - embeddingRules: For example `[.appBskyFeedPostgateDisableRule(.init())]` to disable quote posts.
+    ///
+    /// An existing postgate is updated in place: its detached quote posts, its
+    /// creation time and any fields this SDK does not model are kept.
+    ///
+    /// - Throws: ``BskyAgentError/swapRetriesExhausted(attempts:)`` when the
+    ///   gate kept changing underneath the update.
     @discardableResult
     func setPostgate(
         for post: ATProtocolURI,
@@ -370,7 +382,34 @@ public extension BskyAgent {
     ) async throws -> ComAtprotoRepoStrongRef {
         let location = try Self.recordLocation(post, expecting: AppBskyFeedPost.typeIdentifier)
         let record = AppBskyFeedPostgate(createdAt: Self.now(), post: post, embeddingRules: embeddingRules)
-        return try await putRecord(record, collection: AppBskyFeedPostgate.typeIdentifier, rkey: location.rkey)
+        return try await updateGate(record, collection: AppBskyFeedPostgate.typeIdentifier, rkey: location.rkey, ruleKey: "embeddingRules")
+    }
+
+    /// Writes a gate's rules over the stored gate, keeping everything else it holds.
+    ///
+    /// Only `ruleKey`, `post` and `$type` come from `gate`; `createdAt` is kept
+    /// when the stored gate has one. Moderation state such as hidden replies or
+    /// detached quotes is carried over, never reset.
+    private func updateGate<Gate: Encodable>(
+        _ gate: Gate,
+        collection: String,
+        rkey: String,
+        ruleKey: String
+    ) async throws -> ComAtprotoRepoStrongRef {
+        let fresh = try Self.recordJSON(gate, collection: collection).json
+        guard let freshFields = fresh.objectValue else {
+            throw BskyAgentError.invalidInput("A record must encode to a JSON object")
+        }
+        return try await upsertRecordJSON(collection: collection, rkey: rkey) { existing in
+            guard var record = existing?.value.objectValue else { return fresh }
+            for key in ["$type", "post", ruleKey] {
+                record[key] = freshFields[key]
+            }
+            if record["createdAt"] == nil {
+                record["createdAt"] = freshFields["createdAt"]
+            }
+            return .object(record)
+        }
     }
 
     // MARK: Images
