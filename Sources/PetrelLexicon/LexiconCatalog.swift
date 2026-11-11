@@ -14,6 +14,12 @@ import Foundation
 /// Every `validate…` method throws ``LexiconValidationError`` when the data is
 /// wrong and ``LexiconCatalogError`` when the schema it was asked to use is
 /// not in the catalog (or is of the wrong kind).
+///
+/// The `validate…` methods check a value against a schema; they do not
+/// re-check it against the data model. A ``LexValue`` produced by one of the
+/// parsers always satisfies the data model. One assembled from Swift literals
+/// might not (it could hold a `"$link"` key, or a malformed blob); run
+/// ``LexValue/checkDataModel(options:)`` on such a value first.
 public struct LexiconCatalog: Sendable {
     /// The documents in the catalog, keyed by NSID.
     public private(set) var documents: [String: LexiconDoc] = [:]
@@ -65,6 +71,44 @@ public struct LexiconCatalog: Sendable {
         let document = try LexiconDoc(json: json, options: options)
         try add(document, options: options, replaceExisting: replaceExisting)
         return document
+    }
+
+    /// Adds every `.json` file under a directory, searching subdirectories.
+    ///
+    /// Files are added in path order. The first file that can not be read or
+    /// is not a valid Lexicon stops the load and throws; documents added
+    /// before it stay in the catalog.
+    ///
+    /// - Returns: The documents that were added.
+    /// - Throws: ``LexiconSchemaError`` for an invalid document, or the file
+    ///   system error for an unreadable file or directory.
+    @discardableResult
+    public mutating func add(
+        contentsOfDirectory directory: URL,
+        options: LexiconSchemaOptions = .strict,
+        replaceExisting: Bool = false
+    ) throws -> [LexiconDoc] {
+        var files: [URL] = []
+        var pending = [directory]
+        while let current = pending.popLast() {
+            let entries = try FileManager.default.contentsOfDirectory(
+                at: current,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )
+            for entry in entries {
+                if try entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true {
+                    pending.append(entry)
+                } else if entry.pathExtension == "json" {
+                    files.append(entry)
+                }
+            }
+        }
+        var added: [LexiconDoc] = []
+        for file in files.sorted(by: { $0.path < $1.path }) {
+            try added.append(add(json: Data(contentsOf: file), options: options, replaceExisting: replaceExisting))
+        }
+        return added
     }
 
     /// Removes a document.
