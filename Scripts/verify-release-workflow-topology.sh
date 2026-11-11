@@ -871,8 +871,8 @@ end
 # messages, while these canonical fingerprints cover every remaining parsed
 # workflow, job, and step control surface without depending on shell spellings.
 complete_workflow_fingerprints = {
-  "release" => "dd02351762f5fe09559ea09c022e1db8e3495039c6c6492d21fbf952d000a45d",
-  "Swift compatibility" => "a79abc7627a6d4db03844deed88739a9e8b2ffb3e3c53f3e27e6527621e24599",
+  "release" => "09edafd42ce70ca4f61d8e12294e66c795a9d6184d7eae6f7cc637e9e6cb39c0",
+  "Swift compatibility" => "491a5aab34184b608f7f627e47ed5505e72beb2114a8fb86f6b53d6552b3dbe8",
   "DocC" => "c30190bbe4dbf04d1797b218953fd2a118e5ba6a847c774e296fcdd2c6b8b128",
 }
 [

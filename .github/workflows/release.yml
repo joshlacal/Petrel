@@ -182,13 +182,19 @@ jobs:
       - name: Install system dependencies
         # The container's resolver is sometimes not ready when the job starts, and
         # `apt-get update` exits 0 even when every index fetch failed, so the
-        # failure only shows up in `install`. Retry the pair with a growing pause.
+        # failure only shows up in `install`. Retry the pair with a growing pause, and
+        # after the second failure point the container at public resolvers (the
+        # runner resolver has failed for archive.ubuntu.com for hours at a time).
         run: |
           for attempt in 1 2 3 4 5 6; do
             if apt-get update && apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config; then
               exit 0
             fi
             echo "apt attempt ${attempt} failed; retrying in $((attempt * 15))s"
+            if [ "${attempt}" -eq 2 ]; then
+              echo "switching the container resolver to public DNS"
+              printf "nameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+            fi
             sleep $((attempt * 15))
           done
           echo "apt-get could not install system dependencies after 6 attempts" >&2
