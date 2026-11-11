@@ -372,6 +372,48 @@ public struct LexPermissionSet: Sendable, Hashable {
     }
 }
 
+public extension LexPermissionSet {
+    /// The grants this set makes when it is published under `nsid`.
+    ///
+    /// Two filters apply, both required of anything that turns a permission
+    /// set into access:
+    /// - a declaration that must be ignored (see ``LexPermission/grant``) is
+    ///   dropped;
+    /// - a declaration is dropped as a whole unless every collection or
+    ///   endpoint it names is under the set's own namespace (see
+    ///   ``covers(_:publishedAs:)``), so a set can not grant access to
+    ///   another authority's resources.
+    func grants(publishedAs nsid: String) -> [LexPermission.Grant] {
+        permissions.compactMap { permission in
+            guard let grant = permission.grant else { return nil }
+            let named: [String]
+            switch grant {
+            case let .repo(collections, _): named = collections
+            case let .rpc(methods, _): named = methods
+            }
+            return named.allSatisfy { LexPermissionSet.covers($0, publishedAs: nsid) } ? grant : nil
+        }
+    }
+
+    /// Whether a permission set published as `setNSID` has namespace
+    /// authority over `resourceNSID`.
+    ///
+    /// A set may address resources in its own NSID group (the NSID minus its
+    /// name) and in child groups, recursively, but not in sibling or parent
+    /// groups: `app.example.feed.authPost` covers `app.example.feed.post` and
+    /// `app.example.feed.thread.getReplies`, and does not cover
+    /// `app.example.actor.profile` or `app.example.profile`.
+    static func covers(_ resourceNSID: String, publishedAs setNSID: String) -> Bool {
+        guard LexSyntax.isNSID(setNSID), LexSyntax.isNSID(resourceNSID),
+              let lastDot = setNSID.lastIndex(of: ".")
+        else {
+            return false
+        }
+        // The group, including its trailing dot: "app.example.feed."
+        return resourceNSID.hasPrefix(setNSID[...lastDot])
+    }
+}
+
 /// A `permission` declaration inside a permission set.
 ///
 /// The set of resources and their parameters is expected to grow, so the

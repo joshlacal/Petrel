@@ -420,6 +420,54 @@ struct LexiconSchemaRuleTests {
         #expect(try LexiconDoc(json: doc.jsonData()) == doc)
     }
 
+    @Test("a permission set only has authority over its own namespace", arguments: [
+        ("app.example.feed.authOnlyPost", "app.example.feed.post", true),
+        ("app.example.feed.authOnlyPost", "app.example.feed.getPostThread", true),
+        ("app.example.feed.authOnlyPost", "app.example.feed.thread.getReplies", true),
+        ("app.example.feed.authOnlyPost", "app.example.actor.profile", false),
+        ("app.example.feed.authOnlyPost", "app.example.profile", false),
+        ("app.example.feed.authOnlyPost", "app.example.feedx.post", false),
+        ("app.example.feed.authOnlyPost", "app.example.feed", false),
+        ("app.example.feed.authOnlyPost", "com.other.feed.post", false),
+        ("app.example.authFull", "app.example.feed.post", true),
+        ("app.example.authFull", "app.example.actor.profile", true),
+        ("app.example.authFull", "app.other.thing", false),
+        ("app.example.authFull", "*", false),
+        ("not an nsid", "app.example.feed.post", false),
+    ])
+    func permissionSetNamespace(set: String, resource: String, covered: Bool) {
+        #expect(LexPermissionSet.covers(resource, publishedAs: set) == covered, "\(set) / \(resource)")
+    }
+
+    @Test("a permission set's grants drop ignored and out-of-namespace declarations")
+    func permissionSetGrants() throws {
+        let json = Self.doc(#"""
+        "main":{"type":"permission-set","permissions":[
+          {"type":"permission","resource":"repo","collection":["app.example.feed.post"],"action":["create"]},
+          {"type":"permission","resource":"repo","collection":["app.example.feed.like","app.example.actor.profile"]},
+          {"type":"permission","resource":"rpc","lxm":["app.example.feed.getTimeline"],"inheritAud":true},
+          {"type":"permission","resource":"rpc","lxm":["com.atproto.repo.createRecord"],"aud":"*"},
+          {"type":"permission","resource":"blob","accept":["*/*"]}
+        ]}
+        """#)
+        guard case let .permissionSet(set)? = try LexiconDoc(json: Data(json.utf8)).main else {
+            Issue.record("not a permission set")
+            return
+        }
+        // Every repo/rpc declaration is well formed on its own…
+        #expect(set.permissions.compactMap(\.grant).count == 4)
+        // …but only two are within the authority of app.example.feed.*: one
+        // names a sibling namespace alongside its own, one names another
+        // authority entirely, and each is dropped whole.
+        #expect(set.grants(publishedAs: "app.example.feed.authBasic") == [
+            .repo(collections: ["app.example.feed.post"], actions: ["create"]),
+            .rpc(methods: ["app.example.feed.getTimeline"], inheritAudience: true),
+        ])
+        // One level up, the sibling becomes a child.
+        #expect(set.grants(publishedAs: "app.example.authFull").count == 3)
+        #expect(set.grants(publishedAs: "com.unrelated.auth").isEmpty)
+    }
+
     // MARK: Model
 
     @Test("fields the language does not define are tolerated on decode")
