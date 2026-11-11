@@ -15,8 +15,7 @@ import Foundation
         ///
         /// Links get a `link` attribute. Mentions and tags get the accent
         /// colour, a `mention://<did>` or `tag://<tag>` link, and the
-        /// ``AttributeScopes/RichTextAttributes/mentionLink`` or
-        /// ``AttributeScopes/RichTextAttributes/tagLink`` attribute holding the
+        /// `richText.mentionLink` or `richText.tagLink` attribute holding the
         /// exact DID or tag. Read those attributes rather than parsing the
         /// link: a tag that cannot be written as a URL host (non-ASCII text,
         /// spaces, `%`) is linked as `tag:///<percent-encoded tag>` instead.
@@ -215,9 +214,9 @@ enum RichTextLinkURL {
 public extension AttributedString {
     /// Converts link, mention and tag runs back into facets with UTF-8 byte offsets.
     ///
-    /// Mentions and tags are read from the ``AttributeScopes/RichTextAttributes``
-    /// attributes when present, so the values written by
-    /// ``AppBskyFeedPost/facetsAsAttributedString`` round-trip exactly; otherwise
+    /// Mentions and tags are read from the `richText.mentionLink` and
+    /// `richText.tagLink` attributes when present, so the values written by
+    /// `AppBskyFeedPost.facetsAsAttributedString` round-trip exactly; otherwise
     /// they are recovered from `mention://` and `tag://` links. Any other link
     /// becomes a link facet. Adjacent runs with the same target are merged.
     ///

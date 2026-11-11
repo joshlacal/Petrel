@@ -27,6 +27,12 @@ for existing integrations. New applications should use OAuth.
 The client encapsulates authentication, networking, and account management. You typically do not interact with
 the internal services directly.
 
+### Bluesky
+
+- <doc:BlueskyPosting>
+- <doc:BlueskyPreferences>
+- <doc:BlueskyModeration>
+
 ### Identifier and Record Utilities
 
 - <doc:Identifiers>

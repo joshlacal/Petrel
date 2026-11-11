@@ -265,6 +265,38 @@ final class BskyFakePDS: @unchecked Sendable {
         lock.withLock { store(uri, value) }
     }
 
+    // String-based variants, for test files that use only Petrel's public API.
+
+    /// Writes a record given as JSON text.
+    func seedJSON(_ uri: String, _ json: String) throws {
+        try seed(uri, BskyJSON.parse(Data(json.utf8)))
+    }
+
+    /// Replaces the stored preferences with a JSON array given as text.
+    func setPreferencesJSON(_ json: String) throws {
+        try setPreferences(BskyJSON.parse(Data(json.utf8)).arrayValue ?? [])
+    }
+
+    /// Answers every call to `nsid` with the given JSON text.
+    func setResponseJSON(_ json: String, for nsid: String) throws {
+        try setResponse(.json(BskyJSON.parse(Data(json.utf8))), for: nsid)
+    }
+
+    /// A top-level string field of a stored record.
+    func recordField(_ field: String, at uri: String) -> String? {
+        record(at: uri)?.value[field]?.stringValue
+    }
+
+    /// The lexicon methods called so far, in order.
+    var calledMethods: [String] {
+        server.requests.map(\.nsid)
+    }
+
+    /// The value of a header on the most recent request.
+    func lastRequestHeader(_ name: String) -> String? {
+        server.requests.last?.header(name)
+    }
+
     private func store(_ uri: String, _ value: BskyJSON) -> String {
         counter += 1
         let cid = CID.fromDAGCBOR(Data("\(uri)#\(counter)".utf8)).string

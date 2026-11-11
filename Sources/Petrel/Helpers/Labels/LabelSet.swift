@@ -109,7 +109,9 @@ public struct LabelSet: Sendable {
     }
 
     /// The labels in force on one subject.
-    /// - Parameter uri: An `at://` record URI or an account DID.
+    /// - Parameters:
+    ///   - uri: An `at://` record URI or an account DID.
+    ///   - now: The moment expiry is judged at.
     public func activeLabels(for uri: String, at now: Date = Date()) -> [ComAtprotoLabelDefs.Label] {
         latest.values.filter { $0.uri.uriString() == uri && $0.isActive(at: now) }.sorted(by: Self.inOrder)
     }

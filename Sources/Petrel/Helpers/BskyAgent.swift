@@ -137,6 +137,12 @@ public enum BskyAgentError: Error, Sendable, Equatable, CustomStringConvertible 
     /// A compare-and-swap write kept losing to concurrent writers.
     case swapRetriesExhausted(attempts: Int)
 
+    /// The video service could not process an uploaded video.
+    case videoProcessingFailed(jobId: String, error: String?, message: String?)
+
+    /// The video service did not finish processing an uploaded video in time.
+    case videoProcessingTimedOut(jobId: String)
+
     public var description: String {
         switch self {
         case .notAuthenticated:
@@ -150,6 +156,11 @@ public enum BskyAgentError: Error, Sendable, Equatable, CustomStringConvertible 
             return "Invalid input: \(reason)"
         case let .swapRetriesExhausted(attempts):
             return "Record changed concurrently on each of \(attempts) attempts"
+        case let .videoProcessingFailed(jobId, error, message):
+            let detail = [error, message].compactMap { $0 }.joined(separator: ": ")
+            return "Video job \(jobId) failed" + (detail.isEmpty ? "" : " (\(detail))")
+        case let .videoProcessingTimedOut(jobId):
+            return "Video job \(jobId) did not finish in time"
         }
     }
 
@@ -271,6 +282,17 @@ struct BskyXRPCResponse: Sendable {
         }
     }
 
+    /// The error an unsuccessful response stands for.
+    func error(nsid: String) -> BskyAgentError {
+        let payload = try? BskyJSON.parse(data)
+        return .xrpc(
+            nsid: nsid,
+            status: status,
+            error: payload?["error"]?.stringValue,
+            message: payload?["message"]?.stringValue
+        )
+    }
+
     /// Labelers the server reports having applied (`atproto-content-labelers`).
     var contentLabelers: [AcceptedLabeler] {
         guard let value = headers.first(where: { $0.key.lowercased() == "atproto-content-labelers" })?.value else {
@@ -292,7 +314,30 @@ extension BskyAgent {
         query: [URLQueryItem] = [],
         body: Data? = nil,
         contentType: String = "application/json",
-        options: BskyCallOptions = BskyCallOptions()
+        options: BskyCallOptions = BskyCallOptions(),
+        service: URL? = nil
+    ) async throws -> BskyXRPCResponse {
+        let response = try await xrpcAnyStatus(
+            method, nsid, query: query, body: body, contentType: contentType, options: options, service: service
+        )
+        guard (200 ... 299).contains(response.status) else {
+            throw response.error(nsid: nsid)
+        }
+        return response
+    }
+
+    /// Sends one XRPC request and returns the response whatever its status.
+    ///
+    /// - Parameter service: Send the request to this service directly instead
+    ///   of to the PDS. No `atproto-proxy` header is added in that case.
+    func xrpcAnyStatus(
+        _ method: String,
+        _ nsid: String,
+        query: [URLQueryItem] = [],
+        body: Data? = nil,
+        contentType: String = "application/json",
+        options: BskyCallOptions = BskyCallOptions(),
+        service: URL? = nil
     ) async throws -> BskyXRPCResponse {
         var requestHeaders = ["Accept": "application/json"]
         if body != nil {
@@ -300,7 +345,7 @@ extension BskyAgent {
         }
 
         let request = try await networkService.createURLRequest(
-            endpoint: nsid,
+            endpoint: service.map { $0.appendingPathComponent("xrpc").appendingPathComponent(nsid).absoluteString } ?? nsid,
             method: method,
             headers: requestHeaders,
             body: body,
@@ -310,7 +355,7 @@ extension BskyAgent {
         var perCall = options.headers
         if let proxy = options.proxy {
             perCall["atproto-proxy"] = proxy.headerValue
-        } else if let serviceDID = await networkService.getServiceDID(for: nsid) {
+        } else if service == nil, let serviceDID = await networkService.getServiceDID(for: nsid) {
             perCall["atproto-proxy"] = serviceDID
         }
         if let labelers = options.acceptLabelers {
@@ -322,16 +367,6 @@ extension BskyAgent {
             skipTokenRefresh: false,
             additionalHeaders: perCall.isEmpty ? nil : perCall
         )
-
-        guard (200 ... 299).contains(response.statusCode) else {
-            let payload = try? BskyJSON.parse(data)
-            throw BskyAgentError.xrpc(
-                nsid: nsid,
-                status: response.statusCode,
-                error: payload?["error"]?.stringValue,
-                message: payload?["message"]?.stringValue
-            )
-        }
 
         var headers: [String: String] = [:]
         for (key, value) in response.allHeaderFields {
@@ -355,8 +390,9 @@ extension BskyAgent {
     func xrpcQuery(
         _ nsid: String,
         query: [URLQueryItem] = [],
-        options: BskyCallOptions = BskyCallOptions()
+        options: BskyCallOptions = BskyCallOptions(),
+        service: URL? = nil
     ) async throws -> BskyXRPCResponse {
-        try await xrpc("GET", nsid, query: query, options: options)
+        try await xrpc("GET", nsid, query: query, options: options, service: service)
     }
 }
