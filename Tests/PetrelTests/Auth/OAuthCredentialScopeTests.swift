@@ -164,6 +164,102 @@ struct OAuthCredentialScopeTests {
         }
     }
 
+    @Test("App-password sessions: a 401 from the account's own PDS is refreshed for and replayed")
+    func passwordSessionOwnPDS() async throws {
+        let pds = FakePasswordPDS()
+        pds.add(FakePasswordPDS.Account(
+            did: Self.aliceDID, handle: "alice.test", email: "alice@example.com", password: "app-password"
+        ))
+        try await withOAuthTestNetwork([pds]) {
+            let storage = KeychainStorage(namespace: "scope.password.own")
+            let accountManager = await AccountManager(storage: storage)
+            let networkService = NetworkService(baseURL: pds.url)
+            let resolver = OAuthTestDIDResolver()
+            resolver.register(did: Self.aliceDID, handle: "alice.test", pds: pds.url)
+            let strategy = LegacyPasswordStrategy(
+                storage: storage, accountManager: accountManager, networkService: networkService, didResolver: resolver
+            )
+            await networkService.setAuthenticationProvider(strategy)
+            _ = try await strategy.loginWithPassword(
+                identifier: "alice.test", password: "app-password", bskyAppViewDID: nil, bskyChatDID: nil
+            )
+
+            let url = URL(string: "\(pds.origin)/xrpc/com.atproto.server.getSession")!
+            let (response, data) = unauthorized(url, body: #"{"error":"ExpiredToken"}"#)
+            let (_, replayed) = try await strategy.handleUnauthorizedResponse(
+                response, data: data, for: URLRequest(url: url)
+            )
+            #expect(replayed.statusCode == 200)
+            #expect(pds.requests(to: "refreshSession").map(\.status) == [200])
+        }
+    }
+
+    // MARK: - Client Assertion Backend mode
+
+    /// A signed-in CAB client: a confidential client whose assertions come from a backend.
+    private func makeSignedInCABClient(
+        namespace: String, server: FakeOAuthServer
+    ) async throws -> OAuthTestClient {
+        server.clientAuthentication = .opaqueSingleUse
+        let client = await OAuthTestClient.make(
+            namespace: namespace, server: server, cabBackendSession: FakeAssertionBackend.makeSession()
+        )
+        try await client.signIn(handle: "alice.test", did: Self.aliceDID, server: server)
+        return client
+    }
+
+    @Test("CAB: a 401 from another origin is handed back untouched and costs no assertion")
+    func cabThirdParty() async throws {
+        let server = FakeOAuthServer()
+        let backend = FakeAssertionBackend()
+        let thirdParty = RecordingBackend(host: "third.party.test")
+        try await withOAuthTestNetwork([server, backend, thirdParty]) {
+            let client = try await makeSignedInCABClient(namespace: "scope.cab.thirdparty", server: server)
+            let session = try #require(try await client.storage.getSession(for: Self.aliceDID))
+            let assertionsBefore = backend.issuedAssertions.count
+
+            let (response, data) = unauthorized(Self.thirdPartyURL, body: #"{"error":"ExpiredToken"}"#)
+            let (returnedData, returned) = try await client.strategy.handleUnauthorizedResponse(
+                response, data: data, for: URLRequest(url: Self.thirdPartyURL)
+            )
+
+            #expect(returned.statusCode == 401)
+            #expect(returnedData == data)
+            #expect(thirdParty.requests.isEmpty)
+            #expect(refreshRequests(server).isEmpty)
+            #expect(backend.issuedAssertions.count == assertionsBefore)
+            #expect(try await client.storage.getSession(for: Self.aliceDID) == session)
+
+            // And through the network stack the third party is sent no credentials.
+            _ = try? await client.networkService.request(URLRequest(url: Self.thirdPartyURL), skipTokenRefresh: false)
+            #expect(!thirdParty.requests.isEmpty)
+            #expect(thirdParty.requests.allSatisfy {
+                $0.value(forHTTPHeaderField: "Authorization") == nil && $0.value(forHTTPHeaderField: "DPoP") == nil
+            })
+            #expect(refreshRequests(server).isEmpty)
+        }
+    }
+
+    @Test("CAB: a 401 from the account's own PDS is answered by an authenticated refresh and a replay")
+    func cabOwnPDS() async throws {
+        let server = FakeOAuthServer()
+        let backend = FakeAssertionBackend()
+        try await withOAuthTestNetwork([server, backend]) {
+            let client = try await makeSignedInCABClient(namespace: "scope.cab.own", server: server)
+            #expect(try await client.getSession().1.statusCode == 200)
+            let url = URL(string: "\(server.pdsOrigin)/xrpc/com.atproto.server.getSession")!
+
+            let (response, data) = unauthorized(url, body: #"{"error":"InvalidToken"}"#)
+            let (_, replayed) = try await client.strategy.handleUnauthorizedResponse(
+                response, data: data, for: URLRequest(url: url)
+            )
+            #expect(replayed.statusCode == 200)
+            let refreshes = refreshRequests(server)
+            #expect(refreshes.map(\.status) == [200])
+            #expect(refreshes.first?.form["client_assertion"] != nil)
+        }
+    }
+
     // MARK: - Fresh identity at the callback
 
     @Test("Server-first: the account is re-resolved past the resolver's cache before it is trusted")
