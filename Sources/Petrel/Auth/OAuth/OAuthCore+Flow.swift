@@ -14,6 +14,16 @@ import Foundation
     import FoundationNetworking
 #endif
 
+/// A DID resolver that can skip its cache.
+///
+/// The OAuth callback uses it to re-resolve the account named by a token
+/// response from the network (see `OAuthCore.resolveSubject`). The identity
+/// resolver adopts it by forwarding to its own `forceRefresh:` lookup.
+protocol CacheBypassingDIDResolving: DIDResolving {
+    /// Resolves `did` to its handle and PDS, from the network when `forceRefresh` is true.
+    func resolveDIDToHandleAndPDSURL(did: String, forceRefresh: Bool) async throws -> (String, URL)
+}
+
 /// Where an authorization flow starts ("Identity Authentication" in the OAuth spec).
 enum OAuthFlowTarget: Sendable, Equatable {
     /// A public account identifier supplied by the user: a handle or a DID. The
@@ -377,8 +387,9 @@ extension OAuthCore {
             throw AuthError.invalidResponse
         }
 
-        // Resolve the account independently of anything the authorization server said.
-        let (handle, actualPDS) = try await didResolver.resolveDIDToHandleAndPDSURL(did: did)
+        // Resolve the account independently of anything the authorization server
+        // said — and of anything cached before the flow, when the resolver can.
+        let (handle, actualPDS) = try await resolveSubject(did)
 
         let startedWithIdentifier = oauthState.initialIdentifier != nil
         if startedWithIdentifier {
@@ -403,6 +414,22 @@ extension OAuthCore {
         }
 
         return (did, handle, actualPDS)
+    }
+
+    /// Resolves the `sub` of a token response to its handle and PDS.
+    ///
+    /// INTEGRATION SEAM (audit item oauth-15). The specification recommends
+    /// identity caches of under ten minutes for authorization flows, and this
+    /// lookup is the one a server-first login's safety rests on: served from a
+    /// stale cache it would compare the account against where it used to live.
+    /// A resolver that can bypass its cache declares so by conforming to
+    /// ``CacheBypassingDIDResolving`` and is then asked for a fresh answer. No
+    /// cache is kept here.
+    private func resolveSubject(_ did: String) async throws -> (handle: String, pdsURL: URL) {
+        if let resolver = didResolver as? any CacheBypassingDIDResolving {
+            return try await resolver.resolveDIDToHandleAndPDSURL(did: did, forceRefresh: true)
+        }
+        return try await didResolver.resolveDIDToHandleAndPDSURL(did: did)
     }
 
     /// Whether `callbackURL` is a redirect to `expectedRedirectURI`: same scheme
@@ -618,6 +645,20 @@ extension OAuthCore {
     ) async throws -> (Data, HTTPURLResponse) {
         guard response.statusCode == 401 else { return (data, response) }
 
+        // Only the session's own servers can say anything about the session. A
+        // 401 from any other origin is that server's answer to an unauthenticated
+        // request: it is handed back untouched — no refresh, and above all no
+        // replay of the request with this account's token and DPoP proof attached.
+        guard let account = await accountManager.getCurrentAccount() else {
+            // Nobody is signed in, so there is nothing to refresh.
+            throw AuthError.noActiveAccount
+        }
+        guard let url = request.url,
+              Self.sessionOrigins(for: account).contains(where: { $0 == OAuthOrigin.canonical(of: url) })
+        else {
+            return (data, response)
+        }
+
         // A takedown, suspension or deactivation is not an expired token:
         // refreshing cannot fix it, and the caller needs to know which it is.
         if let statusError = AccountStatusError(xrpcErrorBody: data) {
@@ -633,6 +674,15 @@ extension OAuthCore {
         default:
             throw AuthError.tokenRefreshFailed
         }
+    }
+
+    /// The origins whose 401 is about `account`'s session and that may be sent
+    /// its access token: the account's PDS, which is the resource server the
+    /// token was issued for. The authorization server is deliberately absent —
+    /// it is reached only through `sendAuthorizationServerRequest`, which never
+    /// carries an access token.
+    static func sessionOrigins(for account: Account) -> [String] {
+        OAuthOrigin.canonical(of: account.pdsURL).map { [$0] } ?? []
     }
 
     func attemptRecoveryFromServerFailures(for did: String?) async throws {

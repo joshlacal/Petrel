@@ -749,6 +749,43 @@ final class FakeOAuthServer: OAuthTestBackend, @unchecked Sendable {
     }
 }
 
+// MARK: - A third-party server
+
+/// Any other server on the network: answers every request with one fixed
+/// response and records exactly what it was sent.
+final class RecordingBackend: OAuthTestBackend, @unchecked Sendable {
+    let host: String
+    var status: Int
+    var body: [String: Any]
+    var headers: [String: String]
+
+    private let lock = NSLock()
+    private var recorded: [URLRequest] = []
+
+    init(host: String, status: Int = 401, body: [String: Any] = ["error": "AuthenticationRequired"], headers: [String: String] = [:]) {
+        self.host = host
+        self.status = status
+        self.body = body
+        self.headers = headers
+    }
+
+    var requests: [URLRequest] { lock.withLock { recorded } }
+
+    func serves(host: String) -> Bool {
+        host == self.host
+    }
+
+    func handle(_ request: URLRequest, body _: Data) -> (HTTPURLResponse, Data) {
+        lock.withLock { recorded.append(request) }
+        var allHeaders = headers
+        allHeaders["Content-Type"] = "application/json"
+        let response = HTTPURLResponse(
+            url: request.url!, statusCode: status, httpVersion: "HTTP/1.1", headerFields: allHeaders
+        )!
+        return (response, (try? JSONSerialization.data(withJSONObject: body)) ?? Data())
+    }
+}
+
 // MARK: - Identity
 
 /// A DID resolver over a fixed table, standing in for DID-document resolution.
@@ -780,6 +817,35 @@ final class OAuthTestDIDResolver: DIDResolving, @unchecked Sendable {
     }
 }
 
+/// A resolver with a cache that only a `forceRefresh` lookup gets past, as the
+/// identity resolver's does. `cached` is what a plain lookup returns.
+final class CachingTestDIDResolver: CacheBypassingDIDResolving, @unchecked Sendable {
+    let network = OAuthTestDIDResolver()
+    let cached = OAuthTestDIDResolver()
+    private let lock = NSLock()
+    private var forced: [String] = []
+
+    var forcedLookups: [String] { lock.withLock { forced } }
+
+    func resolveHandleToDID(handle: String) async throws -> String {
+        try await cached.resolveHandleToDID(handle: handle)
+    }
+
+    func resolveDIDToPDSURL(did: String) async throws -> URL {
+        try await cached.resolveDIDToPDSURL(did: did)
+    }
+
+    func resolveDIDToHandleAndPDSURL(did: String) async throws -> (String, URL) {
+        try await cached.resolveDIDToHandleAndPDSURL(did: did)
+    }
+
+    func resolveDIDToHandleAndPDSURL(did: String, forceRefresh: Bool) async throws -> (String, URL) {
+        guard forceRefresh else { return try await cached.resolveDIDToHandleAndPDSURL(did: did) }
+        lock.withLock { forced.append(did) }
+        return try await network.resolveDIDToHandleAndPDSURL(did: did)
+    }
+}
+
 // MARK: - Client under test
 
 /// One OAuth client instance wired exactly as `ATProtoClient` wires it: real
@@ -800,10 +866,12 @@ struct OAuthTestClient {
         namespace: String,
         server: FakeOAuthServer,
         resolver: OAuthTestDIDResolver = OAuthTestDIDResolver(),
+        didResolver: (any DIDResolving)? = nil,
         scope: String = "atproto transition:generic",
         signer: (any OAuthClientAssertionSigner)? = nil,
         cabBackendSession: URLSession? = nil
     ) async -> OAuthTestClient {
+        let didResolver: any DIDResolving = didResolver ?? resolver
         let storage = KeychainStorage(namespace: namespace)
         let accountManager = await AccountManager(storage: storage)
         let networkService = NetworkService(baseURL: server.pdsURL)
@@ -816,7 +884,7 @@ struct OAuthTestClient {
                 accountManager: accountManager,
                 networkService: networkService,
                 oauthConfig: config,
-                didResolver: resolver,
+                didResolver: didResolver,
                 urlSession: cabBackendSession
             )
         } else {
@@ -825,7 +893,7 @@ struct OAuthTestClient {
                 accountManager: accountManager,
                 networkService: networkService,
                 oauthConfig: config,
-                didResolver: resolver,
+                didResolver: didResolver,
                 clientAssertionSigner: signer
             )
         }

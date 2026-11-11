@@ -438,6 +438,20 @@ actor LegacyPasswordStrategy: AuthStrategy {
     ) async throws -> (Data, HTTPURLResponse) {
         guard response.statusCode == 401 else { return (data, response) }
 
+        // Only the account's own PDS can say anything about its session. A 401
+        // from any other origin is handed back untouched: no refresh, and no
+        // replay of the request with this account's Bearer token attached.
+        guard let pdsURL = await accountManager.getCurrentAccount()?.pdsURL else {
+            // Nobody is signed in, so there is nothing to refresh.
+            throw AuthError.noActiveAccount
+        }
+        guard let url = request.url,
+              let origin = OAuthOrigin.canonical(of: url),
+              origin == OAuthOrigin.canonical(of: pdsURL)
+        else {
+            return (data, response)
+        }
+
         // A takedown, suspension or deactivation is not an expired token.
         if let statusError = AccountStatusError(xrpcErrorBody: data) {
             if let did = await accountManager.getCurrentAccount()?.did {
