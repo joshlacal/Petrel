@@ -39,7 +39,7 @@ OAuth for new production applications.
 
 ## Token Management
 
-Petrel automatically handles token refresh using the `TokenRefreshCoordinator`. Tokens are securely stored in the keychain and refreshed as needed.
+Petrel refreshes tokens automatically before they expire and when a server rejects one. Refresh tokens are single-use, so concurrent requests share one refresh. Tokens and the session's DPoP key are stored in the keychain (Secret Service or an encrypted file on Linux), and logging out revokes the session at the authorization server.
 
 ## Handling OAuth Callback in your App
 
@@ -65,4 +65,5 @@ Call this helper from the corresponding iOS scene or application delegate, or fr
 
 ## Next Steps
 
+- Read <doc:OAuthClient> for server-first login, permission scopes, confidential clients and account status.
 - Return to <doc:GettingStarted> to make API calls with ``ATProtoClient``.

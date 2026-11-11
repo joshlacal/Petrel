@@ -19,6 +19,7 @@ for existing integrations. New applications should use OAuth.
 
 - <doc:GettingStarted>
 - <doc:Authentication>
+- <doc:OAuthClient>
 
 ### Core Components
 
