@@ -1,113 +1,129 @@
 // TIDGenerator.swift
 import Foundation
 
-/// Timestamp-based ID generator compatible with Bluesky/AT Protocol
-/// Timestamp-based ID generator compatible with Bluesky/AT Protocol
+/// Generates timestamp identifiers (TIDs) as specified at https://atproto.com/specs/tid.
+///
+/// Guarantees, for one generator instance:
+///
+/// - **Strictly increasing.** Every identifier is greater than the one before
+///   it, as an integer and as a string, however fast it is called and even if
+///   the system clock stalls or steps backwards. When the clock has not advanced
+///   past the previous identifier the generator uses the previous timestamp plus
+///   one microsecond instead.
+/// - **Never repeated.** A direct consequence of the above; the actor serialises
+///   concurrent callers. (``next(after:)`` has one documented exception.)
+/// - **Fixed clock identifier.** The low 10 bits are chosen once (at random by
+///   default) and identify this generator, so two generators that produce the
+///   same microsecond still produce different identifiers unless their clock
+///   identifiers collide.
+///
+/// ```swift
+/// let rkey = await TIDGenerator.next()               // "3lxy…", shared generator
+/// let generator = TIDGenerator(clockID: 7)           // independent generator
+/// let revision = try await generator.next(after: previousRevision)
+/// ```
 public actor TIDGenerator {
-    /// Base32 sortable character set
-    private static let base32Chars = "234567abcdefghijklmnopqrstuvwxyz"
+    /// Highest timestamp a TID can carry: 53 bits of microseconds.
+    private static let timestampMask: UInt64 = 0x1F_FFFF_FFFF_FFFF
 
-    /// Fixed length of TID strings
-    private static let TID_LENGTH = 13
+    /// The timestamp of the last identifier handed out, in microseconds.
+    private var lastTimestamp: UInt64 = 0
 
-    /// Track last timestamp to ensure ordering
-    private var lastMicroTimestamp: UInt64 = 0
+    /// Clock identifier for this instance (0–1023, the low 10 bits of every TID).
+    public nonisolated let clockID: UInt16
 
-    /// Counter for sub-microsecond collision avoidance
-    private var counter: UInt64 = 0
+    /// Source of the current time in microseconds since the UNIX epoch.
+    private let clock: @Sendable () -> UInt64
 
-    /// Clock ID for this instance (0-1023, using 10 bits as per spec)
-    private let clockId: UInt64
-
-    /// Singleton instance
+    /// Process-wide generator with a random clock identifier.
     public static let shared = TIDGenerator()
 
-    /// Private initializer for singleton pattern
-    private init() {
-        // Random clock ID between 0 and 1023 (10 bits)
-        clockId = UInt64.random(in: 0 ..< 1024)
-    }
-
-    /// Generate a new TID string
-    public func nextStr() -> String {
-        // Get current timestamp in milliseconds
-        let currentTimeMs = UInt64(Date().timeIntervalSince1970 * 1000)
-
-        // Convert to microseconds (53 bits for timestamp as per spec)
-        let currentTimeMicro = currentTimeMs * 1000
-
-        // Ensure we're always moving forward in time
-        var microTimestamp = max(currentTimeMicro, lastMicroTimestamp)
-
-        // If same microsecond, increment counter
-        if microTimestamp == lastMicroTimestamp {
-            counter += 1
-            // If counter would overflow into the clock ID space, increment the timestamp
-            if counter >= 1024 {
-                microTimestamp += 1
-                counter = 0
-            }
-        } else {
-            counter = 0
-            lastMicroTimestamp = microTimestamp
+    /// Creates an independent generator.
+    ///
+    /// - Parameters:
+    ///   - clockID: The 10-bit clock identifier (0–1023) stamped on every TID.
+    ///     Defaults to a random value. Passing a value above 1023 is a programmer
+    ///     error and traps.
+    ///   - clock: Returns the current time in microseconds since the UNIX epoch.
+    ///     Defaults to the system clock; inject one to make output deterministic
+    ///     in tests.
+    public init(clockID: UInt16? = nil, clock: (@Sendable () -> UInt64)? = nil) {
+        if let clockID {
+            precondition(clockID < 1024, "TID clock identifier must be in 0...1023")
         }
-
-        // Combine timestamp and clock ID
-        // Ensure top bit is 0, use 53 bits for timestamp, 10 bits for clock ID
-        let timestampBits = (microTimestamp & 0x1F_FFFF_FFFF_FFFF) << 10
-        let tidValue = timestampBits | (clockId + counter)
-
-        return encode(tidValue)
+        self.clockID = clockID ?? UInt16.random(in: 0 ..< 1024)
+        self.clock = clock ?? TIDGenerator.systemMicroseconds
     }
 
-    /// Static convenience method
+    /// The system clock in microseconds since the UNIX epoch.
+    private static let systemMicroseconds: @Sendable () -> UInt64 = {
+        let seconds = Date().timeIntervalSince1970
+        return seconds > 0 ? UInt64(seconds * 1_000_000) : 0
+    }
+
+    /// Generates the next TID. Strictly greater than every TID previously
+    /// returned by ``nextTID()``, ``nextStr()`` or the static conveniences.
+    public func nextTID() -> TID {
+        TID(timestampBits: advance(), clockBits: UInt64(clockID))
+    }
+
+    /// Generates a TID that is also greater than `previous` — for example the
+    /// current repository revision, which may have been produced by another
+    /// generator or another machine. The result always sorts after `previous`,
+    /// as an integer and as a string, or the call throws.
+    ///
+    /// When `previous` is ahead of this generator (its clock was fast), the
+    /// result is `previous` plus one microsecond. That value is not adopted as
+    /// the generator's own position, so one far-future `previous` cannot push
+    /// every later identifier into the future; pass each result back as the next
+    /// `previous` to keep such a chain increasing.
+    ///
+    /// Throws ``ATProtocolError/invalidTID(_:)`` when nothing this generator can
+    /// produce would sort after `previous`:
+    ///
+    /// - `previous` has the top bit of its 64-bit value set
+    ///   (``TID/hasHighBitSet``). Such a TID is valid syntax, but every generated
+    ///   TID keeps that bit clear and so sorts before it.
+    /// - `previous` already carries the largest timestamp a TID can hold.
+    public func next(after previous: TID?) throws -> TID {
+        let candidate = TID(timestampBits: advance(), clockBits: UInt64(clockID))
+        guard let previous, candidate <= previous else {
+            return candidate
+        }
+        guard !previous.hasHighBitSet else {
+            throw ATProtocolError.invalidTID(
+                "No generated TID can follow \(previous.toString()): its high bit is set, which the TID layout reserves as zero"
+            )
+        }
+        guard previous.timestampMicros < Self.timestampMask else {
+            throw ATProtocolError.invalidTID(
+                "No TID can follow \(previous.toString()): its timestamp is the maximum"
+            )
+        }
+        return TID(timestampBits: previous.timestampMicros + 1, clockBits: UInt64(clockID))
+    }
+
+    /// Moves the generator forward and returns the new timestamp: the clock
+    /// reading, or one microsecond past the previous timestamp if the clock has
+    /// not got that far.
+    private func advance() -> UInt64 {
+        let timestamp = max(clock(), lastTimestamp &+ 1) & Self.timestampMask
+        lastTimestamp = timestamp
+        return timestamp
+    }
+
+    /// Generates the next TID as a string.
+    public func nextStr() -> String {
+        nextTID().toString()
+    }
+
+    /// Generates the next TID string from the shared generator.
     public static func next() async -> String {
         await shared.nextStr()
     }
 
-    /// Generate a new TID struct
-    public func nextTID() -> TID {
-        let tidStr = nextStr()
-        guard let tid = try? TID(tidString: tidStr) else {
-            // nextStr() always produces a 13-char base32-sortable string; reaching
-            // this means the generator and validator have diverged.
-            preconditionFailure("TIDGenerator produced an invalid TID: \(tidStr)")
-        }
-        return tid
-    }
-
-    /// Static convenience method for TID struct
+    /// Generates the next TID from the shared generator.
     public static func nextTID() async -> TID {
         await shared.nextTID()
-    }
-
-    /// Encode a number to base32 sortable with exactly 13 characters
-    private func encode(_ number: UInt64) -> String {
-        var result = ""
-        var n = number
-
-        // Convert to base32
-        while n > 0 {
-            let remainder = Int(n % 32)
-            let char = String(Self.base32Chars[Self.base32Chars.index(Self.base32Chars.startIndex, offsetBy: remainder)])
-            result = char + result
-            n /= 32
-        }
-
-        // Pad with '2' to ensure exactly 13 characters
-        if result.isEmpty {
-            result = "2" // Special case for zero
-        }
-
-        while result.count < Self.TID_LENGTH {
-            result = "2" + result
-        }
-
-        // Ensure exactly 13 characters
-        if result.count > Self.TID_LENGTH {
-            result = String(result.suffix(Self.TID_LENGTH))
-        }
-
-        return result
     }
 }

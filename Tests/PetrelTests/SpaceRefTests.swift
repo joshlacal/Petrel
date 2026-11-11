@@ -83,20 +83,18 @@ struct SpaceRefTests {
         #expect(uri.recordKey == "abc123")
     }
 
-    @Test("a handle authority has no space parts")
-    func handleAuthorityHasNoSpaceParts() throws {
-        let uri = try ATProtocolURI(uriString: "at://user.bsky.social/space/com.example.group/default")
-
-        #expect(uri.spaceDID == nil)
-        #expect(uri.spaceRef == nil)
+    @Test("a space uri with a handle authority is rejected")
+    func handleAuthorityIsRejected() {
+        #expect(throws: ATProtocolError.self) {
+            try ATProtocolURI(uriString: "at://user.bsky.social/space/com.example.group/default")
+        }
     }
 
-    @Test("a non-nsid space type has no space parts")
-    func nonNSIDSpaceTypeHasNoSpaceParts() throws {
-        let uri = try ATProtocolURI(uriString: "at://did:plc:asdf123/space/short/default")
-
-        #expect(uri.spaceType == nil)
-        #expect(uri.spaceRef == nil)
+    @Test("a space uri with a non-nsid space type is rejected")
+    func nonNSIDSpaceTypeIsRejected() {
+        #expect(throws: ATProtocolError.self) {
+            try ATProtocolURI(uriString: "at://did:plc:asdf123/space/short/default")
+        }
     }
 
     // MARK: - spaceRef

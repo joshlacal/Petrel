@@ -29,4 +29,16 @@ the internal services directly.
 
 ### Identifier and Record Utilities
 
+- <doc:Identifiers>
+- ``DID``
+- ``Handle``
+- ``ATIdentifier``
+- ``NSID``
+- ``RecordKey``
+- ``TID``
 - ``TIDGenerator``
+- ``ATProtocolURI``
+- ``ATProtocolDate``
+- ``LanguageTag``
+- ``URI``
+- ``ATProtocolError``
