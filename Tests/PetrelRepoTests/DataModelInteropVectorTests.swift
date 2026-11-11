@@ -102,6 +102,35 @@ struct DataModelInteropVectorTests {
         }
     }
 
+    @Test("integrality is decided on the decimal text, never through a lossy Double")
+    func floatsAreJudgedExactly() throws {
+        // Each of these rounds to a whole Double, but none is a whole number.
+        for text in [
+            "1.00000000000000001", "9007199254740990.5", "1e-9999",
+            "-1e-9999", "12345678901234567.25e1", "1e-99999999999999999999",
+        ] {
+            #expect(throws: RepositoryRecordJSONError.nonIntegerNumber, "\(text)") {
+                try PublicRecordValue(json: Data(text.utf8))
+            }
+        }
+        // Exact whole numbers in any spelling are accepted, across the full
+        // 64-bit range that plain integer syntax accepts.
+        let exact: [(String, Int)] = [
+            ("0e-9999", 0), ("0.000e99999999999999999999", 0), ("1.50e1", 15),
+            ("12300e-2", 123), ("9007199254740993.0", 9_007_199_254_740_993),
+            ("9.223372036854775807e18", Int.max),
+            ("-9.223372036854775808e18", Int.min),
+        ]
+        for (text, value) in exact {
+            #expect(try PublicRecordValue(json: Data(text.utf8)) == .integer(value), "\(text)")
+        }
+        for text in ["9.223372036854775808e18", "1e19", "1e99999999999999999999"] {
+            #expect(throws: RepositoryRecordJSONError.nonIntegerNumber, "\(text)") {
+                try PublicRecordValue(json: Data(text.utf8))
+            }
+        }
+    }
+
     @Test("the JSON parser is strict")
     func strictJSON() {
         let malformed = [

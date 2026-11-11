@@ -296,45 +296,88 @@ private struct DataModelJSONParser {
 
     private mutating func parseNumber() throws -> Int {
         let start = offset
-        if offset < bytes.count, bytes[offset] == UInt8(ascii: "-") { offset += 1 }
+        let isNegative = offset < bytes.count && bytes[offset] == UInt8(ascii: "-")
+        if isNegative { offset += 1 }
         let integerStart = offset
         while offset < bytes.count, (0x30 ... 0x39).contains(bytes[offset]) { offset += 1 }
-        let integerDigits = offset - integerStart
+        let integerEnd = offset
+        let integerDigits = integerEnd - integerStart
         guard integerDigits > 0,
               integerDigits == 1 || bytes[integerStart] != UInt8(ascii: "0") else {
             throw RepositoryRecordJSONError.malformedJSON
         }
-        var isIntegerSyntax = true
+        var fraction = offset ..< offset
         if offset < bytes.count, bytes[offset] == UInt8(ascii: ".") {
-            isIntegerSyntax = false
             offset += 1
             let fractionStart = offset
             while offset < bytes.count, (0x30 ... 0x39).contains(bytes[offset]) { offset += 1 }
             guard offset > fractionStart else { throw RepositoryRecordJSONError.malformedJSON }
+            fraction = fractionStart ..< offset
         }
+        var exponent: (isNegative: Bool, digits: Range<Int>)?
         if offset < bytes.count, bytes[offset] == UInt8(ascii: "e") || bytes[offset] == UInt8(ascii: "E") {
-            isIntegerSyntax = false
             offset += 1
+            var exponentIsNegative = false
             if offset < bytes.count,
                bytes[offset] == UInt8(ascii: "+") || bytes[offset] == UInt8(ascii: "-") {
+                exponentIsNegative = bytes[offset] == UInt8(ascii: "-")
                 offset += 1
             }
             let exponentStart = offset
             while offset < bytes.count, (0x30 ... 0x39).contains(bytes[offset]) { offset += 1 }
             guard offset > exponentStart else { throw RepositoryRecordJSONError.malformedJSON }
+            exponent = (exponentIsNegative, exponentStart ..< offset)
         }
-        let text = String(decoding: bytes[start ..< offset], as: UTF8.self)
-        if isIntegerSyntax {
+        if fraction.isEmpty, exponent == nil {
+            let text = String(decoding: bytes[start ..< offset], as: UTF8.self)
             guard let value = Int(text) else { throw RepositoryRecordJSONError.nonIntegerNumber }
             return value
         }
-        // Written with a fraction or exponent: accepted only when the value
-        // is a whole number that an integer holds exactly.
-        guard let double = Double(text), double.isFinite, double == double.rounded(),
-              abs(double) <= 9_007_199_254_740_991 else {
+        // Written with a fraction or exponent: accepted only when the decimal
+        // value is exactly a whole number in range. Decided on the digits
+        // themselves; a floating-point intermediate would round
+        // `1.00000000000000001` or `1e-9999` into an integer.
+        return try Self.exactInteger(
+            isNegative: isNegative,
+            digits: Array(bytes[integerStart ..< integerEnd]) + Array(bytes[fraction]),
+            fractionDigits: fraction.count,
+            exponent: exponent.map { (isNegative: $0.isNegative, digits: Array(bytes[$0.digits])) }
+        )
+    }
+
+    /// The integer `±digits × 10^(exponent − fractionDigits)`, or
+    /// `nonIntegerNumber` if that value is not a whole number in `Int`'s range.
+    private static func exactInteger(
+        isNegative: Bool,
+        digits: [UInt8],
+        fractionDigits: Int,
+        exponent: (isNegative: Bool, digits: [UInt8])?
+    ) throws -> Int {
+        // Significant digits: no leading zeros, trailing zeros folded into
+        // the scale.
+        var significand = digits.drop { $0 == UInt8(ascii: "0") }
+        if significand.isEmpty { return 0 } // zero in any spelling
+        var scale = -fractionDigits
+        while significand.last == UInt8(ascii: "0") {
+            significand.removeLast()
+            scale += 1
+        }
+        // Any exponent this large makes a nonzero value either fractional or
+        // far outside Int's 19 digits; parsing it exactly is unnecessary.
+        if let exponent {
+            let magnitude = exponent.digits.drop { $0 == UInt8(ascii: "0") }
+            guard magnitude.count <= 9 else { throw RepositoryRecordJSONError.nonIntegerNumber }
+            let value = Int(String(decoding: magnitude, as: UTF8.self)) ?? 0
+            scale += exponent.isNegative ? -value : value
+        }
+        guard scale >= 0, significand.count + scale <= 19 else {
             throw RepositoryRecordJSONError.nonIntegerNumber
         }
-        return Int(double)
+        let text = (isNegative ? "-" : "")
+            + String(decoding: significand, as: UTF8.self)
+            + String(repeating: "0", count: scale)
+        guard let value = Int(text) else { throw RepositoryRecordJSONError.nonIntegerNumber }
+        return value
     }
 
     private mutating func parseString() throws -> String {
