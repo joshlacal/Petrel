@@ -3,7 +3,7 @@ import kotlinx.benchmark.gradle.JvmBenchmarkTarget
 plugins {
     kotlin("jvm")
     kotlin("plugin.serialization")
-    kotlin("plugin.allopen") version "2.0.21"
+    kotlin("plugin.allopen")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlinx.benchmark") version "0.4.13"
     `maven-publish`

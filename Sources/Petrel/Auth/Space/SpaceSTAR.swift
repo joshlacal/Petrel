@@ -11,6 +11,7 @@ public enum SpaceVerificationError: Error, Sendable, Equatable {
     case invalidRecord
     case digestMismatch
     case missingKEMKey
+    case missingSigningKey
 }
 
 /// A complete, verified repository snapshot. No records escape until every frame

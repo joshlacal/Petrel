@@ -353,6 +353,23 @@ struct DAGCBORJSONBridgeTests {
         #expect(!cborAppendData.isEmpty)
     }
 
+    @Test("Dictionary DAG-CBOR conversion emits canonical map order")
+    func dictionaryConversionUsesCanonicalMapOrder() throws {
+        let values: [String: ATProtocolValueContainer] = [
+            "aa": .string("two"),
+            "b": .string("one"),
+            "a": .string("zero"),
+        ]
+
+        let map = try #require(try values.toCBORValue() as? OrderedCBORMap)
+        #expect(map.entries.map(\.key) == ["a", "b", "aa"])
+        #expect(try map.encodedDAGCBOR() == OrderedCBORMap(entries: [
+            ("a", "zero"),
+            ("b", "one"),
+            ("aa", "two"),
+        ]).encodedDAGCBOR())
+    }
+
     // MARK: - Encoded CBOR Preflight and Bounds (F14)
 
     @Test("CBOR nesting depth 64 succeeds and 65 throws before allocation")

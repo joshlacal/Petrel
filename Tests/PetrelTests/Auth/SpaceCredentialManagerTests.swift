@@ -27,14 +27,44 @@ private func makeB64URL(_ data: Data) -> String {
         .replacingOccurrences(of: "=", with: "")
 }
 
-private func makeMockCredentialJWT(exp: Int, sub: String = "did:plc:user123", iss: String = "did:plc:auth123", iat: Int? = nil) -> String {
-    let header = ##"{"alg":"ES256","typ":"JWT","kid":"#atproto"}"##
-    let issuedAt = iat.map { #","iat":\#($0)"# } ?? ""
-    let payload = #"{"exp":\#(exp)\#(issuedAt),"sub":"\#(sub)","iss":"\#(iss)"}"#
-    let headerB64 = makeB64URL(Data(header.utf8))
-    let payloadB64 = makeB64URL(Data(payload.utf8))
-    let dummySig = makeB64URL(Data(repeating: 0x42, count: 64))
-    return "\(headerB64).\(payloadB64).\(dummySig)"
+private let testAuthoritySigningKey = P256.Signing.PrivateKey()
+private let testAuthoritySigningMultibase = String(
+    P256DIDKey(publicKey: testAuthoritySigningKey.publicKey).value.dropFirst("did:key:".count)
+)
+private let testAuthoritySigningKeyProvider: SpaceCredentialManager.AuthoritySigningKeyProvider = { _, _ in
+    .p256(testAuthoritySigningKey.publicKey)
+}
+
+private func makeSignedCredentialJWT(
+    for request: URLRequest,
+    space: SpaceRef,
+    exp: Int,
+    iat: Int? = nil,
+    jti: String = UUID().uuidString
+) throws -> String {
+    let rawBody = try #require(request.httpBody)
+    let bodyObj = try #require(JSONSerialization.jsonObject(with: rawBody) as? [String: Any])
+    let credentialKid = try #require(bodyObj["credentialKid"] as? String)
+    let now = Int(Date().timeIntervalSince1970)
+    let actualIat = iat ?? max(exp - 3600, min(now, exp - 600))
+    let headerObj: [String: Any] = [
+        "alg": "ES256",
+        "typ": "atproto-space-credential+jwt",
+        "kid": "#atproto",
+    ]
+    let payloadObj: [String: Any] = [
+        "iss": space.spaceDID,
+        "sub": space.uriString(),
+        "iat": actualIat,
+        "exp": exp,
+        "jti": jti,
+        "cnf": ["kid": credentialKid],
+    ]
+    let headerB64 = try makeB64URL(JSONSerialization.data(withJSONObject: headerObj, options: [.sortedKeys]))
+    let payloadB64 = try makeB64URL(JSONSerialization.data(withJSONObject: payloadObj, options: [.sortedKeys]))
+    let signingInput = "\(headerB64).\(payloadB64)"
+    let sig = try P256WireSignature.sign(Data(signingInput.utf8), using: testAuthoritySigningKey)
+    return "\(signingInput).\(makeB64URL(sig))"
 }
 
 private final class SpaceMockURLProtocol: URLProtocol {
@@ -187,7 +217,7 @@ struct SpaceCredentialManagerTests {
           "id": "did:plc:auth123#atproto",
           "type": "Multikey",
           "controller": "did:plc:auth123",
-          "publicKeyMultibase": "zQ3shokFTS3brHcDQrn82RUDfCZESWL1ZdCEJwekUDPqiYBme"
+          "publicKeyMultibase": "\(testAuthoritySigningMultibase)"
         }
       ],
       "service": [
@@ -225,7 +255,7 @@ struct SpaceCredentialManagerTests {
 
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
-            let credentialJWT = makeMockCredentialJWT(exp: expTime)
+            let lastIssuedJWT = Mutex<String>("")
 
             let capturedRequests = Mutex<[URLRequest]>([])
 
@@ -244,13 +274,15 @@ struct SpaceCredentialManagerTests {
                 }
 
                 if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                    let jwt = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
+                    lastIssuedJWT.withLock { $0 = jwt }
                     let resp = HTTPURLResponse(
                         url: request.url!,
                         statusCode: 200,
                         httpVersion: nil,
                         headerFields: ["Content-Type": "application/json"]
                     )!
-                    let body = try JSONEncoder().encode(["credential": credentialJWT])
+                    let body = try JSONEncoder().encode(["credential": jwt])
                     return (resp, body)
                 }
 
@@ -268,7 +300,7 @@ struct SpaceCredentialManagerTests {
 
             // 1. Initial exchange
             let cred1 = try await manager.credential(for: space)
-            #expect(cred1.token == credentialJWT)
+            #expect(cred1.token == lastIssuedJWT.withLock { $0 })
             #expect(abs(cred1.expiresAt.timeIntervalSince1970 - Double(expTime)) < 2.0)
             #expect(!cred1.keyRawRepresentation.isEmpty)
 
@@ -315,7 +347,7 @@ struct SpaceCredentialManagerTests {
 
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
-            let credentialJWT = makeMockCredentialJWT(exp: expTime)
+            let lastIssuedJWT = Mutex<String>("")
 
             let capturedRequests = Mutex<[URLRequest]>([])
 
@@ -334,13 +366,15 @@ struct SpaceCredentialManagerTests {
                 }
 
                 if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                    let jwt = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
+                    lastIssuedJWT.withLock { $0 = jwt }
                     let resp = HTTPURLResponse(
                         url: request.url!,
                         statusCode: 200,
                         httpVersion: nil,
                         headerFields: ["Content-Type": "application/json"]
                     )!
-                    let body = try JSONEncoder().encode(["credential": credentialJWT])
+                    let body = try JSONEncoder().encode(["credential": jwt])
                     return (resp, body)
                 }
 
@@ -371,6 +405,7 @@ struct SpaceCredentialManagerTests {
             #expect(response.statusCode == 200)
             #expect(String(data: data, encoding: .utf8) == #"{"record":{"value":"ok"}}"#)
 
+            let credentialJWT = lastIssuedJWT.withLock { $0 }
             let requests = capturedRequests.withLock { $0 }
             let getRequests = requests.filter { $0.url?.host == "repo.test" }
             #expect(getRequests.count == 1)
@@ -451,7 +486,12 @@ struct SpaceCredentialManagerTests {
                         count += 1
                         return count
                     }
-                    let jwt = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970), sub: "cred-\(n)")
+                    let jwt = try makeSignedCredentialJWT(
+                        for: request,
+                        space: space,
+                        exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970),
+                        jti: "cred-\(n)"
+                    )
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return try (resp, JSONEncoder().encode(["credential": jwt]))
                 }
@@ -474,7 +514,8 @@ struct SpaceCredentialManagerTests {
                 client: client,
                 authorityHostProvider: { _ in URL(string: "https://space.test")! },
                 urlSession: session,
-                delegationTokenProvider: { _ in "mock-delegation-token" }
+                delegationTokenProvider: { _ in "mock-delegation-token" },
+                authoritySigningKeyProvider: testAuthoritySigningKeyProvider
             )
             let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?repo=did:plc:writer"))
 
@@ -504,7 +545,11 @@ struct SpaceCredentialManagerTests {
             SpaceMockURLProtocol.setHandler { request in
                 if request.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
                     exchangeCount.withLock { $0 += 1 }
-                    let jwt = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970))
+                    let jwt = try makeSignedCredentialJWT(
+                        for: request,
+                        space: space,
+                        exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970)
+                    )
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return try (resp, JSONEncoder().encode(["credential": jwt]))
                 }
@@ -517,7 +562,8 @@ struct SpaceCredentialManagerTests {
                 client: client,
                 authorityHostProvider: { _ in URL(string: "https://space.test")! },
                 urlSession: session,
-                delegationTokenProvider: { _ in "mock-delegation-token" }
+                delegationTokenProvider: { _ in "mock-delegation-token" },
+                authoritySigningKeyProvider: testAuthoritySigningKeyProvider
             )
             let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?repo=did:plc:writer"))
             _ = try await manager.get(url: url, space: space)
@@ -562,7 +608,6 @@ struct SpaceCredentialManagerTests {
 
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
-            let credentialJWT = makeMockCredentialJWT(exp: expTime)
 
             let exchangeCount = Mutex<Int>(0)
 
@@ -581,13 +626,14 @@ struct SpaceCredentialManagerTests {
 
                 if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
                     exchangeCount.withLock { $0 += 1 }
+                    let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     let resp = HTTPURLResponse(
                         url: request.url!,
                         statusCode: 200,
                         httpVersion: nil,
                         headerFields: ["Content-Type": "application/json"]
                     )!
-                    let body = try! JSONEncoder().encode(["credential": credentialJWT])
+                    let body = try JSONEncoder().encode(["credential": credentialJWT])
                     return (resp, body)
                 }
 
@@ -627,7 +673,7 @@ struct SpaceCredentialManagerTests {
 
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
-            let credentialJWT = makeMockCredentialJWT(exp: expTime)
+            let issuedTokens = Mutex<Set<String>>([])
 
             let exchangeCount = Mutex<Int>(0)
             let delegationAttempts = Mutex<Int>(0)
@@ -649,13 +695,15 @@ struct SpaceCredentialManagerTests {
 
                 if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
                     exchangeCount.withLock { $0 += 1 }
+                    let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
+                    _ = issuedTokens.withLock { $0.insert(credentialJWT) }
                     let resp = HTTPURLResponse(
                         url: request.url!,
                         statusCode: 200,
                         httpVersion: nil,
                         headerFields: ["Content-Type": "application/json"]
                     )!
-                    let body = try! JSONEncoder().encode(["credential": credentialJWT])
+                    let body = try JSONEncoder().encode(["credential": credentialJWT])
                     return (resp, body)
                 }
 
@@ -713,7 +761,7 @@ struct SpaceCredentialManagerTests {
 
             // 7. Assert post-invalidation caller completes successfully with fresh credential from distinct attempt
             let cred = try await freshCred
-            #expect(cred.token == credentialJWT)
+            #expect(issuedTokens.withLock { $0.contains(cred.token) })
             #expect(delegationAttempts.withLock { $0 } == 2)
         }
     }
@@ -755,14 +803,14 @@ struct SpaceCredentialManagerTests {
                         ? Int(Date().addingTimeInterval(30).timeIntervalSince1970)
                         : Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
 
-                    let jwt = makeMockCredentialJWT(exp: exp)
+                    let jwt = try makeSignedCredentialJWT(for: request, space: space, exp: exp)
                     let resp = HTTPURLResponse(
                         url: request.url!,
                         statusCode: 200,
                         httpVersion: nil,
                         headerFields: ["Content-Type": "application/json"]
                     )!
-                    let body = try! JSONEncoder().encode(["credential": jwt])
+                    let body = try JSONEncoder().encode(["credential": jwt])
                     return (resp, body)
                 }
 
@@ -1126,7 +1174,7 @@ struct SpaceCredentialManagerTests {
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
             let space = try SpaceRef(uriString: "at://did:plc:customauth/space/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
-            let credentialJWT = makeMockCredentialJWT(exp: expTime)
+            let lastIssuedJWT = Mutex<String>("")
 
             let capturedRequests = Mutex<[URLRequest]>([])
             let providerCalledWithDID = Mutex<String?>(nil)
@@ -1135,6 +1183,8 @@ struct SpaceCredentialManagerTests {
                 capturedRequests.withLock { $0.append(request) }
                 let urlString = request.url?.absoluteString ?? ""
                 if urlString == "https://custom-space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                    let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
+                    lastIssuedJWT.withLock { $0 = credentialJWT }
                     let resp = HTTPURLResponse(
                         url: request.url!,
                         statusCode: 200,
@@ -1156,11 +1206,12 @@ struct SpaceCredentialManagerTests {
                     return URL(string: "https://custom-space.test")!
                 },
                 urlSession: session,
-                delegationTokenProvider: { _ in "mock-delegation-token-custom" }
+                delegationTokenProvider: { _ in "mock-delegation-token-custom" },
+                authoritySigningKeyProvider: testAuthoritySigningKeyProvider
             )
 
             let cred = try await manager.credential(for: space)
-            #expect(cred.token == credentialJWT)
+            #expect(cred.token == lastIssuedJWT.withLock { $0 })
             #expect(providerCalledWithDID.withLock { $0 } == "did:plc:customauth")
 
             let requests = capturedRequests.withLock { $0 }
@@ -1183,7 +1234,7 @@ struct SpaceCredentialManagerTests {
 
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
-            let credentialJWT = makeMockCredentialJWT(exp: expTime)
+            let lastIssuedJWT = Mutex<String>("")
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
@@ -1197,6 +1248,8 @@ struct SpaceCredentialManagerTests {
                     return (resp, Data(self.didDocJSON.utf8))
                 }
                 if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                    let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
+                    lastIssuedJWT.withLock { $0 = credentialJWT }
                     let resp = HTTPURLResponse(
                         url: request.url!,
                         statusCode: 200,
@@ -1219,7 +1272,7 @@ struct SpaceCredentialManagerTests {
             )
 
             let cred = try await manager.credential(for: space)
-            #expect(cred.token == credentialJWT)
+            #expect(cred.token == lastIssuedJWT.withLock { $0 })
         }
     }
 
@@ -1231,13 +1284,13 @@ struct SpaceCredentialManagerTests {
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
             let expTime = Int(Date().addingTimeInterval(3600).timeIntervalSince1970)
-            let credentialJWT = makeMockCredentialJWT(exp: expTime)
 
             let callOrder = Mutex<[String]>([])
 
             SpaceMockURLProtocol.setHandler { request in
                 let urlString = request.url?.absoluteString ?? ""
                 if urlString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
+                    let credentialJWT = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     let resp = HTTPURLResponse(
                         url: request.url!,
                         statusCode: 200,
@@ -1262,7 +1315,8 @@ struct SpaceCredentialManagerTests {
                 delegationTokenProvider: { ref in
                     callOrder.withLock { $0.append("delegationTokenProvider:\(ref.spaceDID)") }
                     return "mock-delegation-token"
-                }
+                },
+                authoritySigningKeyProvider: testAuthoritySigningKeyProvider
             )
 
             _ = try await manager.credential(for: space)
@@ -1310,7 +1364,7 @@ extension SpaceCredentialManagerTests {
             let stale = try didKey(staleKey), current = try didKey(currentKey)
             let refreshes = Mutex<[Bool]>([])
             let shares = Mutex<[String]>([])
-            let token = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970))
+            let lastIssuedJWT = Mutex<String>("")
             let digest = Data(repeating: 1, count: 32)
             let revision = "3kbcq3p7ad422"
             SpaceMockURLProtocol.setHandler { request in
@@ -1318,12 +1372,18 @@ extension SpaceCredentialManagerTests {
                 if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
                     #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
                     #expect(request.value(forHTTPHeaderField: "Signature") == nil)
+                    let token = try makeSignedCredentialJWT(
+                        for: request,
+                        space: space,
+                        exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970)
+                    )
+                    lastIssuedJWT.withLock { $0 = token }
                     return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
                 }
                 let want = try #require(request.value(forHTTPHeaderField: "Atproto-Space-Want-Mac"))
                 let share = try #require(want.components(separatedBy: "key_share=\"").last?.split(separator: "\"").first.map(String.init))
                 shares.withLock { $0.append(share) }
-                #expect(request.value(forHTTPHeaderField: "Authorization") == "Atproto-Space-Credential " + token)
+                #expect(request.value(forHTTPHeaderField: "Authorization") == "Atproto-Space-Credential " + lastIssuedJWT.withLock { $0 })
                 #expect(request.value(forHTTPHeaderField: "Signature-Input") == "atproto-space-credential=" + SpaceHTTPSignature.signatureParams())
                 if url.lastPathComponent == "com.atproto.space.listRepoOps" {
                     return (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, Data(#"{"ops":[],"cursor":"next"}"#.utf8))
@@ -1335,10 +1395,17 @@ extension SpaceCredentialManagerTests {
             }
             defer { SpaceMockURLProtocol.setHandler(nil) }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let manager = SpaceCredentialManager(client: client, authorityHostProvider: { _ in URL(string: "https://space.test")! }, urlSession: session, delegationTokenProvider: { _ in "delegation" }, authorKEMKeyProvider: { _, forceRefresh in
-                refreshes.withLock { $0.append(forceRefresh) }
-                return forceRefresh ? current : stale
-            })
+            let manager = SpaceCredentialManager(
+                client: client,
+                authorityHostProvider: { _ in URL(string: "https://space.test")! },
+                urlSession: session,
+                delegationTokenProvider: { _ in "delegation" },
+                authorKEMKeyProvider: { _, forceRefresh in
+                    refreshes.withLock { $0.append(forceRefresh) }
+                    return forceRefresh ? current : stale
+                },
+                authoritySigningKeyProvider: testAuthoritySigningKeyProvider
+            )
             _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getLatestCommit?repo=\(repo)")), space: space)
             _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.listRepoOps?repo=\(repo)&cursor=one")), space: space)
             _ = try await manager.get(url: #require(URL(string: "https://repo.test/xrpc/com.atproto.space.listRepoOps?repo=\(repo)&cursor=two")), space: space)
@@ -1420,7 +1487,7 @@ extension SpaceCredentialManagerTests {
                     exchangeCount.withLock { $0 += 1 }
                     // Swan's conversation-space policy issues exp = iat + 60.
                     let iat = Int(Date().timeIntervalSince1970)
-                    let jwt = makeMockCredentialJWT(exp: iat + 60, iat: iat)
+                    let jwt = try makeSignedCredentialJWT(for: request, space: space, exp: iat + 60, iat: iat)
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return try (resp, JSONEncoder().encode(["credential": jwt]))
                 }
@@ -1433,7 +1500,8 @@ extension SpaceCredentialManagerTests {
                 client: client,
                 authorityHostProvider: { _ in URL(string: "https://space.test")! },
                 urlSession: session,
-                delegationTokenProvider: { _ in "mock-delegation-token" }
+                delegationTokenProvider: { _ in "mock-delegation-token" },
+                authoritySigningKeyProvider: testAuthoritySigningKeyProvider
             )
             let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?repo=did:plc:writer"))
 
@@ -1468,7 +1536,7 @@ extension SpaceCredentialManagerTests {
                     }
                     let now = Int(Date().timeIntervalSince1970)
                     let iat = current == 1 ? now - age : now
-                    let jwt = makeMockCredentialJWT(exp: iat + lifetime, iat: iat)
+                    let jwt = try makeSignedCredentialJWT(for: request, space: space, exp: iat + lifetime, iat: iat)
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return try (resp, JSONEncoder().encode(["credential": jwt]))
                 }
@@ -1478,7 +1546,8 @@ extension SpaceCredentialManagerTests {
                     client: client,
                     authorityHostProvider: { _ in URL(string: "https://space.test")! },
                     urlSession: session,
-                    delegationTokenProvider: { _ in "mock-delegation-token" }
+                    delegationTokenProvider: { _ in "mock-delegation-token" },
+                    authoritySigningKeyProvider: testAuthoritySigningKeyProvider
                 )
                 let first = try await manager.credential(for: space)
                 let renewed = try await manager.credential(for: space)
@@ -1738,11 +1807,12 @@ extension SpaceCredentialManagerTests {
             let metadata: [String: Any] = ["$type": "atproto-space-repo", "ver": 1, "repo": repo, "space": space.uriString(), "rev": rev, "data": digest]
             let archive = try Data([0x2A, 0x6C, 1, 0]) + starFrame(DAGCBOR.encodeValue(metadata)) + records
             #expect(archive.count > NetworkResponseLimits.default.maximumWireBytes)
-            let token = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970))
+            let expTime = Int(Date().addingTimeInterval(600).timeIntervalSince1970)
 
             SpaceMockURLProtocol.setHandler { request in
                 let url = request.url!
                 if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
+                    let token = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
                 }
                 let want = try #require(request.value(forHTTPHeaderField: "Atproto-Space-Want-Mac"))
@@ -1763,7 +1833,8 @@ extension SpaceCredentialManagerTests {
                 authorityHostProvider: { _ in URL(string: "https://space.test")! },
                 urlSession: session,
                 delegationTokenProvider: { _ in "delegation" },
-                authorKEMKeyProvider: { _, _ in kemDIDKey }
+                authorKEMKeyProvider: { _, _ in kemDIDKey },
+                authoritySigningKeyProvider: testAuthoritySigningKeyProvider
             )
             let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getRepo?space=\(space.uriString())&repo=\(repo)"))
 
@@ -1817,11 +1888,12 @@ extension SpaceCredentialManagerTests {
             let cid = CID.fromDAGCBOR(Data("large-blob".utf8)).string
             let blob = Data(repeating: 0x5A, count: 11 * 1_048_576)
             #expect(blob.count > NetworkResponseLimits.default.maximumWireBytes)
-            let token = makeMockCredentialJWT(exp: Int(Date().addingTimeInterval(600).timeIntervalSince1970))
+            let expTime = Int(Date().addingTimeInterval(600).timeIntervalSince1970)
 
             SpaceMockURLProtocol.setHandler { request in
                 let url = request.url!
                 if url.lastPathComponent == "com.atproto.space.getSpaceCredential" {
+                    let token = try makeSignedCredentialJWT(for: request, space: space, exp: expTime)
                     return try (HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!, JSONEncoder().encode(["credential": token]))
                 }
                 guard url.lastPathComponent == "com.atproto.space.getBlob",
@@ -1843,7 +1915,8 @@ extension SpaceCredentialManagerTests {
                 authorKEMKeyProvider: { _, _ in
                     Issue.record("getBlob needs no response MAC")
                     throw SpaceVerificationError.missingKEMKey
-                }
+                },
+                authoritySigningKeyProvider: testAuthoritySigningKeyProvider
             )
             let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?space=\(space.uriString())&repo=\(repo)&cid=\(cid)"))
 

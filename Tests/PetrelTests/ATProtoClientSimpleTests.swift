@@ -254,16 +254,21 @@ struct ATProtoClientSimpleTests {
 
   @Test("API methods have proper error handling structure")
   func aPIErrorHandlingStructure() async throws {
-    let client = try await createTestClient()
-    let params = AppBskyFeedGetTimeline.Parameters(limit: 20)
+    // This is the one test in the suite that actually issues its request. Hold the shared
+    // lock so it cannot be routed to a URLProtocol mock that another suite installed
+    // process-wide through NetworkService.setNetworkTestProtocolClasses.
+    try await withSerializedStorageOverrideTest {
+      let client = try await createTestClient()
+      let params = AppBskyFeedGetTimeline.Parameters(limit: 20)
 
-    // Test that API methods are marked as throws
-    do {
-      // This will fail in test environment, but we're testing the structure
-      _ = try await client.app.bsky.feed.getTimeline(input: params)
-      Issue.record("Expected timeline request to fail in the test environment")
-    } catch {
-      // Reaching this branch proves the generated method propagates its failure.
+      // Test that API methods are marked as throws
+      do {
+        // This will fail in test environment, but we're testing the structure
+        _ = try await client.app.bsky.feed.getTimeline(input: params)
+        Issue.record("Expected timeline request to fail in the test environment")
+      } catch {
+        // Reaching this branch proves the generated method propagates its failure.
+      }
     }
   }
 

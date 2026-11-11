@@ -1491,6 +1491,21 @@ extension Array: DAGCBOREncodable where Element: DAGCBOREncodable {
     }
 }
 
+extension Dictionary: DAGCBOREncodable where Key == String, Value: DAGCBOREncodable {
+    public func toCBORValue() throws -> Any {
+        let sortedKeys = keys.sorted { lhs, rhs in
+            let lhsCount = lhs.utf8.count
+            let rhsCount = rhs.utf8.count
+            return lhsCount == rhsCount ? lhs < rhs : lhsCount < rhsCount
+        }
+        var map = OrderedCBORMap(minimumCapacity: count)
+        for key in sortedKeys {
+            map.append(key: key, value: try self[key]!.toCBORValue())
+        }
+        return map
+    }
+}
+
 extension Int: DAGCBOREncodable {
     public func toCBORValue() throws -> Any {
         return self

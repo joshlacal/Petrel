@@ -172,7 +172,8 @@ let package = Package(
         ),
         .testTarget(
             name: "PetrelTests",
-            dependencies: ["Petrel", "PetrelCrypto"]
+            dependencies: ["Petrel", "PetrelCrypto"],
+            resources: [.copy("Vectors")]
         ),
         .testTarget(
             name: "PetrelCryptoTests",

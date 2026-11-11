@@ -9,6 +9,14 @@ public struct SpaceSetHash: Sendable {
     public init() {}
 
     public mutating func add(path: String, cid: String) {
+        apply(path: path, cid: cid, subtracting: false)
+    }
+
+    public mutating func remove(path: String, cid: String) {
+        apply(path: path, cid: cid, subtracting: true)
+    }
+
+    private mutating func apply(path: String, cid: String, subtracting: Bool) {
         let element = Data("\(path)/\(cid)".utf8)
         var hasher = petrel_blake3_hasher()
         petrel_blake3_hasher_init(&hasher)
@@ -17,8 +25,8 @@ public struct SpaceSetHash: Sendable {
         expanded.withUnsafeMutableBufferPointer { petrel_blake3_hasher_finalize(&hasher, $0.baseAddress, $0.count) }
         for offset in stride(from: 0, to: 2048, by: 2) {
             let existing = UInt16(state[offset]) | UInt16(state[offset + 1]) << 8
-            let addition = UInt16(expanded[offset]) | UInt16(expanded[offset + 1]) << 8
-            let result = existing &+ addition
+            let delta = UInt16(expanded[offset]) | UInt16(expanded[offset + 1]) << 8
+            let result = subtracting ? (existing &- delta) : (existing &+ delta)
             state[offset] = UInt8(truncatingIfNeeded: result)
             state[offset + 1] = UInt8(truncatingIfNeeded: result >> 8)
         }

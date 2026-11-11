@@ -117,17 +117,17 @@ class KotlinCodeGenerator(BaseCodeGenerator):
         name = self.main_def.get('name', self.lexicon_id)
         collections = self.main_def.get('collections', [])
         collections_literal = ', '.join(json.dumps(value) for value in collections)
-        return f'''data class SpaceDeclarationDescriptor(
-    val nsid: String,
-    val keyType: String,
-    val name: String,
-    val collections: List<String>,
-)
+        return f'''    data class SpaceDeclarationDescriptor(
+        val nsid: String,
+        val keyType: String,
+        val name: String,
+        val collections: List<String>,
+    )
 
-val spaceDeclaration = SpaceDeclarationDescriptor(
-    nsid = "{self.lexicon_id}", keyType = {json.dumps(key_type)},
-    name = {json.dumps(name)}, collections = listOf({collections_literal}),
-)'''
+    val spaceDeclaration = SpaceDeclarationDescriptor(
+        nsid = "{self.lexicon_id}", keyType = {json.dumps(key_type)},
+        name = {json.dumps(name)}, collections = listOf({collections_literal}),
+    )'''
 
     def generate_properties(
         self,
