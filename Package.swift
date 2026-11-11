@@ -38,6 +38,10 @@ let package = Package(
             name: "PetrelJetstream",
             targets: ["PetrelJetstream"]
         ),
+        .library(
+            name: "PetrelLexicon",
+            targets: ["PetrelLexicon"]
+        ),
         .executable(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
@@ -166,6 +170,16 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        .target(
+            name: "PetrelLexicon",
+            dependencies: [
+                "Petrel",
+                "PetrelCore",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .executableTarget(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
@@ -198,6 +212,11 @@ let package = Package(
         .testTarget(
             name: "PetrelPLCTests",
             dependencies: ["PetrelPLC", "PetrelCrypto", "PetrelCore"]
+        ),
+        .testTarget(
+            name: "PetrelLexiconTests",
+            dependencies: ["PetrelLexicon", "Petrel", "PetrelCore"],
+            resources: [.copy("Vectors")]
         ),
         .testTarget(
             name: "PetrelLoadTests",
