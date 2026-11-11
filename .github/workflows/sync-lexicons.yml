@@ -65,19 +65,33 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # Pinned upstream atproto revision (reviewed 2026-08-30, commit 328a4a86a999357eeae12a6da897bf686b4da88e)
-          mkdir -p /tmp/atproto
-          git -C /tmp/atproto init
-          git -C /tmp/atproto remote add origin https://github.com/bluesky-social/atproto.git
-          git -C /tmp/atproto config core.sparseCheckout true
-          git -C /tmp/atproto sparse-checkout set lexicons
-          git -C /tmp/atproto fetch --depth 1 origin 328a4a86a999357eeae12a6da897bf686b4da88e
-          git -C /tmp/atproto checkout FETCH_HEAD
+          # com.atproto and tools.ozone are canonical in bluesky-social/atproto; app.bsky,
+          # chat.bsky and network.bsky in bluesky-social/bsky. The tip of each main branch
+          # is fetched, and the commits end up in generator/provenance/standard-lexicons.json
+          # so the pull request this job opens names exactly what a reviewer is approving.
+          fetch_lexicons() {
+            local name=$1
+            mkdir -p "/tmp/$name"
+            git -C "/tmp/$name" init
+            git -C "/tmp/$name" remote add origin "https://github.com/bluesky-social/$name.git"
+            git -C "/tmp/$name" config core.sparseCheckout true
+            git -C "/tmp/$name" sparse-checkout set lexicons
+            git -C "/tmp/$name" fetch --depth 1 origin main
+            git -C "/tmp/$name" checkout FETCH_HEAD
+          }
+          fetch_lexicons atproto
+          fetch_lexicons bsky
+          {
+            printf 'ATPROTO_COMMIT=%s\n' "$(git -C /tmp/atproto rev-parse HEAD)"
+            printf 'BSKY_COMMIT=%s\n' "$(git -C /tmp/bsky rev-parse HEAD)"
+          } >> "$GITHUB_ENV"
       - name: Sync standard namespaces
         shell: bash
         run: |
           set -euo pipefail
-          Scripts/sync-standard-lexicons.sh /tmp/atproto/lexicons
+          Scripts/sync-standard-lexicons.sh \
+            /tmp/atproto/lexicons "$ATPROTO_COMMIT" \
+            /tmp/bsky/lexicons "$BSKY_COMMIT"
       - name: Regenerate the Swift and Kotlin projections
         shell: bash
         run: |
@@ -85,22 +99,35 @@ jobs:
           "$PETREL_PYTHON" run.py \
             --manifest generator/manifests/petrel-core.json \
             --language both
+          "$PETREL_PYTHON" run.py \
+            --manifest generator/manifests/petrel-ozone.json \
+            --language swift
+          "$PETREL_PYTHON" run.py \
+            --manifest Tests/LexiconFixture/lexgen.json \
+            --language swift
           "$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \
-            Sources/Petrel/Generated
+            Sources/Petrel/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated
       - name: Open PR if changed
         uses: peter-evans/create-pull-request@22a9089034f40e5a961c8808d113e2c98fb63676 # v7.0.11
         with:
           token: ${{ github.token }}
           branch: bot/sync-lexicons
-          title: 'Sync lexicons from bluesky-social/atproto'
+          title: 'Sync lexicons from bluesky-social/atproto and bluesky-social/bsky'
           commit-message: 'Sync standard lexicons from upstream + regenerate'
           add-paths: |
             generator/lexicons/**
+            generator/provenance/standard-lexicons.json
             Sources/Petrel/Generated/**
+            Sources/PetrelOzone/Generated/**
+            Tests/LexiconFixture/Generated/**
             kotlin/src/main/kotlin/blue/catbird/petrel/generated/**
           body: |
-            Automated weekly sync of `app`, `chat`, `com`, `tools`, `site` lexicon namespaces
-            from [bluesky-social/atproto](https://github.com/bluesky-social/atproto),
-            followed by regeneration of the closed Swift and Kotlin projections and SwiftFormat.
+            Automated weekly sync of the standard lexicon namespaces from their canonical
+            repositories, followed by regeneration of the closed Swift and Kotlin projections
+            and SwiftFormat:
 
-            Review the generated-code diff before merging.
+            - `com.atproto`, `tools.ozone` from [bluesky-social/atproto](https://github.com/bluesky-social/atproto)
+            - `app.bsky`, `chat.bsky`, `network.bsky` from [bluesky-social/bsky](https://github.com/bluesky-social/bsky)
+
+            The synced commits are recorded in `generator/provenance/standard-lexicons.json`.
+            Review the lexicon and generated-code diff before merging.

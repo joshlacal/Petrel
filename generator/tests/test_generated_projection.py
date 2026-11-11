@@ -1657,7 +1657,10 @@ fi
                     self._tool_call_lines(),
                     [
                         "release-python|run.py|--manifest|generator/manifests/petrel-core.json|--language|swift",
-                        "release-mint|run|--executable|swiftformat|nicklockwood/SwiftFormat@0.61.1|Sources/Petrel/Generated",
+                        "release-python|run.py|--manifest|generator/manifests/petrel-ozone.json|--language|swift",
+                        "release-python|run.py|--manifest|Tests/LexiconFixture/lexgen.json|--language|swift",
+                        "release-mint|run|--executable|swiftformat|nicklockwood/SwiftFormat@0.61.1|"
+                        "Sources/Petrel/Generated|Sources/PetrelOzone/Generated|Tests/LexiconFixture/Generated",
                     ],
                 )
                 self.assertEqual(
@@ -1990,10 +1993,13 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         text = self.text["generator.yml"]
         tests_command = '"$PETREL_PYTHON" -m unittest discover -s generator/tests -v'
         regenerate_command = "Scripts/regenerate-generated.sh"
-        diff_command = "git diff --exit-code -- Sources/Petrel/Generated"
+        # Every generated tree: the core package, the tools.ozone overlay product and
+        # the third-party fixture module.
+        trees = "Sources/Petrel/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated"
+        diff_command = f"git diff --exit-code -- {trees}"
         untracked_command = (
             'test -z "$(git status --porcelain --untracked-files=all -- '
-            'Sources/Petrel/Generated)"'
+            f'{trees})"'
         )
         self.assertEqual(text.count(tests_command), 1)
         regenerate_positions = [
@@ -2027,7 +2033,7 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         )
         self.assertIn("--lint Sources/Petrel/Generated", text)
 
-    def test_sync_includes_site_standard_and_regenerates_both_projections(self):
+    def test_sync_mirrors_both_upstreams_and_regenerates_every_projection(self):
         text = self.text["sync-lexicons.yml"]
         manifest = json.loads(
             (REPOSITORY_ROOT / "generator" / "manifests" / "petrel-core.json").read_text(
@@ -2039,26 +2045,52 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
             manifest["lexicons"]["exclude_namespaces"],
         )
         self.assertNotIn("Scripts/regenerate-generated.sh", text)
+        # com.atproto and tools.ozone live in bluesky-social/atproto; app.bsky and
+        # chat.bsky moved to bluesky-social/bsky. Both are fetched and their commits
+        # passed on, so the provenance file names what was synced.
+        for repository in ("atproto", "bsky"):
+            self.assertIn(f"fetch_lexicons {repository}", text)
+        self.assertIn('https://github.com/bluesky-social/$name.git', text)
         self.assertIn(
-            '"$PETREL_PYTHON" run.py',
+            'Scripts/sync-standard-lexicons.sh \\\n'
+            '            /tmp/atproto/lexicons "$ATPROTO_COMMIT" \\\n'
+            '            /tmp/bsky/lexicons "$BSKY_COMMIT"',
             text,
         )
-        self.assertIn("Scripts/sync-standard-lexicons.sh /tmp/atproto/lexicons", text)
         sync_script = (REPOSITORY_ROOT / "Scripts" / "sync-standard-lexicons.sh").read_text(encoding="utf-8")
-        self.assertIn("for ns in app chat com tools site; do", sync_script)
-        self.assertIn("--exclude='/atproto/space/'", sync_script)
-        for namespace in ("memberspace", "managedspace", "personalspace"):
-            self.assertIn(f"--exclude='/atproto/{namespace}/'", sync_script)
+        for source, namespace in (
+            ("ATPROTO_SOURCE", "com/atproto"),
+            ("ATPROTO_SOURCE", "tools/ozone"),
+            ("BSKY_SOURCE", "app/bsky"),
+            ("BSKY_SOURCE", "chat/bsky"),
+            ("BSKY_SOURCE", "network/bsky"),
+        ):
+            self.assertIn(f'sync_namespace "${source}" {namespace}', sync_script)
+        # Third-party namespaces vendored by hand are never mirrored (and so never deleted).
+        for untouched in ("site", "germnetwork"):
+            self.assertNotIn(f"sync_namespace \"$ATPROTO_SOURCE\" {untouched}", sync_script)
+            self.assertNotIn(f"sync_namespace \"$BSKY_SOURCE\" {untouched}", sync_script)
+        for namespace in ("space", "memberspace", "managedspace", "personalspace"):
+            self.assertIn(f"--exclude='/{namespace}/'", sync_script)
         self.assertNotIn("simplespace", sync_script)
-        self.assertIn("--manifest generator/manifests/petrel-core.json", text)
-        self.assertIn("--language both", text)
+        self.assertIn("generator/provenance/standard-lexicons.json", sync_script)
+        for manifest_path, language in (
+            ("generator/manifests/petrel-core.json", "both"),
+            ("generator/manifests/petrel-ozone.json", "swift"),
+            ("Tests/LexiconFixture/lexgen.json", "swift"),
+        ):
+            self.assertIn(
+                f'--manifest {manifest_path} \\\n            --language {language}',
+                text,
+            )
         self.assertIn(
-            '"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1',
+            '"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \\\n'
+            '            Sources/Petrel/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated',
             text,
         )
         self.assertLess(
             text.index("Scripts/bootstrap-release-tools.sh"),
-            text.index("Scripts/sync-standard-lexicons.sh /tmp/atproto/lexicons"),
+            text.index("Scripts/sync-standard-lexicons.sh \\"),
         )
         lines = text.splitlines()
         add_paths_index = lines.index("          add-paths: |")
@@ -2071,10 +2103,29 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
             add_paths,
             [
                 "generator/lexicons/**",
+                "generator/provenance/standard-lexicons.json",
                 "Sources/Petrel/Generated/**",
+                "Sources/PetrelOzone/Generated/**",
+                "Tests/LexiconFixture/Generated/**",
                 "kotlin/src/main/kotlin/blue/catbird/petrel/generated/**",
             ],
         )
+
+    def test_recorded_upstream_commits_are_full_commit_ids(self):
+        provenance = json.loads(
+            (REPOSITORY_ROOT / "generator" / "provenance" / "standard-lexicons.json").read_text(
+                encoding="utf-8"
+            )
+        )
+        self.assertEqual(
+            [source["repository"] for source in provenance["sources"]],
+            [
+                "https://github.com/bluesky-social/atproto",
+                "https://github.com/bluesky-social/bsky",
+            ],
+        )
+        for source in provenance["sources"]:
+            self.assertRegex(source["commit"], r"^[0-9a-f]{40}$")
 
 
 if __name__ == "__main__":

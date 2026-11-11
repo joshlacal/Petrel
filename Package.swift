@@ -50,6 +50,10 @@ let package = Package(
             name: "PetrelOAuthServer",
             targets: ["PetrelOAuthServer"]
         ),
+        .library(
+            name: "PetrelOzone",
+            targets: ["PetrelOzone"]
+        ),
         .executable(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
@@ -208,6 +212,15 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        // The tools.ozone lexicons, generated as an overlay on Petrel
+        // (generator/manifests/petrel-ozone.json).
+        .target(
+            name: "PetrelOzone",
+            dependencies: ["Petrel"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .executableTarget(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
@@ -288,6 +301,7 @@ let package = Package(
         // A module generated from third-party lexicons with the overlay manifest in
         // Tests/LexiconFixture/lexgen.json. It is not a product: it exists so that every
         // build and test run compiles generator output for lexicons Petrel does not ship.
+        // Its test target also covers PetrelOzone, the overlay module that is a product.
         .target(
             name: "PetrelLexiconFixture",
             dependencies: ["Petrel"],
@@ -298,7 +312,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PetrelLexiconFixtureTests",
-            dependencies: ["PetrelLexiconFixture", "Petrel"],
+            dependencies: ["PetrelLexiconFixture", "PetrelOzone", "Petrel"],
             resources: [.copy("Vectors")]
         ),
     ]
