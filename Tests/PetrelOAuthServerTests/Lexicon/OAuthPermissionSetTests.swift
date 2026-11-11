@@ -122,6 +122,33 @@ struct OAuthPermissionSetTests {
         }
     }
 
+    @Test("an inherited audience containing % is stored so it reads back as the same service")
+    func inheritedPercentAudience() async throws {
+        // The include's audience is `…#svc%26admin`. Its canonical rpc form
+        // ends `%23svc%26admin`, which reads back as `…#svc&admin`: a
+        // different service the user never consented to.
+        let includeScope = "include:app.example.authBasic?aud=did:web:api.example.com%23svc%2526admin"
+        let resolver = MutableLexiconResolver([Self.setNSID: .permissionSet(Self.basicSet())])
+        let expanded = try await OAuthLexiconScopeResolution.expandIncludes(
+            ["atproto", includeScope], resolver: resolver, stage: .pushedAuthorizationRequest
+        )
+        for scope in expanded.scopes {
+            guard case let .rpc(permission) = try ATProtoScope.parse(scope),
+                  permission.lxm == [.nsid("app.example.getFeed")] else { continue }
+            #expect(permission.aud == .service("did:web:api.example.com#svc%26admin"))
+        }
+
+        let harness = try TestServer(lexiconResolver: resolver, webClientScopes: ["atproto", includeScope])
+        let client = try TestClient(harness)
+        let tokens = try await client.signIn(scope: "atproto \(includeScope)")
+        let verifier = OAuthResourceServerVerifier(authorizationServer: harness.server)
+        let grant = try await authenticate(verifier, client, token: tokens.accessToken)
+        try grant.requireRPC(lxm: "app.example.getFeed", aud: "did:web:api.example.com#svc%26admin")
+        #expect(throws: OAuthResourceAuthorizationFailure.self) {
+            try grant.requireRPC(lxm: "app.example.getFeed", aud: "did:web:api.example.com#svc&admin")
+        }
+    }
+
     @Test("the consent page shows the set's title, localised, and the permissions inside it")
     func consentDescription() async throws {
         let resolver = MutableLexiconResolver([Self.setNSID: .permissionSet(Self.basicSet())])

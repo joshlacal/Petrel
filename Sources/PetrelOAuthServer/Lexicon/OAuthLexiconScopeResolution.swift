@@ -163,7 +163,9 @@ public enum OAuthLexiconScopeResolution {
                 let permissions = include.expand(set)
                 if permissions.isEmpty { empty.append(nsid) }
                 for permission in permissions {
-                    guard let string = try? permission.canonicalScopeString() else {
+                    // A string that parses back to this permission, not its canonical
+                    // form: see IncludedPermission.scopeString().
+                    guard let string = try? permission.scopeString() else {
                         throw OAuthScopeResolutionError(
                             stage: stage, failure: .unserialisableExpansion(nsid: nsid)
                         )
