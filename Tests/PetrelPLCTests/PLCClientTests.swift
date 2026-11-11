@@ -666,7 +666,13 @@ final class PLCClientTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
 
-        XCTAssertEqual(transport.lastAcceptedBytes, 600)
+        // The bound is what matters: nothing past 1,000 bytes is ever kept.
+        // URLSession normally hands the delegate the two 600-byte chunks one
+        // at a time, so the first is kept and the second trips the bound.
+        // Under load it may coalesce them into a single 1,200-byte buffer,
+        // which is refused whole. Both are correct; a partial buffer is not.
+        let accepted = transport.lastAcceptedBytes
+        XCTAssertTrue(accepted == 600 || accepted == 0, "accepted \(accepted) bytes")
         XCTAssertEqual(MockPLCHTTPURLProtocol.chunksDeliveredAfterStop, 0)
         XCTAssertEqual(MockPLCHTTPURLProtocol.bytesDeliveredAfterStop, 0)
         XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 1)
@@ -1342,21 +1348,28 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
                     loaderTask = Task.detached {
                         let proto = protoTransfer.value
                         for await chunk in stream {
-                            let stoppedDuringStream = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
-                            guard !stoppedDuringStream else {
+                            // The stop check and the hand-off to the client
+                            // are one critical section with `stopLoading`,
+                            // so a chunk is either handed over before the
+                            // stop or dropped; it cannot straddle it. A
+                            // chunk dequeued after the stop is dropped and
+                            // is not a delivery.
+                            let delivered = proto.instanceLock.withLock { () -> Bool in
+                                guard !proto.isStopped, !Task.isCancelled else { return false }
                                 Self.lock.withLock {
-                                    Self._chunksDeliveredAfterStop += 1
-                                    Self._bytesDeliveredAfterStop += chunk.count
+                                    if Self._isStopLoadingCalled {
+                                        Self._chunksDeliveredAfterStop += 1
+                                        Self._bytesDeliveredAfterStop += chunk.count
+                                    } else {
+                                        Self._chunksDeliveredBeforeStop += 1
+                                        Self._bytesDeliveredBeforeStop += chunk.count
+                                    }
                                 }
-                                Self.recordChunkDelivered()
-                                break
+                                clientTransfer.value?.urlProtocol(proto, didLoad: chunk)
+                                return true
                             }
-                            Self.lock.withLock {
-                                Self._chunksDeliveredBeforeStop += 1
-                                Self._bytesDeliveredBeforeStop += chunk.count
-                            }
-                            clientTransfer.value?.urlProtocol(proto, didLoad: chunk)
                             Self.recordChunkDelivered()
+                            guard delivered else { break }
                         }
 
                         let stoppedAfterStream = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
@@ -1403,6 +1416,18 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {
+        // Stop the loader before telling anyone the stop happened: a test
+        // released by the expectation below may feed the stream at once,
+        // and by then nothing more may reach the client.
+        let taskToCancel = instanceLock.withLock { () -> Task<Void, Never>? in
+            guard !isStopped else { return nil }
+            isStopped = true
+            let task = loaderTask
+            loaderTask = nil
+            return task
+        }
+        taskToCancel?.cancel()
+
         let (exp, cont) = Self.lock.withLock { () -> (XCTestExpectation?, CheckedContinuation<Void, Never>?) in
             Self._stopCallCount += 1
             Self._isStopLoadingCalled = true
@@ -1414,15 +1439,5 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
 
         exp?.fulfill()
         cont?.resume()
-
-        let taskToCancel = instanceLock.withLock { () -> Task<Void, Never>? in
-            guard !isStopped else { return nil }
-            isStopped = true
-            let task = loaderTask
-            loaderTask = nil
-            return task
-        }
-
-        taskToCancel?.cancel()
     }
 }
