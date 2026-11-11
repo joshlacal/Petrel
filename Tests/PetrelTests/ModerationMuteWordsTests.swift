@@ -215,6 +215,56 @@ struct ModerationMuteWordsTests {
         ),
     ]
 
+    // MARK: slash tokens
+
+    /// A word containing `/` (`and/or`, `9/11`, a URL) never matches a muted
+    /// word by its parts. It must not stop the words after it from being
+    /// checked.
+    ///
+    /// The third column is what the reference implementation (`@atproto/api`
+    /// 0.20.26, `matchMuteWords`) returns for the same input. It abandons the
+    /// whole text at the first slash token (`continue outer`), so a link or an
+    /// `and/or` ahead of a muted word hides the match; Petrel skips only the
+    /// token. Rows where the two differ are the fix; the others pin what is
+    /// shared.
+    static let slashCases: [(text: String, word: String, reference: Bool, petrel: Bool)] = [
+        ("and/or cat", "cat", false, true),
+        ("see https://example.com/page cat", "cat", false, true),
+        ("http://example.com cat", "cat", false, true),
+        ("9/11 cat", "cat", false, true),
+        ("Tomatoes are fruits and/or vegetables", "vegetables", false, true),
+        ("a/b c/d cat", "cat", false, true),
+        ("cat and/or", "cat", true, true),
+        ("I like my cat and/or dog", "cat", true, true),
+        ("w/ cat", "cat", true, true),
+        ("cat w/ hat", "hat", true, true),
+        ("and/or cat", "and/or", true, true),
+        // The slash token itself still does not match by its parts.
+        ("cat/dog", "cat", false, false),
+        ("and/or", "and", false, false),
+        ("and/or", "andor", false, false),
+        ("Tomatoes are fruits and/or vegetables", "Andor", false, false),
+        ("and/or dog", "cat", false, false),
+    ]
+
+    @Test("a slash token does not hide muted words after it", arguments: slashCases.indices)
+    func slashTokens(_ index: Int) {
+        let testCase = Self.slashCases[index]
+        let matches = match(testCase.text, [ModerationMock.mutedWord(testCase.word)])
+        #expect(matches.isEmpty != testCase.petrel, "\(testCase.word.debugDescription) in \(testCase.text.debugDescription)")
+        if testCase.petrel {
+            #expect(matches.first?.word.value == testCase.word)
+        }
+    }
+
+    @Test("a post with a link before a muted word is still filtered")
+    func linkBeforeMutedWord() throws {
+        let view = try post("Read https://example.com/2024/review before the finale spoilers land")
+        let decision = try Moderation.moderatePost(view, options: options(mutedWords: [ModerationMock.mutedWord("spoilers")]))
+        #expect(decision.ui(.contentList).filter)
+        #expect(decision.ui(.contentList).blur)
+    }
+
     @Test("matchMuteWords", arguments: cases)
     func matchTable(_ testCase: Case) {
         let matches = match(testCase.text, [ModerationMock.mutedWord(testCase.word)], languages: testCase.languages)

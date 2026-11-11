@@ -4,7 +4,7 @@ Decide how to show posts, profiles and other content from labels, mutes, blocks 
 
 ## Overview
 
-Moderation in Bluesky is applied by the client. The AppView attaches labels and viewer state (mutes, blocks) to what it returns; the client combines those with the user's preferences and decides what to hide, cover or annotate. ``Moderation`` is a port of the decision engine of the official client: the same inputs give the same decisions, and the reference test suites run against it.
+Moderation in Bluesky is applied by the client. The AppView attaches labels and viewer state (mutes, blocks) to what it returns; the client combines those with the user's preferences and decides what to hide, cover or annotate. ``Moderation`` is a port of the decision engine of the official client: the same inputs give the same decisions, and the reference test suites run against it. There is one deliberate difference in muted-word matching: a word containing `/`, such as a link or `and/or`, is skipped on its own, where the reference stops checking the rest of the text and so misses muted words that come after it.
 
 Every example on this page is compiled and run by `Tests/PetrelTests/ModerationDocExampleTests.swift` or `Tests/PetrelTests/BskyDocumentationExampleTests.swift`.
 

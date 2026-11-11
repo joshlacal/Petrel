@@ -276,10 +276,13 @@ enum MuteWordMatcher {
             if mutedLength > utf16Length(trimmed) { continue }
 
             if trimmed.contains(where: isPunctuation) {
-                // Exit case for punctuation within the predicate that we _do_
-                // allow: `and/or` should not match `Andor`.
+                // A word containing a slash is never matched by its parts:
+                // `and/or` should not match `Andor`. Only this word is
+                // skipped. The reference implementation gives up on the whole
+                // text here (`continue outer`), which lets a link or an
+                // `and/or` earlier in a post hide every muted word after it.
                 if trimmed.contains("/") {
-                    return nil
+                    continue
                 }
 
                 let spaced = replacingPunctuationWithSpace(trimmed)
