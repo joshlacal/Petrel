@@ -292,7 +292,7 @@ public struct OAuthResourceServerVerifier: Sendable {
     }
 
     private static func isToken68(_ token: String) -> Bool {
-        !token.isEmpty && token.utf8.count <= 8192 && token.utf8.allSatisfy { byte in
+        !token.isEmpty && token.utf8.count <= OAuthAccessTokenFormat.maximumSignedTokenBytes && token.utf8.allSatisfy { byte in
             (0x30 ... 0x39).contains(byte) || (0x41 ... 0x5A).contains(byte) || (0x61 ... 0x7A).contains(byte)
                 || byte == 0x2D || byte == 0x2E || byte == 0x5F || byte == 0x7E || byte == 0x2B || byte == 0x2F
                 || byte == 0x3D

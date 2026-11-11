@@ -169,7 +169,9 @@ extension OAuthAuthorizationServer {
         // stopped resolving: it keeps the grant it already has.
         let granted: Set<String>
         do {
-            granted = try await effectiveGrant(for: binding.requestedScopes, stage: .tokenMint).scopes
+            let derived = try await effectiveGrant(for: binding.requestedScopes, stage: .tokenMint).scopes
+            // Likewise for a grant that has grown too large to sign.
+            granted = configuration.accessTokenFormat.admits(grant: derived) ? derived : binding.grantedScopes
         } catch is OAuthScopeResolutionError {
             granted = binding.grantedScopes
         } catch {
@@ -282,6 +284,13 @@ extension OAuthAuthorizationServer {
                 accessToken = try OAuthCompactJWT.sign(claims, with: key, type: OAuthAccessTokenType.jwtType)
             } catch {
                 throw .serverError
+            }
+            // Never issue a token the resource verifier would refuse.
+            guard accessToken.utf8.count <= OAuthAccessTokenFormat.maximumSignedTokenBytes else {
+                throw EndpointError(
+                    status: 400, code: "invalid_scope",
+                    description: "the granted permissions are too large for this server's access tokens"
+                )
             }
         }
         var refreshToken: String?

@@ -15,6 +15,33 @@ public enum OAuthAccessTokenFormat: Sendable {
     /// public key alone; one that shares the session store also sees
     /// revocation immediately.
     case signedJWT(OAuthSigningKey)
+
+    /// The longest access token, in bytes, that ``OAuthResourceServerVerifier``
+    /// accepts and that this server issues. 8 KiB is also the usual limit on
+    /// a request header line in HTTP servers and proxies.
+    public static let maximumSignedTokenBytes = 8192
+
+    /// The longest effective grant, in bytes of its space-separated `scope`
+    /// claim, that a ``signedJWT(_:)`` server admits at the pushed
+    /// authorization request.
+    ///
+    /// A signed token carries its scopes, base64url-encoded (4/3 larger), next
+    /// to the other claims, header and signature. 4 KiB of scopes leaves about
+    /// 1.6 KiB for the rest within ``maximumSignedTokenBytes``. A grant over
+    /// this is refused with `invalid_scope` before the user is asked; a token
+    /// that still comes out too long (for example from an unusually long
+    /// `client_id` or DID) is refused at issue. At refresh, a re-derived
+    /// grant over the budget leaves the session on the grant it already has.
+    /// Opaque tokens carry no scopes and have no such limit.
+    public static let signedTokenScopeBudget = 4096
+
+    /// Whether `scopes` fit in a token of this format.
+    func admits(grant scopes: Set<String>) -> Bool {
+        guard case .signedJWT = self else { return true }
+        // The claim joins the scopes with single spaces.
+        let bytes = scopes.reduce(0) { $0 + $1.utf8.count } + max(0, scopes.count - 1)
+        return bytes <= Self.signedTokenScopeBudget
+    }
 }
 
 /// The claims of a signed access token.

@@ -89,12 +89,21 @@ extension OAuthAuthorizationServer {
             }
             // A permission set that cannot be resolved fails the request here,
             // before the user is asked anything.
+            let grant: OAuthExpandedScopeSet
             do {
-                _ = try await effectiveGrant(for: requestedScopes, stage: .pushedAuthorizationRequest)
+                grant = try await effectiveGrant(for: requestedScopes, stage: .pushedAuthorizationRequest)
             } catch let error as OAuthScopeResolutionError {
                 throw EndpointError(status: 400, code: error.oauthErrorCode, description: error.description)
             } catch {
                 throw EndpointError.unavailable
+            }
+            // A signed access token carries the grant; one too large for the
+            // resource verifier would be useless, so refuse it before consent.
+            guard configuration.accessTokenFormat.admits(grant: grant.scopes) else {
+                throw EndpointError(
+                    status: 400, code: "invalid_scope",
+                    description: "the requested permissions are too large for this server's access tokens"
+                )
             }
 
             // A code_challenge may not be reused across sessions, and a state

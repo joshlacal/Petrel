@@ -286,4 +286,56 @@ struct OAuthResourceServerVerifierTests {
             _ = try await authenticate(stateless(), client, token: tokens.accessToken)
         }
     }
+
+    /// `count` distinct repo scopes of about 80 bytes each, plus `atproto`.
+    private static func largeScopes(_ count: Int) -> [String] {
+        ["atproto"] + (0 ..< count).map { "repo:app.example.c\($0)" + String(repeating: "x", count: 55) }
+    }
+
+    @Test("signed tokens: a grant too large for a token the verifier accepts is refused at PAR, before consent")
+    func signedTokenSizeRefusedAtPAR() async throws {
+        let scopes = Self.largeScopes(60) // about 4.9 KB: admitted raw, too large to sign
+        let scope = scopes.joined(separator: " ")
+        #expect(scope.utf8.count > OAuthAccessTokenFormat.signedTokenScopeBudget)
+        #expect(scope.utf8.count <= OAuthScopeBudget.rawInput.bytesPerSet)
+
+        let signed = try TestServer(
+            accessTokenFormat: .signedJWT(OAuthSigningKey.generate(keyID: "as-1")),
+            webClientScopes: Set(scopes)
+        )
+        let response = try await TestClient(signed).send(
+            OAuthAuthorizationServer.Path.pushedAuthorizationRequest, TestClient(signed).parFields(scope: scope)
+        )
+        #expect(response.status == 400)
+        #expect(response.oauthError == "invalid_scope")
+
+        // Opaque tokens carry no scope, so the same request is fine there.
+        let opaque = try TestServer(webClientScopes: Set(scopes))
+        _ = try await TestClient(opaque).signIn(scope: scope)
+    }
+
+    @Test("signed tokens: the largest grant PAR admits yields a token the resource verifier accepts")
+    func signedTokenSizeFitsVerifier() async throws {
+        let key = try OAuthSigningKey.generate(keyID: "as-1")
+        var scopes = Self.largeScopes(0)
+        while (scopes + ["repo:app.example.c\(scopes.count)" + String(repeating: "x", count: 55)])
+            .joined(separator: " ").utf8.count <= OAuthAccessTokenFormat.signedTokenScopeBudget
+        {
+            scopes.append("repo:app.example.c\(scopes.count)" + String(repeating: "x", count: 55))
+        }
+        let harness = try TestServer(accessTokenFormat: .signedJWT(key), webClientScopes: Set(scopes))
+        let client = try TestClient(harness)
+        let tokens = try await client.signIn(scope: scopes.joined(separator: " "))
+        #expect(tokens.accessToken.utf8.count <= OAuthAccessTokenFormat.maximumSignedTokenBytes)
+        let verifier = try OAuthResourceServerVerifier(
+            issuer: #require(URL(string: TestServer.issuer)),
+            resource: #require(URL(string: TestServer.issuer)),
+            keys: OAuthJSONWebKeySet(keys: [key.publicJWK]),
+            secret: Data(repeating: 9, count: 32),
+            replayStore: InMemoryOAuthStore(),
+            clock: harness.clock
+        )
+        let grant = try await authenticate(verifier, client, token: tokens.accessToken)
+        try grant.requireRepo(collection: "app.example.c1" + String(repeating: "x", count: 55), action: .create)
+    }
 }
