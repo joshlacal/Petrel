@@ -1,0 +1,21 @@
+{
+ "downloaded": "2026-11-11",
+ "organisationAndServiceIdentities": [
+  "did:plc:z72i7hdynmk6r22z27h6tvur",
+  "did:plc:ewvi7nxzyoun6zhxrhs64oiz",
+  "did:plc:ar7c4by46qjdydhdevvrndac",
+  "did:plc:eon2iu7v3x2ukgxkqaf7e5np",
+  "did:plc:oc6vwdlmk2kqyida5i74d3p5",
+  "did:plc:4dtbz2ivhp5app3sbntcccxc",
+  "did:plc:hymtrrab3tb62ktcluou37ce"
+ ],
+ "testIdentities": [
+  "did:plc:5qepwfemd2p3ts3phpzjvmsi",
+  "did:plc:n7eilcz7ouze6kj5hwvyt4ju",
+  "did:plc:xgj5yvayzto5fx3qq2o7ichg",
+  "did:plc:k525d5my7ob3divsqd5ogf7b",
+  "did:plc:nlkuhfcmtu7jluphj37j5o4f"
+ ],
+ "exportLegacyLines": 34,
+ "exportSequencedLines": 14
+}
