@@ -1,3 +1,8 @@
+#if canImport(Darwin)
+    import Darwin
+#else
+    import Glibc
+#endif
 import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
@@ -329,6 +334,14 @@ actor FakePLCDirectory: PLCHTTPTransport {
 }
 
 /// The directory under test in stubbed tests: `https://plc.test`.
+/// The timeout for HTTP exchanges answered in-process by a `URLProtocol`
+/// stub: the transport's ceiling. Nothing on the other end is slow, but a
+/// loaded CI runner can stall the whole test process for several seconds
+/// (one stalled 7.5 s), and a 5-second `URLRequest` timeout then fires before
+/// the stub answers. These tests are about bounds and cancellation, not
+/// timeouts; `testURLSessionPLCTransportReportsATimeout` covers the timeout.
+let stubbedExchangeTimeout: TimeInterval = 30
+
 func plcTestClient(
     _ directory: FakePLCDirectory,
     limits: PLCOperationLimits = .specification
@@ -387,5 +400,63 @@ func plcError(_ operation: () async throws -> Void) async -> PetrelPLCError? {
         return error
     } catch {
         return nil
+    }
+}
+
+/// A TCP listener on 127.0.0.1 that never accepts: the kernel completes
+/// connections into the backlog, the client sends its request, and nothing
+/// ever answers.
+final class SilentLoopbackListener: @unchecked Sendable {
+    let url: URL
+    private let lock = NSLock()
+    private var descriptor: Int32
+
+    init() throws {
+        #if canImport(Darwin)
+            let descriptor = socket(AF_INET, SOCK_STREAM, 0)
+        #else
+            let descriptor = socket(AF_INET, Int32(SOCK_STREAM.rawValue), 0)
+        #endif
+        guard descriptor >= 0 else { throw POSIXError(.EIO) }
+        var address = sockaddr_in()
+        #if canImport(Darwin)
+            address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
+        #endif
+        address.sin_family = sa_family_t(AF_INET)
+        address.sin_port = 0
+        address.sin_addr = in_addr(s_addr: UInt32(0x7F00_0001).bigEndian)
+        var length = socklen_t(MemoryLayout<sockaddr_in>.size)
+        let bound = withUnsafeMutablePointer(to: &address) {
+            $0.withMemoryRebound(to: sockaddr.self, capacity: 1) {
+                bind(descriptor, $0, length) == 0
+                    && listen(descriptor, 16) == 0
+                    && getsockname(descriptor, $0, &length) == 0
+            }
+        }
+        guard bound else {
+            _ = Self.closeDescriptor(descriptor)
+            throw POSIXError(.EADDRNOTAVAIL)
+        }
+        self.descriptor = descriptor
+        url = URL(string: "http://127.0.0.1:\(UInt16(bigEndian: address.sin_port))")!
+    }
+
+    deinit { close() }
+
+    func close() {
+        lock.withLock {
+            if descriptor >= 0 {
+                _ = Self.closeDescriptor(descriptor)
+                descriptor = -1
+            }
+        }
+    }
+
+    private static func closeDescriptor(_ descriptor: Int32) -> Int32 {
+        #if canImport(Darwin)
+            Darwin.close(descriptor)
+        #else
+            Glibc.close(descriptor)
+        #endif
     }
 }

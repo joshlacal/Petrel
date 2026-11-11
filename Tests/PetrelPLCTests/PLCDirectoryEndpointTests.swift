@@ -632,8 +632,8 @@ struct PLCDirectoryEndpointTests {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubPLCURLProtocol.self]
         let client = try PLCDirectoryClient(
-            configuration: .production(origin: URL(string: "https://plc.test")!),
-            transport: URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+            configuration: .production(origin: URL(string: "https://plc.test")!, timeout: stubbedExchangeTimeout),
+            transport: URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
         )
         let log = try await client.fetchVerifiedAuditLog(did: did)
         #expect(log.entries.count == 3)
@@ -663,7 +663,7 @@ final class StubPLCURLProtocol: URLProtocol, @unchecked Sendable {
             url: url,
             headers: request.allHTTPHeaderFields ?? [:],
             body: request.httpBody,
-            timeout: 5,
+            timeout: stubbedExchangeTimeout,
             maximumResponseBytes: 1_048_576
         )
         let box = PLCTestUnchecked(self)

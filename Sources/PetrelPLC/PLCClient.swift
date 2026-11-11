@@ -195,7 +195,7 @@ final class PLCRequestContext: @unchecked Sendable {
                         return (continuation, .failure(PetrelPLCError.unavailable("PLC HTTP response exceeded its bound")))
                     }
                 }
-                return (continuation, .failure(PetrelPLCError.unavailable("PLC HTTP request failed")))
+                return (continuation, .failure(PetrelPLCError.unavailable(Self.failureMessage(for: nsError))))
             }
 
             guard let httpResponse = self.response else {
@@ -236,6 +236,17 @@ final class PLCRequestContext: @unchecked Sendable {
                 continuation.resume(throwing: error)
             }
         }
+    }
+}
+
+extension PLCRequestContext {
+    /// Names the failure without echoing anything the server sent: a timeout
+    /// says so, anything else carries the error's domain and code.
+    static func failureMessage(for error: NSError) -> String {
+        if error.domain == NSURLErrorDomain, error.code == NSURLErrorTimedOut {
+            return "PLC HTTP request timed out"
+        }
+        return "PLC HTTP request failed (\(error.domain) \(error.code))"
     }
 }
 
