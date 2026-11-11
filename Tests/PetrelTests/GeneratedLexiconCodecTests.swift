@@ -59,6 +59,73 @@ struct GeneratedLexiconCodecTests {
         #expect(try ref.encodedDAGCBOR().range(of: Data([0xD8, 0x2A])) == nil)
     }
 
+    // MARK: - Blobs (lex-12)
+
+    private static let rawCID = "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
+
+    @Test("A blob round-trips in the current format")
+    func blobRoundTrips() throws {
+        let json = Data("""
+        {"$type":"blob","ref":{"$link":"\(Self.rawCID)"},"mimeType":"image/png","size":4096}
+        """.utf8)
+
+        let blob = try JSONDecoder().decode(Blob.self, from: json)
+        #expect(!blob.isLegacy)
+        #expect(blob.ref?.cid.string == Self.rawCID)
+        #expect(blob == Blob(ref: ATProtoLink(cid: try CID.parse(Self.rawCID)), mimeType: "image/png", size: 4096))
+        #expect(try Self.jsonObject(blob) == Self.jsonObject(json))
+        #expect(try blob.encodedDAGCBOR().range(of: Self.cborLinkPrefix) != nil)
+    }
+
+    /// The deprecated form must still be readable, and must be written back as it was read:
+    /// it used to come back as `{"$type":"blob","mimeType":…,"size":0,"cid":…}`, which is
+    /// neither the legacy nor a valid current blob.
+    @Test("A legacy blob is written back exactly as it was read")
+    func legacyBlobRoundTrips() throws {
+        let json = Data("""
+        {"cid":"\(Self.rawCID)","mimeType":"image/jpeg"}
+        """.utf8)
+
+        let blob = try JSONDecoder().decode(Blob.self, from: json)
+        #expect(blob.isLegacy)
+        #expect(blob.size < 0)
+        #expect(blob.cid == Self.rawCID)
+        #expect(blob.mimeType == "image/jpeg")
+
+        #expect(try Self.jsonObject(blob) == Self.jsonObject(json))
+        let untyped = try JSONDecoder().decode([String: ATProtocolValueContainer].self, from: json)
+        #expect(try blob.encodedDAGCBOR() == ATProtocolValueContainer.object(untyped).encodedDAGCBOR())
+
+        // Inside a record too.
+        let record = Data("""
+        {"$type":"app.bsky.actor.profile","displayName":"old","avatar":{"cid":"\(Self.rawCID)","mimeType":"image/jpeg"}}
+        """.utf8)
+        let profile = try JSONDecoder().decode(AppBskyActorProfile.self, from: record)
+        #expect(profile.avatar?.isLegacy == true)
+        #expect(try Self.jsonObject(profile) == Self.jsonObject(record))
+    }
+
+    @Test("A malformed blob is rejected", arguments: [
+        #"{"$type":"blob","mimeType":"image/png","size":10}"#,
+        #"{"$type":"blob","ref":{"$link":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"},"mimeType":"image/png","size":"10"}"#,
+        #"{"$type":"blob","ref":{"$link":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"},"mimeType":"image/png","size":-1}"#,
+        #"{"$type":"blob","ref":{"$link":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"},"mimeType":"","size":10}"#,
+        #"{"$type":"blobby","ref":{"$link":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"},"mimeType":"image/png","size":10}"#,
+        #"{"$type":"blob","ref":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku","mimeType":"image/png","size":10}"#,
+    ])
+    func malformedBlobIsRejected(json: String) {
+        #expect(throws: DecodingError.self) {
+            try JSONDecoder().decode(Blob.self, from: Data(json.utf8))
+        }
+    }
+
+    @Test("A negative size is never written in the current format")
+    func negativeSizeIsNeverWritten() {
+        let invalid = Blob(type: "blob", ref: nil, mimeType: "image/png", size: -5, cid: nil)
+        #expect(throws: (any Error).self) { try JSONEncoder().encode(invalid) }
+        #expect(throws: (any Error).self) { try invalid.encodedDAGCBOR() }
+    }
+
     // MARK: - Undeclared fields (lex-15)
 
     private static let postWithFutureFields = Data("""
