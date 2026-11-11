@@ -84,9 +84,10 @@ public struct PLCPDSOperationFields: Sendable, Equatable {
 /// 1. ``requestSignatureToken()`` — the PDS emails a confirmation token.
 /// 2. ``signOperation(token:changing:)`` — the PDS returns a signed
 ///    operation that applies the requested changes to the current state.
-/// 3. Check what was signed against the identity's verified audit log
-///    (`PLCVerifiedAuditLog.verifyNextOperation(_:)`), so that neither the
-///    PDS nor anything between you and it can slip in a different change.
+/// 3. Check what was signed against the identity's verified audit log and
+///    the request (`PLCVerifiedAuditLog.verifyNextOperation(_:applying:)`),
+///    so that neither the PDS nor anything between you and it can slip in a
+///    different change.
 /// 4. ``submit(_:)`` — the PDS validates the operation and forwards it to
 ///    the directory. Submitting directly with `PLCDirectoryClient.submit`
 ///    works too.
@@ -144,7 +145,9 @@ public struct PLCPDSOperationFlow: Sendable {
     /// identity's current state.
     ///
     /// The result is decoded but not trusted: verify it against the audit
-    /// log before submitting it.
+    /// log and `changes` with
+    /// `PLCVerifiedAuditLog.verifyNextOperation(_:applying:)` before
+    /// submitting it.
     ///
     /// - Parameters:
     ///   - token: The token from the confirmation email.
@@ -189,6 +192,56 @@ public struct PLCPDSOperationFlow: Sendable {
                 status: status
             )
         }
+    }
+}
+
+public extension PLCVerifiedAuditLog {
+    /// Checks an operation a PDS signed in answer to
+    /// ``PLCPDSOperationFlow/signOperation(token:changing:)`` before it is
+    /// submitted: it must pass `verifyNextOperation(_:)` (its `prev` names
+    /// the current head and a current rotation key signed it), it must be an
+    /// update rather than a tombstone, and the state it establishes must be
+    /// the current state with exactly `changes` applied — every requested
+    /// field equal, in order, to what was asked for, and every other field
+    /// unchanged.
+    ///
+    /// A valid signature only proves that the PDS signed *something*. This
+    /// is what proves it signed what the account holder agreed to.
+    ///
+    /// - Parameters:
+    ///   - operation: The operation the PDS returned.
+    ///   - changes: The fields passed to `signOperation(token:changing:)`.
+    /// - Returns: The index of the signing key in the current rotation keys.
+    /// - Throws: `PetrelPLCError.tombstoned` if the identity is tombstoned;
+    ///   `PetrelPLCError.unauthorized` if the operation does not follow the
+    ///   head, is not signed by a current rotation key, is a tombstone, or
+    ///   establishes any state other than the requested one.
+    @discardableResult
+    func verifyNextOperation(
+        _ operation: PLCSignedOperation,
+        applying changes: PLCPDSOperationFields
+    ) throws -> Int {
+        let signer = try verifyNextOperation(operation)
+        guard case .regularOperation = operation,
+              let current = documentData,
+              let proposed = operation.documentData(did: did) else {
+            throw PetrelPLCError.unauthorized("PLC operation is not an update of the identity")
+        }
+        let expectedRotationKeys = changes.rotationKeys ?? current.rotationKeys
+        let expectedAlsoKnownAs = changes.alsoKnownAs ?? current.alsoKnownAs
+        let expectedVerificationMethods = changes.verificationMethods ?? current.verificationMethods
+        let expectedServices = changes.services ?? current.services
+        var mismatched = [String]()
+        if proposed.rotationKeys != expectedRotationKeys { mismatched.append("rotationKeys") }
+        if proposed.alsoKnownAs != expectedAlsoKnownAs { mismatched.append("alsoKnownAs") }
+        if proposed.verificationMethods != expectedVerificationMethods { mismatched.append("verificationMethods") }
+        if proposed.services != expectedServices { mismatched.append("services") }
+        guard mismatched.isEmpty else {
+            throw PetrelPLCError.unauthorized(
+                "PLC operation does not apply the requested changes: \(mismatched.joined(separator: ", ")) differ"
+            )
+        }
+        return signer
     }
 }
 

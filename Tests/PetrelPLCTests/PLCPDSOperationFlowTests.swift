@@ -114,15 +114,13 @@ struct PLCPDSOperationFlowTests {
         //    of its own.
         let current = try await client.fetchVerifiedAuditLog(did: did)
         let currentKeys = try #require(current.documentData?.rotationKeys)
-        let operation = try await flow.signOperation(
-            token: "ABCDE-12345",
-            changing: PLCPDSOperationFields(rotationKeys: [recovery.didKey] + currentKeys)
-        )
+        let changes = PLCPDSOperationFields(rotationKeys: [recovery.didKey] + currentKeys)
+        let operation = try await flow.signOperation(token: "ABCDE-12345", changing: changes)
 
         // 3. Verify what came back before it goes anywhere: it follows the
         //    current operation, is signed by a current rotation key, and
         //    changes what was asked and nothing else.
-        #expect(try current.verifyNextOperation(operation) == 0)
+        #expect(try current.verifyNextOperation(operation, applying: changes) == 0)
         let proposed = try #require(operation.documentData(did: did))
         #expect(proposed.rotationKeys == [recovery.didKey] + currentKeys)
         #expect(proposed.alsoKnownAs == current.documentData?.alsoKnownAs)
@@ -140,6 +138,90 @@ struct PLCPDSOperationFlowTests {
         let after = try await client.fetchState(did: did)
         #expect(after.rotationKeys.first == recovery.didKey)
         try await client.updateHandle(did: did, signer: recovery, handle: "alice.example.org")
+    }
+
+    @Test("an operation that applies exactly the requested changes passes the field check")
+    func requestedChangesVerify() async throws {
+        let (did, genesis, pds, recovery) = try await hostedAccount()
+        let client = try plcTestClient(FakePLCDirectory())
+        try await client.submit(did: did, operation: genesis)
+        let current = try await client.fetchVerifiedAuditLog(did: did)
+        let flow = PLCPDSOperationFlow(api: pds)
+        try await flow.requestSignatureToken()
+        let changes = PLCPDSOperationFields(
+            rotationKeys: [recovery.didKey, pds.rotationKey.didKey],
+            alsoKnownAs: ["at://alice.example.org"]
+        )
+        let operation = try await flow.signOperation(token: "ABCDE-12345", changing: changes)
+        #expect(try current.verifyNextOperation(operation, applying: changes) == 0)
+    }
+
+    @Test(
+        "a signed operation that drops, adds or alters fields beyond the request is refused",
+        arguments: [
+            // Omits the requested recovery key.
+            "omits-requested-key",
+            // Adds the requested key but also swaps the PDS endpoint.
+            "changes-unrequested-service",
+            // Adds the requested key but also rewrites the handle.
+            "changes-unrequested-alias",
+            // Adds the requested key but also replaces the signing key.
+            "changes-unrequested-verification-method",
+            // Puts the requested keys in a different priority order.
+            "reorders-requested-keys",
+        ]
+    )
+    func unrequestedChangesRefused(variant: String) async throws {
+        let (did, genesis, pds, recovery) = try await hostedAccount()
+        let client = try plcTestClient(FakePLCDirectory())
+        try await client.submit(did: did, operation: genesis)
+        let current = try await client.fetchVerifiedAuditLog(did: did)
+        let changes = PLCPDSOperationFields(rotationKeys: [recovery.didKey, pds.rotationKey.didKey])
+        let unsigned = try PLCOperationCodec.update(after: genesis) { draft in
+            switch variant {
+            case "omits-requested-key":
+                break
+            case "changes-unrequested-service":
+                draft.rotationKeys = [recovery.didKey, pds.rotationKey.didKey]
+                draft.services["atproto_pds"] = PLCService(
+                    type: "AtprotoPersonalDataServer", endpoint: "https://attacker.example.com"
+                )
+            case "changes-unrequested-alias":
+                draft.rotationKeys = [recovery.didKey, pds.rotationKey.didKey]
+                draft.alsoKnownAs = ["at://mallory.example.com"]
+            case "changes-unrequested-verification-method":
+                draft.rotationKeys = [recovery.didKey, pds.rotationKey.didKey]
+                draft.verificationMethods["atproto"] = K256Keypair.generate().didKey
+            default:
+                draft.rotationKeys = [pds.rotationKey.didKey, recovery.didKey]
+            }
+        }
+        let operation = try await PLCOperationCodec.sign(.regular(unsigned), with: pds.rotationKey)
+
+        // Signature and chain are fine: only the field check can catch it.
+        #expect(try current.verifyNextOperation(operation) == 0)
+        #expect(throws: PetrelPLCError.self) {
+            try current.verifyNextOperation(operation, applying: changes)
+        }
+    }
+
+    @Test("a validly signed tombstone is refused whatever was requested")
+    func signedTombstoneRefused() async throws {
+        let (did, genesis, pds, recovery) = try await hostedAccount()
+        let client = try plcTestClient(FakePLCDirectory())
+        try await client.submit(did: did, operation: genesis)
+        let current = try await client.fetchVerifiedAuditLog(did: did)
+        let tombstone = try await PLCOperationCodec.sign(
+            .tombstone(PLCUnsignedTombstoneOperation(prev: genesis.cid.string)),
+            with: pds.rotationKey
+        )
+        #expect(try current.verifyNextOperation(tombstone) == 0)
+        #expect(throws: PetrelPLCError.self) {
+            try current.verifyNextOperation(
+                tombstone,
+                applying: PLCPDSOperationFields(rotationKeys: [recovery.didKey, pds.rotationKey.didKey])
+            )
+        }
     }
 
     @Test("a wrong token and failing procedures surface as typed errors")

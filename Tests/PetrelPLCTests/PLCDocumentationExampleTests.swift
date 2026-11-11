@@ -234,13 +234,12 @@ struct PLCDocumentationExampleTests {
         // 2. Ask the PDS to sign an operation that puts a key you hold first.
         let current = try await directory.fetchVerifiedAuditLog(did: did)
         let currentKeys = current.documentData?.rotationKeys ?? []
-        let operation = try await flow.signOperation(
-            token: tokenFromEmail,
-            changing: PLCPDSOperationFields(rotationKeys: [myRecoveryKey.didKey] + currentKeys)
-        )
+        let changes = PLCPDSOperationFields(rotationKeys: [myRecoveryKey.didKey] + currentKeys)
+        let operation = try await flow.signOperation(token: tokenFromEmail, changing: changes)
 
-        // 3. Check what was signed against the verified log.
-        try current.verifyNextOperation(operation)
+        // 3. Check what was signed: it follows the verified log, a current
+        //    rotation key signed it, and it applies exactly `changes`.
+        try current.verifyNextOperation(operation, applying: changes)
 
         // 4. Submit it through the PDS.
         try await flow.submit(operation)

@@ -125,9 +125,12 @@ public struct PLCVerifiedAuditLog: Sendable, Equatable {
     /// its `prev` must name ``head``, the identity must not be tombstoned,
     /// and it must be signed by one of the current rotation keys.
     ///
-    /// Use this on an operation someone else signed for you — for example
-    /// the one a PDS returns from `com.atproto.identity.signPlcOperation` —
-    /// before sending it anywhere.
+    /// This proves who signed the operation and where it goes in the chain,
+    /// not what it changes. For an operation someone else signed for you —
+    /// for example the one a PDS returns from
+    /// `com.atproto.identity.signPlcOperation` — also compare the state it
+    /// establishes with what you asked for; `PetrelPLCPDS` does both in
+    /// `verifyNextOperation(_:applying:)`.
     ///
     /// - Returns: The index of the signing key in the current rotation keys.
     /// - Throws: ``PetrelPLCError/tombstoned(did:)``;
