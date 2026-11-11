@@ -206,14 +206,20 @@ public struct BlobPermission: ScopePermission {
     /// `:75-105`):
     ///
     ///  1. a list containing `*/*` is just `*/*`;
-    ///  2. otherwise every value is lowercased, each `type/subtype` already
-    ///     covered by a `type/*` in the list is dropped, and the rest is
-    ///     sorted.
+    ///  2. otherwise the ASCII letters of every value are lower-cased, each
+    ///     `type/subtype` already covered by a `type/*` in the list is
+    ///     dropped, and the rest is sorted.
+    ///
+    /// Only `A`–`Z` are folded, as in ``AcceptPattern/init(_:)`` and
+    /// ``matches(_:)``. The reference implementation lower-cases with
+    /// Unicode case mapping, which turns U+212A KELVIN SIGN into `k` and so
+    /// writes a different permission; for ASCII patterns the two agree. See
+    /// <doc:ReferenceParity>.
     ///
     /// Duplicates are removed afterwards, by
     /// ``ScopeParameterSchema/format(_:)``.
     static let normalizeAccept: @Sendable ([String]) -> [String] = { given in
-        let lowered = given.map { $0.lowercased() }
+        let lowered = given.map(\.asciiLowercased)
         if lowered.contains("*/*") { return ["*/*"] }
         let parsed = lowered.map { (raw: $0, pattern: AcceptPattern($0)) }
         let typeWildcards = Set(parsed.compactMap { entry -> String? in

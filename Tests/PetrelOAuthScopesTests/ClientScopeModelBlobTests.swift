@@ -332,4 +332,27 @@ struct ClientScopeModelBlobTests {
         let kelvin = BlobPermission(accept: [.exact("image", "\u{212A}tx")])
         #expect(!kelvin.matches(.init(mime: "image/ktx")))
     }
+
+    /// Matching folds only ASCII letters, so normalisation must too: a
+    /// pattern with U+212A KELVIN SIGN is not the pattern `k`, and its scope
+    /// string must say so. Unicode lower-casing would turn it into `image/ktx`,
+    /// a different permission.
+    @Test("a non-ASCII pattern keeps its bytes through normalisation and the scope string")
+    func nonASCIIPatternKeepsItsMeaning() throws {
+        let kelvinMime = "image/\u{212A}tx"
+        let scope = try ATProtoScope.blob(accept: [kelvinMime])
+        let string = try #require(scope.scopeString)
+        let reparsed = try ATProtoScope.parse(string)
+        guard case let .blob(blob) = reparsed else { Issue.record("not a blob scope"); return }
+        #expect(blob.accept == [.exact("image", "\u{212A}tx")])
+        #expect(blob.matches(.init(mime: kelvinMime)))
+        #expect(!blob.matches(.init(mime: "image/ktx")))
+
+        let set = ATProtoScopeSet([.atproto, scope])
+        #expect(set.unrecognized.isEmpty)
+        #expect(set.allowsBlob(.init(mime: kelvinMime)))
+        #expect(!set.allowsBlob(.init(mime: "image/ktx")))
+        // ASCII letters are still folded in the canonical form.
+        #expect(try ATProtoScope.blob(accept: ["IMAGE/PNG"]).canonicalScopeString() == "blob:image/png")
+    }
 }
