@@ -83,8 +83,7 @@ public struct LexPermissionSyntax: Sendable, ScopeSyntax {
     /// (`lib/syntax-lexicon.ts:22-31`). Without that, every entry would carry
     /// two parameters no schema declares.
     private func get(_ key: String) -> LexiconValue? {
-        if key == "type" { return nil }
-        if key == "resource" { return nil }
+        if key.isByteEqual(to: "type") || key.isByteEqual(to: "resource") { return nil }
         return permission.fields[key]
     }
 

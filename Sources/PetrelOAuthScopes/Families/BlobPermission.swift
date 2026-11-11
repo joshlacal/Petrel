@@ -220,28 +220,35 @@ public struct BlobPermission: ScopePermission {
     /// ``ScopeParameterSchema/format(_:)``.
     static let normalizeAccept: @Sendable ([String]) -> [String] = { given in
         let lowered = given.map(\.asciiLowercased)
-        if lowered.contains("*/*") { return ["*/*"] }
+        if lowered.containsBytes(of: "*/*") { return ["*/*"] }
         let parsed = lowered.map { (raw: $0, pattern: AcceptPattern($0)) }
-        let typeWildcards = Set(parsed.compactMap { entry -> String? in
-            if case let .type(t)? = entry.pattern { return t }
+        // Keyed on bytes: `é/*` (U+00E9) does not cover `e\u{301}/png`, though
+        // the two type names are equal as `String`s.
+        let typeWildcards = Set(parsed.compactMap { entry -> ScopeBytes? in
+            if case let .type(t)? = entry.pattern { return t.scopeBytes }
             return nil
         })
         return parsed
             .filter { entry in
-                if case let .exact(t, _)? = entry.pattern, typeWildcards.contains(t) { return false }
+                if case let .exact(t, _)? = entry.pattern, typeWildcards.contains(t.scopeBytes) { return false }
                 return true
             }
             .map(\.raw)
-            .sorted()
+            .sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }
     }
 
     /// The narrowest `blob:` scope that covers `target`
     /// (`scopes/blob-permission.ts:68-72`). The media type is not validated:
     /// a malformed one still yields a scope string, which then matches
     /// nothing.
+    ///
+    /// The string is the canonical form, except that a `+` or `%` in a value
+    /// stays percent-encoded, so it always parses back to a scope covering
+    /// `target` (the reference's canonical form would read a literal `%41` as
+    /// `A`).
     public static func scopeNeeded(for target: Target) throws(ScopeParseError) -> String {
         var values = ScopeParameterValues()
         values.set("accept", [target.mime])
-        return try schema.format(values)
+        return try schema.formatParseable(values)
     }
 }

@@ -46,13 +46,13 @@ public struct ScopeParameterBag: Sendable, Hashable {
 
     /// Distinct keys in first-appearance order (`lib/syntax-string.ts:14-16`).
     public func orderedKeys() -> [String] {
-        var seen = Set<String>()
-        return entries.compactMap { seen.insert($0.key).inserted ? $0.key : nil }
+        var seen = Set<ScopeBytes>()
+        return entries.compactMap { seen.insert($0.key.scopeBytes).inserted ? $0.key : nil }
     }
 
     /// Every value given for `key`, in order.
     public func values(for key: String) -> [String] {
-        entries.lazy.filter { $0.key == key }.map(\.value)
+        entries.lazy.filter { $0.key.isByteEqual(to: key) }.map(\.value)
     }
 
     /// Looks up `key` as a single-valued parameter.

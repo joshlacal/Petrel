@@ -102,10 +102,15 @@ public struct AccountPermission: ScopePermission {
 
     /// The narrowest `account:` scope that covers `target`
     /// (`scopes/account-permission.ts:72-77`).
+    ///
+    /// The string is the canonical form, except that a `+` or `%` in a value
+    /// stays percent-encoded, so it always parses back to a scope covering
+    /// `target` (the reference's canonical form would read a literal `%41` as
+    /// `A`).
     public static func scopeNeeded(for target: Target) throws(ScopeParseError) -> String {
         var values = ScopeParameterValues()
         values.set("attr", [target.attr.rawValue])
         values.set("action", [target.action.rawValue])
-        return try schema.format(values)
+        return try schema.formatParseable(values)
     }
 }

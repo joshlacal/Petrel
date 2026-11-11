@@ -64,6 +64,36 @@ extension Sequence where Element == String {
     func containsBytes(of value: String) -> Bool {
         contains { $0.isByteEqual(to: value) }
     }
+
+    /// The distinct values, de-duplicated on their bytes and sorted in byte
+    /// order. `Array(Set(values)).sorted()` would merge canonically
+    /// equivalent values that are different bytes, and order by Unicode
+    /// collation rather than by bytes. For ASCII values the two agree.
+    func byteDistinctSorted() -> [String] {
+        var seen = Set<ScopeBytes>()
+        return filter { seen.insert($0.scopeBytes).inserted }
+            .sorted { $0.utf8.lexicographicallyPrecedes($1.utf8) }
+    }
+
+    /// Whether the two sequences hold the same values, ignoring order and
+    /// duplicates, compared byte-wise.
+    func hasSameBytesSet(as other: some Sequence<String>) -> Bool {
+        Set(map(\.scopeBytes)) == Set(other.map(\.scopeBytes))
+    }
+}
+
+extension StringProtocol {
+    /// Whether the bytes of `needle` occur anywhere in the bytes of `self`.
+    /// `String.contains(_:)` searches by `Character`, so a combining mark
+    /// after the match would hide it.
+    func containsByteSequence(_ needle: String) -> Bool {
+        let haystack = Array(utf8), pattern = Array(needle.utf8)
+        guard !pattern.isEmpty else { return true }
+        guard haystack.count >= pattern.count else { return false }
+        return (0 ... haystack.count - pattern.count).contains { start in
+            haystack[start ..< start + pattern.count].elementsEqual(pattern)
+        }
+    }
 }
 
 extension CaseIterable where Self: RawRepresentable, RawValue == String {

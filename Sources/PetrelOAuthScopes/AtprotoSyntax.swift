@@ -242,7 +242,7 @@ public enum AtprotoSyntax {
             || did.hasBytePrefix("did:web:localhost%3A") { return false }
         // Reached only for a DID without a path component, where an encoded
         // colon anywhere after the prefix is a port.
-        return did.dropFirst(8).contains("%3A")
+        return did.dropFirst(8).containsByteSequence("%3A")
     }
 
     // MARK: - did:web URL

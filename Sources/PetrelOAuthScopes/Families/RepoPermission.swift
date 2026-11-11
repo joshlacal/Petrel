@@ -109,7 +109,7 @@ public struct RepoPermission: ScopePermission {
                   // scopes/repo-permission.ts:59-65 — a list containing `*` is
                   // just `*`; otherwise duplicates are dropped and the list is
                   // sorted.
-                  normalize: { $0.containsBytes(of: "*") && $0.count > 1 ? ["*"] : Array(Set($0)).sorted() },
+                  normalize: { $0.containsBytes(of: "*") && $0.count > 1 ? ["*"] : $0.byteDistinctSorted() },
                   validate: { $0.isByteEqual(to: "*") || AtprotoSyntax.isValidNSID($0) }),
             .init(key: "action", arity: .multiple,
                   defaultValue: REPO_ACTIONS.map(\.rawValue),
@@ -148,10 +148,15 @@ public struct RepoPermission: ScopePermission {
     /// (`scopes/repo-permission.ts:95-100`), such as
     /// `repo:com.example.foo?action=create`. The collection is not validated
     /// (`scopes/repo-permission.test.ts:106-116`).
+    ///
+    /// The string is the canonical form, except that a `+` or `%` in a value
+    /// stays percent-encoded, so it always parses back to a scope covering
+    /// `target` (the reference's canonical form would read a literal `%41` as
+    /// `A`).
     public static func scopeNeeded(for target: Target) throws(ScopeParseError) -> String {
         var values = ScopeParameterValues()
         values.set("collection", [target.collection])
         values.set("action", [target.action.rawValue])
-        return try schema.format(values)
+        return try schema.formatParseable(values)
     }
 }

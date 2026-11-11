@@ -116,7 +116,6 @@ public struct ScopeParameterSchema: Sendable {
         self.parameters = parameters
     }
 
-    private var keys: Set<String> { Set(parameters.map(\.key)) }
 
     // MARK: parse
 
@@ -137,8 +136,8 @@ public struct ScopeParameterSchema: Sendable {
         // lib/parser.ts:105-107 — a parameter the schema does not declare
         // invalidates the whole scope. This is why `identity:*?action=manage`
         // is rejected: `identity` has no `action`.
-        let declared = keys
-        for key in syntax.keys() where !declared.contains(key) {
+        let declared = Set(parameters.map(\.key.scopeBytes))
+        for key in syntax.keys() where !declared.contains(key.scopeBytes) {
             throw .unknownParameter(prefix: prefix, key: key)
         }
 
@@ -241,7 +240,7 @@ public struct ScopeParameterSchema: Sendable {
             // omitted. `arrayParamEquals` (:169-176) ignores order and
             // duplicates, so the comparison is between sets.
             if !parameter.isRequired, let defaultValue = parameter.defaultValue,
-               Set(defaultValue) == Set(normalized) {
+               defaultValue.hasSameBytesSet(as: normalized) {
                 continue
             }
 

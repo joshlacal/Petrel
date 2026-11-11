@@ -140,7 +140,7 @@ public struct RpcPermission: ScopePermission {
             // scopes/rpc-permission.ts:54-57 — a list containing `*` is just
             // `*`; otherwise duplicates are dropped and the list is sorted.
             .init(key: "lxm", arity: .multiple, isRequired: true,
-                  normalize: { $0.containsBytes(of: "*") && $0.count > 1 ? ["*"] : Array(Set($0)).sorted() },
+                  normalize: { $0.containsBytes(of: "*") && $0.count > 1 ? ["*"] : $0.byteDistinctSorted() },
                   validate: { $0.isByteEqual(to: "*") || AtprotoSyntax.isValidNSID($0) }),
             // scopes/rpc-permission.ts:19-20 — `*` or an atproto DID with a
             // service fragment. A DID of another method, or one without a
@@ -177,10 +177,15 @@ public struct RpcPermission: ScopePermission {
 
     /// The narrowest `rpc:` scope that covers `target`
     /// (`scopes/rpc-permission.ts:84-89`). The target is not validated.
+    ///
+    /// The string is the canonical form, except that a `+` or `%` in a value
+    /// stays percent-encoded, so it always parses back to a scope covering
+    /// `target` (the reference's canonical form would read a literal `%41` as
+    /// `A`).
     public static func scopeNeeded(for target: Target) throws(ScopeParseError) -> String {
         var values = ScopeParameterValues()
         values.set("lxm", [target.lxm])
         values.set("aud", [target.aud])
-        return try schema.format(values)
+        return try schema.formatParseable(values)
     }
 }

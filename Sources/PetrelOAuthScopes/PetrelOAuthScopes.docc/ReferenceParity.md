@@ -37,6 +37,8 @@ Because a canonical string may not parse back, it is not always the right thing 
 | `rpc` with audience `did:web:example.com#a%41` | `…?aud=did:web:example.com%23a%41` (reads back as `#aA`) | `…?aud=did:web:example.com%23a%2541` |
 | everything else | the canonical string | the same |
 
+The scope a denial names — `scopeNeeded(for:)` on each permission type, and ``ScopeDenied/needed`` — is written the same way, so requesting it always grants the request that was denied. The reference writes the canonical form there too, so for an audience containing a literal `%41` it names a scope for another service.
+
 ``ATProtoScopeSet/init(_:)`` keeps the typed scopes it is given and stores their `scopeString`, so a set built from typed scopes grants exactly what the values say and serialises to something a server reads the same way. Whether one scope covers another (`covers(_:)`) is decided from what the scopes grant, never from their spelling.
 
 ### Scopes are compared by what they grant
@@ -60,7 +62,7 @@ A scope that has to be written down — sent in a request, or stored in a grant 
 
 ### Comparisons are byte-wise
 
-Everything that decides whether a request is allowed — a collection, a method, a service, a media type, an attribute, the `chat.bsky.` prefix that separates the two transition scopes, the namespace authority of a permission set — compares bytes. The reference implementation compares UTF-16 code units, which amounts to the same thing. Swift's own `String ==` and `hasPrefix` compare by Unicode canonical equivalence, under which U+212A KELVIN SIGN equals `K` and `e` followed by U+0301 equals `é`, so they are not used: `repo:com.example.Key` does not allow a write to a collection spelled with a Kelvin sign, and a method name cannot hide its `chat.bsky.` prefix behind a combining mark. The parameter values (``CollectionParam``, ``LxmParam``, ``AudParam``, ``AcceptPattern``) are `Equatable` and `Hashable` on the same terms.
+Everything that decides whether a request is allowed — a collection, a method, a service, a media type, an attribute, the `chat.bsky.` prefix that separates the two transition scopes, the namespace authority of a permission set — compares bytes. The reference implementation compares UTF-16 code units, which amounts to the same thing. Swift's own `String ==` and `hasPrefix` compare by Unicode canonical equivalence, under which U+212A KELVIN SIGN equals `K` and `e` followed by U+0301 equals `é`, so they are not used: `repo:com.example.Key` does not allow a write to a collection spelled with a Kelvin sign, and a method name cannot hide its `chat.bsky.` prefix behind a combining mark. The parameter values (``CollectionParam``, ``LxmParam``, ``AudParam``, ``AcceptPattern``) are `Equatable` and `Hashable` on the same terms. Normalising a scope works on the same terms: duplicates are dropped by bytes, lists are sorted in byte order (the same order as the reference's for ASCII values), and a `type/*` pattern absorbs a `type/subtype` only when the two types are the same bytes, so `é/*` (U+00E9) does not absorb `e` + U+0301 `/png`.
 
 ### Media type case
 
