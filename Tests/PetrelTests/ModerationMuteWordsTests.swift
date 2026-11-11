@@ -228,6 +228,55 @@ struct ModerationMuteWordsTests {
         )
     }
 
+    // MARK: robustness
+
+    /// A small deterministic generator so the fuzz inputs are the same on every run.
+    private struct SplitMix64: RandomNumberGenerator {
+        var state: UInt64
+        mutating func next() -> UInt64 {
+            state &+= 0x9E37_79B9_7F4A_7C15
+            var z = state
+            z = (z ^ (z >> 30)) &* 0xBF58_476D_1CE4_E5B9
+            z = (z ^ (z >> 27)) &* 0x94D0_49BB_1331_11EB
+            return z ^ (z >> 31)
+        }
+    }
+
+    @Test("Arbitrary text and words never trap, and hasMutedWord agrees with matchMuteWords")
+    func fuzz() {
+        let alphabet: [String] = [
+            "a", "b", "A", "ß", "İ", "é", "e\u{301}", "希", "🦋", "👨‍👩‍👧‍👧", "☠︎", " ", "  ", "\n", "\t", "\u{A0}",
+            "\u{200B}", "\u{FEFF}", "-", "_", "/", "!", "'", "’", "(", ")", ".", "#", "@", "$", "\u{0}", "\r\n",
+        ]
+        var generator = SplitMix64(state: 0x5EED)
+        func randomString(maxPieces: Int) -> String {
+            let count = Int.random(in: 0 ... maxPieces, using: &generator)
+            return (0 ..< count).map { _ in alphabet.randomElement(using: &generator) ?? "" }.joined()
+        }
+
+        for _ in 0 ..< 2000 {
+            let text = randomString(maxPieces: 24)
+            let words = (0 ..< Int.random(in: 0 ... 3, using: &generator)).map { _ in
+                ModerationMock.mutedWord(
+                    randomString(maxPieces: 6),
+                    targets: Bool.random(using: &generator) ? ["content"] : ["tag"]
+                )
+            }
+            let languages = Bool.random(using: &generator) ? ["ja"] : nil
+            let tags = [randomString(maxPieces: 3)]
+
+            let matches = Moderation.matchMuteWords(
+                mutedWords: words, text: text, outlineTags: tags, languages: languages
+            )
+            let has = Moderation.hasMutedWord(
+                mutedWords: words, text: text, outlineTags: tags, languages: languages
+            )
+            #expect(has == !matches.isEmpty)
+            #expect(matches.count <= words.count)
+            #expect(matches.allSatisfy { words.contains($0.word) })
+        }
+    }
+
     // MARK: facet with multiple features
 
     @Test("facet with multiple features: multiple tags")
