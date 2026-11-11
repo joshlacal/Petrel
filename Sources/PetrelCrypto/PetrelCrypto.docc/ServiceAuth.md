@@ -127,8 +127,10 @@ verified the token, and the claims.
 ### Resolve the issuer's key
 
 ``ServiceAuthKeyResolver`` is the seam to DID resolution. In the `Petrel`
-module, `DIDDocumentServiceAuthKeyResolver` reads the key out of a resolved DID
-document. For tests, or a service with a known set of callers,
+module, `IdentityResolver` conforms to it and resolves issuers over the
+network, and `DIDDocumentServiceAuthKeyResolver` reads the key out of a DID
+document from any other source. For tests, or a service with a known set of
+callers,
 ``StaticServiceAuthKeyResolver`` holds a table, and
 ``ClosureServiceAuthKeyResolver`` adapts any lookup you already have:
 

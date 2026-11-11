@@ -77,8 +77,27 @@ grants at most one hour with a method.
 
 `ServiceAuthVerifier` (in `PetrelCrypto`) turns an `Authorization` header into
 a verified caller. It needs the issuer's public key, which is published in the
-issuer's DID document; ``DIDDocumentServiceAuthKeyResolver`` reads it from
-there. Give it any way of fetching a DID document:
+issuer's DID document. ``IdentityResolver`` resolves DID documents and can be
+used as the verifier's key source directly:
+
+```swift
+let verifier = ServiceAuthVerifier(
+    audience: .service(did: "did:web:feed.example.com", id: "bsky_fg", acceptBareDID: true),
+    keyResolver: CachingServiceAuthKeyResolver(upstream: IdentityResolver())
+)
+let caller = try await verifier.verify(
+    authorizationHeader: request.headers["Authorization"],
+    method: .exactly("app.bsky.feed.getFeedSkeleton")
+)
+```
+
+`CachingServiceAuthKeyResolver` limits how often a failed signature can make
+the resolver fetch a DID document again; anyone can send a token with a bad
+signature.
+
+To read keys from a document source of your own — a PLC mirror, a database —
+use ``DIDDocumentServiceAuthKeyResolver`` and give it any way of fetching a
+DID document:
 
 ```swift
 struct FeedGenerator {
@@ -128,9 +147,9 @@ A labeler authenticates the same way, with its own audience
 (`.service(did: labelerDID, id: "atproto_labeler")`) and method NSIDs.
 
 The proxying and token snippets on this page are exercised on the wire by
-`Tests/PetrelTests/ServiceAuth/ServiceAuthClientTests.swift`; the feed
-generator is the one in
-`Tests/PetrelTests/ServiceAuth/ServiceAuthDIDDocumentTests.swift`.
+`Tests/PetrelTests/ServiceAuth/ServiceAuthClientTests.swift`; the identity
+resolver snippet by `ServiceAuthIdentityResolverTests.swift` and the feed
+generator by `ServiceAuthDIDDocumentTests.swift`, in the same directory.
 
 ## Topics
 
@@ -147,4 +166,5 @@ generator is the one in
 
 ### Verifying tokens
 
+- ``IdentityResolver``
 - ``DIDDocumentServiceAuthKeyResolver``
