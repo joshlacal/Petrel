@@ -804,6 +804,10 @@ public enum AppBskyFeedDefs {
 
         public let post: PostView
         public let reply: ReplyRef?
+        /// The 1-indexed position of this post within the contiguous OP thread. Only present when this post is part of the OP thread.
+        public let opThreadPostIndex: Int?
+        /// The total number of posts in the contiguous OP thread that this post belongs to. Only present when this post is part of the OP thread.
+        public let opThreadPostCount: Int?
         public let reason: FeedViewPostReasonUnion?
         /// Context provided by feed generator that may be passed back alongside interactions.
         public let feedContext: String?
@@ -816,6 +820,8 @@ public enum AppBskyFeedDefs {
         public init(
             post: PostView,
             reply: ReplyRef? = nil,
+            opThreadPostIndex: Int? = nil,
+            opThreadPostCount: Int? = nil,
             reason: FeedViewPostReasonUnion? = nil,
             feedContext: String? = nil,
             reqId: String? = nil,
@@ -823,6 +829,8 @@ public enum AppBskyFeedDefs {
         ) {
             self.post = post
             self.reply = reply
+            self.opThreadPostIndex = opThreadPostIndex
+            self.opThreadPostCount = opThreadPostCount
             self.reason = reason
             self.feedContext = feedContext
             self.reqId = reqId
@@ -842,6 +850,26 @@ public enum AppBskyFeedDefs {
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'reply' — degrading to nil: \(error)")
                 reply = nil
+            }
+            do {
+                opThreadPostIndex = try container.decodeIfPresent(Int.self, forKey: .opThreadPostIndex, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'opThreadPostIndex' — degrading to nil: \(error)")
+                opThreadPostIndex = nil
+            }
+            do {
+                opThreadPostCount = try container.decodeIfPresent(Int.self, forKey: .opThreadPostCount, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'opThreadPostCount' — degrading to nil: \(error)")
+                opThreadPostCount = nil
             }
             do {
                 reason = try container.decodeIfPresent(FeedViewPostReasonUnion.self, forKey: .reason, rejectingNull: strict)
@@ -880,6 +908,8 @@ public enum AppBskyFeedDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(post, forKey: .post)
             try container.encodeIfPresent(reply, forKey: .reply)
+            try container.encodeIfPresent(opThreadPostIndex, forKey: .opThreadPostIndex)
+            try container.encodeIfPresent(opThreadPostCount, forKey: .opThreadPostCount)
             try container.encodeIfPresent(reason, forKey: .reason)
             try container.encodeIfPresent(feedContext, forKey: .feedContext)
             try container.encodeIfPresent(reqId, forKey: .reqId)
@@ -889,6 +919,16 @@ public enum AppBskyFeedDefs {
         public func hash(into hasher: inout Hasher) {
             hasher.combine(post)
             if let value = reply {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = opThreadPostIndex {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = opThreadPostCount {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -919,6 +959,12 @@ public enum AppBskyFeedDefs {
             if reply != other.reply {
                 return false
             }
+            if opThreadPostIndex != other.opThreadPostIndex {
+                return false
+            }
+            if opThreadPostCount != other.opThreadPostCount {
+                return false
+            }
             if reason != other.reason {
                 return false
             }
@@ -943,6 +989,14 @@ public enum AppBskyFeedDefs {
                 let replyValue = try value.toCBORValue()
                 map = map.adding(key: "reply", value: replyValue)
             }
+            if let value = opThreadPostIndex {
+                let opThreadPostIndexValue = try value.toCBORValue()
+                map = map.adding(key: "opThreadPostIndex", value: opThreadPostIndexValue)
+            }
+            if let value = opThreadPostCount {
+                let opThreadPostCountValue = try value.toCBORValue()
+                map = map.adding(key: "opThreadPostCount", value: opThreadPostCountValue)
+            }
             if let value = reason {
                 let reasonValue = try value.toCBORValue()
                 map = map.adding(key: "reason", value: reasonValue)
@@ -958,11 +1012,13 @@ public enum AppBskyFeedDefs {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "post", "reply", "reason", "feedContext", "reqId"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "post", "reply", "opThreadPostIndex", "opThreadPostCount", "reason", "feedContext", "reqId"]
 
         private enum CodingKeys: String, CodingKey {
             case post
             case reply
+            case opThreadPostIndex
+            case opThreadPostCount
             case reason
             case feedContext
             case reqId

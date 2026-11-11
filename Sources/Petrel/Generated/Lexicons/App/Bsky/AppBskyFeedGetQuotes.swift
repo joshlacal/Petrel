@@ -12,17 +12,20 @@ public enum AppBskyFeedGetQuotes {
         public let cid: CID?
         public let limit: Int?
         public let cursor: String?
+        public let sort: String?
 
         public init(
             uri: ATProtocolURI,
             cid: CID? = nil,
             limit: Int? = nil,
-            cursor: String? = nil
+            cursor: String? = nil,
+            sort: String? = nil
         ) {
             self.uri = uri
             self.cid = cid
             self.limit = limit
             self.cursor = cursor
+            self.sort = sort
         }
     }
 

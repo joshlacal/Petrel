@@ -15,7 +15,7 @@ public enum AppBskyAuthManageNotifications {
         detail: "View and configure notifications for the Bluesky app.",
         detailLang: [:],
         permissions: [
-            LexiconPermission(resource: "rpc", parameters: ["lxm": ["app.bsky.notification.getPreferences", "app.bsky.notification.getUnreadCount", "app.bsky.notification.listActivitySubscriptions", "app.bsky.notification.listNotifications", "app.bsky.notification.putActivitySubscription", "app.bsky.notification.putPreferences", "app.bsky.notification.putPreferencesV2", "app.bsky.notification.registerPush", "app.bsky.notification.unregisterPush", "app.bsky.notification.updateSeen"]], inheritAud: true),
+            LexiconPermission(resource: "rpc", parameters: ["lxm": ["app.bsky.notification.getPreferences", "app.bsky.notification.getGroupedNotifications", "app.bsky.notification.getUnreadCount", "app.bsky.notification.listActivitySubscriptions", "app.bsky.notification.listNotifications", "app.bsky.notification.putActivitySubscription", "app.bsky.notification.putPreferences", "app.bsky.notification.putPreferencesV2", "app.bsky.notification.registerPush", "app.bsky.notification.unregisterPush", "app.bsky.notification.updateSeen"]], inheritAud: true),
         ]
     )
 }

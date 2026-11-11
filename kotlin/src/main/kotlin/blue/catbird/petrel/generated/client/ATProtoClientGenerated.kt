@@ -297,6 +297,24 @@ class ATProtoClient(val networkService: NetworkService) {
 
     }
 
+    val network: Network = Network()
+
+    inner class Network {
+        val client: ATProtoClient get() = this@ATProtoClient
+        val bsky: Bsky = Bsky()
+
+        inner class Bsky {
+            val client: ATProtoClient get() = this@ATProtoClient
+            val jetstream: Jetstream = Jetstream()
+
+            inner class Jetstream {
+                val client: ATProtoClient get() = this@ATProtoClient
+            }
+
+        }
+
+    }
+
     val site: Site = Site()
 
     inner class Site {

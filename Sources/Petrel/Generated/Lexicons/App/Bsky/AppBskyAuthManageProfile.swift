@@ -15,7 +15,7 @@ public enum AppBskyAuthManageProfile {
         detail: "Update profile data, as well as status and public chat visibility.",
         detailLang: [:],
         permissions: [
-            LexiconPermission(resource: "repo", parameters: ["action": ["create", "update", "delete"], "collection": ["app.bsky.actor.profile", "app.bsky.actor.status", "app.bsky.notification.declaration"]], inheritAud: false),
+            LexiconPermission(resource: "repo", parameters: ["action": ["create", "update", "delete"], "collection": ["app.bsky.actor.link", "app.bsky.actor.profile", "app.bsky.actor.status", "app.bsky.notification.declaration"]], inheritAud: false),
         ]
     )
 }

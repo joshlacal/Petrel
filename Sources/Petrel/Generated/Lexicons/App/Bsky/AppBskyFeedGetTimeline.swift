@@ -11,27 +11,34 @@ public enum AppBskyFeedGetTimeline {
         public let algorithm: String?
         public let limit: Int?
         public let cursor: String?
+        public let since: String?
 
         public init(
             algorithm: String? = nil,
             limit: Int? = nil,
-            cursor: String? = nil
+            cursor: String? = nil,
+            since: String? = nil
         ) {
             self.algorithm = algorithm
             self.limit = limit
             self.cursor = cursor
+            self.since = since
         }
     }
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
+        /// Cursor identifying the newest item in this page. Pass it as since on a later request to fetch only newer content.
+        public let startCursor: String?
         public let feed: [AppBskyFeedDefs.FeedViewPost]
 
         public init(
             cursor: String? = nil,
+            startCursor: String? = nil,
             feed: [AppBskyFeedDefs.FeedViewPost]
         ) {
             self.cursor = cursor
+            self.startCursor = startCursor
             self.feed = feed
         }
 
@@ -48,12 +55,23 @@ public enum AppBskyFeedGetTimeline {
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
+            do {
+                startCursor = try container.decodeIfPresent(String.self, forKey: .startCursor, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'startCursor' — degrading to nil: \(error)")
+                startCursor = nil
+            }
             feed = try container.decode([AppBskyFeedDefs.FeedViewPost].self, forKey: .feed)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(cursor, forKey: .cursor)
+            try container.encodeIfPresent(startCursor, forKey: .startCursor)
             try container.encode(feed, forKey: .feed)
         }
 
@@ -63,6 +81,10 @@ public enum AppBskyFeedGetTimeline {
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
+            if let value = startCursor {
+                let startCursorValue = try value.toCBORValue()
+                map = map.adding(key: "startCursor", value: startCursorValue)
+            }
             let feedValue = try feed.toCBORValue()
             map = map.adding(key: "feed", value: feedValue)
             return map
@@ -70,6 +92,7 @@ public enum AppBskyFeedGetTimeline {
 
         private enum CodingKeys: String, CodingKey {
             case cursor
+            case startCursor
             case feed
         }
     }

@@ -29,6 +29,7 @@ object ChatBskyConvoLeaveConvoDefs {
 
 sealed class ChatBskyConvoLeaveConvoError(val name: String, val description: String?) {
         object InvalidConvo: ChatBskyConvoLeaveConvoError("InvalidConvo", null)
+        object AlreadyLeftConvo: ChatBskyConvoLeaveConvoError("AlreadyLeftConvo", "The user has already left the conversation and is not back in (a direct conversation can be restarted by a new message, which allows leaving again).")
         object OwnerCannotLeave: ChatBskyConvoLeaveConvoError("OwnerCannotLeave", "The owner of a group conversation cannot leave before locking the group.")
     }
 

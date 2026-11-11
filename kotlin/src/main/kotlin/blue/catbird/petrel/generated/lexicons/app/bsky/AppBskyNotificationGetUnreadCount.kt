@@ -18,7 +18,7 @@ object AppBskyNotificationGetUnreadCountDefs {
 
 @Serializable
     data class AppBskyNotificationGetUnreadCountParameters(
-        @SerialName("priority")
+// Deprecated: this parameter is ignored.        @SerialName("priority")
         val priority: Boolean? = null,        @SerialName("seenAt")
         val seenAt: ATProtocolDate? = null    )
 

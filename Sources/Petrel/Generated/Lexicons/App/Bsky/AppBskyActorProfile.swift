@@ -15,6 +15,7 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
     public let description: String?
     /// Free-form pronouns text.
     public let pronouns: String?
+    /// Deprecated: use links instead.
     public let website: URI?
     /// Small image to be displayed next to posts from account. AKA, 'profile picture'
     public let avatar: Blob?
@@ -24,6 +25,8 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
     public let labels: AppBskyActorProfileLabelsUnion?
     public let joinedViaStarterPack: ComAtprotoRepoStrongRef?
     public let pinnedPost: ComAtprotoRepoStrongRef?
+    /// Links shown on the profile, in display order. Each ref points to an app.bsky.actor.link record in this repo.
+    public let links: [ComAtprotoRepoStrongRef]?
     public let createdAt: ATProtocolDate?
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
@@ -39,6 +42,7 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         labels: AppBskyActorProfileLabelsUnion? = nil,
         joinedViaStarterPack: ComAtprotoRepoStrongRef? = nil,
         pinnedPost: ComAtprotoRepoStrongRef? = nil,
+        links: [ComAtprotoRepoStrongRef]? = nil,
         createdAt: ATProtocolDate? = nil,
         extraFields: [String: ATProtocolValueContainer] = [:]
     ) {
@@ -51,6 +55,7 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         self.labels = labels
         self.joinedViaStarterPack = joinedViaStarterPack
         self.pinnedPost = pinnedPost
+        self.links = links
         self.createdAt = createdAt
         self.extraFields = extraFields
     }
@@ -149,6 +154,16 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
             pinnedPost = nil
         }
         do {
+            links = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .links, rejectingNull: strict)
+        } catch {
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
+            LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
+            links = nil
+        }
+        do {
             createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt, rejectingNull: strict)
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
@@ -173,6 +188,7 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(labels, forKey: .labels)
         try container.encodeIfPresent(joinedViaStarterPack, forKey: .joinedViaStarterPack)
         try container.encodeIfPresent(pinnedPost, forKey: .pinnedPost)
+        try container.encodeIfPresent(links, forKey: .links)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
@@ -223,6 +239,11 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?)
         }
+        if let value = links {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
         if let value = createdAt {
             hasher.combine(value)
         } else {
@@ -258,6 +279,9 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
             return false
         }
         if pinnedPost != other.pinnedPost {
+            return false
+        }
+        if links != other.links {
             return false
         }
         if createdAt != other.createdAt {
@@ -309,6 +333,10 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
             let pinnedPostValue = try value.toCBORValue()
             map = map.adding(key: "pinnedPost", value: pinnedPostValue)
         }
+        if let value = links {
+            let linksValue = try value.toCBORValue()
+            map = map.adding(key: "links", value: linksValue)
+        }
         if let value = createdAt {
             let createdAtValue = try value.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
@@ -316,7 +344,7 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
 
-    private static let knownFieldKeys: Swift.Set<String> = ["$type", "displayName", "description", "pronouns", "website", "avatar", "banner", "labels", "joinedViaStarterPack", "pinnedPost", "createdAt"]
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "displayName", "description", "pronouns", "website", "avatar", "banner", "labels", "joinedViaStarterPack", "pinnedPost", "links", "createdAt"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -329,6 +357,7 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         case labels
         case joinedViaStarterPack
         case pinnedPost
+        case links
         case createdAt
     }
 

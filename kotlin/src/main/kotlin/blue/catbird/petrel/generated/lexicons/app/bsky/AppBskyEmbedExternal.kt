@@ -16,6 +16,69 @@ object AppBskyEmbedExternalDefs {
     const val TYPE_IDENTIFIER = "app.bsky.embed.external"
 }
 
+@Serializable(with = AppBskyEmbedExternalViewGalleryItemsUnionSerializer::class)
+sealed interface AppBskyEmbedExternalViewGalleryItemsUnion {
+    @Serializable
+    data class ViewGalleryImage(val value: blue.catbird.petrel.generated.AppBskyEmbedExternalViewGalleryImage) : AppBskyEmbedExternalViewGalleryItemsUnion
+
+    @Serializable
+    data class Unexpected(val value: JsonElement) : AppBskyEmbedExternalViewGalleryItemsUnion
+}
+
+object AppBskyEmbedExternalViewGalleryItemsUnionSerializer : kotlinx.serialization.KSerializer<AppBskyEmbedExternalViewGalleryItemsUnion> {
+    override val descriptor: kotlinx.serialization.descriptors.SerialDescriptor =
+        kotlinx.serialization.descriptors.buildClassSerialDescriptor("AppBskyEmbedExternalViewGalleryItemsUnion")
+
+    private val TYPE_ViewGalleryImage = kotlinx.serialization.json.JsonPrimitive("app.bsky.embed.external#viewGalleryImage")
+
+    override fun serialize(encoder: kotlinx.serialization.encoding.Encoder, value: AppBskyEmbedExternalViewGalleryItemsUnion) {
+        val jsonEncoder = encoder as kotlinx.serialization.json.JsonEncoder
+        val element = when (value) {
+            is AppBskyEmbedExternalViewGalleryItemsUnion.ViewGalleryImage -> {
+                val obj = (jsonEncoder.json.encodeToJsonElement(
+                    blue.catbird.petrel.generated.AppBskyEmbedExternalViewGalleryImage.serializer(),
+                    value.value
+                ) as? kotlinx.serialization.json.JsonObject)?.let { original ->
+                    val map = java.util.LinkedHashMap<String, kotlinx.serialization.json.JsonElement>(original.size + 1)
+                    map["\$type"] = TYPE_ViewGalleryImage
+                    map.putAll(original)
+                    kotlinx.serialization.json.JsonObject(map)
+                } ?: kotlinx.serialization.json.buildJsonObject {
+                    put("\$type", TYPE_ViewGalleryImage)
+                }
+                obj
+            }
+            is AppBskyEmbedExternalViewGalleryItemsUnion.Unexpected -> value.value
+            // Synthetic variants (e.g. <Union>Error / <Union>Unexpected added by
+            // subscription codegen) are runtime-only sentinels; JSON round-trip
+            // serialises them as an empty object tagged with the variant class
+            // name. Consumers should filter these before JSON serialisation.
+            else -> kotlinx.serialization.json.buildJsonObject {
+                put("\$type", kotlinx.serialization.json.JsonPrimitive(value::class.simpleName ?: "Unknown"))
+            }
+        }
+        jsonEncoder.encodeJsonElement(element)
+    }
+
+    override fun deserialize(decoder: kotlinx.serialization.encoding.Decoder): AppBskyEmbedExternalViewGalleryItemsUnion {
+        val jsonDecoder = decoder as? kotlinx.serialization.json.JsonDecoder
+            ?: throw kotlinx.serialization.SerializationException("AppBskyEmbedExternalViewGalleryItemsUnion can only be deserialized from JSON")
+        val element = jsonDecoder.decodeJsonElement()
+        val jsonObject = element as? kotlinx.serialization.json.JsonObject
+            ?: return AppBskyEmbedExternalViewGalleryItemsUnion.Unexpected(element)
+        val primitive = jsonObject["\$type"] as? kotlinx.serialization.json.JsonPrimitive
+        val type = if (primitive != null && primitive.isString) primitive.content else null
+            ?: return AppBskyEmbedExternalViewGalleryItemsUnion.Unexpected(element)
+
+        return when (type) {
+            "app.bsky.embed.external#viewGalleryImage" -> AppBskyEmbedExternalViewGalleryItemsUnion.ViewGalleryImage(
+                jsonDecoder.json.decodeFromJsonElement(blue.catbird.petrel.generated.AppBskyEmbedExternalViewGalleryImage.serializer(), element)
+            )
+            else -> AppBskyEmbedExternalViewGalleryItemsUnion.Unexpected(element)
+        }
+    }
+}
+
     @Serializable
     data class AppBskyEmbedExternalExternal(
         @SerialName("uri")
@@ -99,6 +162,111 @@ object AppBskyEmbedExternalDefs {
         val b: Int    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyEmbedExternalColorRGB"
+        }
+    }
+
+    @Serializable
+    data class AppBskyEmbedExternalViewArticle(
+        @SerialName("uri")
+        val uri: URI,        @SerialName("title")
+        val title: String,        @SerialName("description")
+        val description: String,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate? = null,        @SerialName("updatedAt")
+        val updatedAt: ATProtocolDate? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("associatedRefs")
+        val associatedRefs: List<ComAtprotoRepoStrongRef>? = null,        @SerialName("associatedProfiles")
+        val associatedProfiles: List<AppBskyActorDefsProfileViewBasic>? = null,        @SerialName("image")
+        val image: URI? = null,        @SerialName("publisher")
+        val publisher: AppBskyEmbedExternalViewArticlePublication? = null,        @SerialName("readingTime")
+        val readingTime: Int? = null,        @SerialName("likeCount")
+        val likeCount: Int? = null,/** Available profile previews. Selected deterministically by DID; not a ranking. */        @SerialName("likers")
+        val likers: List<AppBskyActorDefsProfileViewBasic>? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewArticle"
+        }
+    }
+
+    @Serializable
+    data class AppBskyEmbedExternalViewArticlePublication(
+        @SerialName("uri")
+        val uri: URI,        @SerialName("title")
+        val title: String,        @SerialName("description")
+        val description: String,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate? = null,        @SerialName("updatedAt")
+        val updatedAt: ATProtocolDate? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("associatedRefs")
+        val associatedRefs: List<ComAtprotoRepoStrongRef>? = null,        @SerialName("associatedProfiles")
+        val associatedProfiles: List<AppBskyActorDefsProfileViewBasic>? = null,        @SerialName("logo")
+        val logo: URI? = null,        @SerialName("image")
+        val image: URI? = null,        @SerialName("theme")
+        val theme: AppBskyEmbedExternalViewArticlePublicationTheme? = null,        @SerialName("subscriptionCount")
+        val subscriptionCount: Int? = null,/** Available profile previews. Selected deterministically by DID; not a ranking. */        @SerialName("subscribers")
+        val subscribers: List<AppBskyActorDefsProfileViewBasic>? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewArticlePublication"
+        }
+    }
+
+    @Serializable
+    data class AppBskyEmbedExternalViewArticlePublicationTheme(
+/** Hex color string, if available. Example: '#ffffff'. */        @SerialName("background")
+        val background: String? = null,/** Hex color string, if available. Example: '#ffffff'. */        @SerialName("foreground")
+        val foreground: String? = null,/** Hex color string, if available. Example: '#ffffff'. */        @SerialName("accent")
+        val accent: String? = null,/** Hex color string, if available. Example: '#ffffff'. */        @SerialName("accentForeground")
+        val accentForeground: String? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewArticlePublicationTheme"
+        }
+    }
+
+    @Serializable
+    data class AppBskyEmbedExternalViewGallery(
+        @SerialName("uri")
+        val uri: URI,        @SerialName("title")
+        val title: String,        @SerialName("description")
+        val description: String,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate? = null,        @SerialName("updatedAt")
+        val updatedAt: ATProtocolDate? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("associatedRefs")
+        val associatedRefs: List<ComAtprotoRepoStrongRef>? = null,        @SerialName("associatedProfiles")
+        val associatedProfiles: List<AppBskyActorDefsProfileViewBasic>? = null,/** The media items in the gallery. Each item may be of a different type, but all types must be supported by the client. */        @SerialName("items")
+        val items: List<AppBskyEmbedExternalViewGalleryItemsUnion>,        @SerialName("likeCount")
+        val likeCount: Int? = null,/** Available profile previews. Selected deterministically by DID; not a ranking. */        @SerialName("likers")
+        val likers: List<AppBskyActorDefsProfileViewBasic>? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewGallery"
+        }
+    }
+
+    @Serializable
+    data class AppBskyEmbedExternalViewGalleryImage(
+/** Fully-qualified URL where a thumbnail of the image can be fetched. For example, CDN location provided by the App View. */        @SerialName("thumbnail")
+        val thumbnail: URI,/** Fully-qualified URL where a large version of the image can be fetched. May or may not be the exact original blob. For example, CDN location provided by the App View. */        @SerialName("fullsize")
+        val fullsize: URI,/** Alt text description of the image, for accessibility. */        @SerialName("alt")
+        val alt: String? = null,        @SerialName("aspectRatio")
+        val aspectRatio: AppBskyEmbedDefsAspectRatio? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewGalleryImage"
+        }
+    }
+
+    @Serializable
+    data class AppBskyEmbedExternalViewLivestream(
+        @SerialName("uri")
+        val uri: URI,        @SerialName("title")
+        val title: String,        @SerialName("description")
+        val description: String,        @SerialName("createdAt")
+        val createdAt: ATProtocolDate? = null,        @SerialName("updatedAt")
+        val updatedAt: ATProtocolDate? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("associatedRefs")
+        val associatedRefs: List<ComAtprotoRepoStrongRef>? = null,        @SerialName("associatedProfiles")
+        val associatedProfiles: List<AppBskyActorDefsProfileViewBasic>? = null,        @SerialName("image")
+        val image: URI? = null,/** True if the livestream is currently active at the time this view is served, false if it has ended. */        @SerialName("active")
+        val active: Boolean,        @SerialName("startedAt")
+        val startedAt: ATProtocolDate? = null,        @SerialName("endedAt")
+        val endedAt: ATProtocolDate? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyEmbedExternalViewLivestream"
         }
     }
 

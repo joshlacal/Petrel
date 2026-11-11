@@ -79,6 +79,8 @@ public enum ChatBskyConvoLeaveConvo {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case invalidConvo = "InvalidConvo"
+        /// The user has already left the conversation and is not back in (a direct conversation can be restarted by a new message, which allows leaving again).
+        case alreadyLeftConvo = "AlreadyLeftConvo"
         /// The owner of a group conversation cannot leave before locking the group.
         case ownerCannotLeave = "OwnerCannotLeave"
         public var description: String {

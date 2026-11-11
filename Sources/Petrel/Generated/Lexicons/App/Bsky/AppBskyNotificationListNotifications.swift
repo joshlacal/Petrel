@@ -247,6 +247,7 @@ public enum AppBskyNotificationListNotifications {
     public struct Output: ATProtocolCodable {
         public let cursor: String?
         public let notifications: [Notification]
+        /// Deprecated: this field is no longer populated.
         public let priority: Bool?
         public let seenAt: ATProtocolDate?
 

@@ -21,7 +21,7 @@ object AppBskyGraphGetFollowsDefs {
         @SerialName("actor")
         val actor: ATIdentifier,        @SerialName("limit")
         val limit: Int? = null,        @SerialName("cursor")
-        val cursor: String? = null,        @SerialName("sort")
+        val cursor: String? = null,// Sort order of the returned follows.        @SerialName("sort")
         val sort: String? = null    )
 
     @Serializable

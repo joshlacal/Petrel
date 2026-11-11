@@ -524,6 +524,8 @@ public enum AppBskyGraphDefs {
 
         public let uri: ATProtocolURI
         public let subject: AppBskyActorDefs.ProfileView
+        /// Set to true when the subject has opted out of appearing in the reference list. Only set when the viewer owns the list.
+        public let subjectOptedOut: Bool?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
@@ -531,17 +533,30 @@ public enum AppBskyGraphDefs {
         public init(
             uri: ATProtocolURI,
             subject: AppBskyActorDefs.ProfileView,
+            subjectOptedOut: Bool? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.subject = subject
+            self.subjectOptedOut = subjectOptedOut
             self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             subject = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .subject)
+            do {
+                subjectOptedOut = try container.decodeIfPresent(Bool.self, forKey: .subjectOptedOut, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'subjectOptedOut' — degrading to nil: \(error)")
+                subjectOptedOut = nil
+            }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
@@ -549,12 +564,18 @@ public enum AppBskyGraphDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(uri, forKey: .uri)
             try container.encode(subject, forKey: .subject)
+            try container.encodeIfPresent(subjectOptedOut, forKey: .subjectOptedOut)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(uri)
             hasher.combine(subject)
+            if let value = subjectOptedOut {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(extraFields)
         }
 
@@ -564,6 +585,9 @@ public enum AppBskyGraphDefs {
                 return false
             }
             if subject != other.subject {
+                return false
+            }
+            if subjectOptedOut != other.subjectOptedOut {
                 return false
             }
             return extraFields == other.extraFields
@@ -579,14 +603,19 @@ public enum AppBskyGraphDefs {
             map = map.adding(key: "uri", value: uriValue)
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
+            if let value = subjectOptedOut {
+                let subjectOptedOutValue = try value.toCBORValue()
+                map = map.adding(key: "subjectOptedOut", value: subjectOptedOutValue)
+            }
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "subject"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "subject", "subjectOptedOut"]
 
         private enum CodingKeys: String, CodingKey {
             case uri
             case subject
+            case subjectOptedOut
         }
     }
 
@@ -1081,6 +1110,8 @@ public enum AppBskyGraphDefs {
 
         public let muted: Bool?
         public let blocked: ATProtocolURI?
+        /// The authenticated viewer's app.bsky.graph.referencelistoptout record URI for this reference list. Only set for reference lists. A client can delete this record to undo the opt-out.
+        public let referenceListOptOut: ATProtocolURI?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
@@ -1088,10 +1119,12 @@ public enum AppBskyGraphDefs {
         public init(
             muted: Bool? = nil,
             blocked: ATProtocolURI? = nil,
+            referenceListOptOut: ATProtocolURI? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.muted = muted
             self.blocked = blocked
+            self.referenceListOptOut = referenceListOptOut
             self.extraFields = extraFields
         }
 
@@ -1118,6 +1151,16 @@ public enum AppBskyGraphDefs {
                 LogManager.logWarning("Decoding error for optional property 'blocked' — degrading to nil: \(error)")
                 blocked = nil
             }
+            do {
+                referenceListOptOut = try container.decodeIfPresent(ATProtocolURI.self, forKey: .referenceListOptOut, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'referenceListOptOut' — degrading to nil: \(error)")
+                referenceListOptOut = nil
+            }
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
@@ -1125,6 +1168,7 @@ public enum AppBskyGraphDefs {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(muted, forKey: .muted)
             try container.encodeIfPresent(blocked, forKey: .blocked)
+            try container.encodeIfPresent(referenceListOptOut, forKey: .referenceListOptOut)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
@@ -1139,6 +1183,11 @@ public enum AppBskyGraphDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = referenceListOptOut {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(extraFields)
         }
 
@@ -1148,6 +1197,9 @@ public enum AppBskyGraphDefs {
                 return false
             }
             if blocked != other.blocked {
+                return false
+            }
+            if referenceListOptOut != other.referenceListOptOut {
                 return false
             }
             return extraFields == other.extraFields
@@ -1167,14 +1219,19 @@ public enum AppBskyGraphDefs {
                 let blockedValue = try value.toCBORValue()
                 map = map.adding(key: "blocked", value: blockedValue)
             }
+            if let value = referenceListOptOut {
+                let referenceListOptOutValue = try value.toCBORValue()
+                map = map.adding(key: "referenceListOptOut", value: referenceListOptOutValue)
+            }
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "muted", "blocked"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "muted", "blocked", "referenceListOptOut"]
 
         private enum CodingKeys: String, CodingKey {
             case muted
             case blocked
+            case referenceListOptOut
         }
     }
 

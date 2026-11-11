@@ -1080,7 +1080,7 @@ enum class AppBskyActorDefsMutedWordTarget {
         val handle: Handle,        @SerialName("displayName")
         val displayName: String? = null,        @SerialName("description")
         val description: String? = null,        @SerialName("pronouns")
-        val pronouns: String? = null,        @SerialName("website")
+        val pronouns: String? = null,/** Deprecated: use links instead. */        @SerialName("website")
         val website: URI? = null,        @SerialName("avatar")
         val avatar: URI? = null,        @SerialName("banner")
         val banner: URI? = null,        @SerialName("followersCount")
@@ -1093,7 +1093,8 @@ enum class AppBskyActorDefsMutedWordTarget {
         val createdAt: ATProtocolDate? = null,        @SerialName("viewer")
         val viewer: AppBskyActorDefsViewerState? = null,        @SerialName("labels")
         val labels: List<ComAtprotoLabelDefsLabel>? = null,        @SerialName("pinnedPost")
-        val pinnedPost: ComAtprotoRepoStrongRef? = null,        @SerialName("verification")
+        val pinnedPost: ComAtprotoRepoStrongRef? = null,/** The profile's links, in display order. Links that were taken down or don't resolve are left out. */        @SerialName("links")
+        val links: List<AppBskyActorDefsProfileLinkView>? = null,        @SerialName("verification")
         val verification: AppBskyActorDefsVerificationState? = null,        @SerialName("status")
         val status: AppBskyActorDefsStatusView? = null,/** Debug information for internal development */        @SerialName("debug")
         val debug: JsonElement? = null    ) {
@@ -1134,6 +1135,20 @@ enum class AppBskyActorDefsMutedWordTarget {
         val showButtonTo: String    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileAssociatedGerm"
+        }
+    }
+
+    @Serializable
+    data class AppBskyActorDefsProfileLinkView(
+/** The app.bsky.actor.link record, e.g. for reporting the link. */        @SerialName("uri")
+        val uri: ATProtocolURI,        @SerialName("cid")
+        val cid: CID,/** The link destination. */        @SerialName("url")
+        val url: URI,        @SerialName("title")
+        val title: String? = null,/** Image URL for the destination site's icon. */        @SerialName("icon")
+        val icon: URI? = null,        @SerialName("labels")
+        val labels: List<ComAtprotoLabelDefsLabel>? = null    ) {
+        companion object {
+            const val TYPE_IDENTIFIER = "#appBskyActorDefsProfileLinkView"
         }
     }
 
@@ -1314,7 +1329,8 @@ enum class AppBskyActorDefsMutedWordTarget {
 
     @Serializable
     data class AppBskyActorDefsInterestsPref(
-/** A list of tags which describe the account owner's interests gathered during onboarding. */        @SerialName("tags")
+/** The timestamp when the account owner last updated their interests. */        @SerialName("updatedAt")
+        val updatedAt: ATProtocolDate? = null,/** A list of tags which describe the account owner's interests gathered during onboarding. */        @SerialName("tags")
         val tags: List<String>    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyActorDefsInterestsPref"

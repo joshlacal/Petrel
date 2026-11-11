@@ -21,12 +21,14 @@ object AppBskyFeedGetTimelineDefs {
 // Variant 'algorithm' for timeline. Implementation-specific. NOTE: most feed flexibility has been moved to feed generator mechanism.        @SerialName("algorithm")
         val algorithm: String? = null,        @SerialName("limit")
         val limit: Int? = null,        @SerialName("cursor")
-        val cursor: String? = null    )
+        val cursor: String? = null,// Return only items newer than the position identified by this cursor value, newest first. Use the startCursor from a previous response. The item at that position is not returned because the caller already holds it. When the bounded range is exhausted, the returned cursor equals this value so that pagination continues below the boundary.        @SerialName("since")
+        val since: String? = null    )
 
     @Serializable
     data class AppBskyFeedGetTimelineOutput(
         @SerialName("cursor")
-        val cursor: String? = null,        @SerialName("feed")
+        val cursor: String? = null,// Cursor identifying the newest item in this page. Pass it as since on a later request to fetch only newer content.        @SerialName("startCursor")
+        val startCursor: String? = null,        @SerialName("feed")
         val feed: List<AppBskyFeedDefsFeedViewPost>    )
 
 /**

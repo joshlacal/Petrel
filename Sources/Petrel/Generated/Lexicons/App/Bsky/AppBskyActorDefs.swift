@@ -754,6 +754,7 @@ public struct AppBskyActorDefs {
         public let displayName: String?
         public let description: String?
         public let pronouns: String?
+        /// Deprecated: use links instead.
         public let website: URI?
         public let avatar: URI?
         public let banner: URI?
@@ -767,6 +768,8 @@ public struct AppBskyActorDefs {
         public let viewer: ViewerState?
         public let labels: [ComAtprotoLabelDefs.Label]?
         public let pinnedPost: ComAtprotoRepoStrongRef?
+        /// The profile's links, in display order. Links that were taken down or don't resolve are left out.
+        public let links: [ProfileLinkView]?
         public let verification: VerificationState?
         public let status: StatusView?
         /// Debug information for internal development
@@ -794,6 +797,7 @@ public struct AppBskyActorDefs {
             viewer: ViewerState? = nil,
             labels: [ComAtprotoLabelDefs.Label]? = nil,
             pinnedPost: ComAtprotoRepoStrongRef? = nil,
+            links: [ProfileLinkView]? = nil,
             verification: VerificationState? = nil,
             status: StatusView? = nil,
             debug: ATProtocolValueContainer? = nil,
@@ -817,6 +821,7 @@ public struct AppBskyActorDefs {
             self.viewer = viewer
             self.labels = labels
             self.pinnedPost = pinnedPost
+            self.links = links
             self.verification = verification
             self.status = status
             self.debug = debug
@@ -989,6 +994,16 @@ public struct AppBskyActorDefs {
                 pinnedPost = nil
             }
             do {
+                links = try container.decodeIfPresent([ProfileLinkView].self, forKey: .links, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
+                links = nil
+            }
+            do {
                 verification = try container.decodeIfPresent(VerificationState.self, forKey: .verification, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
@@ -1041,6 +1056,7 @@ public struct AppBskyActorDefs {
             try container.encodeIfPresent(viewer, forKey: .viewer)
             try container.encodeIfPresent(labels, forKey: .labels)
             try container.encodeIfPresent(pinnedPost, forKey: .pinnedPost)
+            try container.encodeIfPresent(links, forKey: .links)
             try container.encodeIfPresent(verification, forKey: .verification)
             try container.encodeIfPresent(status, forKey: .status)
             try container.encodeIfPresent(debug, forKey: .debug)
@@ -1130,6 +1146,11 @@ public struct AppBskyActorDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            if let value = links {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             if let value = verification {
                 hasher.combine(value)
             } else {
@@ -1202,6 +1223,9 @@ public struct AppBskyActorDefs {
                 return false
             }
             if pinnedPost != other.pinnedPost {
+                return false
+            }
+            if links != other.links {
                 return false
             }
             if verification != other.verification {
@@ -1290,6 +1314,10 @@ public struct AppBskyActorDefs {
                 let pinnedPostValue = try value.toCBORValue()
                 map = map.adding(key: "pinnedPost", value: pinnedPostValue)
             }
+            if let value = links {
+                let linksValue = try value.toCBORValue()
+                map = map.adding(key: "links", value: linksValue)
+            }
             if let value = verification {
                 let verificationValue = try value.toCBORValue()
                 map = map.adding(key: "verification", value: verificationValue)
@@ -1305,7 +1333,7 @@ public struct AppBskyActorDefs {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "handle", "displayName", "description", "pronouns", "website", "avatar", "banner", "followersCount", "followsCount", "postsCount", "associated", "joinedViaStarterPack", "indexedAt", "createdAt", "viewer", "labels", "pinnedPost", "verification", "status", "debug"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "handle", "displayName", "description", "pronouns", "website", "avatar", "banner", "followersCount", "followsCount", "postsCount", "associated", "joinedViaStarterPack", "indexedAt", "createdAt", "viewer", "labels", "pinnedPost", "links", "verification", "status", "debug"]
 
         private enum CodingKeys: String, CodingKey {
             case did
@@ -1326,6 +1354,7 @@ public struct AppBskyActorDefs {
             case viewer
             case labels
             case pinnedPost
+            case links
             case verification
             case status
             case debug
@@ -1724,6 +1753,174 @@ public struct AppBskyActorDefs {
         private enum CodingKeys: String, CodingKey {
             case messageMeUrl
             case showButtonTo
+        }
+    }
+
+    public struct ProfileLinkView: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "app.bsky.actor.defs#profileLinkView"
+
+        /// The app.bsky.actor.link record, e.g. for reporting the link.
+        public let uri: ATProtocolURI
+        public let cid: CID
+        /// The link destination.
+        public let url: URI
+        public let title: String?
+        /// Image URL for the destination site's icon.
+        public let icon: URI?
+        public let labels: [ComAtprotoLabelDefs.Label]?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            uri: ATProtocolURI,
+            cid: CID,
+            url: URI,
+            title: String? = nil,
+            icon: URI? = nil,
+            labels: [ComAtprotoLabelDefs.Label]? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.uri = uri
+            self.cid = cid
+            self.url = url
+            self.title = title
+            self.icon = icon
+            self.labels = labels
+            self.extraFields = extraFields
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            cid = try container.decode(CID.self, forKey: .cid)
+            url = try container.decode(URI.self, forKey: .url)
+            do {
+                title = try container.decodeIfPresent(String.self, forKey: .title, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'title' — degrading to nil: \(error)")
+                title = nil
+            }
+            do {
+                icon = try container.decodeIfPresent(URI.self, forKey: .icon, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'icon' — degrading to nil: \(error)")
+                icon = nil
+            }
+            do {
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
+                labels = nil
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(uri, forKey: .uri)
+            try container.encode(cid, forKey: .cid)
+            try container.encode(url, forKey: .url)
+            try container.encodeIfPresent(title, forKey: .title)
+            try container.encodeIfPresent(icon, forKey: .icon)
+            try container.encodeIfPresent(labels, forKey: .labels)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(uri)
+            hasher.combine(cid)
+            hasher.combine(url)
+            if let value = title {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = icon {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = labels {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(extraFields)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if uri != other.uri {
+                return false
+            }
+            if cid != other.cid {
+                return false
+            }
+            if url != other.url {
+                return false
+            }
+            if title != other.title {
+                return false
+            }
+            if icon != other.icon {
+                return false
+            }
+            if labels != other.labels {
+                return false
+            }
+            return extraFields == other.extraFields
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let uriValue = try uri.toCBORValue()
+            map = map.adding(key: "uri", value: uriValue)
+            let cidValue = try cid.toCBORValue()
+            map = map.adding(key: "cid", value: cidValue)
+            let urlValue = try url.toCBORValue()
+            map = map.adding(key: "url", value: urlValue)
+            if let value = title {
+                let titleValue = try value.toCBORValue()
+                map = map.adding(key: "title", value: titleValue)
+            }
+            if let value = icon {
+                let iconValue = try value.toCBORValue()
+                map = map.adding(key: "icon", value: iconValue)
+            }
+            if let value = labels {
+                let labelsValue = try value.toCBORValue()
+                map = map.adding(key: "labels", value: labelsValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        }
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "url", "title", "icon", "labels"]
+
+        private enum CodingKeys: String, CodingKey {
+            case uri
+            case cid
+            case url
+            case title
+            case icon
+            case labels
         }
     }
 
@@ -3358,6 +3555,8 @@ public struct AppBskyActorDefs {
     public struct InterestsPref: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.actor.defs#interestsPref"
 
+        /// The timestamp when the account owner last updated their interests.
+        public let updatedAt: ATProtocolDate?
         /// A list of tags which describe the account owner's interests gathered during onboarding.
         public let tags: [String]
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
@@ -3365,32 +3564,54 @@ public struct AppBskyActorDefs {
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
+            updatedAt: ATProtocolDate? = nil,
             tags: [String],
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
+            self.updatedAt = updatedAt
             self.tags = tags
             self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            do {
+                updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'updatedAt' — degrading to nil: \(error)")
+                updatedAt = nil
+            }
             tags = try container.decode([String].self, forKey: .tags)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
             try container.encode(tags, forKey: .tags)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
+            if let value = updatedAt {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
             hasher.combine(tags)
             hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
+            if updatedAt != other.updatedAt {
+                return false
+            }
             if tags != other.tags {
                 return false
             }
@@ -3403,14 +3624,19 @@ public struct AppBskyActorDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
+            if let value = updatedAt {
+                let updatedAtValue = try value.toCBORValue()
+                map = map.adding(key: "updatedAt", value: updatedAtValue)
+            }
             let tagsValue = try tags.toCBORValue()
             map = map.adding(key: "tags", value: tagsValue)
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "tags"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "updatedAt", "tags"]
 
         private enum CodingKeys: String, CodingKey {
+            case updatedAt
             case tags
         }
     }

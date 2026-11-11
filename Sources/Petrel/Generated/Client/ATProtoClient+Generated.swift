@@ -1267,6 +1267,39 @@ public actor ATProtoClient {
         }
     }
 
+    public var network: Network {
+        Network(networkService: networkService)
+    }
+
+    public struct Network: Sendable {
+        public let networkService: NetworkService
+        public init(networkService: NetworkService) {
+            self.networkService = networkService
+        }
+
+        public var bsky: Bsky {
+            Bsky(networkService: networkService)
+        }
+
+        public struct Bsky: Sendable {
+            public let networkService: NetworkService
+            public init(networkService: NetworkService) {
+                self.networkService = networkService
+            }
+
+            public var jetstream: Jetstream {
+                Jetstream(networkService: networkService)
+            }
+
+            public struct Jetstream: Sendable {
+                public let networkService: NetworkService
+                public init(networkService: NetworkService) {
+                    self.networkService = networkService
+                }
+            }
+        }
+    }
+
     public var site: Site {
         Site(networkService: networkService)
     }

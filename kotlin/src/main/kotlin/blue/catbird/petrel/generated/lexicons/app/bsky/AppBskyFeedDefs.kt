@@ -843,7 +843,9 @@ object AppBskyFeedDefsSkeletonFeedPostReasonUnionSerializer : kotlinx.serializat
     data class AppBskyFeedDefsFeedViewPost(
         @SerialName("post")
         val post: AppBskyFeedDefsPostView,        @SerialName("reply")
-        val reply: AppBskyFeedDefsReplyRef? = null,        @SerialName("reason")
+        val reply: AppBskyFeedDefsReplyRef? = null,/** The 1-indexed position of this post within the contiguous OP thread. Only present when this post is part of the OP thread. */        @SerialName("opThreadPostIndex")
+        val opThreadPostIndex: Int? = null,/** The total number of posts in the contiguous OP thread that this post belongs to. Only present when this post is part of the OP thread. */        @SerialName("opThreadPostCount")
+        val opThreadPostCount: Int? = null,        @SerialName("reason")
         val reason: AppBskyFeedDefsFeedViewPostReasonUnion? = null,/** Context provided by feed generator that may be passed back alongside interactions. */        @SerialName("feedContext")
         val feedContext: String? = null,/** Unique identifier per request that may be passed back alongside interactions. */        @SerialName("reqId")
         val reqId: String? = null    ) {

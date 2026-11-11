@@ -134,6 +134,10 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         public let repostCount: Int?
         public let likeCount: Int?
         public let quoteCount: Int?
+        /// The 1-indexed position of this post within the contiguous OP thread. Only present when this post is part of the OP thread.
+        public let opThreadPostIndex: Int?
+        /// The total number of posts in the contiguous OP thread that this post belongs to. Only present when this post is part of the OP thread.
+        public let opThreadPostCount: Int?
         public let embeds: [ViewRecordEmbedsUnion]?
         public let indexedAt: ATProtocolDate
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
@@ -150,6 +154,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             repostCount: Int? = nil,
             likeCount: Int? = nil,
             quoteCount: Int? = nil,
+            opThreadPostIndex: Int? = nil,
+            opThreadPostCount: Int? = nil,
             embeds: [ViewRecordEmbedsUnion]? = nil,
             indexedAt: ATProtocolDate,
             extraFields: [String: ATProtocolValueContainer] = [:]
@@ -163,6 +169,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             self.repostCount = repostCount
             self.likeCount = likeCount
             self.quoteCount = quoteCount
+            self.opThreadPostIndex = opThreadPostIndex
+            self.opThreadPostCount = opThreadPostCount
             self.embeds = embeds
             self.indexedAt = indexedAt
             self.extraFields = extraFields
@@ -226,6 +234,26 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
                 quoteCount = nil
             }
             do {
+                opThreadPostIndex = try container.decodeIfPresent(Int.self, forKey: .opThreadPostIndex, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'opThreadPostIndex' — degrading to nil: \(error)")
+                opThreadPostIndex = nil
+            }
+            do {
+                opThreadPostCount = try container.decodeIfPresent(Int.self, forKey: .opThreadPostCount, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'opThreadPostCount' — degrading to nil: \(error)")
+                opThreadPostCount = nil
+            }
+            do {
                 embeds = try container.decodeIfPresent([ViewRecordEmbedsUnion].self, forKey: .embeds, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
@@ -250,6 +278,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(repostCount, forKey: .repostCount)
             try container.encodeIfPresent(likeCount, forKey: .likeCount)
             try container.encodeIfPresent(quoteCount, forKey: .quoteCount)
+            try container.encodeIfPresent(opThreadPostIndex, forKey: .opThreadPostIndex)
+            try container.encodeIfPresent(opThreadPostCount, forKey: .opThreadPostCount)
             try container.encodeIfPresent(embeds, forKey: .embeds)
             try container.encode(indexedAt, forKey: .indexedAt)
             try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
@@ -281,6 +311,16 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
                 hasher.combine(nil as Int?)
             }
             if let value = quoteCount {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = opThreadPostIndex {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = opThreadPostCount {
                 hasher.combine(value)
             } else {
                 hasher.combine(nil as Int?)
@@ -321,6 +361,12 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
                 return false
             }
             if quoteCount != other.quoteCount {
+                return false
+            }
+            if opThreadPostIndex != other.opThreadPostIndex {
+                return false
+            }
+            if opThreadPostCount != other.opThreadPostCount {
                 return false
             }
             if embeds != other.embeds {
@@ -366,6 +412,14 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
                 let quoteCountValue = try value.toCBORValue()
                 map = map.adding(key: "quoteCount", value: quoteCountValue)
             }
+            if let value = opThreadPostIndex {
+                let opThreadPostIndexValue = try value.toCBORValue()
+                map = map.adding(key: "opThreadPostIndex", value: opThreadPostIndexValue)
+            }
+            if let value = opThreadPostCount {
+                let opThreadPostCountValue = try value.toCBORValue()
+                map = map.adding(key: "opThreadPostCount", value: opThreadPostCountValue)
+            }
             if let value = embeds {
                 let embedsValue = try value.toCBORValue()
                 map = map.adding(key: "embeds", value: embedsValue)
@@ -375,7 +429,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "value", "labels", "replyCount", "repostCount", "likeCount", "quoteCount", "embeds", "indexedAt"]
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "value", "labels", "replyCount", "repostCount", "likeCount", "quoteCount", "opThreadPostIndex", "opThreadPostCount", "embeds", "indexedAt"]
 
         private enum CodingKeys: String, CodingKey {
             case uri
@@ -387,6 +441,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             case repostCount
             case likeCount
             case quoteCount
+            case opThreadPostIndex
+            case opThreadPostCount
             case embeds
             case indexedAt
         }

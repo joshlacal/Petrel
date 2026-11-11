@@ -3,38 +3,52 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.embed.getEmbedExternalView
 
-/// Resolve one or more AT-URIs into the data needed to render an enhanced external embed. Returns `associatedRefs` (strongRefs to embed into a post's external.associatedRefs), the raw `associatedRecords`, and a hydrated `view`. The response is empty (`{}`) when no records were resolvable, or when validation determined the resolved records don't actually back the requested URL; clients should fall back to their own link-card rendering in that case and skip writing strongRefs to the post.
+/// Resolve one AT-URI record into the data needed to render an enhanced external embed. The records are validated against the requested `url` before any view is built. When validation passes, returns `data`, `associatedRefs` (strongRefs to embed into a post's external.associatedRefs) and the raw `associatedRecords`, plus a legacy `view` for Standard.site records only. When validation fails, only `unverifiedAssociatedRefs` and `unverifiedAssociatedRecords` are returned and no view or data is built. The response is empty (`{}`) when no record URI was usable or the record could not be resolved; clients should fall back to their own link-card rendering in that case and skip writing strongRefs to the post.
 public enum AppBskyEmbedGetEmbedExternalView {
     public static let typeIdentifier = "app.bsky.embed.getEmbedExternalView"
 
     public struct Parameters: Parametrizable {
         public let url: URI
-        public let uris: [ATProtocolURI]
+        public let canonicalUri: ATProtocolURI?
+        public let uris: [ATProtocolURI]?
 
         public init(
             url: URI,
-            uris: [ATProtocolURI]
+            canonicalUri: ATProtocolURI? = nil,
+            uris: [ATProtocolURI]? = nil
         ) {
             self.url = url
+            self.canonicalUri = canonicalUri
             self.uris = uris
         }
     }
 
     public struct Output: ATProtocolCodable {
-        /// Hydrated view of the embed. Present only when the resolved records back the requested URL and supply enough information to populate the required `viewExternal` fields. Omitted alongside the rest of the response when no records resolved or validation failed.
+        /// Legacy hydrated view of the embed, returned for Standard.site records only. Present only when validation passed and the records supply enough information to populate the required `viewExternal` fields.
         public let view: AppBskyEmbedExternal.View?
-        /// StrongRefs (URI+CID) of the Atmosphere records that backed this view, suitable for embedding into a post's external.associatedRefs.
+        /// Preferred to #view. Hydrated data of the embed. Present only when validation passed and the records supply enough information to populate the required fields.
+        public let data: OutputDataUnion?
+        /// StrongRefs (URI+CID) of the Atmosphere records selected for persistence in a post, suitable for embedding into its external.associatedRefs: the canonical record, plus only the additional records the service chooses to persist for its collection. This can be a subset of the records used to render `data`, which may also draw on other hydrated records such as recommendations, subscriptions, or favorites. Present only when validation passed. Index-aligned with `associatedRecords`.
         public let associatedRefs: [ComAtprotoRepoStrongRef]?
         public let associatedRecords: [ATProtocolValueContainer]?
+        /// StrongRefs (URI+CID) of the same persistence-selected Atmosphere records (the canonical record plus chosen additional records) when validation of the requested `url` failed. These must not be written to a post. Index-aligned with `unverifiedAssociatedRecords`.
+        public let unverifiedAssociatedRefs: [ComAtprotoRepoStrongRef]?
+        public let unverifiedAssociatedRecords: [ATProtocolValueContainer]?
 
         public init(
             view: AppBskyEmbedExternal.View? = nil,
+            data: OutputDataUnion? = nil,
             associatedRefs: [ComAtprotoRepoStrongRef]? = nil,
-            associatedRecords: [ATProtocolValueContainer]? = nil
+            associatedRecords: [ATProtocolValueContainer]? = nil,
+            unverifiedAssociatedRefs: [ComAtprotoRepoStrongRef]? = nil,
+            unverifiedAssociatedRecords: [ATProtocolValueContainer]? = nil
         ) {
             self.view = view
+            self.data = data
             self.associatedRefs = associatedRefs
             self.associatedRecords = associatedRecords
+            self.unverifiedAssociatedRefs = unverifiedAssociatedRefs
+            self.unverifiedAssociatedRecords = unverifiedAssociatedRecords
         }
 
         public init(from decoder: Decoder) throws {
@@ -49,6 +63,16 @@ public enum AppBskyEmbedGetEmbedExternalView {
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'view' — degrading to nil: \(error)")
                 view = nil
+            }
+            do {
+                data = try container.decodeIfPresent(OutputDataUnion.self, forKey: .data, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'data' — degrading to nil: \(error)")
+                data = nil
             }
             do {
                 associatedRefs = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .associatedRefs, rejectingNull: strict)
@@ -70,13 +94,36 @@ public enum AppBskyEmbedGetEmbedExternalView {
                 LogManager.logWarning("Decoding error for optional property 'associatedRecords' — degrading to nil: \(error)")
                 associatedRecords = nil
             }
+            do {
+                unverifiedAssociatedRefs = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .unverifiedAssociatedRefs, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'unverifiedAssociatedRefs' — degrading to nil: \(error)")
+                unverifiedAssociatedRefs = nil
+            }
+            do {
+                unverifiedAssociatedRecords = try container.decodeIfPresent([ATProtocolValueContainer].self, forKey: .unverifiedAssociatedRecords, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'unverifiedAssociatedRecords' — degrading to nil: \(error)")
+                unverifiedAssociatedRecords = nil
+            }
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encodeIfPresent(view, forKey: .view)
+            try container.encodeIfPresent(data, forKey: .data)
             try container.encodeIfPresent(associatedRefs, forKey: .associatedRefs)
             try container.encodeIfPresent(associatedRecords, forKey: .associatedRecords)
+            try container.encodeIfPresent(unverifiedAssociatedRefs, forKey: .unverifiedAssociatedRefs)
+            try container.encodeIfPresent(unverifiedAssociatedRecords, forKey: .unverifiedAssociatedRecords)
         }
 
         public func toCBORValue() throws -> Any {
@@ -84,6 +131,10 @@ public enum AppBskyEmbedGetEmbedExternalView {
             if let value = view {
                 let viewValue = try value.toCBORValue()
                 map = map.adding(key: "view", value: viewValue)
+            }
+            if let value = data {
+                let dataValue = try value.toCBORValue()
+                map = map.adding(key: "data", value: dataValue)
             }
             if let value = associatedRefs {
                 let associatedRefsValue = try value.toCBORValue()
@@ -93,13 +144,230 @@ public enum AppBskyEmbedGetEmbedExternalView {
                 let associatedRecordsValue = try value.toCBORValue()
                 map = map.adding(key: "associatedRecords", value: associatedRecordsValue)
             }
+            if let value = unverifiedAssociatedRefs {
+                let unverifiedAssociatedRefsValue = try value.toCBORValue()
+                map = map.adding(key: "unverifiedAssociatedRefs", value: unverifiedAssociatedRefsValue)
+            }
+            if let value = unverifiedAssociatedRecords {
+                let unverifiedAssociatedRecordsValue = try value.toCBORValue()
+                map = map.adding(key: "unverifiedAssociatedRecords", value: unverifiedAssociatedRecordsValue)
+            }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case view
+            case data
             case associatedRefs
             case associatedRecords
+            case unverifiedAssociatedRefs
+            case unverifiedAssociatedRecords
+        }
+    }
+
+    public enum OutputDataUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        case appBskyEmbedExternalViewArticle(AppBskyEmbedExternal.ViewArticle)
+        case appBskyEmbedExternalViewArticlePublication(AppBskyEmbedExternal.ViewArticlePublication)
+        case appBskyEmbedExternalViewGallery(AppBskyEmbedExternal.ViewGallery)
+        case appBskyEmbedExternalViewLivestream(AppBskyEmbedExternal.ViewLivestream)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
+        case unexpected(ATProtocolValueContainer)
+        public init(_ value: AppBskyEmbedExternal.ViewArticle) {
+            self = .appBskyEmbedExternalViewArticle(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.ViewArticlePublication) {
+            self = .appBskyEmbedExternalViewArticlePublication(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.ViewGallery) {
+            self = .appBskyEmbedExternalViewGallery(value)
+        }
+
+        public init(_ value: AppBskyEmbedExternal.ViewLivestream) {
+            self = .appBskyEmbedExternalViewLivestream(value)
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let typeValue = try container.decode(String.self, forKey: .type)
+
+            switch typeValue {
+            case "app.bsky.embed.external#viewArticle":
+                let value = try AppBskyEmbedExternal.ViewArticle(from: decoder)
+                self = .appBskyEmbedExternalViewArticle(value)
+            case "app.bsky.embed.external#viewArticlePublication":
+                let value = try AppBskyEmbedExternal.ViewArticlePublication(from: decoder)
+                self = .appBskyEmbedExternalViewArticlePublication(value)
+            case "app.bsky.embed.external#viewGallery":
+                let value = try AppBskyEmbedExternal.ViewGallery(from: decoder)
+                self = .appBskyEmbedExternalViewGallery(value)
+            case "app.bsky.embed.external#viewLivestream":
+                let value = try AppBskyEmbedExternal.ViewLivestream(from: decoder)
+                self = .appBskyEmbedExternalViewLivestream(value)
+            default:
+                let unknownValue = try ATProtocolValueContainer(from: decoder)
+                self = .unexpected(unknownValue)
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+
+            switch self {
+            case let .appBskyEmbedExternalViewArticle(value):
+                try container.encode("app.bsky.embed.external#viewArticle", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyEmbedExternalViewArticlePublication(value):
+                try container.encode("app.bsky.embed.external#viewArticlePublication", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyEmbedExternalViewGallery(value):
+                try container.encode("app.bsky.embed.external#viewGallery", forKey: .type)
+                try value.encode(to: encoder)
+            case let .appBskyEmbedExternalViewLivestream(value):
+                try container.encode("app.bsky.embed.external#viewLivestream", forKey: .type)
+                try value.encode(to: encoder)
+            case let .unexpected(container):
+                try container.encode(to: encoder)
+            }
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            switch self {
+            case let .appBskyEmbedExternalViewArticle(value):
+                hasher.combine("app.bsky.embed.external#viewArticle")
+                hasher.combine(value)
+            case let .appBskyEmbedExternalViewArticlePublication(value):
+                hasher.combine("app.bsky.embed.external#viewArticlePublication")
+                hasher.combine(value)
+            case let .appBskyEmbedExternalViewGallery(value):
+                hasher.combine("app.bsky.embed.external#viewGallery")
+                hasher.combine(value)
+            case let .appBskyEmbedExternalViewLivestream(value):
+                hasher.combine("app.bsky.embed.external#viewLivestream")
+                hasher.combine(value)
+            case let .unexpected(container):
+                hasher.combine("unexpected")
+                hasher.combine(container)
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case type = "$type"
+        }
+
+        public static func == (lhs: OutputDataUnion, rhs: OutputDataUnion) -> Bool {
+            switch (lhs, rhs) {
+            case let (
+                .appBskyEmbedExternalViewArticle(lhsValue),
+                .appBskyEmbedExternalViewArticle(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyEmbedExternalViewArticlePublication(lhsValue),
+                .appBskyEmbedExternalViewArticlePublication(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyEmbedExternalViewGallery(lhsValue),
+                .appBskyEmbedExternalViewGallery(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (
+                .appBskyEmbedExternalViewLivestream(lhsValue),
+                .appBskyEmbedExternalViewLivestream(rhsValue)
+            ):
+                return lhsValue == rhsValue
+            case let (.unexpected(lhsValue), .unexpected(rhsValue)):
+                return lhsValue.isEqual(to: rhsValue)
+            default:
+                return false
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? OutputDataUnion else { return false }
+            return self == other
+        }
+
+        /// DAGCBOR encoding with field ordering
+        public func toCBORValue() throws -> Any {
+            // Create an ordered map to maintain field order
+            var map = OrderedCBORMap()
+
+            switch self {
+            case let .appBskyEmbedExternalViewArticle(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.external#viewArticle")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyEmbedExternalViewArticlePublication(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.external#viewArticlePublication")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyEmbedExternalViewGallery(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.external#viewGallery")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .appBskyEmbedExternalViewLivestream(value):
+                map = map.adding(key: "$type", value: "app.bsky.embed.external#viewLivestream")
+
+                let valueDict = try value.toCBORValue()
+
+                // If the value is already an OrderedCBORMap, merge its entries
+                if let orderedMap = valueDict as? OrderedCBORMap {
+                    for (key, value) in orderedMap.entries where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                } else if let dict = valueDict as? [String: Any] {
+                    // Otherwise add each key-value pair from the dictionary
+                    for (key, value) in dict where key != "$type" {
+                        map = map.adding(key: key, value: value)
+                    }
+                }
+                return map
+            case let .unexpected(container):
+                return try container.toCBORValue()
+            }
         }
     }
 }
@@ -107,7 +375,7 @@ public enum AppBskyEmbedGetEmbedExternalView {
 public extension ATProtoClient.App.Bsky.Embed {
     // MARK: - getEmbedExternalView
 
-    /// Resolve one or more AT-URIs into the data needed to render an enhanced external embed. Returns `associatedRefs` (strongRefs to embed into a post's external.associatedRefs), the raw `associatedRecords`, and a hydrated `view`. The response is empty (`{}`) when no records were resolvable, or when validation determined the resolved records don't actually back the requested URL; clients should fall back to their own link-card rendering in that case and skip writing strongRefs to the post.
+    /// Resolve one AT-URI record into the data needed to render an enhanced external embed. The records are validated against the requested `url` before any view is built. When validation passes, returns `data`, `associatedRefs` (strongRefs to embed into a post's external.associatedRefs) and the raw `associatedRecords`, plus a legacy `view` for Standard.site records only. When validation fails, only `unverifiedAssociatedRefs` and `unverifiedAssociatedRecords` are returned and no view or data is built. The response is empty (`{}`) when no record URI was usable or the record could not be resolved; clients should fall back to their own link-card rendering in that case and skip writing strongRefs to the post.
     ///
     /// - Parameter input: The input parameters for the request
     /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
