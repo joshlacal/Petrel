@@ -20,7 +20,7 @@ from base_code_generator import BaseCodeGenerator
 # QueryParametersTests.EveryLeafParameters.
 QUERY_ENCODABLE_SWIFT_TYPES = frozenset({
     "String", "Int", "Bool",
-    "CID", "ATProtocolDate", "URI", "ATProtocolURI", "SpaceRef", "ATIdentifier",
+    "CID", "CIDString", "ATProtocolDate", "URI", "ATProtocolURI", "SpaceRef", "ATIdentifier",
     "DID", "Handle", "NSID", "TID", "RecordKey", "LanguageCodeContainer",
 })
 

@@ -27,13 +27,13 @@ class RequiredNullableGenerationTests(unittest.TestCase):
 
         expected_lines = (
             "public let nullableScalar: String?",
-            "public let nullableCID: CID?",
+            "public let nullableCID: CIDString?",
             "public let requiredCount: Int",
             "public let optionalNote: String?",
             "guard container.contains(.nullableScalar) else {",
             "guard container.contains(.nullableCID) else {",
             "self.nullableScalar = try container.decodeIfPresent(String.self, forKey: .nullableScalar)",
-            "self.nullableCID = try container.decodeIfPresent(CID.self, forKey: .nullableCID)",
+            "self.nullableCID = try container.decodeIfPresent(CIDString.self, forKey: .nullableCID)",
             "self.requiredCount = try container.decode(Int.self, forKey: .requiredCount)",
             "self.optionalNote = try container.decodeIfPresent(String.self, forKey: .optionalNote, rejectingNull: strict)",
             "try container.encode(self.nullableScalar, forKey: .nullableScalar)",
@@ -42,7 +42,7 @@ class RequiredNullableGenerationTests(unittest.TestCase):
             "try container.encodeIfPresent(self.optionalNote, forKey: .optionalNote)",
             # A required-nullable property has no default; an optional one does.
             "nullableScalar: String?,",
-            "nullableCID: CID?,",
+            "nullableCID: CIDString?,",
             "requiredCount: Int,",
             "optionalNote: String? = nil,",
         )
@@ -60,7 +60,7 @@ class RequiredNullableGenerationTests(unittest.TestCase):
             normalized,
         )
         self.assertNotIn("nullableScalar: String? = nil", generated)
-        self.assertNotIn("nullableCID: CID? = nil", generated)
+        self.assertNotIn("nullableCID: CIDString? = nil", generated)
 
     def test_kotlin_snapshot_distinguishes_required_nullable_from_optional(self):
         generated = KotlinCodeGenerator(required_nullable_lexicon()).convert()
@@ -97,7 +97,7 @@ class RequiredNullableGenerationTests(unittest.TestCase):
                 public static func logDebug(_ message: String) {{}}
             }}
             {CONTAINER_STUB}
-            public struct CID: Codable, Equatable, Hashable {{
+            public struct CIDString: Codable, Equatable, Hashable {{
                 public let value: String
                 public init(from decoder: Decoder) throws {{
                     value = try decoder.singleValueContainer().decode(String.self)

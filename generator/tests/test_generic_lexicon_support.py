@@ -376,8 +376,8 @@ class ObjectShapeTests(unittest.TestCase):
                 required=["must"], nullable=["swap", "must"],
             )},
         )
-        self.assertIn("public let swap: ATProtoNullable<CID>?", generated)
-        self.assertIn("swap: ATProtoNullable<CID>? = nil,", generated)
+        self.assertIn("public let swap: ATProtoNullable<CIDString>?", generated)
+        self.assertIn("swap: ATProtoNullable<CIDString>? = nil,", generated)
         self.assertIn("if try container.decodeNil(forKey: .swap) {", generated)
         self.assertIn("try container.encodeIfPresent(self.swap, forKey: .swap)", generated)
         # Required and nullable stays a plain optional whose key must be present.
@@ -387,7 +387,8 @@ class ObjectShapeTests(unittest.TestCase):
         self.assertIn("try container.decodeIfPresent(String.self, forKey: .may, rejectingNull: strict)", generated)
 
     def test_cid_link_is_a_link_and_a_cid_format_string_is_a_string(self):
-        """lex-4."""
+        """lex-4: a cid-link is a data-model link; a `format: cid` string stays a string,
+        kept verbatim, because `CID` parses only the link forms atproto blesses."""
         generated = render(
             "com.example.thing",
             {
@@ -403,7 +404,7 @@ class ObjectShapeTests(unittest.TestCase):
         self.assertIn("public let link: ATProtoLink?", generated)
         self.assertIn("public let links: [ATProtoLink]?", generated)
         self.assertIn("public let viaRef: ATProtoLink?", generated)
-        self.assertIn("public let text: CID?", generated)
+        self.assertIn("public let text: CIDString?", generated)
         self.assertIn("public typealias Head = ATProtoLink", generated)
 
     def test_types_outside_the_lexicon_language_are_rejected(self):

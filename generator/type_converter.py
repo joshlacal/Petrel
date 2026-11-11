@@ -90,7 +90,9 @@ class TypeConverter:
             elif string_format == 'at-identifier':
                 swift_type = "ATIdentifier"
             elif string_format == 'cid':
-                swift_type = "CID"
+                # The syntax-tier string, kept verbatim. `CID` parses only the forms
+                # atproto blesses for links and would reject valid `cid` strings.
+                swift_type = "CIDString"
             elif string_format == 'did':
                 swift_type = "DID"
             elif string_format == 'handle':
@@ -187,8 +189,8 @@ class TypeConverter:
 #     TID(tidString:) throws            .toString() -> String
 #     URI(url:) NON-throwing            .url -> URL? (always Optional, even
 #                                        for a non-Optional source URI)
-#   Sources/Petrel/Core/Types/CID.swift
-#     CID(cidString:) throws            .string -> String
+#   Sources/Petrel/Core/Types/CIDString.swift
+#     CIDString(cidString:) throws      .string -> String
 #   Sources/Petrel/Core/Utils/Languages.swift
 #     LanguageCodeContainer(languageCode:) NON-throwing
 #   Sources/Petrel/Core/Utils/DateValidation.swift
@@ -213,7 +215,7 @@ _INTENT_WRAPPER_BY_FORMAT = {
     'handle': 'Handle',
     'at-identifier': 'ATIdentifier',
     'at-uri': 'ATProtocolURI',
-    'cid': 'CID',
+    'cid': 'CIDString',
     'nsid': 'NSID',
     'tid': 'TID',
     'record-key': 'RecordKey',
@@ -229,7 +231,7 @@ _INTENT_PARAM_BRIDGE = {
     'Handle': ('String', 'try Handle(handleString: {v})', True),
     'ATIdentifier': ('String', 'try ATIdentifier(string: {v})', True),
     'ATProtocolURI': ('String', 'try ATProtocolURI(uriString: {v})', True),
-    'CID': ('String', 'try CID(cidString: {v})', True),
+    'CIDString': ('String', 'try CIDString(cidString: {v})', True),
     'NSID': ('String', 'try NSID(nsidString: {v})', True),
     'TID': ('String', 'try TID(tidString: {v})', True),
     'RecordKey': ('String', 'try RecordKey(keyString: {v})', True),
@@ -248,7 +250,7 @@ _INTENT_ENTITY_EXTRACT = {
     'Handle': ('String', '{v}.value', '{v}?.value'),
     'ATIdentifier': ('String', '{v}.stringValue()', '{v}?.stringValue()'),
     'NSID': ('String', '{v}.nsidString()', '{v}?.nsidString()'),
-    'CID': ('String', '{v}.string', '{v}?.string'),
+    'CIDString': ('String', '{v}.string', '{v}?.string'),
     'ATProtocolURI': ('String', '{v}.uriString()', '{v}?.uriString()'),
     'RecordKey': ('String', '{v}.value', '{v}?.value'),
     'TID': ('String', '{v}.toString()', '{v}?.toString()'),
