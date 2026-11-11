@@ -1,0 +1,13 @@
+{
+  "name": "petrel-oauth-server-ts-client-interop",
+  "private": true,
+  "type": "module",
+  "description": "Drives @atproto/oauth-client-node (the reference TypeScript OAuth client) against petrel-oauth-server-example.",
+  "scripts": {
+    "interop": "node run.mjs"
+  },
+  "dependencies": {
+    "@atproto/jwk-jose": "0.2.4",
+    "@atproto/oauth-client-node": "0.5.16"
+  }
+}

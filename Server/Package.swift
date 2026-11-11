@@ -8,6 +8,8 @@ let package = Package(
     .executable(name: "petrel-cab-server", targets: ["petrel-cab-server"]),
     .executable(name: "petrel-cab-demo", targets: ["petrel-cab-demo"]),
     .library(name: "PetrelCABServerCore", targets: ["PetrelCABServerCore"]),
+    .library(name: "PetrelOAuthServerHummingbird", targets: ["PetrelOAuthServerHummingbird"]),
+    .executable(name: "petrel-oauth-server-example", targets: ["petrel-oauth-server-example"]),
   ],
   dependencies: [
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.25.0"),
@@ -44,6 +46,33 @@ let package = Package(
         .product(name: "Hummingbird", package: "hummingbird"),
       ],
       swiftSettings: [.swiftLanguageMode(.v6)]
+    ),
+    .target(
+      name: "PetrelOAuthServerHummingbird",
+      dependencies: [
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "PetrelOAuthServer", package: "Petrel"),
+      ],
+      swiftSettings: [.swiftLanguageMode(.v6)]
+    ),
+    .executableTarget(
+      name: "petrel-oauth-server-example",
+      dependencies: [
+        "PetrelOAuthServerHummingbird",
+        .product(name: "PetrelOAuthServer", package: "Petrel"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Hummingbird", package: "hummingbird"),
+      ],
+      swiftSettings: [.swiftLanguageMode(.v6)]
+    ),
+    .testTarget(
+      name: "PetrelOAuthServerHummingbirdTests",
+      dependencies: [
+        "PetrelOAuthServerHummingbird",
+        "petrel-oauth-server-example",
+        .product(name: "PetrelOAuthServer", package: "Petrel"),
+        .product(name: "HummingbirdTesting", package: "hummingbird"),
+      ]
     ),
     .testTarget(
       name: "PetrelCABServerCoreTests",
