@@ -32,6 +32,12 @@ public enum OAuthResourceAuthorizationFailure: Error, Sendable, Equatable {
     /// key.
     case invalidToken(String)
     /// The token is valid but does not carry the scope the request needs.
+    ///
+    /// `needed` is a scope that grants the request and parses back as such
+    /// (`grantingScope(for:)`), so a client may request it as it is. The
+    /// request's target is chosen by the caller, and when no scope can grant
+    /// it (a service ending in a bare `%`, say) `needed` is only the resource
+    /// family, such as `rpc`, which is not a scope.
     case insufficientScope(needed: String)
     /// A dependency could not answer.
     case unavailable
@@ -311,7 +317,7 @@ public extension OAuthAccessGrant {
     func requireRepo(collection: String, action: RepoAction) throws(OAuthResourceAuthorizationFailure) {
         let target = RepoPermission.Target(collection: collection, action: action)
         guard permissions.allowsRepo(target) else {
-            throw .insufficientScope(needed: (try? RepoPermission.scopeNeeded(for: target)) ?? "repo")
+            throw .insufficientScope(needed: (try? RepoPermission.grantingScope(for: target)) ?? "repo")
         }
     }
 
@@ -319,7 +325,7 @@ public extension OAuthAccessGrant {
     func requireRPC(lxm: String, aud: String) throws(OAuthResourceAuthorizationFailure) {
         let target = RpcPermission.Target(lxm: lxm, aud: aud)
         guard permissions.allowsRPC(target) else {
-            throw .insufficientScope(needed: (try? RpcPermission.scopeNeeded(for: target)) ?? "rpc")
+            throw .insufficientScope(needed: (try? RpcPermission.grantingScope(for: target)) ?? "rpc")
         }
     }
 
@@ -327,7 +333,7 @@ public extension OAuthAccessGrant {
     func requireBlob(mime: String) throws(OAuthResourceAuthorizationFailure) {
         let target = BlobPermission.Target(mime: mime)
         guard permissions.allowsBlob(target) else {
-            throw .insufficientScope(needed: (try? BlobPermission.scopeNeeded(for: target)) ?? "blob")
+            throw .insufficientScope(needed: (try? BlobPermission.grantingScope(for: target)) ?? "blob")
         }
     }
 
@@ -335,7 +341,7 @@ public extension OAuthAccessGrant {
     func requireAccount(attr: AccountAttribute, action: AccountAction) throws(OAuthResourceAuthorizationFailure) {
         let target = AccountPermission.Target(attr: attr, action: action)
         guard permissions.allowsAccount(target) else {
-            throw .insufficientScope(needed: (try? AccountPermission.scopeNeeded(for: target)) ?? "account")
+            throw .insufficientScope(needed: (try? AccountPermission.grantingScope(for: target)) ?? "account")
         }
     }
 
@@ -343,7 +349,7 @@ public extension OAuthAccessGrant {
     func requireIdentity(attr: IdentityAttribute) throws(OAuthResourceAuthorizationFailure) {
         let target = IdentityPermission.Target(attr: attr)
         guard permissions.allowsIdentity(target) else {
-            throw .insufficientScope(needed: (try? IdentityPermission.scopeNeeded(for: target)) ?? "identity")
+            throw .insufficientScope(needed: (try? IdentityPermission.grantingScope(for: target)) ?? "identity")
         }
     }
 }

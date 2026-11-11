@@ -200,10 +200,12 @@ struct OAuthPermissionSetTests {
                     try grant.requireRPC(lxm: "app.example.getFeed", aud: other)
                     Issue.record("\(aud) also granted \(other)")
                 } catch let .insufficientScope(needed) {
-                    // The scope named in the denial reads back as the service
-                    // denied, where a scope can name that service at all.
-                    guard (try? ATProtoScope.rpc(lxm: ["app.example.getFeed"], aud: other))?.scopeString != nil else { continue }
-                    let named = try #require(try? ATProtoScope.parse(needed), "denying \(other) under \(aud) named unparseable \(needed)")
+                    // The denial names a scope that reads back as the service
+                    // denied, or, where no scope can name it, only the family.
+                    guard let named = try? ATProtoScope.parse(needed) else {
+                        #expect(needed == "rpc", "denying \(other) under \(aud) named unparseable \(needed)")
+                        continue
+                    }
                     guard case let .rpc(permission) = named else { Issue.record("\(needed)"); continue }
                     #expect(permission.matches(.init(lxm: "app.example.getFeed", aud: other)), "\(needed)")
                     #expect(!permission.matches(.init(lxm: "app.example.getFeed", aud: aud)), "\(needed)")
