@@ -898,6 +898,39 @@ struct ServiceAuthVerifierTests {
         }
     }
 
+    @Test("A token cannot be replayed during its last accepted second", arguments: [0.0, 5.0, 5.5])
+    func replayThroughLastAcceptedSecond(skew: TimeInterval) async throws {
+        // The expiry check compares whole seconds, so with skew s a token
+        // with `exp` is accepted until just before exp + floor(s) + 1. The
+        // replay record must last at least that long.
+        let keypair = K256Keypair.generate()
+        let token = try await Fixture.mint(keypair) // exp = now + 60
+        let exp = Fixture.now.addingTimeInterval(60)
+        let lastSecond = exp.addingTimeInterval(skew.rounded(.down))
+        let clock = ServiceAuthSupportTests.Clock(lastSecond)
+        let store = InMemoryServiceAuthReplayStore(clock: { clock.now })
+        var configuration = ServiceAuthVerifier.Configuration(audience: .exactly(Fixture.audience))
+        configuration.clockSkew = skew
+        let verifier = ServiceAuthVerifier(
+            configuration: configuration,
+            keyResolver: StaticServiceAuthKeyResolver(keys: [Fixture.issuer: keypair.publicKey]),
+            replayStore: store
+        )
+
+        _ = try await verifier.verify(token: token, method: .exactly(Fixture.method), now: lastSecond)
+        for offset in [0.0, 0.5, 0.999] {
+            clock.advance(offset - (clock.now.timeIntervalSince(lastSecond)))
+            await #expect(throws: ServiceAuthError.replayed) {
+                try await verifier.verify(token: token, method: .exactly(Fixture.method), now: clock.now)
+            }
+        }
+        // One whole second later the token has expired on its own.
+        clock.advance(1.0 - clock.now.timeIntervalSince(lastSecond))
+        await #expect(throws: ServiceAuthError.expired) {
+            try await verifier.verify(token: token, method: .exactly(Fixture.method), now: clock.now)
+        }
+    }
+
     @Test("Only authentic tokens reach the replay store")
     func replayStoreSeesOnlyVerifiedTokens() async throws {
         let keypair = K256Keypair.generate()
@@ -1076,6 +1109,101 @@ struct ServiceAuthSupportTests {
         // Wrapped around a rotating upstream, the verifier still follows the rotation.
         await resolver.removeAll()
         #expect(try await resolver.signingKey(for: did, forceRefresh: false) == oldKey)
+    }
+
+    /// An upstream whose lookups block until released, so concurrent callers
+    /// overlap with an in-flight fetch.
+    actor GatedKeyResolver: ServiceAuthKeyResolver {
+        private(set) var calls = 0
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+        private var isOpen = false
+        private let key: ATProtoPublicKey
+        private let failure: (any Error)?
+
+        init(key: ATProtoPublicKey, failure: (any Error)? = nil) {
+            self.key = key
+            self.failure = failure
+        }
+
+        func signingKey(for did: String, forceRefresh: Bool) async throws -> ATProtoPublicKey {
+            try await signingKey(for: did, keyID: "#atproto", forceRefresh: forceRefresh)
+        }
+
+        func signingKey(for did: String, keyID: String, forceRefresh: Bool) async throws -> ATProtoPublicKey {
+            calls += 1
+            if !isOpen {
+                await withCheckedContinuation { waiters.append($0) }
+            }
+            if let failure { throw failure }
+            return key
+        }
+
+        func release() {
+            isOpen = true
+            for waiter in waiters { waiter.resume() }
+            waiters.removeAll()
+        }
+    }
+
+    /// Runs `count` concurrent lookups against `resolver` while `upstream`
+    /// is held, then releases it.
+    static func concurrentLookups(
+        _ count: Int,
+        resolver: CachingServiceAuthKeyResolver,
+        upstream: GatedKeyResolver,
+        forceRefresh: Bool = false
+    ) async -> [Result<ATProtoPublicKey, any Error>] {
+        await withTaskGroup(of: Result<ATProtoPublicKey, any Error>.self) { group in
+            for _ in 0..<count {
+                group.addTask {
+                    do {
+                        return .success(try await resolver.signingKey(
+                            for: ServiceAuthFixture.issuer, forceRefresh: forceRefresh
+                        ))
+                    } catch {
+                        return .failure(error)
+                    }
+                }
+            }
+            // Wait for the first fetch, then give the other callers ample
+            // time to arrive while it is still suspended.
+            while await upstream.calls == 0 { await Task.yield() }
+            try? await Task.sleep(nanoseconds: 100_000_000)
+            await upstream.release()
+            var results: [Result<ATProtoPublicKey, any Error>] = []
+            for await result in group { results.append(result) }
+            return results
+        }
+    }
+
+    @Test("Concurrent lookups of one key share a single upstream fetch")
+    func cachingResolverCoalescesInFlightLookups() async throws {
+        let key = K256Keypair.generate().publicKey
+        let upstream = GatedKeyResolver(key: key)
+        let resolver = CachingServiceAuthKeyResolver(upstream: upstream, minimumRefreshInterval: 30)
+
+        let results = await Self.concurrentLookups(20, resolver: resolver, upstream: upstream)
+        #expect(results.count == 20)
+        #expect(try results.allSatisfy { try $0.get() == key })
+        #expect(await upstream.calls == 1)
+    }
+
+    @Test("Callers sharing a failed fetch all see the error, and the next lookup retries")
+    func cachingResolverSharesFailures() async throws {
+        struct Offline: Error {}
+        let upstream = GatedKeyResolver(key: K256Keypair.generate().publicKey, failure: Offline())
+        let resolver = CachingServiceAuthKeyResolver(upstream: upstream, minimumRefreshInterval: 30)
+
+        let results = await Self.concurrentLookups(10, resolver: resolver, upstream: upstream)
+        #expect(results.count == 10)
+        #expect(results.allSatisfy { if case .failure(let error) = $0 { error is Offline } else { false } })
+        #expect(await upstream.calls == 1)
+
+        // Failures are not cached: the next lookup asks upstream again.
+        await #expect(throws: Offline.self) {
+            try await resolver.signingKey(for: ServiceAuthFixture.issuer, forceRefresh: false)
+        }
+        #expect(await upstream.calls == 2)
     }
 
     @Test("The closure resolver passes the key identifier through")

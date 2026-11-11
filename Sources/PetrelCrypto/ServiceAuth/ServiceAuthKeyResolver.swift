@@ -123,7 +123,8 @@ public struct ClosureServiceAuthKeyResolver: ServiceAuthKeyResolver {
 /// each forged request into a DID-document fetch. This wrapper answers a
 /// forced refresh from the upstream resolver at most once per
 /// `minimumRefreshInterval` for a given DID and key, and otherwise returns
-/// what it already has.
+/// what it already has. Concurrent lookups of the same key while a fetch is
+/// outstanding share that fetch, and its result or error.
 ///
 /// Wrap resolvers that do not cache themselves. A resolver that already
 /// caches and throttles can be given to ``ServiceAuthVerifier`` directly.
@@ -144,6 +145,7 @@ public actor CachingServiceAuthKeyResolver: ServiceAuthKeyResolver {
     private let capacity: Int
     private let clock: @Sendable () -> Date
     private var entries: [CacheKey: Entry] = [:]
+    private var inFlight: [CacheKey: Task<ATProtoPublicKey, any Error>] = [:]
 
     /// - Parameters:
     ///   - upstream: The resolver that actually reads DID documents.
@@ -185,11 +187,23 @@ public actor CachingServiceAuthKeyResolver: ServiceAuthKeyResolver {
                 return entry.key
             }
         }
+        // Callers arriving while a fetch for this key is outstanding share
+        // it; otherwise a burst of requests would each pass the checks above
+        // before the first fetch returns, and each go upstream.
+        if let pending = inFlight[cacheKey] {
+            return try await pending.value
+        }
         // A stale or distrusted entry here means upstream's own cache, if it
         // has one, is no better: ask it to re-read the DID document.
-        let key = try await upstream.signingKey(
-            for: did, keyID: keyID, forceRefresh: forceRefresh || entries[cacheKey] != nil
-        )
+        let upstream = upstream
+        let refresh = forceRefresh || entries[cacheKey] != nil
+        let fetch = Task<ATProtoPublicKey, any Error> {
+            try await upstream.signingKey(for: did, keyID: keyID, forceRefresh: refresh)
+        }
+        inFlight[cacheKey] = fetch
+        let result = await fetch.result
+        inFlight[cacheKey] = nil
+        let key = try result.get()
         if entries[cacheKey] == nil, entries.count >= capacity {
             evictOldest()
         }

@@ -245,7 +245,7 @@ public struct ServiceAuthVerifier: Sendable {
                 firstUse = try await replayStore.claim(
                     nonce: nonce,
                     issuer: issuer.did,
-                    expiresAt: expiresAt.addingTimeInterval(effectiveClockSkew)
+                    expiresAt: replayRecordExpiry(exp: claims.exp)
                 )
             } catch {
                 throw .replayStoreFailed(String(describing: error))
@@ -289,6 +289,19 @@ public struct ServiceAuthVerifier: Sendable {
     private var effectiveClockSkew: TimeInterval {
         let skew = configuration.clockSkew
         return skew.isFinite && skew >= 0 && skew <= 5 * 60 ? skew : 0
+    }
+
+    /// The first instant at which a token with this `exp` is refused as
+    /// expired.
+    ///
+    /// The expiry check compares whole seconds (`exp >= floor(now) - skew`,
+    /// with the skew truncated), so the token stays acceptable until just
+    /// before `exp + skew + 1`. The replay record must last that long, or
+    /// the token could be replayed during its final accepted second.
+    private func replayRecordExpiry(exp: Int64) -> Date {
+        let lastAcceptedSecond = exp.addingReportingOverflow(Int64(effectiveClockSkew))
+        guard !lastAcceptedSecond.overflow, lastAcceptedSecond.partialValue < .max else { return .distantFuture }
+        return Date(timeIntervalSince1970: TimeInterval(lastAcceptedSecond.partialValue + 1))
     }
 
     private func checkTimes(_ claims: ServiceJWTClaims, now: Date) throws(ServiceAuthError) {

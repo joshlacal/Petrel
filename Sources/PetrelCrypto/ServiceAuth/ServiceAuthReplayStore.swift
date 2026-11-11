@@ -18,9 +18,11 @@ public protocol ServiceAuthReplayStore: Sendable {
     /// - Parameters:
     ///   - nonce: The token's `jti`.
     ///   - issuer: The issuer DID; nonces are only unique per issuer.
-    ///   - expiresAt: When the record may be forgotten: the token's `exp`
-    ///     plus the verifier's clock skew. A token cannot be presented
-    ///     after that, so nothing is lost by dropping it.
+    ///   - expiresAt: When the record may be forgotten: the first instant
+    ///     the verifier refuses the token as expired (`exp` plus the clock
+    ///     skew plus the one second lost to whole-second comparison). A
+    ///     token cannot be presented after that, so nothing is lost by
+    ///     dropping it.
     /// - Returns: `true` if this is the first use, `false` if the nonce was
     ///   already recorded.
     func claim(nonce: String, issuer: String, expiresAt: Date) async throws -> Bool
