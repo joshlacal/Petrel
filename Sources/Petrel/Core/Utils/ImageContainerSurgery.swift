@@ -97,10 +97,31 @@ enum ImageContainerSurgery {
 
     /// A TIFF block holding nothing but an Orientation entry (26 bytes, big-endian).
     static func orientationOnlyTIFF(_ orientation: UInt16) -> [UInt8] {
-        [0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08] // "MM", 42, first IFD at 8
-            + [0x00, 0x01] // one entry
-            + [0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, UInt8(orientation >> 8), UInt8(orientation & 0xFF), 0x00, 0x00]
-            + [0x00, 0x00, 0x00, 0x00] // no next IFD
+        let high = UInt8(truncatingIfNeeded: orientation >> 8)
+        let low = UInt8(truncatingIfNeeded: orientation)
+        var tiff: [UInt8] = [0x4D, 0x4D, 0x00, 0x2A, 0x00, 0x00, 0x00, 0x08] // "MM", 42, first IFD at 8
+        tiff += [0x00, 0x01] as [UInt8] // one entry
+        tiff += [0x01, 0x12, 0x00, 0x03, 0x00, 0x00, 0x00, 0x01, high, low, 0x00, 0x00] as [UInt8] // Orientation, SHORT, count 1
+        tiff += [0x00, 0x00, 0x00, 0x00] as [UInt8] // no next IFD
+        return tiff
+    }
+
+    /// The four bytes of `value`, most significant first.
+    private static func bigEndian32(_ value: UInt32) -> [UInt8] {
+        var bytes: [UInt8] = []
+        for shift in [24, 16, 8, 0] as [UInt32] {
+            bytes.append(UInt8(truncatingIfNeeded: value >> shift))
+        }
+        return bytes
+    }
+
+    /// The four bytes of `value`, least significant first.
+    private static func littleEndian32(_ value: Int) -> [UInt8] {
+        var bytes: [UInt8] = []
+        for shift in [0, 8, 16, 24] {
+            bytes.append(UInt8(truncatingIfNeeded: value >> shift))
+        }
+        return bytes
     }
 
     private static let exifHeader: [UInt8] = [0x45, 0x78, 0x69, 0x66, 0x00, 0x00] // "Exif\0\0"
@@ -152,7 +173,11 @@ enum ImageContainerSurgery {
             index += length
 
             if let kept = keptJPEGSegment(marker, payload, keptOrientation: &keptOrientation) {
-                output += [0xFF, marker, UInt8((kept.count + 2) >> 8), UInt8((kept.count + 2) & 0xFF)]
+                let segmentLength: Int = kept.count + 2
+                output.append(0xFF)
+                output.append(marker)
+                output.append(UInt8(truncatingIfNeeded: segmentLength >> 8))
+                output.append(UInt8(truncatingIfNeeded: segmentLength))
                 output += kept
             }
 
@@ -191,13 +216,18 @@ enum ImageContainerSurgery {
             // JFIF: version, density and thumbnail size. Written back without the
             // thumbnail, which can show a picture as it was before cropping.
             guard hasPrefix(payload, ascii("JFIF\0")), payload.count >= 14 else { return nil }
-            return Array(payload.prefix(12)) + [0, 0]
+            var header = Array(payload.prefix(12))
+            header.append(0)
+            header.append(0)
+            return header
         case 0xE1:
             guard hasPrefix(payload, exifHeader), !keptOrientation,
                   let orientation = displayOrientation(inTIFF: payload.dropFirst(exifHeader.count))
             else { return nil }
             keptOrientation = true
-            return exifHeader + orientationOnlyTIFF(orientation)
+            var exif: [UInt8] = exifHeader
+            exif += orientationOnlyTIFF(orientation)
+            return exif
         case 0xE2:
             return hasPrefix(payload, ascii("ICC_PROFILE\0")) ? Array(payload) : nil
         case 0xEE:
@@ -238,7 +268,10 @@ enum ImageContainerSurgery {
 
         while true {
             guard index + 12 <= bytes.count else { throw malformed }
-            let length = Int(bytes[index]) << 24 | Int(bytes[index + 1]) << 16 | Int(bytes[index + 2]) << 8 | Int(bytes[index + 3])
+            var length = 0
+            for offset in 0 ..< 4 {
+                length = length << 8 | Int(bytes[index + offset])
+            }
             guard length <= bytes.count - index - 12 else { throw malformed }
             let typeBytes = bytes[(index + 4) ..< (index + 8)]
             guard typeBytes.allSatisfy({ (0x41 ... 0x5A).contains($0) || (0x61 ... 0x7A).contains($0) }) else { throw malformed }
@@ -257,10 +290,11 @@ enum ImageContainerSurgery {
                 output += bytes[chunkRange]
             } else if type == "eXIf", !keptOrientation, let orientation = displayOrientation(inTIFF: bytes[dataRange]) {
                 keptOrientation = true
-                let data = orientationOnlyTIFF(orientation)
-                let checksum = crc32(Array(typeBytes) + data)
-                output += [0, 0, 0, UInt8(data.count)] + typeBytes + data
-                output += [UInt8(checksum >> 24), UInt8(checksum >> 16 & 0xFF), UInt8(checksum >> 8 & 0xFF), UInt8(checksum & 0xFF)]
+                var typeAndData = Array(typeBytes)
+                typeAndData += orientationOnlyTIFF(orientation)
+                output += bigEndian32(UInt32(typeAndData.count - 4))
+                output += typeAndData
+                output += bigEndian32(crc32(typeAndData))
             }
 
             if type == "IEND" {
@@ -304,7 +338,11 @@ enum ImageContainerSurgery {
             throw malformed
         }
         func le32(_ offset: Int) -> Int {
-            Int(bytes[offset]) | Int(bytes[offset + 1]) << 8 | Int(bytes[offset + 2]) << 16 | Int(bytes[offset + 3]) << 24
+            var value = 0
+            for position in (0 ..< 4).reversed() {
+                value = value << 8 | Int(bytes[offset + position])
+            }
+            return value
         }
         let riffSize = le32(4)
         guard riffSize >= 4, riffSize <= bytes.count - 8 else { throw malformed }
@@ -356,16 +394,16 @@ enum ImageContainerSurgery {
         for chunk in chunks {
             let size = chunk.payload.count
             body += chunk.fourCC
-            body += [UInt8(size & 0xFF), UInt8(size >> 8 & 0xFF), UInt8(size >> 16 & 0xFF), UInt8(size >> 24 & 0xFF)]
+            body += littleEndian32(size)
             body += chunk.payload
             if size % 2 == 1 {
                 body.append(0)
             }
         }
-        let total = body.count
-        return ascii("RIFF")
-            + [UInt8(total & 0xFF), UInt8(total >> 8 & 0xFF), UInt8(total >> 16 & 0xFF), UInt8(total >> 24 & 0xFF)]
-            + body
+        var output: [UInt8] = ascii("RIFF")
+        output += littleEndian32(body.count)
+        output += body
+        return output
     }
 
     // MARK: - GIF
