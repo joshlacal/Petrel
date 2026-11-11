@@ -491,6 +491,11 @@ public actor NetworkService: NetworkServiceProtocol {
     nonisolated package let exactAuthSessionDelegate: HardenedURLSessionDelegate
     nonisolated package let session: URLSession
     private let exactAuthSession: URLSession
+    /// Carries requests to third-party origins that are sent no account credentials. It adds no
+    /// default headers and has no cookies, credential storage or cache; redirects stay bounded
+    /// and address-checked.
+    private let anonymousSession: URLSession
+    private let anonymousSessionDelegate: HardenedURLSessionDelegate
     private let jsonEncoder: JSONEncoder = {
         let encoder = JSONEncoder()
         encoder.keyEncodingStrategy = .useDefaultKeys
@@ -900,6 +905,9 @@ public actor NetworkService: NetworkServiceProtocol {
             delegate: exactAuthDelegate,
             delegateQueue: nil
         )
+        let anonymousDelegate = HardenedURLSessionDelegate(allowsRedirects: true, limits: limits)
+        anonymousSessionDelegate = anonymousDelegate
+        anonymousSession = URLSession(configuration: exactConfig, delegate: anonymousDelegate, delegateQueue: nil)
         LogManager.logDebug("Network Service initialized")
     }
 
@@ -1167,16 +1175,27 @@ public actor NetworkService: NetworkServiceProtocol {
         defer {
             authCtx_simple?.releaseAuthenticationLease()
         }
-        let (requestToSend, authedCtx) = try await attachCredentialsIfAuthorized(request, policy: policy)
+        let (authedRequest, authedCtx) = try await attachCredentialsIfAuthorized(request, policy: policy)
         authCtx_simple = authedCtx
+        // As in the retrying path: a third-party origin that is sent no credentials is sent no
+        // client-wide or session default headers either.
+        let anonymousRequest = Self.anonymousThirdPartyRequest(
+            authedRequest,
+            additionalHeaders: nil,
+            clientHeaders: headers,
+            policy: policy,
+            authContext: authedCtx,
+            baseURL: baseURL
+        )
+        let requestToSend = anonymousRequest.map(Self.withAnonymousSessionDefaults) ?? authedRequest
         // Perform the request using the internal session
         do {
             LogManager.logRequest(requestToSend)
             let launchedCtx = authCtx_simple
             let (data, response) = try await Self.executeDataTask(
                 requestToSend,
-                using: session,
-                delegate: sessionDelegate,
+                using: anonymousRequest == nil ? session : anonymousSession,
+                delegate: anonymousRequest == nil ? sessionDelegate : anonymousSessionDelegate,
                 limits: Self.scopedResponseLimits,
                 onLaunch: { launchedCtx?.releaseAuthenticationLease() }
             )
@@ -1287,8 +1306,27 @@ public actor NetworkService: NetworkServiceProtocol {
             requestToSend = authedRequest
             authCtx = authedCtx
 
+            // A third-party origin that is sent no account credentials (a handle host, a did:web
+            // host, the PLC directory) is sent nothing else about the account or the app: no
+            // client-wide headers such as atproto-proxy and atproto-accept-labelers, no request
+            // correlation headers, and no session default headers.
+            let anonymousRequest = Self.anonymousThirdPartyRequest(
+                requestToSend,
+                additionalHeaders: additionalHeaders,
+                clientHeaders: headers,
+                policy: policy,
+                authContext: authCtx,
+                baseURL: baseURL
+            )
+            let isAnonymousThirdParty = anonymousRequest != nil
+            if let anonymousRequest {
+                requestToSend = anonymousRequest
+            }
+
             // Add custom headers
-            for (name, value) in headers {
+            for (name, value) in headers
+                where !isAnonymousThirdParty || name.caseInsensitiveCompare("User-Agent") == .orderedSame
+            {
                 requestToSend.setValue(value, forHTTPHeaderField: name)
             }
 
@@ -1315,9 +1353,13 @@ public actor NetworkService: NetworkServiceProtocol {
 
             // Generate request ID for end-to-end correlation with BFF
             let requestId = UUID().uuidString
-            requestToSend.setValue(requestId, forHTTPHeaderField: "X-Catbird-Request-Id")
-            if let ua = userAgent {
-                requestToSend.setValue(ua, forHTTPHeaderField: "X-Catbird-Client")
+            if isAnonymousThirdParty {
+                requestToSend = Self.withAnonymousSessionDefaults(requestToSend)
+            } else {
+                requestToSend.setValue(requestId, forHTTPHeaderField: "X-Catbird-Request-Id")
+                if let ua = userAgent {
+                    requestToSend.setValue(ua, forHTTPHeaderField: "X-Catbird-Client")
+                }
             }
 
             // Log structured request shape for BFF debugging
@@ -1355,21 +1397,23 @@ public actor NetworkService: NetworkServiceProtocol {
                 // request; stale-credential 401s are already scoped by the credential-bound proof.
                 let launchedCtx = authCtx
                 let releaseLease: @Sendable () -> Void = { launchedCtx?.releaseAuthenticationLease() }
+                let transportSession = isAnonymousThirdParty ? anonymousSession : session
+                let transportDelegate = isAnonymousThirdParty ? anonymousSessionDelegate : sessionDelegate
                 let (data, response) = if !skipTokenRefresh, scopedLimits == nil {
                     try await requestDeduplicator.deduplicate(
                         request: request,
                         authIdentity: authIdentity,
                         onJoinExisting: releaseLease
-                    ) { @Sendable [session, sessionDelegate] in
+                    ) { @Sendable [transportSession, transportDelegate] in
                         return try await Self.executeDataTask(
-                            request, using: session, delegate: sessionDelegate, onLaunch: releaseLease
+                            request, using: transportSession, delegate: transportDelegate, onLaunch: releaseLease
                         )
                     }
                 } else {
                     // Skip deduplication for refresh requests to avoid circular dependencies,
                     // and for scoped response limits so no request shares another's limits.
                     try await Self.executeDataTask(
-                        requestToSend, using: session, delegate: sessionDelegate, limits: scopedLimits, onLaunch: releaseLease
+                        requestToSend, using: transportSession, delegate: transportDelegate, limits: scopedLimits, onLaunch: releaseLease
                     )
                 }
                 authCtx?.releaseAuthenticationLease()
@@ -1453,6 +1497,20 @@ public actor NetworkService: NetworkServiceProtocol {
                     return (decompressedData, httpResponse)
 
                 case 401:
+                    // A third-party origin that was sent no account credentials cannot report on
+                    // the account session. Its 401 must not force a token refresh, must not get
+                    // the request sent again with credentials attached by the auth strategy,
+                    // and must not broadcast an automatic logout.
+                    if isAnonymousThirdParty {
+                        LogManager.logInfo(
+                            "Network Service - 401 from a third-party origin that received no credentials; not a session failure."
+                        )
+                        if returnsTerminalHTTPErrorResponses {
+                            return (decompressedData, httpResponse)
+                        }
+                        throw NetworkError.responseError(statusCode: 401)
+                    }
+
                     // Handle unauthorized (401)
                     guard let authProvider = authProvider, let url = requestToSend.url else {
                         LogManager.logError(
@@ -1947,6 +2005,56 @@ public actor NetworkService: NetworkServiceProtocol {
             return false
         }
         return true
+    }
+
+    /// The request to send when it goes to an origin other than this client's own service and
+    /// carries no account credentials, neither attached by the auth provider nor supplied by
+    /// the caller; `nil` for every other request.
+    ///
+    /// The returned request has the client-wide headers removed again (`createURLRequest` copies
+    /// them into every request), except `User-Agent`. The client's own origin is excluded: a
+    /// loopback `http` development service has an unauthenticated policy and still needs the
+    /// client's headers and its 401 handling.
+    private nonisolated static func anonymousThirdPartyRequest(
+        _ request: URLRequest,
+        additionalHeaders: [String: String]?,
+        clientHeaders: [String: String],
+        policy: RequestSecurityPolicy,
+        authContext: AuthContext?,
+        baseURL: URL
+    ) -> URLRequest? {
+        guard case .unauthenticated = policy, authContext == nil, let url = request.url else { return nil }
+        func origin(_ url: URL) -> (String, String, Int)? {
+            guard let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return nil }
+            let defaultPort = (scheme == "https" || scheme == "wss") ? 443 : 80
+            return (scheme, host, url.port ?? defaultPort)
+        }
+        if let target = origin(url), let own = origin(baseURL), target == own {
+            return nil
+        }
+        var anonymous = request
+        for (name, value) in clientHeaders
+            where name.caseInsensitiveCompare("User-Agent") != .orderedSame
+            && anonymous.value(forHTTPHeaderField: name) == value
+        {
+            anonymous.setValue(nil, forHTTPHeaderField: name)
+        }
+        let headerNames = Array((anonymous.allHTTPHeaderFields ?? [:]).keys) + Array((additionalHeaders ?? [:]).keys)
+        guard !headerNames.contains(where: isCredentialHeader) else { return nil }
+        return anonymous
+    }
+
+    /// The anonymous session adds no default headers; this keeps the content negotiation the
+    /// default session would have supplied.
+    private nonisolated static func withAnonymousSessionDefaults(_ request: URLRequest) -> URLRequest {
+        var request = request
+        if request.value(forHTTPHeaderField: "Accept") == nil {
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+        }
+        if request.httpBody != nil, request.value(forHTTPHeaderField: "Content-Type") == nil {
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        }
+        return request
     }
 
     private nonisolated static func isCredentialHeader(_ name: String) -> Bool {
