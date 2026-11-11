@@ -225,6 +225,15 @@ private func signSpaceCredentialForTest(
     return "\(signingInput).\(b64urlEncode(sig))"
 }
 
+/// `NetworkService.setNetworkTestProtocolClasses` is process-wide, so a request issued by an
+/// unrelated test running in parallel can be routed to the Gate 7 handler. Such a request is
+/// failed with a transport error instead of being parsed, so it cannot record an issue here.
+private func requireGate7CredentialExchange(_ url: URL) throws {
+    guard url.host == "space.test" else {
+        throw URLError(.unsupportedURL)
+    }
+}
+
 private final class Gate7MockURLProtocol: URLProtocol {
     private static let lock = NSLock()
     private nonisolated(unsafe) static var handler: (@Sendable (URLRequest) throws -> (HTTPURLResponse, Data))?
@@ -470,6 +479,7 @@ struct SpacesCrossLanguageVectorsTests {
                             let resp = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                             return (resp, makeDidDocJSON(signingKey: activeKey))
                         }
+                        try requireGate7CredentialExchange(url)
                         let rawBody = try #require(request.httpBody)
                         let bodyObj = try #require(JSONSerialization.jsonObject(with: rawBody) as? [String: Any])
                         let requestedKid = try #require(bodyObj["credentialKid"] as? String)
@@ -551,6 +561,7 @@ struct SpacesCrossLanguageVectorsTests {
                         let resp = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                         return (resp, makeDidDocJSON(signingKey: keyToServe))
                     }
+                    try requireGate7CredentialExchange(url)
                     let rawBody = try #require(request.httpBody)
                     let bodyObj = try #require(JSONSerialization.jsonObject(with: rawBody) as? [String: Any])
                     let requestedKid = try #require(bodyObj["credentialKid"] as? String)
