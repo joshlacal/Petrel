@@ -407,18 +407,22 @@ public enum Moderation {
                 if !matches.isEmpty { return matches }
             }
 
-            // media attached next to the quote
+            // Media attached next to the quote. It belongs to the quoting post,
+            // so a follow-based exemption follows that post's author. (The
+            // TypeScript reference uses the quoted author here, which lets an
+            // unfollowed account dodge an `exclude-following` mute by quoting
+            // someone the viewer follows.)
             let languages = languageTags(post)
             switch view.media {
             case let .appBskyEmbedImagesView(images):
-                return firstMatch(inAltTexts: images.images.map(\.alt), languages: languages, actor: embedAuthor)
+                return firstMatch(inAltTexts: images.images.map(\.alt), languages: languages, actor: postAuthor)
             case let .appBskyEmbedGalleryView(gallery):
-                return firstMatch(inAltTexts: altTexts(gallery), languages: languages, actor: embedAuthor)
+                return firstMatch(inAltTexts: altTexts(gallery), languages: languages, actor: postAuthor)
             case let .appBskyEmbedExternalView(external):
                 return match(
                     linkCardText(title: external.external.title, description: external.external.description),
                     languages: [],
-                    actor: embedAuthor
+                    actor: postAuthor
                 )
             default:
                 return []

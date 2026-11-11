@@ -477,6 +477,64 @@ struct ModerationSubjectsTests {
         #expect(try Moderation.moderatePost(post, options: options(mutedWords: [word])).causes.isEmpty)
     }
 
+    @Test("Muted words in media next to a quote follow the author who attached it, not the quoted one")
+    func mutedWordsUseOuterAuthorForMediaBesideQuote() throws {
+        let followedCarla = ModerationMock.profile(
+            handle: "carla.test",
+            viewer: ["following": "at://did:web:alice.test/app.bsky.graph.follow/fake"]
+        )
+        let word = ModerationMock.mutedWord("badword", actorTarget: "exclude-following")
+        let media: [String: JSONObject] = [
+            "images": [
+                "$type": "app.bsky.embed.images#view",
+                "images": [[
+                    "thumb": "https://example.test/thumb.jpg",
+                    "fullsize": "https://example.test/full.jpg",
+                    "alt": "badword",
+                ] as JSONObject],
+            ],
+            "external": [
+                "$type": "app.bsky.embed.external#view",
+                "external": [
+                    "uri": "https://example.test",
+                    "title": "badword",
+                    "description": "",
+                ] as JSONObject,
+            ],
+        ]
+        for (kind, view) in media {
+            // An unfollowed author (bob) quotes a followed one (carla) and attaches the media.
+            let unfollowedAttaches = try ModerationMock.postView(
+                record: ModerationMock.post(text: "fine"),
+                author: bob,
+                embed: [
+                    "$type": "app.bsky.embed.recordWithMedia#view",
+                    "record": ModerationMock.embedRecordView(record: ModerationMock.post(text: "fine"), author: followedCarla),
+                    "media": view,
+                ]
+            )
+            #expect(
+                try !Moderation.moderatePost(unfollowedAttaches, options: options(mutedWords: [word])).causes.isEmpty,
+                "\(kind) attached by an unfollowed author"
+            )
+
+            // A followed author quotes an unfollowed one and attaches the media.
+            let followedAttaches = try ModerationMock.postView(
+                record: ModerationMock.post(text: "fine"),
+                author: followedCarla,
+                embed: [
+                    "$type": "app.bsky.embed.recordWithMedia#view",
+                    "record": ModerationMock.embedRecordView(record: ModerationMock.post(text: "fine"), author: bob),
+                    "media": view,
+                ]
+            )
+            #expect(
+                try Moderation.moderatePost(followedAttaches, options: options(mutedWords: [word])).causes.isEmpty,
+                "\(kind) attached by a followed author"
+            )
+        }
+    }
+
     // MARK: Decision mechanics
 
     @Test("Merge keeps the first decision's identity and concatenates causes in order")
