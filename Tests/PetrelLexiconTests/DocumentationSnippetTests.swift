@@ -49,6 +49,62 @@ struct DocumentationSnippetTests {
         try catalog.validateRecord(record, collection: "com.example.note", recordKey: "3jzfcijpj2z2a")
     }
 
+    /// RuntimeValidation.md, "Load schemas, validate a record" (directory)
+    @Test func documentationLoadDirectory() throws {
+        let lexiconsDirectory = Vectors.root.appendingPathComponent("lexicon/catalog")
+
+        var catalog = LexiconCatalog()
+        try catalog.add(contentsOfDirectory: lexiconsDirectory)
+
+        #expect(catalog.nsids.count == 5)
+    }
+
+    static let permissionSetSchema = Data(#"""
+    {
+      "lexicon": 1,
+      "id": "com.example.calendar.authBasic",
+      "defs": {
+        "main": {
+          "type": "permission-set",
+          "title": "Calendar",
+          "permissions": [
+            { "type": "permission", "resource": "repo", "collection": ["com.example.calendar.event"], "action": ["create", "delete"] },
+            { "type": "permission", "resource": "rpc", "lxm": ["com.example.calendar.listEvents"], "aud": "*" },
+            { "type": "permission", "resource": "repo", "collection": ["app.bsky.feed.post"] },
+            { "type": "permission", "resource": "account", "attr": "email" }
+          ]
+        }
+      }
+    }
+    """#.utf8)
+
+    /// RuntimeValidation.md, "Permission sets"
+    @Test func documentationPermissionSet() throws {
+        var catalog = LexiconCatalog()
+        try catalog.add(json: Self.permissionSetSchema)
+        var granted: [String] = []
+
+        guard case let .permissionSet(set)? = catalog.definition("com.example.calendar.authBasic") else { return }
+
+        for grant in set.grants(publishedAs: "com.example.calendar.authBasic") {
+            switch grant {
+            case let .repo(collections, actions):
+                // Write access to `collections`, limited to `actions` when not nil.
+                granted.append("repo \(collections) \(actions ?? ["create", "update", "delete"])")
+            case let .rpc(methods, inheritAudience):
+                // Calls to `methods`, against any audience or the inherited one.
+                granted.append("rpc \(methods) \(inheritAudience ? "inherited audience" : "any audience")")
+            }
+        }
+
+        // The app.bsky.feed.post declaration is outside the set's namespace and
+        // the account declaration is not supported in a permission set.
+        #expect(granted == [
+            #"repo ["com.example.calendar.event"] ["create", "delete"]"#,
+            #"rpc ["com.example.calendar.listEvents"] any audience"#,
+        ])
+    }
+
     /// RuntimeValidation.md, "Read the issues"
     @Test func documentationReadIssues() throws {
         var catalog = LexiconCatalog()
