@@ -11,10 +11,10 @@ import Foundation
 /// An authorization server's RFC 8414 metadata document
 /// (`/.well-known/oauth-authorization-server`).
 ///
-/// Decoding is deliberately lenient about which members are present: whether a
-/// document satisfies the atproto OAuth profile is decided by
-/// ``validate(fetchedFrom:clientAuthentication:)``, which reports the exact
-/// requirement that failed instead of a generic decoding error.
+/// Decoding is deliberately lenient about which members are present. Whether a
+/// document satisfies the atproto OAuth profile is decided by a separate
+/// validation step, which reports the exact requirement that failed as an
+/// ``OAuthMetadataError`` instead of a generic decoding error.
 public struct AuthorizationServerMetadata: Codable, Sendable, Hashable {
     /// The authorization server's issuer identifier (its origin URL).
     public let issuer: String
@@ -94,7 +94,8 @@ public struct AuthorizationServerMetadata: Codable, Sendable, Hashable {
 ///
 /// Only `resource` and `authorization_servers` are required: the atproto OAuth
 /// profile mandates nothing else, so a PDS publishing the minimal document must
-/// decode. ``validate(forResourceAt:)`` enforces the profile's value rules.
+/// decode. The profile's value rules are enforced by a separate validation step,
+/// which reports failures as ``OAuthMetadataError``.
 public struct ProtectedResourceMetadata: Codable, Sendable, Hashable {
     /// The resource server's identifier (the PDS origin).
     public let resource: URL

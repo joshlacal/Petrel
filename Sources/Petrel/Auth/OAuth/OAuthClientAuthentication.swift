@@ -135,6 +135,7 @@ public struct OAuthClientAssertionKey: OAuthClientAssertionSigner, Hashable {
         )
     }
 
+    /// Signs `signingInput` with this key and returns the 64-byte raw `r || s` signature.
     public func signES256(_ signingInput: Data) async throws -> Data {
         let key = try P256.Signing.PrivateKey(rawRepresentation: rawRepresentation)
         return try P256WireSignature.sign(signingInput, using: key)
@@ -148,6 +149,7 @@ public enum OAuthClientAssertionError: Error, LocalizedError, Equatable, Sendabl
     /// The signer returned something other than a 64-byte ES256 signature.
     case invalidSignature
 
+    /// A sentence describing what was wrong with the key or signature.
     public var errorDescription: String? {
         switch self {
         case .invalidKey:

@@ -87,6 +87,7 @@ public struct AccountStatus: Sendable, Hashable, CustomStringConvertible {
         self.init(isActive: active ?? true, reason: status.map(Reason.init))
     }
 
+    /// `active` or `inactive`, with the reason in parentheses when one was given.
     public var description: String {
         let state = isActive ? "active" : "inactive"
         return reason.map { "\(state) (\($0.rawValue))" } ?? state
@@ -130,6 +131,7 @@ public struct AccountStatusError: Error, LocalizedError, Equatable, Sendable {
         self.init(xrpcErrorName: body.error, message: body.message)
     }
 
+    /// A sentence naming the status, suitable for showing to the user.
     public var errorDescription: String? {
         switch status.reason {
         case .takendown: "This account has been taken down."
@@ -140,6 +142,7 @@ public struct AccountStatusError: Error, LocalizedError, Equatable, Sendable {
         }
     }
 
+    /// The server's own explanation, if it gave one.
     public var failureReason: String? {
         message
     }
@@ -152,6 +155,7 @@ public struct AuthFactorTokenRequiredError: Error, LocalizedError, Equatable, Se
     /// Creates the error.
     public init() {}
 
+    /// A sentence telling the user a sign-in code was emailed.
     public var errorDescription: String? {
         "A sign-in code was emailed to this account. Enter it to finish signing in."
     }

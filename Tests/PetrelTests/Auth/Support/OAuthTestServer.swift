@@ -54,14 +54,18 @@ final class OAuthTestURLProtocol: URLProtocol {
         }
         let (response, data) = backend.handle(request, body: request.bodyBytes ?? Data())
         // Offer redirects to the URL loading system the way a real transport
-        // does, so the session's redirect policy is what decides.
-        if (300 ..< 400).contains(response.statusCode),
-           let location = response.value(forHTTPHeaderField: "Location"),
-           let target = URL(string: location)
-        {
-            client?.urlProtocol(self, wasRedirectedTo: URLRequest(url: target), redirectResponse: response)
-            // A session that refuses the redirect receives the 3xx response itself.
-        }
+        // does, so the session's redirect policy is what decides. A session that
+        // refuses the redirect receives the 3xx response itself, delivered below.
+        // (swift-corelibs-foundation traps on protocol-initiated redirects, so on
+        // Linux the 3xx response is delivered without the offer.)
+        #if !canImport(FoundationNetworking)
+            if (300 ..< 400).contains(response.statusCode),
+               let location = response.value(forHTTPHeaderField: "Location"),
+               let target = URL(string: location)
+            {
+                client?.urlProtocol(self, wasRedirectedTo: URLRequest(url: target), redirectResponse: response)
+            }
+        #endif
         client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
         client?.urlProtocol(self, didLoad: data)
         client?.urlProtocolDidFinishLoading(self)

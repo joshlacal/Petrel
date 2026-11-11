@@ -51,6 +51,7 @@ public enum OAuthMetadataError: Error, LocalizedError, Equatable, Sendable {
     /// The authorization server lists the resources it protects and the PDS is not one of them.
     case resourceNotProtected(resource: String, issuer: String)
 
+    /// A sentence naming the requirement the server failed.
     public var errorDescription: String? {
         switch self {
         case let .invalidOrigin(value):

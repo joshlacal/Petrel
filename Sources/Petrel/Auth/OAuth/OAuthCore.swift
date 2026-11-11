@@ -880,6 +880,7 @@ actor OAuthCore {
     ///   - proofType: The DPoP proof type.
     ///   - key: The DPoP key that signs the request.
     ///   - initialNonce: A nonce to use on the first attempt instead of the stored one.
+    ///   - timeout: Per-attempt request timeout.
     ///   - parameters: The request's own form parameters (client authentication is added here).
     /// - Returns: The body and response of the final attempt, whatever its status.
     func sendAuthorizationServerRequest(
@@ -888,6 +889,7 @@ actor OAuthCore {
         proofType: DPoPProofType,
         key: DPoPKeySource,
         initialNonce: String? = nil,
+        timeout: TimeInterval = 30.0,
         parameters: [String: String]
     ) async throws -> (Data, HTTPURLResponse) {
         guard OAuthOrigin.isEndpointURL(endpoint), let endpointURL = URL(string: endpoint) else {
@@ -903,7 +905,7 @@ actor OAuthCore {
 
             var request = URLRequest(url: endpointURL)
             request.httpMethod = "POST"
-            request.timeoutInterval = 30.0
+            request.timeoutInterval = timeout
             request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
             request.setValue("application/json", forHTTPHeaderField: "Accept")
             request.httpBody = encodeFormData(form)
@@ -1157,6 +1159,9 @@ actor OAuthCore {
                 issuer: metadata.issuer,
                 proofType: .tokenRequest,
                 key: key,
+                // Logout and account removal wait on this; an unreachable
+                // server must not hold them up for long.
+                timeout: 10.0,
                 parameters: ["token": token]
             )
             guard response.statusCode == 200 else {

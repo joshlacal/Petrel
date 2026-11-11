@@ -80,6 +80,7 @@ public enum OAuthConfigurationError: Error, LocalizedError, Equatable, Sendable 
     /// client created without authentication.
     case unsupportedByAuthMode
 
+    /// A sentence naming the rule the configuration breaks.
     public var errorDescription: String? {
         switch self {
         case let .scopeMissingAtproto(scope):
