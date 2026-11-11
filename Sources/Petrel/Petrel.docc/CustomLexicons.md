@@ -102,7 +102,7 @@ Every part of Lexicon version 1:
 | `token` | string constant holding `nsid#name` |
 | `union` | enum; open unions add `.unexpected`, closed unions do not |
 | `ref` | the referenced type, across Lexicons and into `petrel:core` |
-| `string` | `String`, or a typed value for each `format`; `enum` and named `knownValues` become types |
+| `string` | `String`, or a typed value for each `format` (`DID`, `Handle`, `ATProtocolURI`, `CIDString`, `ATProtocolDate`, …); `enum` and named `knownValues` become types |
 | `integer`, `boolean`, `bytes`, `cid-link`, `blob`, `unknown`, `array` | `Int`, `Bool`, `Bytes`, `ATProtoLink`, `Blob`, `ATProtocolValueContainer`, `[T]` |
 | `required`, `nullable` | non-optional, optional, and `ATProtoNullable<T>?` for optional and nullable |
 

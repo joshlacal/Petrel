@@ -147,22 +147,33 @@ let repoRev = metadata?.repoRev
 ## Uploading blobs
 
 A procedure whose input encoding is `*/*`, such as `com.atproto.repo.uploadBlob`,
-sends the bytes you pass, with the MIME type you pass as `Content-Type`. Nothing
-is decoded, re-encoded or stripped.
+takes the bytes and their MIME type, which is sent as `Content-Type`.
 
-<!-- Mirrors GeneratedXRPCCallTests.testUploadBlobSendsTheBodyUntouched -->
+<!-- Mirrors GeneratedXRPCCallTests.testUploadBlobStripsImageMetadataByDefault,
+     testUploadBlobSendsNonImageBodiesUntouched and
+     testUploadBlobSendsTheBodyUntouchedWhenNotStripping -->
 
 ```swift
 let (_, uploaded) = try await client.com.atproto.repo.uploadBlob(
-    data: pngData,
-    mimeType: "image/png"
+    data: photoData,
+    mimeType: "image/jpeg"
 )
 let blob = uploaded?.blob     // reference it from a record
+
+// Send a file byte for byte, metadata included:
+_ = try await client.com.atproto.repo.uploadBlob(
+    data: photoData,
+    mimeType: "image/jpeg",
+    stripMetadata: false
+)
 ```
 
-Removing metadata such as EXIF location from a photo is a decision for the
-application: do it before the upload, for example with
-`ImageMetadataStripper.stripMetadata(from:)` on Apple platforms.
+By default image metadata (EXIF, GPS position, XMP, comments) is removed before
+the upload, because a photo's metadata can reveal where it was taken. Stripping
+keeps the image format and does not re-encode pixels; `Content-Type` stays what
+you passed. A body whose MIME type is not `image/*` is sent exactly as given.
+An image that cannot be stripped is not uploaded:
+`NetworkError.metadataStrippingFailed` is thrown instead.
 
 ## Retries
 
@@ -177,7 +188,7 @@ twice.
 
 Subscriptions are generated too. The stream skips frames whose message type or
 operation it does not know, as the event-stream specification asks, and throws
-on an error frame.
+with ``EventStreamError`` on an error frame.
 
 ```swift
 for try await message in try await client.com.atproto.sync.subscribeRepos(cursor: nil) {
@@ -196,8 +207,10 @@ Generated types are a view of wire data, and writing a value back reproduces it:
   JSON and DAG-CBOR, so a record keeps its CID through a round trip.
 - An open union keeps a variant it does not know as `.unexpected`; a closed
   union rejects it.
-- `cid-link` fields are ``ATProtoLink`` (`{"$link": …}`, CBOR tag 42); strings of
-  format `cid` are ``CID``.
+- `cid-link` fields are ``ATProtoLink`` (`{"$link": …}`, CBOR tag 42). Strings of
+  format `cid` are ``CIDString``: the text exactly as written, valid for any
+  well-formed CID, with `.cid` giving the parsed ``CID`` when it is one atproto
+  blesses for links.
 - A property that is optional and nullable is `ATProtoNullable<T>?`, so
   absent, `null` and a value stay distinct.
 

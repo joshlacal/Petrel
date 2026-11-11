@@ -32,6 +32,7 @@ for existing integrations. New applications should use OAuth.
 - ``XRPCResponseMetadata``
 - ``XRPCRateLimit``
 - ``ATProtoNullable``
+- ``CIDString``
 - ``LexiconPermissionSet``
 - ``LexiconRecordKeyType``
 
