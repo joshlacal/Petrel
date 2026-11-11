@@ -5,6 +5,12 @@ import Petrel
 import PetrelRepo
 import XCTest
 
+/// These tests pin the producer-conformance (`.strict`) rules used on relay captures. The
+/// consumer rules are covered by `RelayFrameLenientDecodingTests`.
+private func strictDecode(_ frame: Data) throws -> RelayEvent {
+  try RelayFrameDecoder.decode(frame, mode: .strict)
+}
+
 final class PublicRelayVerifierTests: XCTestCase {
   private let did = "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
   private let rev0 = "3jzfcijpj2z2a"
@@ -13,7 +19,7 @@ final class PublicRelayVerifierTests: XCTestCase {
   private let time = "2026-08-08T12:00:00.000Z"
 
   func testDecoderAcceptsHandDerivedCanonicalIdentityFrame() throws {
-    let event = try RelayFrameDecoder.decode(identityFrame(seq: 1))
+    let event = try strictDecode(identityFrame(seq: 1))
     XCTAssertEqual(
       event,
       .identity(.init(seq: 1, did: did, time: time, handle: "alice.test"))
@@ -33,7 +39,7 @@ final class PublicRelayVerifierTests: XCTestCase {
       (identityFrame(seq: 1, extraBodyEntry: ("unexpected", .null)), .invalidEventBody),
     ]
     for (candidate, expected) in mutations {
-      XCTAssertThrowsError(try RelayFrameDecoder.decode(candidate)) {
+      XCTAssertThrowsError(try strictDecode(candidate)) {
         XCTAssertEqual($0 as? RelayVerifierError, expected)
       }
     }
@@ -47,7 +53,7 @@ final class PublicRelayVerifierTests: XCTestCase {
       blocks: Data(),
       ops: [.init(action: "create", path: "app.bsky.feed.post/a", cid: cid, prev: nil)]
     )
-    XCTAssertNotNil(try RelayFrameDecoder.decode(validCommit))
+    XCTAssertNotNil(try strictDecode(validCommit))
 
     let badLink = commitFrame(
       seq: 1,
@@ -55,21 +61,21 @@ final class PublicRelayVerifierTests: XCTestCase {
       blocks: Data(),
       ops: []
     )
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(badLink)) {
+    XCTAssertThrowsError(try strictDecode(badLink)) {
       XCTAssertEqual($0 as? RelayVerifierError, .invalidCIDLink)
     }
 
     for seq in [Int64(0), FirehoseFrameLimits.maximumSequence + 1] {
-      XCTAssertThrowsError(try RelayFrameDecoder.decode(identityFrame(seq: seq))) {
+      XCTAssertThrowsError(try strictDecode(identityFrame(seq: seq))) {
         XCTAssertEqual($0 as? RelayVerifierError, .sequenceOutOfRange)
       }
     }
-    XCTAssertNoThrow(try RelayFrameDecoder.decode(identityFrame(
+    XCTAssertNoThrow(try strictDecode(identityFrame(
       seq: FirehoseFrameLimits.maximumSequence
     )))
 
     let invalidAccount = accountFrame(seq: 1, active: true, status: "suspended")
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(invalidAccount)) {
+    XCTAssertThrowsError(try strictDecode(invalidAccount)) {
       XCTAssertEqual($0 as? RelayVerifierError, .invalidAccountStatus)
     }
 
@@ -79,7 +85,7 @@ final class PublicRelayVerifierTests: XCTestCase {
       blocks: Data(),
       ops: [.init(action: "update", path: "app.bsky.feed.post/a", cid: cid, prev: nil)]
     )
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(badOp)) {
+    XCTAssertThrowsError(try strictDecode(badOp)) {
       XCTAssertEqual($0 as? RelayVerifierError, .invalidRepositoryOperation)
     }
   }
@@ -87,10 +93,10 @@ final class PublicRelayVerifierTests: XCTestCase {
   func testDecoderEnforcesExactFrameBlocksAndOperationLimits() throws {
     let cid = CID.fromDAGCBOR(Data([0xa0]))
     let exactCommitBlocks = Data(repeating: 0, count: FirehoseFrameLimits.maximumCommitBlocksBytes)
-    XCTAssertNoThrow(try RelayFrameDecoder.decode(commitFrame(
+    XCTAssertNoThrow(try strictDecode(commitFrame(
       seq: 1, commitCID: cid, blocks: exactCommitBlocks, ops: []
     )))
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(commitFrame(
+    XCTAssertThrowsError(try strictDecode(commitFrame(
       seq: 1,
       commitCID: cid,
       blocks: exactCommitBlocks + Data([0]),
@@ -100,21 +106,21 @@ final class PublicRelayVerifierTests: XCTestCase {
     }
 
     let exactSyncBlocks = Data(repeating: 0, count: FirehoseFrameLimits.maximumSyncBlocksBytes)
-    XCTAssertNoThrow(try RelayFrameDecoder.decode(syncFrame(seq: 1, blocks: exactSyncBlocks)))
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(syncFrame(
+    XCTAssertNoThrow(try strictDecode(syncFrame(seq: 1, blocks: exactSyncBlocks)))
+    XCTAssertThrowsError(try strictDecode(syncFrame(
       seq: 1, blocks: exactSyncBlocks + Data([0])
     ))) {
       XCTAssertEqual($0 as? RelayVerifierError, .syncBlocksTooLarge)
     }
 
     let op = TestOp(action: "create", path: "app.bsky.feed.post/a", cid: cid, prev: nil)
-    XCTAssertNoThrow(try RelayFrameDecoder.decode(commitFrame(
+    XCTAssertNoThrow(try strictDecode(commitFrame(
       seq: 1,
       commitCID: cid,
       blocks: Data(),
       ops: Array(repeating: op, count: FirehoseFrameLimits.maximumOps)
     )))
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(commitFrame(
+    XCTAssertThrowsError(try strictDecode(commitFrame(
       seq: 1,
       commitCID: cid,
       blocks: Data(),
@@ -124,14 +130,14 @@ final class PublicRelayVerifierTests: XCTestCase {
     }
 
     let frameOverLimit = Data(repeating: 0, count: FirehoseFrameLimits.maximumFrameBytes + 1)
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(frameOverLimit)) {
+    XCTAssertThrowsError(try strictDecode(frameOverLimit)) {
       XCTAssertEqual($0 as? RelayVerifierError, .frameTooLarge)
     }
 
     let exactFrame = infoFrame(exactByteCount: FirehoseFrameLimits.maximumFrameBytes)
     XCTAssertEqual(exactFrame.count, FirehoseFrameLimits.maximumFrameBytes)
-    XCTAssertNoThrow(try RelayFrameDecoder.decode(exactFrame))
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(exactFrame + Data([0]))) {
+    XCTAssertNoThrow(try strictDecode(exactFrame))
+    XCTAssertThrowsError(try strictDecode(exactFrame + Data([0]))) {
       XCTAssertEqual($0 as? RelayVerifierError, .frameTooLarge)
     }
   }
@@ -737,7 +743,7 @@ final class PublicRelayVerifierTests: XCTestCase {
   func testFrameBudgetLimitsAndChargeBeforeAllocation() throws {
     // 5,000,001 bytes frame -> frameTooLarge
     let overLimitFrame = Data(repeating: 0, count: FirehoseFrameLimits.maximumFrameBytes + 1)
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(overLimitFrame)) {
+    XCTAssertThrowsError(try strictDecode(overLimitFrame)) {
       XCTAssertEqual($0 as? RelayVerifierError, .frameTooLarge)
     }
 
@@ -745,7 +751,7 @@ final class PublicRelayVerifierTests: XCTestCase {
     // Construct a valid info frame of exactly 5,000,000 bytes
     let exactFrame = infoFrame(exactByteCount: FirehoseFrameLimits.maximumFrameBytes)
     XCTAssertEqual(exactFrame.count, FirehoseFrameLimits.maximumFrameBytes)
-    XCTAssertNoThrow(try RelayFrameDecoder.decode(exactFrame))
+    XCTAssertNoThrow(try strictDecode(exactFrame))
 
     // Compact million-count array in body with trailing bytes: major type 4 (0x80 | 26 = 0x9a), count 1,000,000 = 0x000f4240, with 5 trailing bytes
     // Pre-fix decoder passed count <= 1_000_000 and allocated ~1M elements before failing on truncated element.
@@ -753,14 +759,14 @@ final class PublicRelayVerifierTests: XCTestCase {
     let validHeader = encode(.map([("op", .unsigned(1)), ("t", .text("#identity"))]))
     let compactMillionArrayBody: [UInt8] = [0x9a, 0x00, 0x0f, 0x42, 0x40, 0x01, 0x02, 0x03, 0x04, 0x05] // array of 1,000,000 with 5 trailing bytes
     let attackFrame1 = validHeader + Data(compactMillionArrayBody)
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(attackFrame1)) {
+    XCTAssertThrowsError(try strictDecode(attackFrame1)) {
       XCTAssertEqual($0 as? RelayVerifierError, .truncatedFrame)
     }
 
     // Truncated input: array claiming 10 elements with 0 bytes remaining
     let truncatedArrayBody: [UInt8] = [0x8a] // array(10), 0 remaining bytes
     let attackFrame2 = validHeader + Data(truncatedArrayBody)
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(attackFrame2)) {
+    XCTAssertThrowsError(try strictDecode(attackFrame2)) {
       XCTAssertEqual($0 as? RelayVerifierError, .truncatedFrame)
     }
 
@@ -779,7 +785,7 @@ final class PublicRelayVerifierTests: XCTestCase {
       XCTAssertEqual($0 as? RelayCBORReaderError, .invalid)
     }
     let attackFrameDepth65 = validHeader + Data(depth65Bytes)
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(attackFrameDepth65)) {
+    XCTAssertThrowsError(try strictDecode(attackFrameDepth65)) {
       XCTAssertEqual($0 as? RelayVerifierError, .invalidCBOR)
     }
 
@@ -800,7 +806,7 @@ final class PublicRelayVerifierTests: XCTestCase {
       XCTAssertEqual($0 as? RelayCBORReaderError, .invalid)
     }
     let attackFrameNodes10001 = validHeader + Data(nodes10001)
-    XCTAssertThrowsError(try RelayFrameDecoder.decode(attackFrameNodes10001)) {
+    XCTAssertThrowsError(try strictDecode(attackFrameNodes10001)) {
       XCTAssertEqual($0 as? RelayVerifierError, .invalidCBOR)
     }
   }

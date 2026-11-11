@@ -2,8 +2,111 @@ import Foundation
 import Petrel
 import PetrelRepo
 
+/// How strictly ``RelayFrameDecoder`` validates a frame.
+public enum RelayFrameDecodingMode: Sendable, Equatable {
+  /// Consumer behaviour required by the event-stream and sync specifications: unknown header
+  /// and payload fields are ignored, `#account` status is an open set, the deprecated
+  /// `tooBig` / `rebase` / `blobs` commit fields are ignored, and `prev` is optional on
+  /// update and delete operations.
+  case lenient
+  /// Producer conformance checking for relay captures: exact key sets, closed account
+  /// statuses, `tooBig` and `rebase` must be false, and sync-1.1 operation shapes.
+  case strict
+}
+
+/// A frame the consumer skipped instead of failing on.
+public struct EventStreamIgnoredFrame: Sendable, Equatable {
+  /// Why a frame was skipped.
+  public enum Reason: Sendable, Equatable {
+    /// The header `op` is neither `1` nor `-1`.
+    case unknownOperation
+    /// The header `t` names a message type this consumer does not know, including the
+    /// deprecated `#handle`, `#migrate` and `#tombstone`.
+    case unknownType
+    /// The frame was well-formed CBOR with a known type, but the payload did not match the
+    /// schema. The associated value describes the failure.
+    case undecodablePayload(String)
+  }
+
+  /// The header `op` value.
+  public let operation: Int64
+  /// The header `t` value, when present.
+  public let type: String?
+  /// The payload `seq`, when the payload carries a valid one. The cursor still advances past
+  /// ignored frames.
+  public let sequence: Int64?
+  /// Why the frame was skipped.
+  public let reason: Reason
+
+  /// Creates a description of a skipped frame.
+  public init(operation: Int64, type: String?, sequence: Int64?, reason: Reason) {
+    self.operation = operation
+    self.type = type
+    self.sequence = sequence
+    self.reason = reason
+  }
+}
+
+/// The result of decoding one `com.atproto.sync.subscribeRepos` frame.
+public enum RelayFrame: Sendable, Equatable {
+  /// A message, info or error frame this decoder understands.
+  case event(RelayEvent)
+  /// A frame with an unknown `op` or `t`, which the specification says to ignore.
+  case ignored(EventStreamIgnoredFrame)
+}
+
 public enum RelayFrameDecoder {
+  /// Decodes one frame into a typed event using ``RelayFrameDecodingMode/lenient`` rules.
+  ///
+  /// A frame with an unknown `op` or `t` throws, because `RelayEvent` cannot represent it.
+  /// Stream consumers call ``decodeFrame(_:mode:)`` and skip ``RelayFrame/ignored(_:)``.
   public static func decode(_ frame: Data) throws -> RelayEvent {
+    try decode(frame, mode: .lenient)
+  }
+
+  /// Decodes one frame into a typed event.
+  ///
+  /// A frame with an unknown `op` throws ``RelayVerifierError/invalidFrameHeader`` and one with
+  /// an unknown `t` throws ``RelayVerifierError/unknownEventKind``.
+  public static func decode(_ frame: Data, mode: RelayFrameDecodingMode) throws -> RelayEvent {
+    switch try decodeFrame(frame, mode: mode) {
+    case let .event(event):
+      return event
+    case let .ignored(ignored):
+      throw ignored.reason == .unknownOperation
+        ? RelayVerifierError.invalidFrameHeader
+        : RelayVerifierError.unknownEventKind
+    }
+  }
+
+  /// Decodes one frame, returning ``RelayFrame/ignored(_:)`` for unknown `op` and `t` values.
+  ///
+  /// Invalid framing or CBOR (truncation, trailing bytes, non-canonical encoding, a frame above
+  /// the 5 MB limit) always throws; the specification treats those as hard errors that drop the
+  /// connection. In ``RelayFrameDecodingMode/strict`` mode unknown `op` and `t` throw as well.
+  public static func decodeFrame(
+    _ frame: Data,
+    mode: RelayFrameDecodingMode = .lenient
+  ) throws -> RelayFrame {
+    let parsed = try parse(frame)
+    return try decode(parsed, mode: mode)
+  }
+
+  /// Header and payload after the hard framing checks.
+  struct ParsedFrame {
+    let operation: Int64
+    let type: String?
+    let headerKeys: Set<String>
+    let body: RelayCBORValue
+
+    /// The payload `seq` when it is present and in range.
+    var sequence: Int64? {
+      guard case let .map(map) = body else { return nil }
+      return try? RelayFrameDecoder.sequence(map["seq"])
+    }
+  }
+
+  static func parse(_ frame: Data) throws -> ParsedFrame {
     guard frame.count <= FirehoseFrameLimits.maximumFrameBytes else {
       throw RelayVerifierError.frameTooLarge
     }
@@ -17,41 +120,62 @@ public enum RelayFrameDecoder {
       throw error.publicError
     }
     guard reader.isAtEnd else { throw RelayVerifierError.trailingFrameBytes }
-    return try decode(header: header, body: body)
-  }
-
-  private static func decode(
-    header: RelayCBORValue,
-    body: RelayCBORValue
-  ) throws -> RelayEvent {
-    let headerMap = try map(header)
-    guard let op = headerMap.signedInteger("op") else {
+    guard case let .map(headerMap) = header,
+          let operation = headerMap.signedInteger("op") else {
       throw RelayVerifierError.invalidFrameHeader
     }
-    if op == -1 {
-      guard headerMap.keys == Set(["op"]) else {
+    if operation == 1, headerMap.text("t") == nil {
+      throw RelayVerifierError.invalidFrameHeader
+    }
+    return ParsedFrame(
+      operation: operation,
+      type: headerMap.text("t"),
+      headerKeys: headerMap.keys,
+      body: body
+    )
+  }
+
+  static func decode(_ parsed: ParsedFrame, mode: RelayFrameDecodingMode) throws -> RelayFrame {
+    let strict = mode == .strict
+    if parsed.operation == -1 {
+      if strict, parsed.headerKeys != Set(["op"]) {
         throw RelayVerifierError.invalidFrameHeader
       }
-      return .error(try decodeError(body))
+      return .event(.error(try decodeError(parsed.body, strict: strict)))
     }
-    guard op == 1,
-          headerMap.keys == Set(["op", "t"]),
-          let type = headerMap.text("t") else {
+    guard parsed.operation == 1, let type = parsed.type else {
+      if strict { throw RelayVerifierError.invalidFrameHeader }
+      return .ignored(.init(
+        operation: parsed.operation,
+        type: parsed.type,
+        sequence: parsed.sequence,
+        reason: .unknownOperation
+      ))
+    }
+    if strict, parsed.headerKeys != Set(["op", "t"]) {
       throw RelayVerifierError.invalidFrameHeader
     }
+    let body = parsed.body
     switch type {
-    case "#identity": return .identity(try decodeIdentity(body))
-    case "#account": return .account(try decodeAccount(body))
-    case "#sync": return .sync(try decodeSync(body))
-    case "#commit": return .commit(try decodeCommit(body))
-    case "#info": return .info(try decodeInfo(body))
-    default: throw RelayVerifierError.unknownEventKind
+    case "#identity": return .event(.identity(try decodeIdentity(body, strict: strict)))
+    case "#account": return .event(.account(try decodeAccount(body, strict: strict)))
+    case "#sync": return .event(.sync(try decodeSync(body, strict: strict)))
+    case "#commit": return .event(.commit(try decodeCommit(body, strict: strict)))
+    case "#info": return .event(.info(try decodeInfo(body, strict: strict)))
+    default:
+      if strict { throw RelayVerifierError.unknownEventKind }
+      return .ignored(.init(
+        operation: parsed.operation,
+        type: type,
+        sequence: parsed.sequence,
+        reason: .unknownType
+      ))
     }
   }
 
-  private static func decodeIdentity(_ body: RelayCBORValue) throws -> RelayIdentityEvent {
+  private static func decodeIdentity(_ body: RelayCBORValue, strict: Bool) throws -> RelayIdentityEvent {
     let value = try map(body)
-    try value.requireKeys(required: ["seq", "did", "time"], optional: ["handle"])
+    try value.requireKeys(required: ["seq", "did", "time"], optional: ["handle"], exact: strict)
     return .init(
       seq: try sequence(value["seq"]),
       did: try did(value["did"]),
@@ -60,11 +184,12 @@ public enum RelayFrameDecoder {
     )
   }
 
-  private static func decodeAccount(_ body: RelayCBORValue) throws -> RelayAccountEvent {
+  private static func decodeAccount(_ body: RelayCBORValue, strict: Bool) throws -> RelayAccountEvent {
     let value = try map(body)
     try value.requireKeys(
       required: ["seq", "did", "time", "active"],
-      optional: ["status"]
+      optional: ["status"],
+      exact: strict
     )
     guard case let .boolean(active)? = value["active"] else {
       throw RelayVerifierError.invalidEventBody
@@ -73,8 +198,12 @@ public enum RelayFrameDecoder {
     let allowed = Set([
       "deactivated", "suspended", "takendown", "desynchronized", "throttled", "deleted",
     ])
-    guard active == (status == nil), status.map(allowed.contains) ?? true else {
-      throw RelayVerifierError.invalidAccountStatus
+    // The lexicon declares `status` with open `knownValues`, and an account can be active
+    // while carrying a status such as `throttled`; only the strict mode pins both.
+    if strict {
+      guard active == (status == nil), status.map(allowed.contains) ?? true else {
+        throw RelayVerifierError.invalidAccountStatus
+      }
     }
     return .init(
       seq: try sequence(value["seq"]),
@@ -85,9 +214,9 @@ public enum RelayFrameDecoder {
     )
   }
 
-  private static func decodeSync(_ body: RelayCBORValue) throws -> RelaySyncEvent {
+  private static func decodeSync(_ body: RelayCBORValue, strict: Bool) throws -> RelaySyncEvent {
     let value = try map(body)
-    try value.requireKeys(required: ["seq", "did", "blocks", "rev", "time"])
+    try value.requireKeys(required: ["seq", "did", "blocks", "rev", "time"], exact: strict)
     guard case let .bytes(blocks)? = value["blocks"] else {
       throw RelayVerifierError.invalidEventBody
     }
@@ -104,20 +233,34 @@ public enum RelayFrameDecoder {
     )
   }
 
-  private static func decodeCommit(_ body: RelayCBORValue) throws -> RelayCommitEvent {
+  private static func decodeCommit(_ body: RelayCBORValue, strict: Bool) throws -> RelayCommitEvent {
     let value = try map(body)
-    try value.requireKeys(
-      required: [
-        "seq", "rebase", "tooBig", "repo", "commit", "rev", "since",
-        "blocks", "ops", "blobs", "time",
-      ],
-      optional: ["prevData"]
-    )
-    guard case .boolean(false)? = value["rebase"],
-          case .boolean(false)? = value["tooBig"],
-          case let .bytes(blocks)? = value["blocks"],
-          case let .array(opValues)? = value["ops"],
-          case let .array(blobValues)? = value["blobs"] else {
+    if strict {
+      try value.requireKeys(
+        required: [
+          "seq", "rebase", "tooBig", "repo", "commit", "rev", "since",
+          "blocks", "ops", "blobs", "time",
+        ],
+        optional: ["prevData"],
+        exact: true
+      )
+      guard case .boolean(false)? = value["rebase"],
+            case .boolean(false)? = value["tooBig"],
+            case let .array(blobValues)? = value["blobs"] else {
+        throw RelayVerifierError.invalidEventBody
+      }
+      for blob in blobValues {
+        _ = try cid(blob)
+      }
+    } else {
+      // `rebase`, `tooBig` and `blobs` are deprecated; consumers ignore them.
+      try value.requireKeys(
+        required: ["seq", "repo", "commit", "rev", "blocks", "ops", "time"],
+        exact: false
+      )
+    }
+    guard case let .bytes(blocks)? = value["blocks"],
+          case let .array(opValues)? = value["ops"] else {
       throw RelayVerifierError.invalidEventBody
     }
     guard blocks.count <= FirehoseFrameLimits.maximumCommitBlocksBytes else {
@@ -126,11 +269,9 @@ public enum RelayFrameDecoder {
     guard opValues.count <= FirehoseFrameLimits.maximumOps else {
       throw RelayVerifierError.tooManyOperations
     }
-    for blob in blobValues {
-      _ = try cid(blob)
-    }
     let since: String?
     switch value["since"] {
+    case nil where !strict: since = nil
     case .null?: since = nil
     case .text?: since = try revision(value["since"])
     default: throw RelayVerifierError.invalidEventBody
@@ -148,21 +289,35 @@ public enum RelayFrameDecoder {
       rev: try revision(value["rev"]),
       since: since,
       blocks: blocks,
-      ops: try opValues.map(decodeOperation),
+      ops: try opValues.map { try decodeOperation($0, strict: strict) },
       prevDataCID: prevDataCID,
       time: try requiredText(value["time"])
     )
   }
 
-  private static func decodeOperation(_ encoded: RelayCBORValue) throws -> RelayRepoOp {
-    let value = try map(encoded)
-    try value.requireKeys(required: ["action", "path", "cid"], optional: ["prev"])
+  private static func decodeOperation(_ encoded: RelayCBORValue, strict: Bool) throws -> RelayRepoOp {
+    guard case let .map(value) = encoded else {
+      throw RelayVerifierError.invalidRepositoryOperation
+    }
+    do {
+      try value.requireKeys(required: ["action", "path", "cid"], optional: ["prev"], exact: strict)
+    } catch {
+      throw RelayVerifierError.invalidRepositoryOperation
+    }
     guard let actionText = value.text("action"),
           let action = RelayRepoAction(rawValue: actionText),
           let pathText = value.text("path") else {
       throw RelayVerifierError.invalidRepositoryOperation
     }
-    _ = try repositoryPath(pathText)
+    if strict {
+      _ = try repositoryPath(pathText)
+    } else {
+      // The lexicon types `path` as a plain string; consumers only need `collection/rkey`.
+      let parts = pathText.split(separator: "/", omittingEmptySubsequences: false)
+      guard parts.count == 2, parts.allSatisfy({ !$0.isEmpty }) else {
+        throw RelayVerifierError.invalidRepositoryOperation
+      }
+    }
     let current: CID?
     switch value["cid"] {
     case .null?: current = nil
@@ -175,27 +330,29 @@ public enum RelayFrameDecoder {
     } else {
       previous = nil
     }
+    // `prev` was added by sync 1.1 and stays optional in the lexicon; only the strict mode
+    // requires it on update and delete.
     switch action {
     case .create where current != nil && previous == nil: break
-    case .update where current != nil && previous != nil: break
-    case .delete where current == nil && previous != nil: break
+    case .update where current != nil && (previous != nil || !strict): break
+    case .delete where current == nil && (previous != nil || !strict): break
     default: throw RelayVerifierError.invalidRepositoryOperation
     }
     return .init(action: action, path: pathText, cid: current, prev: previous)
   }
 
-  private static func decodeInfo(_ body: RelayCBORValue) throws -> RelayInfoEvent {
+  private static func decodeInfo(_ body: RelayCBORValue, strict: Bool) throws -> RelayInfoEvent {
     let value = try map(body)
-    try value.requireKeys(required: ["name"], optional: ["message"])
+    try value.requireKeys(required: ["name"], optional: ["message"], exact: strict)
     return .init(
       name: try requiredText(value["name"]),
       message: try optionalText(value["message"])
     )
   }
 
-  private static func decodeError(_ body: RelayCBORValue) throws -> RelayErrorEvent {
+  private static func decodeError(_ body: RelayCBORValue, strict: Bool) throws -> RelayErrorEvent {
     let value = try map(body)
-    try value.requireKeys(required: ["error"], optional: ["message"])
+    try value.requireKeys(required: ["error"], optional: ["message"], exact: strict)
     return .init(
       error: try requiredText(value["error"]),
       message: try optionalText(value["message"])
@@ -220,7 +377,7 @@ public enum RelayFrameDecoder {
     return try requiredText(value)
   }
 
-  private static func sequence(_ value: RelayCBORValue?) throws -> Int64 {
+  fileprivate static func sequence(_ value: RelayCBORValue?) throws -> Int64 {
     let seq: Int64
     switch value {
     case let .unsigned(raw)?:
@@ -290,6 +447,7 @@ indirect enum RelayCBORValue {
   case text(String)
   case bytes(Data)
   case boolean(Bool)
+  case float(Double)
   case null
   case array([RelayCBORValue])
   case map(RelayCBORMap)
@@ -320,9 +478,16 @@ struct RelayCBORMap {
     }
   }
 
-  func requireKeys(required: Set<String>, optional: Set<String> = []) throws {
-    guard required.isSubset(of: keys), keys.isSubset(of: required.union(optional)) else {
+  /// `exact` additionally rejects keys outside `required` and `optional`; consumers pass
+  /// `false` because unknown payload fields must be ignored.
+  func requireKeys(required: Set<String>, optional: Set<String> = [], exact: Bool) throws {
+    guard required.isSubset(of: keys) else {
       throw RelayVerifierError.invalidEventBody
+    }
+    if exact {
+      guard keys.isSubset(of: required.union(optional)) else {
+        throw RelayVerifierError.invalidEventBody
+      }
     }
   }
 }
@@ -360,6 +525,19 @@ struct CanonicalRelayCBORReader {
     guard nodeCount <= FirehoseFrameLimits.maximumAggregateNodes else { throw RelayCBORReaderError.invalid }
     guard let initial = readByte() else { throw RelayCBORReaderError.truncated }
     let major = initial >> 5
+    if major == 7 {
+      switch initial & 0x1f {
+      case 20: return .boolean(false)
+      case 21: return .boolean(true)
+      case 22: return .null
+      case 27:
+        // DRISL permits 64-bit floats only; they can appear in fields this decoder skips.
+        let value = Double(bitPattern: try fixed(8))
+        guard value.isFinite else { throw RelayCBORReaderError.invalid }
+        return .float(value)
+      default: throw RelayCBORReaderError.invalid
+      }
+    }
     let argument = try readArgument(initial)
     switch major {
     case 0: return .unsigned(argument)
@@ -421,13 +599,6 @@ struct CanonicalRelayCBORReader {
         return .cidLink(try CID(bytes: Data(linkBytes.dropFirst())))
       } catch {
         throw RelayCBORReaderError.invalidCID
-      }
-    case 7:
-      switch argument {
-      case 20: return .boolean(false)
-      case 21: return .boolean(true)
-      case 22: return .null
-      default: throw RelayCBORReaderError.invalid
       }
     default: throw RelayCBORReaderError.invalid
     }
