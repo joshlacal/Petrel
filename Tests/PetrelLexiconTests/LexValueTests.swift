@@ -101,6 +101,22 @@ struct LexValueTests {
         #expect(viaDecoder == .integer(1))
     }
 
+    @Test("objects: keys that are distinct bytes but canonically equivalent are duplicates, never merged")
+    func canonicallyEquivalentKeys() {
+        // "é" as NFC (C3 A9) and as NFD (65 CC 81): a [String: LexValue] cannot hold both.
+        let cbor = Data([0xA2, 0x62, 0xC3, 0xA9, 0x01, 0x63, 0x65, 0xCC, 0x81, 0x02])
+        var cborCode: LexValueError.Code?
+        do {
+            _ = try LexValue(dagCBOR: cbor)
+        } catch let error as LexValueError {
+            cborCode = error.code
+        } catch {
+            Issue.record("unexpected error type: \(error)")
+        }
+        #expect(cborCode == .duplicateKey)
+        #expect(code("{\"\u{00E9}\":1,\"e\u{0301}\":2}") == .duplicateKey)
+    }
+
     @Test("numbers: malformed literals are rejected", arguments: ["01", "-", "1.", ".5", "+1", "1e", "0x10", "NaN", "Infinity"])
     func malformedNumbers(literal: String) {
         #expect(code(literal) == .malformedJSON)

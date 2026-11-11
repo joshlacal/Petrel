@@ -229,7 +229,16 @@ struct LexCBORDecoder {
                 }
             }
             previousKey = encodedKey
-            fields[key] = try decodeItem(path: LexPath.appending(path, key), depth: depth + 1)
+            let childPath = LexPath.appending(path, key)
+            // Byte-distinct keys can still be equal Swift strings (NFC and NFD spellings
+            // compare by canonical equivalence); one dictionary entry cannot hold both.
+            guard try fields.updateValue(decodeItem(path: childPath, depth: depth + 1), forKey: key) == nil else {
+                throw LexValueError(
+                    .duplicateKey,
+                    path: childPath,
+                    "map key \"\(key)\" is canonically equivalent to an earlier key"
+                )
+            }
         }
         return try LexValue.normalizedObject(fields, path: path, options: options, fromJSON: false)
     }
