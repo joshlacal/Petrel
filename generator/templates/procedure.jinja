@@ -3,11 +3,16 @@ extension ATProtoClient.{{ template_namespace_name }} {
     /// {{ (description or ('Calls `' ~ endpoint ~ '`.')) | escapeComment }}
     ///
     {%- if is_blob_upload %}
-    /// The body is sent exactly as given: no re-encoding, no metadata stripping.
+    /// Image metadata (EXIF, GPS position, XMP, comments) is removed before the upload
+    /// unless `stripMetadata` is false: a photo's metadata can say where it was taken.
+    /// Stripping keeps the image format and never re-encodes pixels. A body whose
+    /// `mimeType` is not `image/*` is sent exactly as given. An image that cannot be
+    /// stripped is not uploaded: the call throws `NetworkError.metadataStrippingFailed`.
     ///
     /// - Parameters:
     ///   - data: The request body bytes
     ///   - mimeType: The MIME type of `data`, sent as `Content-Type`
+    ///   - stripMetadata: Pass `false` to send `data` byte for byte
     {%- if parameters_struct_name %}
     ///   - params: The query parameters for the request
     {%- endif %}
@@ -31,7 +36,8 @@ extension ATProtoClient.{{ template_namespace_name }} {
     public func {{ procedure_name | lowerCamelCase }}(
         {% if is_blob_upload %}
         data: Data,
-        mimeType: String{% if parameters_struct_name %},
+        mimeType: String,
+        stripMetadata: Bool = true{% if parameters_struct_name %},
         params: {{ parameters_struct_name }}{% endif %}
         {% elif is_binary_data %}
         data: Data{% if parameters_struct_name %},
@@ -45,9 +51,18 @@ extension ATProtoClient.{{ template_namespace_name }} {
     ) async throws -> {% if output_type %}(responseCode: Int, data: {{ output_type }}?){% else %}Int{% endif %} {
         let endpoint = "{{ endpoint | escapeStringLiteral }}"
         {% if is_blob_upload %}
+        var body = data
+        if stripMetadata {
+            do {
+                body = try ImageMetadataStripper.stripMetadata(from: data, mimeType: mimeType)
+            } catch {
+                // Fail closed: an image whose metadata cannot be removed is not sent.
+                throw NetworkError.metadataStrippingFailed
+            }
+        }
         {{ 'var' if output_encoding else 'let' }} headers: [String: String] = [
             "Content-Type": mimeType,
-            "Content-Length": "\(data.count)"
+            "Content-Length": "\(body.count)"
         ]
         {% elif is_binary_data %}
         {{ 'var' if output_encoding else 'let' }} headers: [String: String] = [
@@ -76,7 +91,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
             endpoint: endpoint,
             method: "POST",
             headers: headers,
-            body: {% if is_blob_upload or is_binary_data %}data{% else %}requestData{% endif %},
+            body: {% if is_blob_upload %}body{% elif is_binary_data %}data{% else %}requestData{% endif %},
             queryItems: queryItems
         )
 
