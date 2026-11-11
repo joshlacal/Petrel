@@ -22,10 +22,13 @@ struct DIDResolutionBidirectionalTests {
             DIDTestURLProtocol.reset()
             NetworkService.setNetworkTestProtocolClasses([DIDTestURLProtocol.self])
             NetworkService.dnsResolverOverride = dnsResolver
+            // No test in this suite may depend on live DNS.
+            SystemIdentityDNSResolver.testOverride.withLock { $0 = { _ in [] } }
             defer {
                 DIDTestURLProtocol.reset()
                 NetworkService.setNetworkTestProtocolClasses(nil)
                 NetworkService.dnsResolverOverride = nil
+                SystemIdentityDNSResolver.testOverride.withLock { $0 = nil }
             }
             return try await body()
         }
@@ -237,17 +240,17 @@ struct DIDResolutionBidirectionalTests {
         let pds2 = try await resolver.resolveDIDToPDSURL(did: "did:plc:valid2")
         #expect(pds2.absoluteString == "https://pds2.example.com")
 
-        await #expect(throws: (any Error).self) {
+        await #expect(throws: IdentityError.missingService(did: "did:plc:wrongtype", id: "#atproto_pds")) {
             try await resolver.resolveDIDToPDSURL(did: "did:plc:wrongtype")
         }
 
-        await #expect(throws: (any Error).self) {
+        await #expect(throws: IdentityError.missingService(did: "did:plc:wrongid", id: "#atproto_pds")) {
             try await resolver.resolveDIDToPDSURL(did: "did:plc:wrongid")
         }
 
-        await #expect(throws: (any Error).self) {
-            try await resolver.resolveDIDToPDSURL(did: "did:plc:multiple")
-        }
+        // The first matching entry is used and later ones are ignored (DID specification).
+        let pds5 = try await resolver.resolveDIDToPDSURL(did: "did:plc:multiple")
+        #expect(pds5.absoluteString == "https://pds5a.example.com")
         }
     }
 
@@ -311,11 +314,6 @@ struct DIDResolutionBidirectionalTests {
     @Test("Reverse DID to handle resolution degrades to handle.invalid when asserted handle cannot be resolved without blocking PDS")
     func reverseResolutionFailureUnresolvable() async throws {
         try await withDIDTestTransport {
-            DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
-            defer {
-                DIDResolutionService.dnsTXTResolverOverride = nil
-            }
-
             // DID doc asserts an unresolvable handle
             let unresolvableDocJSON = """
             {
@@ -353,61 +351,50 @@ struct DIDResolutionBidirectionalTests {
         }
     }
 
-    @Test("did:web rejects path injection and invalid percent-encoding")
+    @Test("did:web with a path, an injected character or a port is rejected before any request")
     func didWebAntiInjection() async throws {
-        let networkService = NetworkService(baseURL: baseURL)
-        let resolver = await DIDResolutionService(networkService: networkService)
-
-        let invalidDIDs = [
-            "did:web:example.com%2F..%2Fx",
-            "did:web:example.com:path%2Ftraversal",
-            "did:web:example.com:..:x",
-            "did:web:example.com:.",
-            "did:web:example.com:port%3Aabc",
-            "did:web:example.com:path?evil",
-            "did:web:example.com:path#evil",
-            "did:web:example.com:path evil",
-            "did:web:example.com:path\u{1F600}",
-        ]
-        for did in invalidDIDs {
-            await #expect(throws: (any Error).self, "Invalid did:web should be rejected: \(did)") {
-                try await resolver.resolveDIDToPDSURL(did: did)
-            }
-        }
-    }
-
-    @Test("did:web preserves percent-encoded path segments and does not interpret %3F as query delimiter")
-    func didWebPercentEncodedPathPreserved() async throws {
         try await withDIDTestTransport {
-            let docJSON = """
-            {
-                "@context": ["https://www.w3.org/ns/did/v1"],
-                "id": "did:web:example.com:path%3Fevil",
-                "service": [
-                    {
-                        "id": "#atproto_pds",
-                        "type": "AtprotoPersonalDataServer",
-                        "serviceEndpoint": "https://pds.example.com"
-                    }
-                ]
-            }
-            """
-
-            let receivedBox = TestBox<URL?>(nil)
-            DIDTestURLProtocol.installRoute(matching: "example.com") { request in
-                receivedBox.set(request.url)
-                return (200, Data(docJSON.utf8), ["Content-Type": "application/json"])
+            let requests = TestBox<Int>(0)
+            DIDTestURLProtocol.installRoute(matching: "example.com") { _ in
+                requests.set(requests.get() + 1)
+                return (200, Data("{}".utf8), ["Content-Type": "application/json"])
             }
             let networkService = NetworkService(baseURL: baseURL)
             let resolver = await DIDResolutionService(networkService: networkService)
 
-            let pds = try await resolver.resolveDIDToPDSURL(did: "did:web:example.com:path%3Fevil")
-            #expect(pds.absoluteString == "https://pds.example.com")
-            let receivedURL = receivedBox.get()
-            #expect(receivedURL != nil)
-            #expect(receivedURL?.query == nil)
-            #expect(receivedURL?.absoluteString.contains("path%3Fevil/did.json") == true)
-            #expect(receivedURL?.absoluteString != "https://example.com/path?evil/did.json")
+            let invalidDIDs = [
+                "did:web:example.com%2F..%2Fx",
+                "did:web:example.com:path%2Ftraversal",
+                "did:web:example.com:..:x",
+                "did:web:example.com:.",
+                "did:web:example.com:port%3Aabc",
+                "did:web:example.com:path?evil",
+                "did:web:example.com:path#evil",
+                "did:web:example.com:path evil",
+                "did:web:example.com:path\u{1F600}",
+                "did:web:example.com:users:alice",
+                "did:web:example.com:path%3Fevil",
+                "did:web:example.com%3A8443",
+                "did:web:example.com\n",
+            ]
+            for did in invalidDIDs {
+                await #expect(throws: IdentityError.self, "Invalid did:web should be rejected: \(did)") {
+                    try await resolver.resolveDIDToPDSURL(did: did)
+                }
+            }
+            #expect(requests.get() == 0, "a rejected did:web must not cause a request")
+        }
+    }
+
+    @Test("A path-based did:web is reported as unsupported, not fetched")
+    func didWebPathIsUnsupported() async throws {
+        try await withDIDTestTransport {
+            let networkService = NetworkService(baseURL: baseURL)
+            let resolver = await DIDResolutionService(networkService: networkService)
+
+            await #expect(throws: IdentityError.unsupportedDIDWebPath("did:web:example.com:users:alice")) {
+                try await resolver.resolveDIDToPDSURL(did: "did:web:example.com:users:alice")
+            }
         }
     }
 
@@ -451,11 +438,6 @@ struct DIDResolutionBidirectionalTests {
     @Test("Cancellation propagates and is never swallowed or converted to handle.invalid")
     func cancellationPropagates() async throws {
         try await withDIDTestTransport {
-            DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
-            defer {
-                DIDResolutionService.dnsTXTResolverOverride = nil
-            }
-
             let didDocJSON = """
             {
                 "@context": ["https://www.w3.org/ns/did/v1"],
@@ -499,11 +481,6 @@ struct DIDResolutionBidirectionalTests {
     @Test("Transient reverse resolution failure is not cached as invalid and retries on subsequent call")
     func transientFailureIsNotCachedAndRetriesReverseCheck() async throws {
         try await withDIDTestTransport {
-            DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
-            defer {
-                DIDResolutionService.dnsTXTResolverOverride = nil
-            }
-
             let didDocJSON = """
             {
                 "@context": ["https://www.w3.org/ns/did/v1"],
@@ -561,11 +538,6 @@ struct DIDResolutionBidirectionalTests {
     @Test("Definitive reverse resolution mismatch is cached as invalid")
     func definitiveMismatchIsCachedAsInvalid() async throws {
         try await withDIDTestTransport {
-            DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
-            defer {
-                DIDResolutionService.dnsTXTResolverOverride = nil
-            }
-
             let attackerDocJSON = """
             {
                 "@context": ["https://www.w3.org/ns/did/v1"],

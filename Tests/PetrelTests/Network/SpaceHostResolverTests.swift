@@ -342,17 +342,22 @@ struct SpaceHostResolverTests {
         #expect(try SpaceAuthorityEndpoints.isSecureOrLoopback(#require(URL(string: "https:///path"))) == false)
     }
 
-    @Test("SpaceHostResolver.didDocumentURL validates did:web paths and rejects path traversal")
+    @Test("SpaceHostResolver.didDocumentURL accepts hostname-level did:web only")
     func didDocumentURLWebHardening() throws {
-        // Valid authority and subpaths
+        // Hostname-level did:web is the only form AT Protocol supports.
         let url1 = try SpaceHostResolver.didDocumentURL(for: "did:web:example.com")
         #expect(url1.absoluteString == "https://example.com/.well-known/did.json")
 
-        let url2 = try SpaceHostResolver.didDocumentURL(for: "did:web:example.com:users:alice")
-        #expect(url2.absoluteString == "https://example.com/users/alice/did.json")
-
-        let url3 = try SpaceHostResolver.didDocumentURL(for: "did:web:example.com%3A8443:users:bob")
-        #expect(url3.absoluteString == "https://example.com:8443/users/bob/did.json")
+        // Path-based DIDs and ports on hosts other than localhost are not supported.
+        #expect(throws: SpaceHostResolutionError.self) {
+            try SpaceHostResolver.didDocumentURL(for: "did:web:example.com:users:alice")
+        }
+        #expect(throws: SpaceHostResolutionError.self) {
+            try SpaceHostResolver.didDocumentURL(for: "did:web:example.com%3A8443")
+        }
+        #expect(throws: SpaceHostResolutionError.self) {
+            try SpaceHostResolver.didDocumentURL(for: "did:web:example.com%3A8443:users:bob")
+        }
 
         // Rejection of path traversal and illegal segments
         #expect(throws: SpaceHostResolutionError.self) {

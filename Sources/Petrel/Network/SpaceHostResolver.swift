@@ -143,90 +143,31 @@ public actor SpaceHostResolver {
         return try SpaceAuthorityEndpoints.extract(from: doc)
     }
 
-    private static let allowedPercentEncodedPathSegmentCharacters: CharacterSet = {
-        var allowed = CharacterSet.urlPathAllowed
-        allowed.insert(charactersIn: "%")
-        allowed.remove(charactersIn: "/?#")
-        return allowed
-    }()
-
-    /// Pure helper to construct the canonical DID document URL for `did:plc:` and `did:web:` per specifications.
+    /// The DID document URL for a `did:plc` DID (in the public PLC directory) or a
+    /// hostname-level `did:web` DID.
+    ///
+    /// `did:web` follows ``DIDWebIdentifier``: path-based DIDs and ports on hosts other than
+    /// `localhost` are rejected, and `localhost` and `.test` hosts are accepted in debug builds
+    /// only.
     public static func didDocumentURL(for did: String) throws -> URL {
+        guard IdentityResolver.isStrictlyValidDID(did) else {
+            throw SpaceHostResolutionError.invalidDID(did)
+        }
         if did.starts(with: "did:plc:") {
-            let endpoint = "https://plc.directory/\(did)"
-            guard let url = URL(string: endpoint) else {
+            guard let url = URL(string: "https://plc.directory/\(did)") else {
                 throw SpaceHostResolutionError.invalidDID(did)
             }
             return url
         } else if did.starts(with: "did:web:") {
-            let parts = did.split(separator: ":", omittingEmptySubsequences: false)
-            guard parts.count >= 3, parts[0] == "did", parts[1] == "web" else {
+            #if DEBUG
+                let allowsDevelopmentHosts = true
+            #else
+                let allowsDevelopmentHosts = false
+            #endif
+            guard let web = try? DIDWebIdentifier(did, allowingDevelopmentHosts: allowsDevelopmentHosts) else {
                 throw SpaceHostResolutionError.invalidDID(did)
             }
-
-            let rawAuthority = String(parts[2])
-            let authorityParts = rawAuthority.components(separatedBy: "%3A")
-            guard (1 ... 2).contains(authorityParts.count),
-                  !authorityParts[0].contains("%"),
-                  !authorityParts[0].contains("/")
-            else {
-                throw SpaceHostResolutionError.invalidDID(did)
-            }
-            let host = authorityParts[0]
-            guard !host.isEmpty else {
-                throw SpaceHostResolutionError.invalidDID(did)
-            }
-            let port: Int?
-            if authorityParts.count == 2 {
-                let portStr = authorityParts[1]
-                guard !portStr.isEmpty, !portStr.contains("%"), !portStr.contains("/"),
-                      let portNum = Int(portStr), (1 ... 65535).contains(portNum)
-                else {
-                    throw SpaceHostResolutionError.invalidDID(did)
-                }
-                port = portNum
-            } else {
-                port = nil
-            }
-
-            let pathComponents = parts.dropFirst(3)
-            var components = URLComponents()
-            components.scheme = "https"
-            components.host = host
-            components.port = port
-
-            if pathComponents.isEmpty {
-                components.percentEncodedPath = "/.well-known/did.json"
-            } else {
-                var rawSegments: [String] = []
-                for component in pathComponents {
-                    let rawSegment = String(component)
-                    guard !rawSegment.isEmpty,
-                          rawSegment != ".",
-                          rawSegment != "..",
-                          !rawSegment.contains("/"),
-                          rawSegment.unicodeScalars.allSatisfy({ allowedPercentEncodedPathSegmentCharacters.contains($0) })
-                    else {
-                        throw SpaceHostResolutionError.invalidDID(did)
-                    }
-                    guard let decoded = rawSegment.removingPercentEncoding,
-                          !decoded.isEmpty,
-                          decoded != ".",
-                          decoded != "..",
-                          !decoded.contains("/"),
-                          !decoded.contains("\\")
-                    else {
-                        throw SpaceHostResolutionError.invalidDID(did)
-                    }
-                    rawSegments.append(rawSegment)
-                }
-                components.percentEncodedPath = "/" + rawSegments.joined(separator: "/") + "/did.json"
-            }
-
-            guard let url = components.url else {
-                throw SpaceHostResolutionError.invalidDID(did)
-            }
-            return url
+            return web.documentURL
         } else {
             throw SpaceHostResolutionError.invalidDID(did)
         }
@@ -380,12 +321,17 @@ public actor SpaceHostResolver {
             throw SpaceHostResolutionError.networkError("HTTP status \(statusCode)")
         }
 
+        let document: DIDDocument
         do {
-            let decoder = JSONDecoder()
-            return try decoder.decode(DIDDocument.self, from: data)
+            document = try JSONDecoder().decode(DIDDocument.self, from: data)
         } catch {
             throw SpaceHostResolutionError.decodingError(error.localizedDescription)
         }
+        // A document that names another DID says nothing about the one that was asked for.
+        guard document.id == did else {
+            throw SpaceHostResolutionError.decodingError("The DID document declares a different id than the requested DID")
+        }
+        return document
     }
 
     public func fetchDIDDocument(for did: String) async throws -> DIDDocument {
@@ -431,15 +377,9 @@ public extension SpaceHostResolver {
         else {
             throw SpaceVerificationError.missingSigningKey
         }
-        let plcKey: PLCDIDVerificationKey
-        switch method.type {
-        case "Multikey":
-            plcKey = try PLCDIDKeyCodec.decode("did:key:" + method.publicKeyMultibase)
-        case "EcdsaSecp256r1VerificationKey2019":
-            plcKey = try PLCDIDKeyCodec.decodeLegacyMultibase(method.publicKeyMultibase, curve: .p256)
-        case "EcdsaSecp256k1VerificationKey2019":
-            plcKey = try PLCDIDKeyCodec.decodeLegacyMultibase(method.publicKeyMultibase, curve: .secp256k1)
-        default:
+        // `candidates.count == 1` above makes "first valid key" and "the only key" the same
+        // thing; the decoding rules are the ones every DID document shares.
+        guard let plcKey = document.verificationKeys(withID: "#atproto").first else {
             throw SpaceVerificationError.missingSigningKey
         }
         return ATProtoJWTVerificationKey(plcKey)

@@ -21,13 +21,10 @@ struct DIDResolutionUnauthorizedHostTests {
             NetworkService.dnsResolverOverride = { host in
                 host == "localhost" ? ["127.0.0.1"] : ["104.244.42.1"]
             }
-            // No test here may depend on live DNS.
-            DIDResolutionService.dnsTXTResolverOverride = { _ in [] }
             defer {
                 UnauthorizedHostURLProtocol.reset()
                 NetworkService.setNetworkTestProtocolClasses(nil)
                 NetworkService.dnsResolverOverride = nil
-                DIDResolutionService.dnsTXTResolverOverride = nil
             }
             return try await LogoutProbe.$id.withValue(UUID()) {
                 try await body()
@@ -41,7 +38,7 @@ struct DIDResolutionUnauthorizedHostTests {
         let provider = LegacyShapedAuthProvider(refreshSucceeds: refreshSucceeds)
         let networkService = NetworkService(baseURL: pdsURL, authService: provider)
         await provider.install(networkService: networkService)
-        let resolver = await DIDResolutionService(networkService: networkService)
+        let resolver = await DIDResolutionService(networkService: networkService, dnsTXTLookup: { _ in [] })
         return (resolver, provider, networkService)
     }
 
