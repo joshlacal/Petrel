@@ -8,7 +8,7 @@ import Foundation
 
 // MARK: - MSTTraverser
 
-/// Walks the Merkle Search Tree of a repository held by a ``CARReader`` and
+/// Walks the Merkle Search Tree of a repository held by a `CARReader` and
 /// reports each record path with its CID.
 ///
 /// This is the tree walk behind ``CARRepository``. It enforces node shape,
