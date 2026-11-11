@@ -215,12 +215,18 @@ final class GatewaySessionFailureContextTests: XCTestCase {
             let cached = try await storage.getCurrentDID()
             XCTAssertEqual(cached, bob)
             backend.plant(key: "currentDID", namespace: namespace, data: Data(alice.utf8))
-            let stale = try await storage.getCurrentDID()
-            XCTAssertEqual(stale, bob, "The fixture must prove the selector cache is stale")
+            // Usually the cached read is now stale (still bob). It is not asserted:
+            // the selector cache is KeychainManager's process-wide NSCache, which
+            // may evict the entry at any time under a loaded suite. What the test
+            // pins is that the proof reads the selector from storage, whatever the
+            // cache holds.
+            let readsBefore = backend.retrievals(key: "currentDID", namespace: namespace)
             let proof = try await storage.recordGatewaySessionFailure(
                 ifMatches: "synthetic-token-\(bob)", for: bob, deleteMatchingSession: true
             )
             XCTAssertNil(proof)
+            XCTAssertGreaterThan(backend.retrievals(key: "currentDID", namespace: namespace), readsBefore,
+                                 "Proof creation must read the account selector from storage, not the cache")
             XCTAssertEqual(backend.peek(key: "gatewaySession.\(bob)", namespace: namespace),
                            Data("synthetic-token-\(bob)".utf8))
         }
@@ -237,10 +243,14 @@ final class GatewaySessionFailureContextTests: XCTestCase {
             let current = await client.isCurrentGatewaySessionFailure(value)
             XCTAssertTrue(current)
             backend.plant(key: "currentDID", namespace: namespace, data: Data(alice.utf8))
-            let stale = try await storage.getCurrentDID()
-            XCTAssertEqual(stale, bob, "The fixture must prove the selector cache is stale")
+            // As above: the cached selector is usually stale here, but whether the
+            // process-wide cache still holds it is not something to assert. What is
+            // pinned is that validation reads the selector from storage.
+            let readsBefore = backend.retrievals(key: "currentDID", namespace: namespace)
             let afterExternalSwitch = await client.isCurrentGatewaySessionFailure(value)
             XCTAssertFalse(afterExternalSwitch)
+            XCTAssertGreaterThan(backend.retrievals(key: "currentDID", namespace: namespace), readsBefore,
+                                 "Proof validation must read the account selector from storage, not the cache")
             XCTAssertEqual(backend.peek(key: "gatewaySession.\(bob)", namespace: namespace),
                            Data("synthetic-token-\(bob)".utf8))
         }

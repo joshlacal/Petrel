@@ -25,6 +25,11 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String: Data] = [:]
     private var operationObserver: (@Sendable (Operation, String) -> Void)?
+    /// Retrievals that reached this backend, per namespaced key. Keyed by
+    /// namespace as well as key, so a test that counts its own reads is not
+    /// disturbed by another test reading the same key in its own namespace
+    /// through the process-global storage override.
+    private var retrievalCounts: [String: Int] = [:]
 
 
 
@@ -71,6 +76,7 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
     func retrieve(key: String, namespace: String, accessGroup _: String?) throws -> Data {
         lock.lock()
         let data = items[fullKey(key, namespace)]
+        retrievalCounts[fullKey(key, namespace), default: 0] += 1
         let observer = operationObserver
         let shouldFail = failRetrieveMatching?(key) ?? false
         lock.unlock()
@@ -147,6 +153,14 @@ final class InMemorySecureStorage: SecureStorage, @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return items[fullKey(key, namespace)]
+    }
+
+    /// How many retrievals of `key` in `namespace` reached this backend, as
+    /// opposed to being answered from `KeychainManager`'s cache.
+    func retrievals(key: String, namespace: String) -> Int {
+        lock.lock()
+        defer { lock.unlock() }
+        return retrievalCounts[fullKey(key, namespace)] ?? 0
     }
 
     func setOperationObserver(_ observer: (@Sendable (Operation, String) -> Void)?) {
