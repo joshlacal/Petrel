@@ -1,7 +1,7 @@
 import Crypto
 import Foundation
 @testable import PetrelCrypto
-import secp256k1
+import P256K
 import XCTest
 
 final class ServiceJWTTests: XCTestCase {
@@ -59,14 +59,14 @@ final class ServiceJWTTests: XCTestCase {
     // MARK: - Mint & Inspect & Verify (ES256K)
 
     func testES256KMintInspectAndVerifyRoundTrip() throws {
-        let secpKey = try secp256k1.Signing.PrivateKey()
+        let secpKey = try P256K.Signing.PrivateKey()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let token = try ServiceJWT.mint(
             issuer: issuerWeb,
             audience: audience,
             method: "com.atproto.repo.getRecord",
             eventID: "secp-event-999",
-            key: secpKey,
+            key: .secp256k1(secpKey),
             now: now,
             lifetime: 60
         )
@@ -364,13 +364,13 @@ final class ServiceJWTTests: XCTestCase {
     }
 
     func testWrongCurveVerificationIsRejected() throws {
-        let secpKey = try secp256k1.Signing.PrivateKey()
+        let secpKey = try P256K.Signing.PrivateKey()
         let es256kToken = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
             method: "app.bsky.actor.getProfile",
             eventID: "curve-mismatch",
-            key: secpKey
+            key: .secp256k1(secpKey)
         )
 
         // Attempt to verify ES256K token against P256 public key
@@ -403,7 +403,12 @@ final class ServiceJWTTests: XCTestCase {
         }
     }
 
-    func testHighSSignatureRejected() throws {
+    // The low-S rule covers signatures over CBOR objects and, in the
+    // specification's words, "does not impact JWT signature validation, for
+    // example service auth tokens". The reference implementation verifies
+    // service JWTs with `allowMalleableSig: true`. A high-S token is
+    // therefore accepted by default and rejected only on request.
+    func testHighSSignatureAcceptedByDefaultAndRejectedWhenStrict() throws {
         let token = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
@@ -414,14 +419,23 @@ final class ServiceJWTTests: XCTestCase {
         let parts = token.split(separator: ".")
         let canonicalSig = try JWTBase64URL.decode(String(parts[2]))
         let highS = highSVariant(of: canonicalSig)
+        XCTAssertFalse(P256WireSignature.isCanonicalLowS(highS))
         let highSToken = "\(parts[0]).\(parts[1]).\(JWTBase64URL.encode(highS))"
+        let key = ATProtoJWTVerificationKey.p256(p256Key.publicKey)
 
-        XCTAssertThrowsError(
-            try ServiceJWT.verify(
-                highSToken,
-                publicKey: ATProtoJWTVerificationKey.p256(p256Key.publicKey)
-            )
+        let claims = try ServiceJWT.verify(highSToken, publicKey: key)
+        XCTAssertEqual(claims.jti, "high-s-test")
+        XCTAssertEqual(try ServiceJWT.verify(highSToken, publicKey: key, signatureOptions: .jwt).jti, "high-s-test")
+        XCTAssertEqual(
+            try ServiceJWT.verify(highSToken, didKey: PLCDIDVerificationKey.p256(p256Key.publicKey).didKey).jti,
+            "high-s-test"
         )
+
+        XCTAssertThrowsError(try ServiceJWT.verify(highSToken, publicKey: key, signatureOptions: .strict))
+        // The canonical token passes under every policy.
+        for options in [ATProtoSignatureVerificationOptions.strict, .jwt, .allowMalleable] {
+            XCTAssertNoThrow(try ServiceJWT.verify(token, publicKey: key, signatureOptions: options))
+        }
     }
 
     // MARK: - Negative Verification Tests: Malformed Token & Header Types
@@ -713,7 +727,7 @@ final class ServiceJWTTests: XCTestCase {
         }
 
         // ES256K mint with requestBodyDigest
-        let secpKey = try secp256k1.Signing.PrivateKey()
+        let secpKey = try P256K.Signing.PrivateKey()
         let verifierSecp = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.dataRepresentation)
         let tokenSecp = try ServiceJWT.mint(
             issuer: issuerPLC,
@@ -721,7 +735,7 @@ final class ServiceJWTTests: XCTestCase {
             method: "com.atproto.space.notifyDeleted",
             eventID: "req-secp-1",
             requestBodyDigest: digest,
-            key: secpKey,
+            key: .secp256k1(secpKey),
             now: now
         )
         let verifiedSecp = try ServiceJWT.verify(

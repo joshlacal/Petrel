@@ -8,7 +8,13 @@ import Foundation
 /// fixed-width `r || s` value, so accepting both encodings would make those
 /// wire values malleable. This boundary emits only low-S values and rejects
 /// high-S values *before* asking Swift Crypto to verify them.
+///
+/// This is the P-256-specific, Swift Crypto-typed layer. For code that
+/// should work on both curves use ``ATProtoSignature``, ``P256Keypair`` /
+/// ``K256Keypair`` and ``ATProtoPublicKey``. The low-S threshold itself
+/// (`floor(n / 2)`) is shared with K-256 and derived from the group order.
 public enum P256WireSignature {
+    /// Length of the compact `r || s` encoding.
     public static let rawByteCount = 64
 
     /// Signs a message using Swift Crypto's P-256 implementation, normalizing
@@ -25,26 +31,21 @@ public enum P256WireSignature {
         try validateScalars(rawRepresentation)
         _ = try decode(rawRepresentation)
 
-        let s = Data(rawRepresentation.suffix(32))
-        guard compare(s, halfOrder) == .orderedDescending else {
-            return rawRepresentation
-        }
-
-        var normalized = rawRepresentation
-        normalized.replaceSubrange(32 ..< 64, with: subtract(s, from: order))
-        return normalized
+        return ECDSAScalar.lowSForm(ofStructurallyValid: rawRepresentation, curve: .p256)
     }
 
     /// Rejects non-canonical raw P-256 values before creating the signature
     /// object passed to the cryptographic verifier.
     public static func decodeCanonical(_ rawRepresentation: Data) throws -> P256.Signing.ECDSASignature {
         try validateScalars(rawRepresentation)
-        guard compare(Data(rawRepresentation.suffix(32)), halfOrder) != .orderedDescending else {
+        guard ECDSAScalar.isLow(rawRepresentation.suffix(32), curve: .p256) else {
             throw PetrelCryptoError.malformed("P-256 signature is not canonical low-S")
         }
         return try decode(rawRepresentation)
     }
 
+    /// Whether `rawRepresentation` is 64 bytes with `0 < r < n` and
+    /// `0 < s <= floor(n / 2)`.
     public static func isCanonicalLowS(_ rawRepresentation: Data) -> Bool {
         (try? decodeCanonical(rawRepresentation)) != nil
     }
@@ -59,13 +60,13 @@ public enum P256WireSignature {
     /// every OAuth JWT a coin flip rather than a security boundary.
     ///
     /// Malleating a JOSE token here buys an attacker nothing: client
-    /// assertions and DPoP proofs are replay-protected by `jti`, and a
-    /// malleated variant carries the same `jti`, so it is caught by the
-    /// existing claim. These tokens are never used as content addresses.
-    /// Structural scalar validation still applies, and AT Protocol's own
-    /// signature suites — PLC operations, repository commits, service JWTs —
-    /// keep using ``decodeCanonical(_:)`` because their wire values *are*
-    /// canonical and malleability there would be observable.
+    /// assertions, DPoP proofs and service-auth tokens are replay-protected
+    /// by `jti`, and a malleated variant carries the same `jti`, so it is
+    /// caught by the existing claim. These tokens are never used as content
+    /// addresses. Structural scalar validation still applies. AT Protocol's
+    /// signatures over CBOR objects — PLC operations, repository commits,
+    /// labels — keep using ``decodeCanonical(_:)``, because the
+    /// specification requires verifiers to reject non-low-S values there.
     public static func decodeMalleabilityTolerant(
         _ rawRepresentation: Data
     ) throws -> P256.Signing.ECDSASignature {
@@ -73,27 +74,11 @@ public enum P256WireSignature {
         return try decode(rawRepresentation)
     }
 
-    private static let order = Data([
-        0xff, 0xff, 0xff, 0xff, 0x00, 0x00, 0x00, 0x00,
-        0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xbc, 0xe6, 0xfa, 0xad, 0xa7, 0x17, 0x9e, 0x84,
-        0xf3, 0xb9, 0xca, 0xc2, 0xfc, 0x63, 0x25, 0x51,
-    ])
-
-    private static let halfOrder = Data([
-        0x7f, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00,
-        0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
-        0xde, 0x73, 0x7d, 0x56, 0xd3, 0x8b, 0xcf, 0x42,
-        0x79, 0xdc, 0xd6, 0x61, 0x7e, 0x31, 0x92, 0xa8,
-    ])
-
     private static func validateScalars(_ rawRepresentation: Data) throws {
         guard rawRepresentation.count == rawByteCount else {
             throw PetrelCryptoError.malformed("P-256 signature must be 64 bytes")
         }
-        let r = Data(rawRepresentation.prefix(32))
-        let s = Data(rawRepresentation.suffix(32))
-        guard isValidScalar(r), isValidScalar(s) else {
+        guard ECDSAScalar.isStructurallyValid(compact: rawRepresentation, curve: .p256) else {
             throw PetrelCryptoError.malformed("P-256 signature scalar is invalid")
         }
     }
@@ -104,40 +89,5 @@ public enum P256WireSignature {
         } catch {
             throw PetrelCryptoError.malformed("P-256 signature is malformed")
         }
-    }
-
-    private static func isValidScalar(_ scalar: Data) -> Bool {
-        scalar.count == 32 && scalar.contains(where: { $0 != 0 }) && compare(scalar, order) == .orderedAscending
-    }
-
-    private static func compare(_ lhs: Data, _ rhs: Data) -> ComparisonResult {
-        precondition(lhs.count == rhs.count)
-        for (left, right) in zip(lhs, rhs) {
-            if left < right { return .orderedAscending }
-            if left > right { return .orderedDescending }
-        }
-        return .orderedSame
-    }
-
-    /// Computes `minuend - subtrahend`, whose caller has already proven does
-    /// not underflow. Both values are fixed-width big-endian scalar bytes.
-    private static func subtract(_ subtrahend: Data, from minuend: Data) -> Data {
-        precondition(subtrahend.count == 32 && minuend.count == 32)
-        let minuendBytes = Array(minuend)
-        let subtrahendBytes = Array(subtrahend)
-        var result = Array(repeating: UInt8.zero, count: 32)
-        var borrow = 0
-        for index in stride(from: 31, through: 0, by: -1) {
-            var value = Int(minuendBytes[index]) - Int(subtrahendBytes[index]) - borrow
-            if value < 0 {
-                value += 256
-                borrow = 1
-            } else {
-                borrow = 0
-            }
-            result[index] = UInt8(value)
-        }
-        precondition(borrow == 0)
-        return Data(result)
     }
 }

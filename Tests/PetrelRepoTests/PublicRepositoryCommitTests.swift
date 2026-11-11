@@ -1,7 +1,7 @@
 import Crypto
 import Foundation
 import Petrel
-import secp256k1
+import P256K
 import PetrelCrypto
 @testable import PetrelRepo
 import XCTest
@@ -269,7 +269,7 @@ final class PublicRepositoryCommitTests: XCTestCase {
     }
 
     func testSecp256k1CommitVerifierAcceptsCompactLowSSignature() async throws {
-        let key = try secp256k1.Signing.PrivateKey(
+        let key = try P256K.Signing.PrivateKey(
             dataRepresentation: Data(repeating: 2, count: 32)
         )
         let root = CID.fromDAGCBOR(PublicRepositoryGenesisCodec.canonicalEmptyMST)
@@ -279,7 +279,7 @@ final class PublicRepositoryCommitTests: XCTestCase {
             dataCID: root
         )
         let signature = normalizeSecp256k1LowS(
-            try key.signature(for: unsigned).compactRepresentation
+            key.signature(for: unsigned).compactRepresentation
         )
         let signed = try signedCommit(
             did: did,
@@ -465,11 +465,11 @@ private struct Secp256k1Verifier: PublicRepositoryCommitVerifier {
         unsignedCommitBytes: Data,
         did _: String
     ) async throws {
-        let publicKey = try secp256k1.Signing.PublicKey(
+        let publicKey = try P256K.Signing.PublicKey(
             dataRepresentation: publicKeyBytes,
             format: .compressed
         )
-        let compact = try secp256k1.Signing.ECDSASignature(
+        let compact = try P256K.Signing.ECDSASignature(
             compactRepresentation: signature
         )
         guard publicKey.isValidSignature(compact, for: unsignedCommitBytes) else {

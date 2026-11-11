@@ -1,7 +1,7 @@
 import Crypto
 import Foundation
 @testable import PetrelCrypto
-import secp256k1
+import P256K
 import XCTest
 
 final class PetrelCryptoTests: XCTestCase {
@@ -46,13 +46,15 @@ final class PetrelCryptoTests: XCTestCase {
             try P256WireSignature.decodeMalleabilityTolerant(Data(repeating: 0, count: 64)))
     }
 
+    // floor(n / 2) for P-256, written out. `LowSBoundaryTests` derives the
+    // same value from the group order with independent arithmetic.
     func testP256WireSignatureUsesTheExactP256HalfOrderBoundary() {
         let r = Data(repeating: 0, count: 31) + Data([1])
         let halfOrder = Data([
             0x7f, 0xff, 0xff, 0xff, 0x80, 0x00, 0x00, 0x00,
             0x7f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
             0xde, 0x73, 0x7d, 0x56, 0xd3, 0x8b, 0xcf, 0x42,
-            0x79, 0xdc, 0xd6, 0x61, 0x7e, 0x31, 0x92, 0xa8,
+            0x79, 0xdc, 0xe5, 0x61, 0x7e, 0x31, 0x92, 0xa8,
         ])
         XCTAssertTrue(P256WireSignature.isCanonicalLowS(r + halfOrder))
 
@@ -128,11 +130,11 @@ final class PetrelCryptoTests: XCTestCase {
         XCTAssertThrowsError(try verifier.verify(signature: sig, signingInput: msg, algorithm: "ES256K"))
 
         // secp256k1 key verification
-        let secpKey = try secp256k1.Signing.PrivateKey()
+        let secpKey = try P256K.Signing.PrivateKey()
         let secpPubBytes = secpKey.publicKey.dataRepresentation
         let secpVerifier = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpPubBytes)
 
-        let compactSig = try secpKey.signature(for: msg)
+        let compactSig = secpKey.signature(for: msg)
         // Verify compact representation
         XCTAssertTrue(try secpVerifier.verify(
             signature: compactSig.compactRepresentation,
@@ -146,6 +148,52 @@ final class PetrelCryptoTests: XCTestCase {
         let encoded = Base58BTC.encode(testData)
         let decoded = try Base58BTC.decode(encoded)
         XCTAssertEqual(testData, decoded)
+    }
+
+    // Each leading zero byte is exactly one leading "1", including when the
+    // whole input is zero bytes.
+    func testBase58BTCAllZeroInputs() throws {
+        XCTAssertEqual(Base58BTC.encode(Data()), "")
+        XCTAssertEqual(Base58BTC.encode(Data([0])), "1")
+        XCTAssertEqual(Base58BTC.encode(Data([0, 0])), "11")
+        XCTAssertEqual(Base58BTC.encode(Data([0, 0, 0, 0])), "1111")
+        XCTAssertEqual(Base58BTC.encode(Data([0, 1])), "12")
+        XCTAssertEqual(Base58BTC.encode(Data([1])), "2")
+        XCTAssertEqual(Base58BTC.encode(Data([57])), "z")
+        XCTAssertEqual(Base58BTC.encode(Data([58])), "21")
+
+        XCTAssertEqual(try Base58BTC.decode("1"), Data([0]))
+        XCTAssertEqual(try Base58BTC.decode("11"), Data([0, 0]))
+        XCTAssertEqual(try Base58BTC.decode("1111"), Data([0, 0, 0, 0]))
+        XCTAssertEqual(try Base58BTC.decode("12"), Data([0, 1]))
+        XCTAssertEqual(try Base58BTC.decode("2"), Data([1]))
+        XCTAssertEqual(try Base58BTC.decode("21"), Data([58]))
+
+        for length in 0 ... 40 {
+            let zeros = Data(repeating: 0, count: length)
+            let encoded = Base58BTC.encode(zeros)
+            XCTAssertEqual(encoded, String(repeating: "1", count: length))
+            if length > 0 {
+                XCTAssertEqual(try Base58BTC.decode(encoded), zeros)
+            }
+        }
+        // The empty string is not a base58btc value.
+        XCTAssertThrowsError(try Base58BTC.decode(""))
+        // Characters outside the alphabet (0, O, I, l) are rejected.
+        for invalid in ["0", "O", "I", "l", "2 ", "+"] {
+            XCTAssertThrowsError(try Base58BTC.decode(invalid))
+        }
+    }
+
+    // Well-known base58 strings, as an external check on the codec.
+    func testBase58BTCKnownAnswers() throws {
+        XCTAssertEqual(Base58BTC.encode(Data("Hello World!".utf8)), "2NEpo7TZRRrLZSi2U")
+        XCTAssertEqual(try Base58BTC.decode("2NEpo7TZRRrLZSi2U"), Data("Hello World!".utf8))
+        XCTAssertEqual(
+            Base58BTC.encode(Data("The quick brown fox jumps over the lazy dog.".utf8)),
+            "USm3fpXnKG5EUBx2ndxBDMPVciP5hGey2Jh4NDv6gmeo1LkMeiKrLJUUBk6Z"
+        )
+        XCTAssertEqual(Base58BTC.encode(Data([0x00, 0x00, 0x28, 0x7f, 0xb4, 0xcd])), "11233QC4")
     }
 
     func testHexCodec() {
