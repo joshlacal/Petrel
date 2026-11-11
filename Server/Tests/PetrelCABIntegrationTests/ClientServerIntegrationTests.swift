@@ -38,6 +38,13 @@ final class IntegrationDIDResolver: DIDResolving, @unchecked Sendable {
   }
 }
 
+// MARK: - Live-network gate
+
+/// Tests that talk to deployed services on the public internet run only when
+/// `PETREL_LIVE_NETWORK_TESTS=1` is set, so `swift test` is hermetic by default:
+/// it passes offline and does not depend on third-party hosts being up.
+let liveNetworkTestsEnabled = ProcessInfo.processInfo.environment["PETREL_LIVE_NETWORK_TESTS"] == "1"
+
 // MARK: - Harness
 
 /// Runs a fully-wired CABServer on a random loopback port for the duration
@@ -176,7 +183,7 @@ struct ClientServerIntegrationTests {
     }
   }
 
-  @Test("Public cab.swan.place fetch round trip")
+  @Test("Public cab.swan.place fetch round trip", .enabled(if: liveNetworkTestsEnabled))
   func publicServerFetch() async throws {
     let strategy = CABOAuthStrategy(
       backendURL: URL(string: "https://cab.swan.place")!,
@@ -204,7 +211,7 @@ struct ClientServerIntegrationTests {
     #expect(!response.clientAssertion.isEmpty)
   }
 
-  @Test("Live PAR against swan.place with cab.swan.place assertion")
+  @Test("Live PAR against swan.place with cab.swan.place assertion", .enabled(if: liveNetworkTestsEnabled))
   func swanPlacePAR() async throws {
     let client = try await ATProtoClient(
       oauthConfig: OAuthConfig(
@@ -220,7 +227,7 @@ struct ClientServerIntegrationTests {
     #expect(authURL.absoluteString.starts(with: "https://swan.place/oauth/authorize"))
   }
 
-  @Test("Live PAR against bsky.social with public-client metadata")
+  @Test("Live PAR against bsky.social with public-client metadata", .enabled(if: liveNetworkTestsEnabled))
   func bskySocialPublicOAuthPAR() async throws {
     let client = try await ATProtoClient(
       oauthConfig: OAuthConfig(
