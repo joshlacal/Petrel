@@ -361,10 +361,10 @@ struct SyntaxFailure: Error, ExpressibleByStringInterpolation {
 /// Any multibase encoding passes, so base32 (`b…`), base58btc (`z…`), base64
 /// (`m…`), base16 (`f…`) and base8 (`7…`) are all accepted.
 ///
-/// It is deliberately separate from ``CID/parse(_:)``, which decodes a CID and
+/// It is deliberately separate from `CID.parse(_:)`, which decodes a CID and
 /// accepts only the forms AT Protocol repositories use (CIDv1, base32, known
 /// codecs). Use `CIDSyntax` to validate a `format: cid` string field, and
-/// `CID.parse` when the bytes are needed.
+/// `CID.parse(_:)` when the bytes are needed.
 public enum CIDSyntax {
     /// Whether `string` has valid Lexicon `cid` string syntax.
     public static func isValid(_ string: String) -> Bool {

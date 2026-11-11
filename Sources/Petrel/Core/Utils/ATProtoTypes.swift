@@ -1114,9 +1114,11 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     /// Whether `did` is a syntactically valid DID that uses a method atproto
     /// supports and meets atproto's rules for it; see ``atprotoMethod``.
     ///
-    /// - Parameter allowLocalhost: Whether `did:web:localhost` (optionally with
-    ///   a port) is accepted. The specification allows it only in testing and
-    ///   development; pass `false` in production paths.
+    /// - Parameters:
+    ///   - did: The string to check.
+    ///   - allowLocalhost: Whether `did:web:localhost` (optionally with a port)
+    ///     is accepted. The specification allows it only in testing and
+    ///     development; pass `false` in production paths.
     public static func isValidAtprotoDID(_ did: String, allowLocalhost: Bool = true) -> Bool {
         atprotoMethod(of: did, allowLocalhost: allowLocalhost) != nil
     }
