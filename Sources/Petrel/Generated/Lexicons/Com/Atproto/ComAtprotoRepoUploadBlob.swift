@@ -75,23 +75,38 @@ public extension ATProtoClient.Com.Atproto.Repo {
 
     /// Upload a new blob, to be referenced from a repository record. The blob will be deleted if it is not referenced within a time window (eg, minutes). Blob restrictions (mimetype, size, etc) are enforced when the reference is created. Requires auth, implemented by PDS.
     ///
-    /// The body is sent exactly as given: no re-encoding, no metadata stripping.
+    /// Image metadata (EXIF, GPS position, XMP, comments) is removed before the upload
+    /// unless `stripMetadata` is false: a photo's metadata can say where it was taken.
+    /// Stripping keeps the image format and never re-encodes pixels. A body whose
+    /// `mimeType` is not `image/*` is sent exactly as given. An image that cannot be
+    /// stripped is not uploaded: the call throws `NetworkError.metadataStrippingFailed`.
     ///
     /// - Parameters:
     ///   - data: The request body bytes
     ///   - mimeType: The MIME type of `data`, sent as `Content-Type`
+    ///   - stripMetadata: Pass `false` to send `data` byte for byte
     /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
     /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func uploadBlob(
         data: Data,
-        mimeType: String
+        mimeType: String,
+        stripMetadata: Bool = true
 
     ) async throws -> (responseCode: Int, data: ComAtprotoRepoUploadBlob.Output?) {
         let endpoint = "com.atproto.repo.uploadBlob"
 
+        var body = data
+        if stripMetadata {
+            do {
+                body = try ImageMetadataStripper.stripMetadata(from: data, mimeType: mimeType)
+            } catch {
+                // Fail closed: an image whose metadata cannot be removed is not sent.
+                throw NetworkError.metadataStrippingFailed
+            }
+        }
         var headers: [String: String] = [
             "Content-Type": mimeType,
-            "Content-Length": "\(data.count)",
+            "Content-Length": "\(body.count)",
         ]
 
         headers["Accept"] = "application/json"
@@ -102,7 +117,7 @@ public extension ATProtoClient.Com.Atproto.Repo {
             endpoint: endpoint,
             method: "POST",
             headers: headers,
-            body: data,
+            body: body,
             queryItems: queryItems
         )
 
