@@ -45,6 +45,26 @@ struct BskyPreferencesEngine: Sendable {
         }.preferences
     }
 
+    /// Like ``updatePreferences(_:)``, and additionally points subsequent
+    /// requests at the labelers of the array that was written, before the
+    /// lock is released.
+    ///
+    /// Saving and reconfiguring are one serialized step. If the header were
+    /// updated after the lock is released, a setter that saved first could
+    /// update the header last and leave requests asking for a labeler set the
+    /// account no longer has.
+    @discardableResult
+    func updatePreferencesApplyingLabelers(
+        _ transform: @Sendable ([BskyJSON]) async throws -> [BskyJSON]
+    ) async throws -> [BskyJSON] {
+        try await lock.withLock {
+            let next = try await transform(backend.loadPreferences())
+            try await backend.savePreferences(next)
+            await applyLabelers(from: next)
+            return next
+        }
+    }
+
     // MARK: Labeler wiring
 
     /// The labeler DIDs of the last valid `labelersPref`, in stored order.
@@ -72,7 +92,14 @@ struct BskyPreferencesEngine: Sendable {
     /// Following timeline is created) and written back so the migration
     /// happens once.
     func getPreferences() async throws -> BskyPreferences {
-        let raw = try await backend.loadPreferences()
+        // Read and reconfigure the labelers as one serialized step, so a read
+        // that started before a concurrent labeler change cannot apply its
+        // older view of the subscriptions after that change has been applied.
+        let raw = try await lock.withLock {
+            let raw = try await backend.loadPreferences()
+            await applyLabelers(from: raw)
+            return raw
+        }
 
         var prefs = BskyPreferences()
         prefs.moderationPrefs = ModerationPrefs(
@@ -224,7 +251,6 @@ struct BskyPreferencesEngine: Sendable {
         }
         prefs.moderationPrefs.labels = Self.remapLegacyLabels(prefs.moderationPrefs.labels)
 
-        await applyLabelers(from: raw)
 
         return prefs
     }

@@ -61,6 +61,54 @@ struct BskyPreferencesRobustnessTests {
         #expect(pinnedFlags == pinnedFlags.sorted { $0 && !$1 })
     }
 
+    /// One round of concurrent labeler changes: six subscriptions exist, four
+    /// are removed and eight new ones are added, all at once, with reads mixed in.
+    private func labelerRound() async throws -> (header: [AcceptedLabeler]?, expected: [AcceptedLabeler], stored: [String]) {
+        func labeler(_ name: String) throws -> DID { try PrefsFixture.did("did:plc:\(name)") }
+        let seeded = try (0 ..< 6).map { try labeler("seed\($0)") }
+        let (engine, backend) = PrefsFixture.make([
+            .object([
+                "$type": .string(AppBskyActorDefs.LabelersPref.typeIdentifier),
+                "labelers": .array(seeded.map { .object(["did": .string($0.didString())]) }),
+            ]),
+        ])
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0 ..< 8 {
+                let added = try labeler("added\(index)")
+                group.addTask { try await engine.addLabeler(added) }
+                if index < 4 {
+                    let removed = seeded[index]
+                    group.addTask { try await engine.removeLabeler(removed) }
+                }
+                if index.isMultiple(of: 2) {
+                    group.addTask { _ = try await engine.getPreferences() }
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        let stored = BskyPreferencesEngine.labelerDIDs(in: backend.preferences)
+        let expected = PrefsFixture.appLabelers.map { AcceptedLabeler(did: $0, redact: true) }
+            + stored.map { AcceptedLabeler(did: $0) }
+        return (backend.configuredLabelers.last, expected, stored.map { $0.didString() })
+    }
+
+    @Test(
+        "concurrent labeler changes leave the header matching the saved subscriptions",
+        .timeLimit(.minutes(1)),
+        arguments: 0 ..< 50
+    )
+    func concurrentLabelerChanges(_: Int) async throws {
+        let round = try await labelerRound()
+        // Every change was persisted…
+        #expect(Set(round.stored) == Set(
+            (4 ..< 6).map { "did:plc:seed\($0)" } + (0 ..< 8).map { "did:plc:added\($0)" }
+        ))
+        // …and the labelers requested from now on are exactly the saved ones, in saved order.
+        #expect(round.header == round.expected)
+    }
+
     @Test("agents of one network service share a lock; different services do not")
     func lockRegistryIsPerNetworkService() throws {
         let url = try #require(URL(string: "https://pds.invalid"))

@@ -66,7 +66,7 @@ extension BskyPreferencesEngine {
     /// subsequent requests. Subscribing twice is a no-op.
     func addLabeler(_ did: DID) async throws {
         let didString = did.didString()
-        let prefs = try await updatePreferences { prefs in
+        try await updatePreferencesApplyingLabelers { prefs in
             let pref = prefs.lastValid(AppBskyActorDefs.LabelersPref.self)?.json
                 ?? BskyJSON.preference(AppBskyActorDefs.LabelersPref.self, ["labelers": .array([])])
             var labelers = pref["labelers"]?.arrayValue ?? []
@@ -75,20 +75,18 @@ extension BskyPreferencesEngine {
             }
             return prefs.replacing(AppBskyActorDefs.LabelersPref.self, with: pref.setting("labelers", .array(labelers)))
         }
-        await applyLabelers(from: prefs)
     }
 
     /// Unsubscribes from a labeler and applies the resulting labeler set to
     /// subsequent requests.
     func removeLabeler(_ did: DID) async throws {
         let didString = did.didString()
-        let prefs = try await updatePreferences { prefs in
+        try await updatePreferencesApplyingLabelers { prefs in
             let pref = prefs.lastValid(AppBskyActorDefs.LabelersPref.self)?.json
                 ?? BskyJSON.preference(AppBskyActorDefs.LabelersPref.self, ["labelers": .array([])])
             let labelers = (pref["labelers"]?.arrayValue ?? []).filter { $0["did"]?.stringValue != didString }
             return prefs.replacing(AppBskyActorDefs.LabelersPref.self, with: pref.setting("labelers", .array(labelers)))
         }
-        await applyLabelers(from: prefs)
     }
 
     // MARK: Muted words

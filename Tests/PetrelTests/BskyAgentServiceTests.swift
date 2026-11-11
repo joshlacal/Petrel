@@ -330,6 +330,46 @@ struct BskyPreferencesWireTests {
         #expect(Set(hidden?.compactMap(\.stringValue) ?? []) == Set(posts.map { $0.uriString() }))
     }
 
+    @Test(
+        "concurrent labeler changes through agents sharing one network service leave the header matching the saved subscriptions",
+        .timeLimit(.minutes(1)),
+        arguments: 0 ..< 20
+    )
+    func concurrentLabelerChanges(_: Int) async throws {
+        let pds = BskyFakePDS()
+        let seeded = (0 ..< 4).map { "did:plc:seed\($0)" }
+        pds.setPreferences([
+            ["$type": "app.bsky.actor.defs#labelersPref", "labelers": .array(seeded.map { ["did": .string($0)] })],
+            ["$type": "app.bsky.actor.defs#savedFeedsPrefV2", "items": []],
+        ])
+        let service = await pds.server.makeNetworkService()
+        let alice = try DID(didString: BskyStubServer.alice)
+
+        try await withThrowingTaskGroup(of: Void.self) { group in
+            for index in 0 ..< 6 {
+                // A fresh agent value per call, as `client.bsky` hands out.
+                let added = try DID(didString: "did:plc:added\(index)")
+                group.addTask { try await BskyAgent(networkService: service, did: alice).addLabeler(added) }
+                if index < 3 {
+                    let removed = try DID(didString: seeded[index])
+                    group.addTask { try await BskyAgent(networkService: service, did: alice).removeLabeler(removed) }
+                }
+                if index.isMultiple(of: 3) {
+                    group.addTask { _ = try await BskyAgent(networkService: service, did: alice).getPreferences() }
+                }
+            }
+            try await group.waitForAll()
+        }
+
+        let stored = pds.storedPreferences
+            .last { $0.typeIdentifier == "app.bsky.actor.defs#labelersPref" }?["labelers"]?.arrayValue?
+            .compactMap { $0["did"]?.stringValue } ?? []
+        #expect(Set(stored) == Set(["did:plc:seed3"] + (0 ..< 6).map { "did:plc:added\($0)" }))
+        // What the next request will ask for is exactly what is saved, in saved order.
+        #expect(await service.getHeader(name: "atproto-accept-labelers")
+            == (["\(bskyLabeler);redact"] + stored).joined(separator: ", "))
+    }
+
     @Test("getLabelDefinitions asks the AppView for detailed services and interprets their definitions")
     func labelDefinitions() async throws {
         let pds = BskyFakePDS()

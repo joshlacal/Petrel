@@ -49,6 +49,9 @@ final class FakePreferencesBackend: BskyPreferencesBackend, @unchecked Sendable 
     }
 
     func configureLabelers(_ labelers: [AcceptedLabeler]) async {
+        // Suspend, as the real header update does (an actor hop), so a caller
+        // that configures labelers outside the preferences lock can be overtaken.
+        await Task.yield()
         lock.withLock { labelerCalls.append(labelers) }
     }
 
