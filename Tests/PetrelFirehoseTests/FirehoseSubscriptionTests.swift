@@ -61,93 +61,54 @@ final class FirehoseSubscriptionTests: XCTestCase {
     XCTAssertEqual(savedCursor, 2)
   }
 
-  func testSequenceGapDetectionSurfacesTypedEvent() async throws {
-    let frame1 = try FirehoseFrameEncoder.identityFrame(
-      seq: 10,
-      material: .init(did: did, handle: nil, time: time)
-    )
-    let frame2 = try FirehoseFrameEncoder.identityFrame(
-      seq: 15,
-      material: .init(did: did, handle: nil, time: time)
-    )
-
-    let session = FakeWebSocketSession(messages: [frame1, frame2])
-    let factory = FakeWebSocketFactory(sessions: [session])
-    let storage = InMemoryFirehoseCursorStorage()
-
+  func testSequenceGapIsReportedAndTheStreamContinues() async throws {
+    let frames = try [Int64(10), 15, 16].map {
+      try FirehoseFrameEncoder.identityFrame(seq: $0, material: .init(did: did, handle: nil, time: time))
+    }
+    let session = FakeWebSocketSession(messages: frames)
     let subscription = FirehoseSubscription(
       url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
-      cursorStorage: storage,
       backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
-      sessionFactory: factory
+      sessionFactory: FakeWebSocketFactory(sessions: [session])
     )
 
     var received: [FirehoseSubscriptionEvent] = []
-    let stream = subscription.events()
-
-    var streamError: Error?
-    do {
-      for try await event in stream {
-        received.append(event)
-      }
-    } catch {
-      streamError = error
+    for try await event in subscription.events() {
+      received.append(event)
+      if received.count == 4 { break }
     }
 
-    XCTAssertEqual(received.count, 2)
-    guard case let .event(.identity(first)) = received.first else {
-      return XCTFail("expected first identity event")
-    }
-    XCTAssertEqual(first.seq, 10)
-
-    guard case let .sequenceGap(expected, receivedSeq) = received.last else {
-      return XCTFail("expected sequenceGap event")
-    }
-    XCTAssertEqual(expected, 11)
-    XCTAssertEqual(receivedSeq, 15)
-
-    XCTAssertEqual(streamError as? FirehoseSubscriptionError, .resynchronizationRequired)
-    await session.waitForClose()
+    // "Sequence numbers … may contain arbitrary gaps": the gap is surfaced, not fatal.
+    XCTAssertEqual(received.map(Self.summary), ["event 10", "gap 11-15", "event 15", "event 16"])
   }
 
-  func testSequenceGapDetectionWithInitialCursor() async throws {
+  func testSequenceGapAfterResumeCursorIsReportedAndTheStreamContinues() async throws {
     let frame = try FirehoseFrameEncoder.identityFrame(
       seq: 50,
       material: .init(did: did, handle: nil, time: time)
     )
-
     let session = FakeWebSocketSession(messages: [frame])
-    let factory = FakeWebSocketFactory(sessions: [session])
-    let storage = InMemoryFirehoseCursorStorage(initialCursor: 40)
-
     let subscription = FirehoseSubscription(
       url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
-      cursorStorage: storage,
+      cursorStorage: InMemoryFirehoseCursorStorage(initialCursor: 40),
       backoff: .init(initialDelay: 0.01, maxDelay: 0.02, multiplier: 1.5),
-      sessionFactory: factory
+      sessionFactory: FakeWebSocketFactory(sessions: [session])
     )
 
     var received: [FirehoseSubscriptionEvent] = []
-    let stream = subscription.events()
-
-    var streamError: Error?
-    do {
-      for try await event in stream {
-        received.append(event)
-      }
-    } catch {
-      streamError = error
+    for try await event in subscription.events() {
+      received.append(event)
+      if received.count == 2 { break }
     }
+    XCTAssertEqual(received.map(Self.summary), ["gap 41-50", "event 50"])
+  }
 
-    XCTAssertEqual(received.count, 1)
-    guard case let .sequenceGap(expected, receivedSeq) = received.first else {
-      return XCTFail("expected sequenceGap event")
+  private static func summary(_ event: FirehoseSubscriptionEvent) -> String {
+    switch event {
+    case let .event(event): "event \(event.sequence.map(String.init) ?? "-")"
+    case let .sequenceGap(expected, received): "gap \(expected)-\(received)"
+    case let .ignoredFrame(frame): "ignored \(frame.type ?? "?") \(frame.sequence.map(String.init) ?? "-")"
     }
-    XCTAssertEqual(expected, 41)
-    XCTAssertEqual(receivedSeq, 50)
-
-    XCTAssertEqual(streamError as? FirehoseSubscriptionError, .resynchronizationRequired)
-    await session.waitForClose()
   }
 
   func testSubscriptionExposesCurrentCursor() async throws {
@@ -422,7 +383,7 @@ final class FirehoseSubscriptionTests: XCTestCase {
     }
   }
 
-  func testUnacknowledgedSequenceGapThrowsError() async throws {
+  func testAcknowledgeMaySkipSequenceNumbersButNeverMovesBackwards() async throws {
     let storage = InMemoryFirehoseCursorStorage()
     let subscription = FirehoseSubscription(
       url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
@@ -431,12 +392,16 @@ final class FirehoseSubscriptionTests: XCTestCase {
     )
 
     try await subscription.acknowledge(sequence: 1)
-    // Acknowledging sequence 3 when sequence 2 was skipped
+    // Sequence numbers may contain gaps, so the acknowledged cursor may jump.
+    try await subscription.acknowledge(sequence: 3)
+    let saved = await storage.loadCursor()
+    XCTAssertEqual(saved, 3)
+
     do {
-      try await subscription.acknowledge(sequence: 3)
-      XCTFail("expected unacknowledgedSequenceGap")
+      try await subscription.acknowledge(sequence: 2)
+      XCTFail("expected cursorRegression")
     } catch {
-      XCTAssertEqual(error as? FirehoseSubscriptionError, .unacknowledgedSequenceGap)
+      XCTAssertEqual(error as? FirehoseSubscriptionError, .cursorRegression(expected: 4, received: 2))
     }
   }
 
@@ -469,7 +434,7 @@ final class FirehoseSubscriptionTests: XCTestCase {
     XCTAssertTrue(isClosed)
   }
 
-  func testBoundedStreamOverflowTerminatesWithResynchronizationRequired() async throws {
+  func testSlowConsumerAppliesBackpressureInsteadOfOverflowing() async throws {
     var frames: [Data] = []
     for i in 1 ... 50 {
       frames.append(try FirehoseFrameEncoder.identityFrame(
@@ -479,29 +444,28 @@ final class FirehoseSubscriptionTests: XCTestCase {
     }
 
     let session = FakeWebSocketSession(messages: frames)
-    let factory = FakeWebSocketFactory(sessions: [session])
-    let storage = InMemoryFirehoseCursorStorage()
-
-    // Buffer limit of 2: producing messages faster than slow consumer will overflow
     let subscription = FirehoseSubscription(
       url: URL(string: "wss://relay.example/xrpc/com.atproto.sync.subscribeRepos")!,
-      cursorStorage: storage,
-      sessionFactory: factory,
-      bufferLimit: 2
+      sessionFactory: FakeWebSocketFactory(sessions: [session])
     )
 
-    let stream = subscription.events()
-    var caughtError: Error?
-    do {
-      for try await _ in stream {
-        // Slow consumer to let the 2-slot producer buffer saturate and drop
-        try await Task.sleep(nanoseconds: 20_000_000)
+    var consumed = 0
+    for try await _ in subscription.events() {
+      consumed += 1
+      // The socket is read only when the consumer asks for an element: after N elements the
+      // transport has handed out exactly N messages, however slow the consumer is.
+      let delivered = await session.deliveredCount
+      XCTAssertEqual(delivered, consumed)
+      if consumed == 10 {
+        try await Task.sleep(nanoseconds: 30_000_000)
+        let afterPause = await session.deliveredCount
+        XCTAssertEqual(afterPause, 10)
       }
-    } catch {
-      caughtError = error
+      if consumed == 50 { break }
     }
-    XCTAssertEqual(caughtError as? FirehoseSubscriptionError, .resynchronizationRequired)
+    XCTAssertEqual(consumed, 50)
   }
+
   func testBackoffCalculation() {
     let backoff = FirehoseBackoffConfiguration(initialDelay: 1.0, maxDelay: 8.0, multiplier: 2.0)
     XCTAssertEqual(backoff.nextDelay(after: nil), 1.0)
@@ -667,7 +631,7 @@ private actor FakeWebSocketSession: FirehoseWebSocketSession {
   private let errorAfterMessages: Error?
   private(set) var isClosed = false
   private var closeContinuations: [CheckedContinuation<Void, Never>] = []
-  private var deliveredCount = 0
+  private(set) var deliveredCount = 0
   private var deliveryContinuations: [(count: Int, continuation: CheckedContinuation<Void, Never>)] = []
 
   init(messages: [Data], errorAfterMessages: Error? = nil) {
