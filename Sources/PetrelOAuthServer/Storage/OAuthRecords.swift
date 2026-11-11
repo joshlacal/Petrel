@@ -35,6 +35,12 @@ public struct OAuthGrantBinding: Sendable, Equatable, Hashable, Codable {
     public let requestedScopes: Set<String>
     /// The effective grant resource servers enforce: ``requestedScopes`` with
     /// each `include:` replaced by the permissions it expands to.
+    ///
+    /// Members of both sets are RFC 6749 scope-tokens (ASCII; validated when
+    /// the request was pushed, or produced by `IncludedPermission.scopeString()`,
+    /// which parses back to the permission), so `String` identity here is byte
+    /// identity. What a set grants is decided by parsing it
+    /// (`ScopePermissions`), never by comparing strings.
     public let grantedScopes: Set<String>
     /// The thumbprint of the DPoP key every token of the session is bound to.
     public let dpopJKT: String

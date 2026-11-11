@@ -149,6 +149,71 @@ struct OAuthPermissionSetTests {
         }
     }
 
+    /// Services that have broken scope strings before: a literal escape, an
+    /// escaped escape, `+`, a bare `%`, `&` (the shared target's
+    /// ScopeLosslessRoundTripTests uses the same list).
+    static let adversarialAudiences = [
+        "did:web:api.example.com#svc", "did:web:api.example.com#svc%41", "did:web:api.example.com#svc%2541",
+        "did:web:api.example.com#svc+x", "did:web:api.example.com#svc%", "did:web:api.example.com#svc&admin",
+        "did:web:api.example.com#svcA", "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+    ]
+
+    @Test("for every adversarial inherited audience, the stored and the signed grant allow that service and no other")
+    func inheritedAudienceProperty() async throws {
+        let resolver = MutableLexiconResolver([Self.setNSID: .permissionSet(Self.basicSet())])
+        let key = try OAuthSigningKey.generate(keyID: "as-1")
+        var checked = 0
+        for aud in Self.adversarialAudiences {
+            guard let include = ATProtoScope.include(IncludeScope(nsid: Self.setNSID, aud: .service(aud))).scopeString else {
+                continue
+            }
+            // What the server stores: every value an ASCII scope-token (so
+            // String identity is byte identity), each reading back as granted.
+            let expanded = try await OAuthLexiconScopeResolution.expandIncludes(
+                ["atproto", include], resolver: resolver, stage: .pushedAuthorizationRequest
+            )
+            #expect(expanded.scopes.allSatisfy(ScopeToken.isScopeToken), "\(aud)")
+            let stored = ScopePermissions(rawScopes: expanded.scopes)
+            #expect(stored.allowsRPC(.init(lxm: "app.example.getFeed", aud: aud)), "\(aud)")
+            for other in Self.adversarialAudiences where !other.utf8.elementsEqual(aud.utf8) {
+                #expect(!stored.allowsRPC(.init(lxm: "app.example.getFeed", aud: other)), "\(aud) also granted \(other)")
+            }
+
+            // What a resource server reads from a signed token.
+            let harness = try TestServer(
+                accessTokenFormat: .signedJWT(key), lexiconResolver: resolver, webClientScopes: ["atproto", include]
+            )
+            let client = try TestClient(harness)
+            let tokens = try await client.signIn(scope: "atproto \(include)")
+            let verifier = try OAuthResourceServerVerifier(
+                issuer: #require(URL(string: TestServer.issuer)),
+                resource: #require(URL(string: TestServer.issuer)),
+                keys: OAuthJSONWebKeySet(keys: [key.publicJWK]),
+                secret: Data(repeating: 9, count: 32),
+                replayStore: InMemoryOAuthStore(),
+                clock: harness.clock
+            )
+            let grant = try await authenticate(verifier, client, token: tokens.accessToken)
+            try grant.requireRPC(lxm: "app.example.getFeed", aud: aud)
+            for other in Self.adversarialAudiences where !other.utf8.elementsEqual(aud.utf8) {
+                do {
+                    try grant.requireRPC(lxm: "app.example.getFeed", aud: other)
+                    Issue.record("\(aud) also granted \(other)")
+                } catch let .insufficientScope(needed) {
+                    // The scope named in the denial reads back as the service
+                    // denied, where a scope can name that service at all.
+                    guard (try? ATProtoScope.rpc(lxm: ["app.example.getFeed"], aud: other))?.scopeString != nil else { continue }
+                    let named = try #require(try? ATProtoScope.parse(needed), "denying \(other) under \(aud) named unparseable \(needed)")
+                    guard case let .rpc(permission) = named else { Issue.record("\(needed)"); continue }
+                    #expect(permission.matches(.init(lxm: "app.example.getFeed", aud: other)), "\(needed)")
+                    #expect(!permission.matches(.init(lxm: "app.example.getFeed", aud: aud)), "\(needed)")
+                }
+            }
+            checked += 1
+        }
+        #expect(checked >= 6)
+    }
+
     @Test("the consent page shows the set's title, localised, and the permissions inside it")
     func consentDescription() async throws {
         let resolver = MutableLexiconResolver([Self.setNSID: .permissionSet(Self.basicSet())])

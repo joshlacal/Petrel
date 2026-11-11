@@ -298,4 +298,23 @@ struct OAuthAuthorizationInterfaceTests {
         #expect(response.text.hasPrefix("CUSTOM sign-in for app.example.test"))
         #expect(response.headers["X-Frame-Options"] == "DENY")
     }
+
+    @Test("a scope is marked sensitive by what it grants, not by whether its string contains *")
+    func sensitivityByMeaning() throws {
+        func sensitive(_ scope: String) throws -> Bool {
+            let lines = OAuthScopeDescription.summarize(requestedScopes: ["atproto", scope])
+            return try #require(lines.first { $0.scopes.contains(scope) }, "\(scope)").isSensitive
+        }
+        // Wildcards, however they are spelled.
+        for scope in ["repo:*", "repo?collection=*", "repo?collection=%2A", "rpc:*?aud=did:web:api.example.com%23svc",
+                      "rpc:app.example.getFeed?aud=*", "rpc?lxm=%2A&aud=did:web:api.example.com%23svc"]
+        {
+            if (try? ATProtoScope.parse(scope)) == nil { continue } // spelling the grammar refuses
+            #expect(try sensitive(scope), "\(scope)")
+        }
+        // A specific grant, even with * or an escape inside a value.
+        for scope in ["repo:app.bsky.feed.post", "rpc:app.example.getFeed?aud=did:web:api.example.com%23svc%2A"] {
+            #expect(try !sensitive(scope), "\(scope)")
+        }
+    }
 }

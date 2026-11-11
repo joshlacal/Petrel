@@ -207,12 +207,17 @@ private enum OAuthPublishedURL {
     }
 
     static func validateScopes(_ scopes: [String]) throws -> [String] {
+        // ASCII first: after that, String identity is byte identity and the
+        // duplicate and atproto checks below are exact.
         guard !scopes.isEmpty, scopes.count <= 64,
-              scopes.contains("atproto"),
-              Set(scopes).count == scopes.count,
               scopes.allSatisfy({ scope in
                   !scope.isEmpty && scope.utf8.count <= 256
                       && scope.utf8.allSatisfy { $0 >= 0x21 && $0 <= 0x7E }
+              }),
+              Set(scopes).count == scopes.count,
+              scopes.contains(where: { scope in
+                  if case .atproto? = try? ATProtoScope.parse(scope) { return true }
+                  return false
               }) else {
             throw OAuthServerError.malformed("OAuth metadata scopes are invalid")
         }

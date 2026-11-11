@@ -34,6 +34,11 @@ public struct OAuthClientMetadata: Codable, Sendable, Equatable {
     /// `response_types`: always includes `code`.
     public let responseTypes: Set<String>
     /// `scope`, split into tokens: every scope the client might request.
+    ///
+    /// Every member is an RFC 6749 scope-token, which is ASCII, so `String`
+    /// identity in this set is byte identity. Whether a requested scope is
+    /// covered is decided by meaning (`OAuthScopeAdmissionPolicy`), never by
+    /// looking a string up here.
     public let scopes: Set<String>
     /// `token_endpoint_auth_method`; `none` when the document omits it.
     public let tokenEndpointAuthMethod: OAuthTokenEndpointAuthenticationMethod
@@ -348,7 +353,11 @@ public struct OAuthClientMetadata: Codable, Sendable, Equatable {
               declaredWireForm.utf8.count <= OAuthScopeBudget.rawInput.bytesPerSet else {
             throw OAuthServerError.malformed("OAuth client metadata scope is not a valid scope-token list")
         }
-        guard scopes.contains("atproto") else {
+        // By what the scope is, not by spelling.
+        guard scopes.contains(where: { scope in
+            if case .atproto? = try? ATProtoScope.parse(scope) { return true }
+            return false
+        }) else {
             throw OAuthServerError.malformed("OAuth client metadata scope must include atproto")
         }
         guard !redirectURIs.isEmpty,

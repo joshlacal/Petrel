@@ -65,8 +65,10 @@ public enum OAuthScopeDescription {
         languages: [String] = []
     ) -> [OAuthScopeSummary] {
         var sets: [OAuthScopeSummary] = []
-        var repo: [(String, String)] = []
-        var rpc: [(String, String)] = []
+        // (scope as requested, description, whether it is sensitive). Every
+        // decision is made on the parsed permission, never on the string.
+        var repo: [(String, String, Bool)] = []
+        var rpc: [(String, String, Bool)] = []
         var blob: [(String, String)] = []
         var account: [(String, String, Bool)] = []
         var identity: [(String, String)] = []
@@ -88,9 +90,9 @@ public enum OAuthScopeDescription {
             case .transitionEmail:
                 transition.append((raw, "Read your account email address"))
             case let .repo(permission):
-                repo.append((raw, describe(permission)))
+                repo.append((raw, describe(permission), permission.collection.contains(.any)))
             case let .rpc(permission):
-                rpc.append((raw, describe(permission)))
+                rpc.append((raw, describe(permission), permission.lxm.contains(.any) || permission.aud == .any))
             case let .blob(permission):
                 blob.append((raw, describe(permission)))
             case let .account(permission):
@@ -106,14 +108,14 @@ public enum OAuthScopeDescription {
         if !repo.isEmpty {
             lines.append(.init(
                 kind: .repository, title: "Your repository",
-                details: repo.map(\.1), isSensitive: repo.contains { $0.0.contains("*") },
+                details: repo.map(\.1), isSensitive: repo.contains { $0.2 },
                 scopes: repo.map(\.0)
             ))
         }
         if !rpc.isEmpty {
             lines.append(.init(
                 kind: .remoteProcedure, title: "Other services",
-                details: rpc.map(\.1), isSensitive: rpc.contains { $0.0.contains("*") },
+                details: rpc.map(\.1), isSensitive: rpc.contains { $0.2 },
                 scopes: rpc.map(\.0)
             ))
         }
