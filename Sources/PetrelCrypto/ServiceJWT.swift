@@ -192,6 +192,10 @@ public enum ServiceJWT {
 
     /// Mints a service JWT bound to the given issuer, audience, method (lxm),
     /// and eventID (jti) using the provided signing key (P-256 for ES256 or secp256k1 for ES256K).
+    ///
+    /// `requestBodyDigest` adds the non-standard `req` claim (see
+    /// ``ServiceJWTClaims/requestBodyDigest``). New code should prefer
+    /// `mint(issuer:audience:lexiconMethod:signer:keyID:nonce:now:lifetime:)`.
     public static func mint(
         issuer: String,
         audience: String,
@@ -408,6 +412,8 @@ public enum ServiceJWT {
         return "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(claimsData))"
     }
 
+    /// Mints an `ES256` service JWT with a Swift Crypto P-256 key. Same
+    /// claims as the `key: ServiceJWTSigningKey` overload.
     public static func mint(
         issuer: String,
         audience: String,
@@ -453,6 +459,7 @@ public enum ServiceJWT {
         )
     }
 
+    /// A legacy spelling of `mint(issuer:audience:method:eventID:requestBodyDigest:key:now:lifetime:)`.
     public static func create(
         issuer: String,
         audience: String,
@@ -574,11 +581,12 @@ public enum ServiceJWT {
 
     /// Verifies a service JWT under an explicit signature-encoding policy.
     ///
-    /// For `signatureOptions`,
+    /// `signatureOptions` chooses which encodings pass:
     /// ``ATProtoSignatureVerificationOptions/jwt`` (compact, either S) is
     /// what the specification asks for;
     /// ``ATProtoSignatureVerificationOptions/strict`` additionally rejects
-    /// high-S.
+    /// high-S. The other parameters are those of
+    /// `verify(_:publicKey:expectedAudience:expectedMethod:expectedRequestBodyDigest:now:clockSkew:maximumLifetime:)`.
     public static func verify(
         _ compact: String,
         publicKey: ATProtoJWTVerificationKey,
@@ -690,9 +698,13 @@ public enum ServiceJWT {
     }
 
     /// Verifies a service JWT against a validated ``ATProtoPublicKey`` on
-    /// either curve. `signatureOptions` defaults to
-    /// ``ATProtoSignatureVerificationOptions/jwt``: compact encoding,
-    /// either S value.
+    /// either curve.
+    ///
+    /// `signatureOptions` defaults to
+    /// ``ATProtoSignatureVerificationOptions/jwt``: the 64-byte encoding
+    /// with either S value. `expectedAudience` and `expectedMethod` default
+    /// to `nil`, which skips those checks; a service authenticating a
+    /// request should use ``ServiceAuthVerifier``, which requires both.
     public static func verify(
         _ compact: String,
         publicKey: ATProtoPublicKey,

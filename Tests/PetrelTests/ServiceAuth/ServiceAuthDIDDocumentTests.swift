@@ -143,6 +143,9 @@ struct ServiceAuthDIDDocumentTests {
                 upstream: DIDDocumentServiceAuthKeyResolver { did, forceRefresh in
                     try await directory.document(for: did, forceRefresh: forceRefresh)
                 },
+                // The article uses the default (30 s). This test rotates the
+                // key milliseconds after the first lookup, so it turns the
+                // refresh rate limit off.
                 minimumRefreshInterval: 0
             )
             verifier = ServiceAuthVerifier(
