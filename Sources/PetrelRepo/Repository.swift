@@ -106,6 +106,10 @@ public enum RepositoryError: Error, Sendable, Equatable {
     case invalidWrites(PublicRepositoryDomainError)
     /// A DID document does not carry a usable `#atproto` signing key.
     case signingKeyNotFound
+    /// A commit would leave more live records than
+    /// ``PublicRepositoryLimits/maximumRepositoryRecords`` allows. Nothing
+    /// was signed or written.
+    case recordLimitExceeded(limit: Int)
 }
 
 /// One record read from a repository.
@@ -598,6 +602,13 @@ public struct Repository: Sendable {
         }
     }
 
+    /// Counts leaves without reading record blocks.
+    private func liveRecordCount() async throws -> Int {
+        var count = 0
+        try await forEachRecordReference { _, _ in count += 1 }
+        return count
+    }
+
     /// Every record of one collection, in record-key order.
     ///
     /// Convenient for small collections. For large ones prefer
@@ -760,6 +771,30 @@ public struct Repository: Sendable {
             nextRevision = try revision ?? PublicRepositoryTID.next(after: commit.revision)
         } catch let error as PublicRepositoryDomainError {
             throw RepositoryError.invalidWrites(error)
+        }
+
+        // The engine refuses a create on an existing path and a delete of a
+        // missing one, so the batch alone gives the exact change in count.
+        // Checked before signing: a commit the repository's own limits
+        // cannot read back must never be persisted.
+        let addedRecords = writes.reduce(0) { total, write in
+            switch write {
+            case .create: return total + 1
+            case .delete: return total - 1
+            case .update: return total
+            }
+        }
+        if addedRecords > 0 {
+            let limit = options.limits.maximumRepositoryRecords
+            let current: Int
+            if let known = statistics?.recordCount {
+                current = known
+            } else {
+                current = try await liveRecordCount()
+            }
+            guard current + addedRecords <= limit else {
+                throw RepositoryError.recordLimitExceeded(limit: limit)
+            }
         }
 
         let mutation: PreparedPublicRepositoryMutation

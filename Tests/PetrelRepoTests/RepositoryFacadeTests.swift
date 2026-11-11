@@ -237,6 +237,49 @@ struct RepositoryFacadeTests {
         #expect(try await second.verify().recordCount == 9)
     }
 
+    @Test("a commit that would exceed maximumRepositoryRecords is refused before anything is signed or stored")
+    func commitRespectsRecordLimit() async throws {
+        let signer = K256Keypair.generate()
+        let options = RepositoryOptions(limits: try PublicRepositoryLimits(
+            maximumRecordBlockBytes: 1_000_000,
+            maximumCARBytes: PublicRepositoryLimits.requiredStreamingCARBytes,
+            maximumCARBlocks: 1_000,
+            maximumMSTNodes: 1_000,
+            maximumMSTEntriesPerNode: 64,
+            maximumCBORNestingDepth: 64,
+            maximumRepositoryRecords: 2
+        ))
+        let store = InMemoryRepositoryBlockStore()
+        let empty = try await Repository.create(did: did, signer: signer, store: store, options: options)
+        let one = try await empty.commit([try create(posts, "a", "a")], signer: signer).repository
+
+        // Known count (statistics carried from create).
+        await #expect(throws: RepositoryError.recordLimitExceeded(limit: 2)) {
+            try await one.commit(
+                [try self.create(self.posts, "b", "b"), try self.create(self.posts, "c", "c")], signer: signer
+            )
+        }
+        // Unknown count: reopened without walking the tree.
+        let reopened = try await Repository.open(
+            commitCID: one.commit.cid, store: store, verification: .signingKey(signer.publicKey),
+            options: options, verifiesTree: false
+        )
+        #expect(reopened.statistics == nil)
+        await #expect(throws: RepositoryError.recordLimitExceeded(limit: 2)) {
+            try await reopened.commit(
+                [try self.create(self.posts, "b", "b"), try self.create(self.posts, "c", "c")], signer: signer
+            )
+        }
+        // Reaching the limit exactly is fine, and a delete makes room again.
+        let full = try await reopened.commit([try create(posts, "b", "b")], signer: signer).repository
+        #expect(try await full.verify().recordCount == 2)
+        let swapped = try await full.commit(
+            [.delete(path: try path(posts, "a"), expectedRecordCID: nil), try create(posts, "c", "c")],
+            signer: signer
+        ).repository
+        #expect(try await swapped.verify().recordCount == 2)
+    }
+
     @Test("a record proof serializes under the repository's own limits")
     func recordProofCarriesRepositoryLimits() async throws {
         // 1.5 MB: allowed by networkScale (2 MB blocks), refused by standard (1 MB).
