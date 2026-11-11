@@ -148,8 +148,11 @@ enum ServiceAuthSyntax {
         guard bytes.count <= maximumNSIDBytes, bytes.allSatisfy({ $0 < 0x80 }) else { return false }
         let segments = value.split(separator: ".", omittingEmptySubsequences: false).map { Array($0.utf8) }
         guard segments.count >= 3 else { return false }
+        // The prose caps the domain authority at 253 characters, but the
+        // reference regex and the official interop vectors (a valid
+        // 317-character NSID with a 313-character authority) do not; the
+        // vectors are followed here.
         let authority = segments.dropLast()
-        guard authority.reduce(0, { $0 + $1.count }) + authority.count - 1 <= 253 else { return false }
         for (index, segment) in authority.enumerated() {
             guard !segment.isEmpty, segment.count <= 63,
                   segment.allSatisfy({ isAlphanumeric($0) || $0 == 0x2D }),
