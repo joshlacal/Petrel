@@ -926,7 +926,7 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .data,
                 in: container,
-                debugDescription: "String is not canonical RFC 4648 base64"
+                debugDescription: "String is not RFC 4648 base64"
             )
         }
         self.data = data
@@ -947,6 +947,9 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
             return nil
         }
 
+        // Bits of the last character that do not complete a byte are ignored, as RFC 4648
+        // §3.5 permits and every other atproto implementation does: the official interop
+        // vector `lexicon/record-data-valid.json` carries `"$bytes": "123"`.
         let remainder = payload.count % 4
         let canonicalPaddingCount: Int
         switch remainder {
@@ -954,10 +957,8 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
             canonicalPaddingCount = 0
         case 2:
             canonicalPaddingCount = 2
-            guard let last = sextets.last, last & 0x0F == 0 else { return nil }
         case 3:
             canonicalPaddingCount = 1
-            guard let last = sextets.last, last & 0x03 == 0 else { return nil }
         default:
             return nil
         }

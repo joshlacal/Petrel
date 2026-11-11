@@ -15,6 +15,7 @@ import Foundation
 #if canImport(Compression)
     import Compression
 #endif
+import SwiftCBOR
 
 public enum RequestSecurityPolicy: Sendable, Equatable {
     case unauthenticated
@@ -2242,6 +2243,8 @@ public actor NetworkService: NetworkServiceProtocol {
         // Add query items if provided
         if let queryItems = queryItems, !queryItems.isEmpty {
             components?.queryItems = queryItems
+            let escapedQuery = Self.xrpcQueryEscapingPlus(components?.percentEncodedQuery)
+            components?.percentEncodedQuery = escapedQuery
         }
 
         guard let finalURL = components?.url else {
@@ -2295,6 +2298,16 @@ public actor NetworkService: NetworkServiceProtocol {
         }
 
         return request
+    }
+
+    /// Percent-encodes `+` in an already percent-encoded query string.
+    ///
+    /// `URLComponents.queryItems` leaves `+` literal, and servers that parse the
+    /// query as `application/x-www-form-urlencoded` (the reference PDS and AppView
+    /// do, through `URLSearchParams`) read a literal `+` as a space. That corrupts
+    /// `q=c++`, datetimes with a `+00:00` offset and base64 cursors.
+    static func xrpcQueryEscapingPlus(_ percentEncodedQuery: String?) -> String? {
+        percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
     }
 
     /// Performs a network request (compatibility method)
@@ -2446,7 +2459,7 @@ public actor NetworkService: NetworkServiceProtocol {
     ///   - request: The original URLRequest
     ///   - additionalHeaders: Optional additional headers (e.g., atproto-proxy)
     /// - Returns: PreparedStreamingRequest containing the URLRequest and its authentication lease
-    func prepareStreamingRequest(
+    public func prepareStreamingRequest(
         _ request: URLRequest,
         additionalHeaders: [String: String]? = nil
     ) async throws -> PreparedStreamingRequest {
@@ -2532,6 +2545,8 @@ public actor NetworkService: NetworkServiceProtocol {
         // Add query parameters if provided
         if let params = parameters {
             urlComponents.queryItems = params.asQueryItems()
+            let escapedQuery = Self.xrpcQueryEscapingPlus(urlComponents.percentEncodedQuery)
+            urlComponents.percentEncodedQuery = escapedQuery
         }
 
         guard let url = urlComponents.url else {
@@ -2597,7 +2612,11 @@ public actor NetworkService: NetworkServiceProtocol {
                         switch message {
                         case let .data(data):
                             do {
-                                let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self, endpoint: endpoint)
+                                guard let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self, endpoint: endpoint) else {
+                                    // Unknown frame operation or message type: the event-stream
+                                    // specification says clients ignore these.
+                                    continue
+                                }
                                 let yieldResult = continuation.yield(decodedMessage)
                                 switch yieldResult {
                                 case .enqueued:
@@ -2668,18 +2687,54 @@ public actor NetworkService: NetworkServiceProtocol {
             }
         }
     }
-    /// Decode a subscription WebSocket frame containing two DAG-CBOR objects
-    private func decodeSubscriptionFrame<Message: Codable & Sendable>(
+    /// Decode a subscription WebSocket frame containing two DAG-CBOR objects.
+    ///
+    /// Returns `nil` for a frame the consumer must skip: a header `op` other than
+    /// `1` (message) or `-1` (error), or a message type the `Message` union does not
+    /// declare. Error frames and malformed frames throw.
+    func decodeSubscriptionFrame<Message: Codable & Sendable>(
         _ data: Data,
         as messageType: Message.Type,
         endpoint: String
-    ) throws -> Message {
+    ) throws -> Message? {
+        if Self.subscriptionFrameHasUnknownOperation(data) {
+            LogManager.logDebug("Skipping event-stream frame with an unknown operation on \(endpoint)")
+            return nil
+        }
         let decoded = try ATProtoWebSocketFrameDecoder.decodeFrame(data, defaultLexicon: endpoint)
+        if let declared = (Message.self as? any XRPCSubscriptionMessage.Type)?.knownMessageTypes,
+           !declared.contains(decoded.messageType)
+        {
+            LogManager.logDebug("Skipping event-stream message of unknown type \(decoded.messageType) on \(endpoint)")
+            return nil
+        }
         do {
             return try jsonDecoder.decode(Message.self, from: decoded.jsonData)
         } catch {
             LogManager.logError("Failed to decode JSON payload (\(decoded.jsonData.count) bytes) for message type: \(decoded.messageType)")
             throw error
+        }
+    }
+
+    /// Whether the frame header carries an `op` that is neither `1` nor `-1`.
+    ///
+    /// Only a well-formed header with an integer `op` can answer yes; anything else
+    /// is left to the frame decoder, which reports it as an error.
+    nonisolated static func subscriptionFrameHasUnknownOperation(_ data: Data) -> Bool {
+        guard let header = try? CBOR.decode([UInt8](data)), case let .map(fields) = header else {
+            return false
+        }
+        switch fields[CBOR.utf8String("op")] {
+        case .unsignedInt(UInt64.max)?:
+            // Not a plausible future operation: this is -1 written as an unsigned
+            // integer. The frame decoder decides what to make of it.
+            return false
+        case let .unsignedInt(value)?:
+            return value != 1
+        case let .negativeInt(value)?:
+            return value != 0
+        default:
+            return false
         }
     }
 

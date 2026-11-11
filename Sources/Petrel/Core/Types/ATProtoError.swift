@@ -44,11 +44,24 @@ public struct ATProtoError<ErrorType: ATProtoErrorType>: Error, LocalizedError {
     public let message: String?
     /// The HTTP status code
     public let statusCode: Int
+    /// The response headers, keyed by lowercased header name.
+    public let headers: [String: String]
 
     public init(error: ErrorType, message: String?, statusCode: Int) {
+        self.init(error: error, message: message, statusCode: statusCode, headers: [:])
+    }
+
+    /// Creates a typed endpoint error that also carries the response headers.
+    public init(error: ErrorType, message: String?, statusCode: Int, headers: [String: String]) {
         self.error = error
         self.message = message
         self.statusCode = statusCode
+        self.headers = headers
+    }
+
+    /// The rate-limit state the server reported with this error, if any.
+    public var rateLimit: XRPCRateLimit? {
+        XRPCRateLimit(headers: headers)
     }
 
     public var errorDescription: String? {
@@ -66,11 +79,33 @@ public struct ATProtoXRPCError: Error, LocalizedError, Sendable, Equatable {
     public let message: String?
     /// The HTTP status code.
     public let statusCode: Int
+    /// The response headers, keyed by lowercased header name.
+    public let headers: [String: String]
 
     public init(error: String, message: String? = nil, statusCode: Int) {
+        self.init(error: error, message: message, statusCode: statusCode, headers: [:])
+    }
+
+    /// Creates an XRPC error that also carries the response headers.
+    public init(error: String, message: String?, statusCode: Int, headers: [String: String]) {
         self.error = error
         self.message = message
         self.statusCode = statusCode
+        self.headers = headers
+    }
+
+    /// The rate-limit state the server reported with this error, if any.
+    ///
+    /// Present on `429 RateLimitExceeded` responses from services that send the
+    /// `ratelimit-*` headers, and on any other error response that carries them.
+    public var rateLimit: XRPCRateLimit? {
+        XRPCRateLimit(headers: headers)
+    }
+
+    /// Seconds to wait before retrying, from a `Retry-After` header holding a
+    /// delay in seconds. `nil` when the header is absent or holds an HTTP date.
+    public var retryAfter: TimeInterval? {
+        headers["retry-after"].flatMap { TimeInterval($0.trimmingCharacters(in: .whitespaces)) }
     }
 
     public var errorDescription: String? {
@@ -78,6 +113,69 @@ public struct ATProtoXRPCError: Error, LocalizedError, Sendable, Equatable {
             return "\(error): \(message)"
         }
         return error
+    }
+}
+
+/// Rate-limit state reported by a service through the `ratelimit-*` response headers.
+public struct XRPCRateLimit: Sendable, Equatable {
+    /// `ratelimit-limit`: the request quota of the current window.
+    public let limit: Int
+    /// `ratelimit-remaining`: the requests left in the current window.
+    public let remaining: Int
+    /// `ratelimit-reset`: when the current window ends.
+    public let reset: Date
+    /// `ratelimit-policy`: the server's description of the window, such as `3000;w=300`.
+    public let policy: String?
+
+    /// Creates a rate-limit value.
+    public init(limit: Int, remaining: Int, reset: Date, policy: String? = nil) {
+        self.limit = limit
+        self.remaining = remaining
+        self.reset = reset
+        self.policy = policy
+    }
+
+    /// Reads the `ratelimit-*` headers. Returns `nil` unless limit, remaining and
+    /// reset are all present and numeric.
+    ///
+    /// - Parameter headers: Response headers keyed by lowercased header name.
+    public init?(headers: [String: String]) {
+        guard let limit = headers["ratelimit-limit"].flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) }),
+              let remaining = headers["ratelimit-remaining"].flatMap({ Int($0.trimmingCharacters(in: .whitespaces)) }),
+              let reset = headers["ratelimit-reset"].flatMap({ TimeInterval($0.trimmingCharacters(in: .whitespaces)) })
+        else {
+            return nil
+        }
+        self.init(
+            limit: limit,
+            remaining: remaining,
+            reset: Date(timeIntervalSince1970: reset),
+            policy: headers["ratelimit-policy"]
+        )
+    }
+}
+
+/// A successful (2xx) XRPC response whose body is not valid for the endpoint's output schema.
+///
+/// The Lexicon specification treats data that fails to validate as invalid as a whole,
+/// so generated calls throw this instead of returning a partial or empty result.
+public struct XRPCResponseDecodingError: Error, LocalizedError, Sendable {
+    /// The NSID of the endpoint that was called.
+    public let endpoint: String
+    /// The HTTP status code of the response.
+    public let statusCode: Int
+    /// The decoding failure.
+    public let underlying: any Error
+
+    /// Creates a response decoding error.
+    public init(endpoint: String, statusCode: Int, underlying: any Error) {
+        self.endpoint = endpoint
+        self.statusCode = statusCode
+        self.underlying = underlying
+    }
+
+    public var errorDescription: String? {
+        "The \(statusCode) response of \(endpoint) does not match its output schema: \(underlying)"
     }
 }
 
@@ -115,5 +213,55 @@ public enum ATProtoErrorParser {
             return ATProtoXRPCError(error: "HTTP \(statusCode)", message: text, statusCode: statusCode)
         }
         return nil
+    }
+
+    /// Builds the error a generated call throws for a non-2xx response.
+    ///
+    /// The `{error, message}` envelope is preserved when the body carries one. A body
+    /// that is not an envelope yields `error == "HTTP <status>"`, with the body text
+    /// (if any) as `message`.
+    public static func xrpcError(data: Data, response: HTTPURLResponse) -> ATProtoXRPCError {
+        let headers = headerFields(of: response)
+        let statusCode = response.statusCode
+        if let parsed = parseGeneric(data: data, statusCode: statusCode) {
+            return ATProtoXRPCError(
+                error: parsed.error,
+                message: parsed.message,
+                statusCode: statusCode,
+                headers: headers
+            )
+        }
+        return ATProtoXRPCError(error: "HTTP \(statusCode)", message: nil, statusCode: statusCode, headers: headers)
+    }
+
+    /// Builds the error a generated call throws for a non-2xx response of an endpoint
+    /// that declares errors in its Lexicon.
+    ///
+    /// - Returns: `ATProtoError<ErrorType>` when the envelope names a declared error,
+    ///   otherwise the `ATProtoXRPCError` from ``xrpcError(data:response:)``.
+    public static func xrpcError<ErrorType: ATProtoErrorType>(
+        data: Data,
+        response: HTTPURLResponse,
+        declaredErrors: ErrorType.Type
+    ) -> any Error {
+        if let declared = parse(data: data, statusCode: response.statusCode, errorType: declaredErrors) {
+            return ATProtoError(
+                error: declared.error,
+                message: declared.message,
+                statusCode: declared.statusCode,
+                headers: headerFields(of: response)
+            )
+        }
+        return xrpcError(data: data, response: response)
+    }
+
+    /// The response headers keyed by lowercased name.
+    public static func headerFields(of response: HTTPURLResponse) -> [String: String] {
+        var headers: [String: String] = [:]
+        for (name, value) in response.allHeaderFields {
+            guard let name = name as? String else { continue }
+            headers[name.lowercased()] = value as? String ?? "\(value)"
+        }
+        return headers
     }
 }

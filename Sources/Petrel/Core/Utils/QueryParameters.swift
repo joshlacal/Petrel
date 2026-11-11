@@ -7,7 +7,16 @@
 
 import Foundation
 
-public protocol Parametrizable: Sendable {}
+public protocol Parametrizable: Sendable {
+    /// Wire names of query parameters whose Lexicon name is not a valid Swift
+    /// identifier, keyed by the property that carries them (`["maxAge": "max-age"]`).
+    /// A property that is not listed is sent under its own name.
+    static var queryParameterNames: [String: String] { get }
+}
+
+public extension Parametrizable {
+    static var queryParameterNames: [String: String] { [:] }
+}
 
 private func unwrapOptional(_ value: Any) -> Any? {
     let mirror = Mirror(reflecting: value)
@@ -20,8 +29,10 @@ private func unwrapOptional(_ value: Any) -> Any? {
 public extension Parametrizable {
     func asQueryItems() -> [URLQueryItem] {
         let mirror = Mirror(reflecting: self)
+        let wireNames = Self.queryParameterNames
         return mirror.children.flatMap { child -> [URLQueryItem] in
-            guard let label = child.label else { return [] }
+            guard let propertyName = child.label else { return [] }
+            let label = wireNames[propertyName] ?? propertyName
             guard let unwrapped = unwrapOptional(child.value) else { return [] }
 
             if let array = unwrapped as? [QueryParameterConvertible] {

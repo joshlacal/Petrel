@@ -2,7 +2,7 @@ import Foundation
 @testable import Petrel
 import Testing
 
-@Suite("Strict RFC 4648 bytes decoding")
+@Suite("RFC 4648 bytes decoding")
 struct BytesBase64DecodingTests {
     @Test("Every byte value round-trips through padded and unpadded base64")
     func everyByteValueRoundTrips() throws {
@@ -18,22 +18,26 @@ struct BytesBase64DecodingTests {
         }
     }
 
-    @Test("All terminal sextets enforce zero discarded bits")
-    func terminalSextetsEnforceZeroDiscardedBits() throws {
+    /// RFC 4648 §3.5 lets a decoder ignore the bits of the last character that do not
+    /// complete a byte. The official interop suite relies on it: `record-data-valid.json`
+    /// contains `"$bytes": "123"`, whose last character carries two such bits.
+    @Test("Unused bits of the terminal sextet are ignored")
+    func terminalSextetsIgnoreUnusedBits() throws {
         let alphabet = Array("ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/")
 
         for (index, character) in alphabet.enumerated() {
             for (payload, padding, divisor) in [("A\(character)", "==", 16), ("AA\(character)", "=", 4)] {
+                // The same payload with the unused bits cleared.
+                let canonicalLast = alphabet[index - index % divisor]
+                let canonical = String(payload.dropLast()) + String(canonicalLast) + padding
+                let expected = try #require(Data(base64Encoded: canonical))
                 for encoded in [payload, payload + padding] {
-                    if index.isMultiple(of: divisor) {
-                        let expected = try #require(Data(base64Encoded: payload + padding))
-                        try expectDecodedBytes(encoded, equalTo: expected)
-                    } else {
-                        try expectRejectedBytes(encoded)
-                    }
+                    try expectDecodedBytes(encoded, equalTo: expected)
                 }
             }
         }
+
+        try expectDecodedBytes("123", equalTo: Data([0xD7, 0x6D]))
     }
 
     @Test("Non-alphabet ASCII, Unicode, and malformed padding remain rejected")
