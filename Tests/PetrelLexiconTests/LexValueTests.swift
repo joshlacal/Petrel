@@ -64,6 +64,43 @@ struct LexValueTests {
         }
     }
 
+    @Test("numbers: decoding through JSONDecoder keeps every digit too")
+    func decodableNumbersAreExact() throws {
+        func decoded(_ literal: String) throws -> LexValue {
+            try JSONDecoder().decode([LexValue].self, from: Data("[\(literal)]".utf8))[0]
+        }
+        for (literal, value) in [
+            ("9007199254740993", Int64(9_007_199_254_740_993)), ("9007199254740993.0", 9_007_199_254_740_993),
+            ("9223372036854775807", .max), ("-9223372036854775808", .min), ("1.50e1", 15), ("123.0", 123),
+        ] as [(String, Int64)] {
+            #expect(try decoded(literal) == .integer(value), "\(literal)")
+        }
+        for literal in ["1.0000000000000001", "9007199254740990.5", "0.5"] {
+            // JSONDecoder reports a decoding failure as DecodingError wrapping LexValueError.
+            var code: LexValueError.Code?
+            do {
+                _ = try decoded(literal)
+            } catch let DecodingError.dataCorrupted(context) {
+                code = (context.underlyingError as? LexValueError)?.code
+            } catch let error as LexValueError {
+                code = error.code
+            }
+            #expect(code == .floatNotAllowed, "\(literal)")
+        }
+    }
+
+    /// Pins the documented limit of the Codable path: past 38 significant
+    /// digits JSONDecoder rounds before LexValue sees the number, so only
+    /// init(json:) can reject it. If this starts failing because Foundation
+    /// stopped rounding, tighten the documentation of init(from:).
+    @Test("numbers: past Decimal's 38 digits only init(json:) sees the fraction")
+    func decodablePrecisionLimitIsDocumented() throws {
+        let literal = "1.000000000000000000000000000000000000001" // 40 significant digits
+        #expect(code(literal) == .floatNotAllowed)
+        let viaDecoder = try JSONDecoder().decode([LexValue].self, from: Data("[\(literal)]".utf8))[0]
+        #expect(viaDecoder == .integer(1))
+    }
+
     @Test("numbers: malformed literals are rejected", arguments: ["01", "-", "1.", ".5", "+1", "1e", "0x10", "NaN", "Infinity"])
     func malformedNumbers(literal: String) {
         #expect(code(literal) == .malformedJSON)

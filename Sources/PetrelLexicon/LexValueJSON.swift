@@ -517,9 +517,17 @@ extension LexValue: Codable {
     /// Decodes from any `Decoder` and applies the same data-model rules as
     /// ``init(json:options:)`` (with ``ParseOptions/standard``).
     ///
-    /// Prefer ``init(json:options:)`` for JSON input: a generic `Decoder`
-    /// cannot report duplicate keys, and `JSONDecoder` decides on its own
-    /// which numbers are integers.
+    /// Use ``init(json:options:)`` for JSON input. A `Decoder` never shows a
+    /// number's text, only the value it decoded, and it cannot report
+    /// duplicate keys:
+    ///
+    /// - Numbers are judged exactly on what `Decimal` holds (38 significant
+    ///   digits), so `1.0000000000000001` is rejected as a float.
+    /// - `JSONDecoder` rounds a longer literal before this initializer runs:
+    ///   `1.000000000000000000000000000000000000001` arrives as exactly `1`,
+    ///   indistinguishable from the literal `1`, and is accepted.
+    ///
+    /// ``init(json:options:)`` reads the text itself and rejects both.
     public init(from decoder: Decoder) throws {
         do {
             self = try LexValue.decode(from: decoder, depth: 0)
@@ -527,6 +535,22 @@ extension LexValue: Codable {
             throw DecodingError.dataCorrupted(
                 DecodingError.Context(codingPath: decoder.codingPath, debugDescription: error.description, underlyingError: error)
             )
+        }
+    }
+
+    /// The integer a decoded `Decimal` holds exactly, judged by the same digit-exact
+    /// rules as ``init(json:options:)``: `floatNotAllowed` when it has a fractional
+    /// part, `integerOutOfRange` when it does not fit in 64 bits.
+    private static func integer(exactly decimal: Decimal, path: String) throws -> Int64 {
+        // Decimal's description is plain decimal text ("1.0000000000000001", "-25").
+        let text = decimal.description
+        do {
+            guard case let .integer(value) = try LexValue(jsonString: text) else {
+                throw LexValueError(.malformedJSON, path: path, "\(text) is not a number")
+            }
+            return value
+        } catch let error as LexValueError {
+            throw LexValueError(error.code, path: path, error.message)
         }
     }
 
@@ -558,6 +582,13 @@ extension LexValue: Codable {
         }
         if let flag = try? single.decode(Bool.self) {
             return .boolean(flag)
+        }
+        // A Codable decoder never shows the number's text. Decimal is its exact view
+        // (38 significant digits); Int64 and Double decoding both go through a
+        // Double for "1.0000000000000001" and would accept it as 1. Parse JSON with
+        // init(json:) for an exact answer at any length.
+        if let decimal = try? single.decode(Decimal.self) {
+            return try .integer(Self.integer(exactly: decimal, path: path))
         }
         if let number = try? single.decode(Int64.self) {
             return .integer(number)
