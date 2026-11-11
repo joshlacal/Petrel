@@ -178,6 +178,34 @@ let record = try LexValue(encoding: post)
 // record.type == "app.bsky.feed.post"
 ```
 
+### The Lexicons Petrel is built from
+
+The schemas behind Petrel's generated types are compiled into this module.
+``LexiconCatalog/bundled()`` returns them as a catalog, and
+``LexiconCatalog/validateRecord(_:recordKey:options:)-(ATProtocolValue,_,_)`` takes a
+generated value directly: the type's `typeIdentifier` names the schema. This is
+how to enforce what the Swift types do not carry — a post's `text` is a
+`String`, and only its Lexicon says it may hold at most 300 graphemes.
+
+<!-- Mirrors BundledCatalogTests.validGeneratedRecordPasses and constraintViolationsAreReported -->
+
+```swift
+let catalog = try LexiconCatalog.bundled()
+
+try catalog.validateRecord(post)                       // an AppBskyFeedPost
+try catalog.validateRecord(post, recordKey: "3jwdwj2ctlk26")
+
+do {
+    try catalog.validateRecord(tooLongPost)
+} catch let error as LexiconValidationError {
+    // error.contains(.stringTooManyGraphemes, at: "/text") == true
+}
+```
+
+For Lexicons of your own, generate the same kind of bundle with the
+`lexicon_documents` manifest option of Petrel's code generator and add the
+documents to a catalog with ``LexiconCatalog/add(json:options:replaceExisting:)``.
+
 ## XRPC parameters and bodies
 
 Query strings are untyped, so parameters are coerced by their declared type

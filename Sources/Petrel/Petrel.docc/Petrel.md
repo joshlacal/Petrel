@@ -21,6 +21,20 @@ for existing integrations. New applications should use OAuth.
 - <doc:Authentication>
 - <doc:OAuthClient>
 
+### XRPC and Lexicons
+
+- <doc:XRPCClient>
+- <doc:CustomLexicons>
+- ``ATProtoXRPCError``
+- ``XRPCResponseDecodingError``
+- ``XRPCCallOptions``
+- ``XRPCResponse``
+- ``XRPCResponseMetadata``
+- ``XRPCRateLimit``
+- ``ATProtoNullable``
+- ``LexiconPermissionSet``
+- ``LexiconRecordKeyType``
+
 ### Core Components
 
 - ``ATProtoClient``
