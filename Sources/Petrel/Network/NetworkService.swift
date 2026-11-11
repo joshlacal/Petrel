@@ -1599,8 +1599,9 @@ public actor NetworkService: NetworkServiceProtocol {
                         LogManager.logInfo("Network Service - 401 error is 'use_dpop_nonce'.")
                     } else {
                         // Also check WWW-Authenticate header (though Bluesky uses response body)
-                        let responseHeaders = httpResponse.allHeaderFields as? [String: String] ?? [:]
-                        if let wwwAuth = responseHeaders["WWW-Authenticate"],
+                        // RFC 9449 §9 signals this through the header; header names
+                        // are case-insensitive, so no literal-key dictionary lookup.
+                        if let wwwAuth = httpResponse.value(forHTTPHeaderField: "WWW-Authenticate"),
                            wwwAuth.lowercased().contains("error=\"use_dpop_nonce\"")
                         {
                             isNonceError = true
@@ -1618,8 +1619,8 @@ public actor NetworkService: NetworkServiceProtocol {
                     if isNonceError {
                         LogManager.logInfo("METRIC dpop_nonce_retry_total origin=protected_resource jkt=\(authCtx?.jkt ?? "unknown")")
                         // If it's a nonce error, make sure nonce is stored properly before retrying
-                        let responseHeaders = httpResponse.allHeaderFields as? [String: String] ?? [:]
-                        if let nonce = responseHeaders["DPoP-Nonce"] {
+                        if let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
+                            let responseHeaders = ["DPoP-Nonce": nonce]
                             // Explicitly store the nonce again, to be double-sure
                             LogManager.logSensitiveValue(
                                 nonce,
@@ -1969,8 +1970,26 @@ public actor NetworkService: NetworkServiceProtocol {
         )
     }
 
-    func executeUnauthenticatedRequest(
+    /// Sends an OAuth protocol request (server metadata, pushed authorization
+    /// request, token, revocation) exactly as the OAuth layer built it.
+    ///
+    /// Unlike `request(_:)`, nothing is inferred from the URL: no account
+    /// credentials are attached, the caller's `DPoP` proof is kept, no response
+    /// nonce is filed under the active account, and redirects are never followed,
+    /// so a proof or authorization code cannot be forwarded to another origin.
+    func executeOAuthProtocolRequest(
         _ request: URLRequest
+    ) async throws -> (Data, HTTPURLResponse) {
+        let (data, response) = try await executeUnauthenticatedRequest(request, strippingDPoP: false)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.requestFailed
+        }
+        return (data, httpResponse)
+    }
+
+    func executeUnauthenticatedRequest(
+        _ request: URLRequest,
+        strippingDPoP: Bool = true
     ) async throws -> (Data, URLResponse) {
         guard let url = request.url else {
             throw NetworkError.invalidURL
@@ -1981,6 +2000,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         var sanitizedRequest = request
         for header in ["Authorization", "DPoP", "Cookie", "Proxy-Authorization", "atproto-proxy"] {
+            if header == "DPoP", !strippingDPoP { continue }
             sanitizedRequest.setValue(nil, forHTTPHeaderField: header)
         }
         if let userAgent = userAgent {

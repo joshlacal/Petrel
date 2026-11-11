@@ -8,14 +8,23 @@
 import Crypto
 import Foundation
 
+/// An authorization server's RFC 8414 metadata document
+/// (`/.well-known/oauth-authorization-server`).
+///
+/// Decoding is deliberately lenient about which members are present: whether a
+/// document satisfies the atproto OAuth profile is decided by
+/// ``validate(fetchedFrom:clientAuthentication:)``, which reports the exact
+/// requirement that failed instead of a generic decoding error.
 public struct AuthorizationServerMetadata: Codable, Sendable, Hashable {
-    let issuer: String
-    let scopesSupported: [String]
+    /// The authorization server's issuer identifier (its origin URL).
+    public let issuer: String
+    /// Scope values the server supports. The atproto profile requires `atproto`.
+    public let scopesSupported: [String]?
     let subjectTypesSupported: [String]?
-    let responseTypesSupported: [String]
+    let responseTypesSupported: [String]?
     let responseModesSupported: [String]?
-    let grantTypesSupported: [String]
-    let codeChallengeMethodsSupported: [String]
+    let grantTypesSupported: [String]?
+    let codeChallengeMethodsSupported: [String]?
     let uiLocalesSupported: [String]?
     let displayValuesSupported: [String]?
     let authorizationResponseIssParameterSupported: Bool?
@@ -26,16 +35,22 @@ public struct AuthorizationServerMetadata: Codable, Sendable, Hashable {
     let requestUriParameterSupported: Bool?
     let requireRequestUriRegistration: Bool?
     let jwksUri: String?
-    let authorizationEndpoint: String
-    let tokenEndpoint: String
+    /// The endpoint the user's browser is sent to for authorization.
+    public let authorizationEndpoint: String
+    /// The token endpoint (code exchange and refresh).
+    public let tokenEndpoint: String
     let tokenEndpointAuthMethodsSupported: [String]?
     let tokenEndpointAuthSigningAlgValuesSupported: [String]?
-    let revocationEndpoint: String?
+    /// The RFC 7009 revocation endpoint, when the server offers one.
+    public let revocationEndpoint: String?
     let introspectionEndpoint: String?
-    let pushedAuthorizationRequestEndpoint: String
+    /// The RFC 9126 pushed authorization request endpoint.
+    public let pushedAuthorizationRequestEndpoint: String
     let requirePushedAuthorizationRequests: Bool?
     let dpopSigningAlgValuesSupported: [String]?
     let clientIdMetadataDocumentSupported: Bool?
+    /// Resource servers this authorization server declares it protects (RFC 9728 §4).
+    let protectedResources: [String]?
     enum CodingKeys: String, CodingKey {
         case issuer
         case scopesSupported = "scopes_supported"
@@ -68,17 +83,26 @@ public struct AuthorizationServerMetadata: Codable, Sendable, Hashable {
         case requirePushedAuthorizationRequests = "require_pushed_authorization_requests"
         case dpopSigningAlgValuesSupported = "dpop_signing_alg_values_supported"
         case clientIdMetadataDocumentSupported = "client_id_metadata_document_supported"
+        case protectedResources = "protected_resources"
     }
 }
 
 // MARK: - ProtectedResourceMetadata Structure
 
+/// A resource server's RFC 9728 metadata document
+/// (`/.well-known/oauth-protected-resource`).
+///
+/// Only `resource` and `authorization_servers` are required: the atproto OAuth
+/// profile mandates nothing else, so a PDS publishing the minimal document must
+/// decode. ``validate(forResourceAt:)`` enforces the profile's value rules.
 public struct ProtectedResourceMetadata: Codable, Sendable, Hashable {
-    let resource: URL
-    let authorizationServers: [URL]
-    let scopesSupported: [String]
-    let bearerMethodsSupported: [String]
-    let resourceDocumentation: URL
+    /// The resource server's identifier (the PDS origin).
+    public let resource: URL
+    /// The authorization servers the resource trusts. The atproto profile requires exactly one.
+    public let authorizationServers: [URL]
+    let scopesSupported: [String]?
+    let bearerMethodsSupported: [String]?
+    let resourceDocumentation: URL?
 
     enum CodingKeys: String, CodingKey {
         case resource
@@ -107,6 +131,12 @@ public struct Account: Codable, Equatable, Sendable {
 
     /// Metadata about the authorization server
     var authorizationServerMetadata: AuthorizationServerMetadata?
+
+    /// The issuer of the authorization server that granted this account's OAuth
+    /// session, or `nil` for accounts without one (app-password or gateway sessions).
+    public var authorizationServerIssuer: String? {
+        authorizationServerMetadata?.issuer
+    }
 
     /// Custom AppView service DID for app.bsky namespace (defaults to official Bluesky AppView)
     public var bskyAppViewDID: String
@@ -165,18 +195,20 @@ public struct Session: Codable, Equatable, Sendable {
         Date() > createdAt.addingTimeInterval(expiresIn)
     }
 
-    /// Whether the token is expiring soon
-    /// Uses proportional buffer: 15 minutes for 1-hour tokens, or 30% of lifetime for shorter tokens
+    /// How long before expiry a token is treated as due for refresh: 20 % of its
+    /// lifetime, capped at 60 seconds.
+    ///
+    /// The atproto OAuth profile recommends access-token lifetimes of 5–15 minutes.
+    /// A fixed multi-minute buffer would mark such a token "expiring" from the
+    /// moment it is issued and trigger a refresh before every request.
+    public var refreshLeadTime: TimeInterval {
+        min(60, max(0, expiresIn) * 0.2)
+    }
+
+    /// Whether the token is close enough to expiry that it should be refreshed
+    /// before the next request. See ``refreshLeadTime``.
     public var isExpiringSoon: Bool {
-        // For short-lived tokens (< 5 min), use 30% of lifetime as buffer
-        // For normal tokens (>= 5 min), use 15 minute buffer
-        let bufferSeconds: TimeInterval
-        if expiresIn < 300 {
-            bufferSeconds = expiresIn * 0.3 // 30% buffer for short tokens
-        } else {
-            bufferSeconds = 900 // 15 minute buffer for normal tokens
-        }
-        return Date() > createdAt.addingTimeInterval(expiresIn - bufferSeconds)
+        Date() > createdAt.addingTimeInterval(expiresIn - refreshLeadTime)
     }
 
     public init(
@@ -280,6 +312,14 @@ public struct OAuthState: Codable, Equatable, Sendable {
     /// Persisted authorization endpoint
     public let authorizationEndpoint: String?
 
+    /// The authorization server metadata validated when the flow started. Carried
+    /// through the redirect so the callback stores exactly the document the flow
+    /// was bound to instead of re-fetching it after the tokens are issued.
+    var authorizationServerMetadata: AuthorizationServerMetadata?
+
+    /// The scope requested by this flow, when it overrides the client's configured scope.
+    var requestedScope: String?
+
     public init(
         stateToken: String,
         codeVerifier: String,
@@ -320,7 +360,7 @@ public struct OAuthState: Codable, Equatable, Sendable {
 // MARK: - DPoP Proof Type
 
 /// Types of DPoP proofs that can be generated
-public enum DPoPProofType {
+public enum DPoPProofType: Sendable {
     /// For pushed authorization requests
     case authorization
 

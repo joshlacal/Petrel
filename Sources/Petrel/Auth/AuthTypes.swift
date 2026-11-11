@@ -217,8 +217,11 @@ public enum AuthError: Error, LocalizedError, Equatable {
 struct TokenResponse: Decodable {
     let accessToken: String
     let tokenType: String
-    let expiresIn: Int
-    let refreshToken: String
+    /// Lifetime of the access token in seconds. RFC 6749 only recommends the
+    /// member, so a server may omit it; see ``effectiveExpiresIn``.
+    let expiresIn: Int?
+    /// Absent when the client was not granted the `refresh_token` grant.
+    let refreshToken: String?
     let scope: String
     let sub: String?
     let dpopJkt: String?
@@ -227,6 +230,17 @@ struct TokenResponse: Decodable {
     /// space-delimited `scope` value.
     var grantedScopes: Set<String> {
         Set(scope.split(whereSeparator: \.isWhitespace).map(String.init))
+    }
+
+    /// Lifetime assumed for an access token whose response states none: the
+    /// profile's recommended lifetime where tokens cannot be revoked individually.
+    /// Erring short costs one early refresh; erring long is corrected by the
+    /// resource server's `invalid_token` challenge.
+    static let assumedAccessTokenLifetime: TimeInterval = 300
+
+    /// The access-token lifetime to schedule refreshes by.
+    var effectiveExpiresIn: TimeInterval {
+        expiresIn.map(TimeInterval.init) ?? Self.assumedAccessTokenLifetime
     }
 
     enum CodingKeys: String, CodingKey {
@@ -243,8 +257,8 @@ struct TokenResponse: Decodable {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         accessToken = try container.decode(String.self, forKey: .accessToken)
         tokenType = try container.decode(String.self, forKey: .tokenType)
-        expiresIn = try container.decode(Int.self, forKey: .expiresIn)
-        refreshToken = try container.decode(String.self, forKey: .refreshToken)
+        expiresIn = try container.decodeIfPresent(Int.self, forKey: .expiresIn)
+        refreshToken = try container.decodeIfPresent(String.self, forKey: .refreshToken)
         scope = try container.decode(String.self, forKey: .scope)
         sub = try container.decodeIfPresent(String.self, forKey: .sub)
         dpopJkt = try container.decodeIfPresent(String.self, forKey: .dpopJkt)

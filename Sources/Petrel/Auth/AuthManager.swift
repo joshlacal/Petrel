@@ -99,6 +99,12 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             didResolver: didResolver,
             gatewayBaseURL: gatewayBaseURL
         )
+
+        // Removing an account must end its session at the authorization server,
+        // not only forget it locally.
+        accountManager.setAccountRemovalHandler { [weak self] did in
+            await self?.revokeSession(for: did)
+        }
     }
 
     // MARK: - Mode Switching
@@ -211,6 +217,53 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         )
     }
 
+
+    /// Starts an OAuth flow from an account identifier or a server, optionally
+    /// requesting a scope other than the configured one. Only OAuth strategies
+    /// that talk to the authorization server directly support this.
+    func startOAuthFlow(
+        target: OAuthFlowTarget,
+        scope: String?,
+        bskyAppViewDID: String? = nil,
+        bskyChatDID: String? = nil
+    ) async throws -> (url: URL, state: String) {
+        guard let strategy = activeStrategy as? any OAuthCoreBackedStrategy else {
+            throw AuthError.invalidOAuthConfiguration
+        }
+        return try await strategy.startOAuthFlow(
+            target: target,
+            scope: scope,
+            bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID
+        )
+    }
+
+    /// Revokes `did`'s OAuth session at its authorization server, leaving local
+    /// state untouched.
+    /// - Returns: `true` only when the server confirmed the revocation; `false`
+    ///   for sessions that are not direct OAuth sessions.
+    @discardableResult
+    func revokeSession(for did: String) async -> Bool {
+        guard let strategy = activeStrategy as? any OAuthCoreBackedStrategy else { return false }
+        return await strategy.revokeSession(for: did)
+    }
+
+    /// Switches the OAuth client to confidential-client authentication with
+    /// assertions signed in process (`private_key_jwt`).
+    func useClientAssertionSigner(_ signer: any OAuthClientAssertionSigner) async throws {
+        guard currentMode == .publicOAuth else {
+            throw AuthError.invalidOAuthConfiguration
+        }
+        await activeStrategy.cancelOAuthFlow()
+        activeStrategy = PublicOAuthStrategy(
+            storage: storage,
+            accountManager: accountManager,
+            networkService: networkService,
+            oauthConfig: oauthConfig,
+            didResolver: didResolver,
+            clientAssertionSigner: signer
+        )
+    }
 
     func startOAuthFlowForSignUp(
         pdsURL: URL?,

@@ -56,6 +56,10 @@ private func jsonResponse(
 ) -> HTTPURLResponse {
     var allHeaders = headers
     allHeaders["Content-Type"] = "application/json"
+    // The profile makes server nonces mandatory on every response to a DPoP request.
+    if allHeaders["DPoP-Nonce"] == nil {
+        allHeaders["DPoP-Nonce"] = "state-test-nonce"
+    }
     return HTTPURLResponse(
         url: url,
         statusCode: status,
