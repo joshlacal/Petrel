@@ -762,18 +762,20 @@ struct NetworkPerformanceHygieneTests {
         }
     }
 
-    @Test("Facade: Subscription server error frame (op == -1) surfaces typed NetworkError.serverError")
+    @Test("Facade: Subscription server error frame (op == -1) surfaces typed EventStreamError")
     func subscriptionServerErrorFrameThrowsTypedError() async throws {
         struct TestSubMessage: Codable, Sendable {
             let seq: Int
         }
 
+        // A real error frame: header {"op": -1} is a1 62 6f 70 20 on the wire, with no `t`.
         let headerCBOR: CBOR = .map([
-            .utf8String("op"): .unsignedInt(UInt64(bitPattern: -1)),
-            .utf8String("t"): .utf8String("#error"),
+            .utf8String("op"): .negativeInt(0),
         ])
+        #expect(headerCBOR.encode() == [0xA1, 0x62, 0x6F, 0x70, 0x20])
         let payloadCBOR: CBOR = .map([
             .utf8String("error"): .utf8String("ConsumerTooSlow"),
+            .utf8String("message"): .utf8String("Stream consumer too slow"),
         ])
         let frameBytes = Data(headerCBOR.encode() + payloadCBOR.encode())
         let task = MockSubscriptionWebSocketTask(message: .data(frameBytes))
@@ -783,13 +785,7 @@ struct NetworkPerformanceHygieneTests {
             Issue.record("Expected subscription to fail on server error frame, but succeeded")
             return
         }
-        guard let networkError = error as? NetworkError,
-              case let .serverError(code, message) = networkError,
-              code == 400, message == "ConsumerTooSlow"
-        else {
-            Issue.record("Expected NetworkError.serverError(code: 400, message: 'ConsumerTooSlow'), got: \(error)")
-            return
-        }
+        #expect(error as? EventStreamError == .consumerTooSlow(message: "Stream consumer too slow"))
     }
 
     @Test("Facade: Subscription unexpected text frame fails closed with typed NetworkError.invalidResponse and cancels task")
