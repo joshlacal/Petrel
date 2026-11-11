@@ -46,6 +46,8 @@ own. Start with <doc:Cryptography>.
 
 ### Service authentication
 
+- <doc:ServiceAuth>
+- ``ServiceAuthVerifier``
 - ``ServiceJWT``
 - ``ServiceJWTClaims``
 - ``ServiceJWTInspection``

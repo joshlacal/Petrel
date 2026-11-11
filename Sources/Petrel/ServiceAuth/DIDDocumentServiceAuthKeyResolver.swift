@@ -26,11 +26,18 @@ import PetrelCrypto
 /// The resolver does not cache. Wrap it in
 /// `CachingServiceAuthKeyResolver` unless the document source already
 /// caches and rate-limits forced refreshes.
-///
-/// - Note: INTEGRATION(sdk-green/identity). Once the public identity
-///   resolver lands, the document source is one line:
-///   `DIDDocumentServiceAuthKeyResolver { try await identityResolver.resolveDIDDocument($0, forceRefresh: $1) }`.
 public struct DIDDocumentServiceAuthKeyResolver: ServiceAuthKeyResolver {
+    // INTEGRATION(sdk-green/identity): when the public IdentityResolver is on
+    // the same branch, add a convenience that uses it as the document source:
+    //
+    //     public init(identityResolver: IdentityResolver) {
+    //         self.init { did, forceRefresh in
+    //             try await identityResolver.resolveDIDDocument(did, forceRefresh: forceRefresh)
+    //         }
+    //     }
+    //
+    // and name it in the two ServiceAuth DocC articles in place of `directory`.
+
     private let resolveDocument: @Sendable (_ did: String, _ forceRefresh: Bool) async throws -> DIDDocument
 
     /// - Parameter resolveDocument: Fetches the DID document for a DID.
