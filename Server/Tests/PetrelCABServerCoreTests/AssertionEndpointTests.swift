@@ -44,6 +44,9 @@ struct AssertionEndpointTests {
   @Test("Happy path mints a verifiable, correctly-shaped assertion")
   func happyPath() async throws {
     let (config, signingKey) = try makeTestConfig()
+    // swift-crypto key types are not Sendable on Linux: carry raw bytes into
+    // the @Sendable test closure.
+    let signingPublicKey = signingKey.publicKey.rawRepresentation
     let server = try CABServer(config: config)
     let app = Application(router: server.buildRouter())
     try await app.test(.router) { client in
@@ -74,7 +77,8 @@ struct AssertionEndpointTests {
       let signingInput = "\(parts[0]).\(parts[1])"
       let signatureBytes = try JWTBase64URL.decode(String(parts[2]))
       let ecdsaSig = try P256WireSignature.decodeMalleabilityTolerant(signatureBytes)
-      #expect(signingKey.publicKey.isValidSignature(ecdsaSig, for: Data(signingInput.utf8)))
+      let publicKey = try P256.Signing.PublicKey(rawRepresentation: signingPublicKey)
+      #expect(publicKey.isValidSignature(ecdsaSig, for: Data(signingInput.utf8)))
 
       let claimsData = try JWTBase64URL.decode(String(parts[1]))
       let claims = try JSONDecoder().decode(AssertionClaims.self, from: claimsData)
@@ -122,8 +126,9 @@ struct AssertionEndpointTests {
     let (config, _) = try makeTestConfig { $0.deniedJkts = [jkt] }
     let server = try CABServer(config: config)
     let app = Application(router: server.buildRouter())
+    // Built outside the @Sendable closure: the key type is not Sendable on Linux.
+    let proof = try makeDPoPProof(key: deviceKey, htu: endpointHTU)
     try await app.test(.router) { client in
-      let proof = try makeDPoPProof(key: deviceKey, htu: endpointHTU)
       let response = try await postAssertion(client, proof: proof)
       #expect(response.status == .forbidden)
       #expect(String(buffer: response.body).contains("access_denied"))
