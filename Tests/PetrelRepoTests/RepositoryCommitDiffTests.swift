@@ -272,6 +272,120 @@ struct RepositoryCommitDiffTests {
         try await verify(from: padded)
     }
 
+    @Test("a #commit event verifies from its own fields, and its envelope is bound to the signed commit")
+    func commitEvent() async throws {
+        let repository = try await base(count: 40)
+        let result = try await repository.commit(
+            [
+                .create(path: try path("event"), record: record("event")),
+                .delete(path: try path("k00020"), expectedRecordCID: nil),
+            ],
+            signer: signer
+        )
+        let car = try await result.diffCAR()
+        let commitCID = result.repository.commit.cid
+        let revision = result.repository.revision.value
+        let resolver = FixedRepositorySigningKey(signer.publicKey)
+        func verify(
+            car eventCAR: Data? = nil, commit: CID? = nil, did: String? = nil,
+            revision eventRevision: String? = nil,
+            resolver eventResolver: (any RepositorySigningKeyResolver)? = nil
+        ) async throws {
+            _ = try await RepositoryCommitDiff.verifyCommitEvent(
+                blocks: eventCAR ?? car,
+                commitCID: commit ?? commitCID,
+                did: did ?? self.did,
+                revision: eventRevision ?? revision,
+                operations: result.operations,
+                previousDataCID: result.previousDataCID,
+                keyResolver: eventResolver ?? resolver,
+                limits: .networkScale
+            )
+        }
+        try await verify(car: car)
+
+        // An event that names another account, another revision or another
+        // commit than the one that was signed.
+        await #expect(throws: RepositoryCommitDiffError.commit(.invalidDID)) {
+            try await verify(did: "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa")
+        }
+        await #expect(throws: RepositoryCommitDiffError.revisionMismatch(
+            event: repository.revision.value, commit: revision
+        )) {
+            try await verify(revision: repository.revision.value)
+        }
+        await #expect(throws: RepositoryCommitDiffError.rootMismatch(
+            root: commitCID, commit: repository.commit.cid
+        )) {
+            try await verify(commit: repository.commit.cid)
+        }
+        await #expect(throws: RepositoryCommitDiffError.commit(.invalidSignature)) {
+            try await verify(resolver: FixedRepositorySigningKey(K256Keypair.generate().publicKey))
+        }
+        // Blocks that are not a CAR, or a CAR cut short.
+        await #expect(throws: RepositoryCommitDiffError.self) {
+            try await verify(car: Data("not a car".utf8))
+        }
+        await #expect(throws: RepositoryCommitDiffError.self) {
+            try await verify(car: car.prefix(car.count - 7))
+        }
+    }
+
+    @Test("a #sync event verifies its commit block, DID and revision")
+    func syncEvent() async throws {
+        let repository = try await base(count: 10)
+        let commit = repository.commit
+        // A #sync event's blocks hold just the signed commit.
+        let car = try await PublicRepositoryCAR.encode(
+            rootCID: commit.cid, blocks: [.init(cid: commit.cid, bytes: commit.bytes)]
+        )
+        let resolver = FixedRepositorySigningKey(signer.publicKey)
+        let verified = try await RepositoryCommitDiff.verifySyncEvent(
+            blocks: car, did: did, revision: commit.revision.value, keyResolver: resolver
+        )
+        #expect(verified.commitCID == commit.cid)
+        #expect(verified.descriptor.dataCID == commit.dataCID)
+
+        await #expect(throws: RepositoryCommitDiffError.commit(.invalidDID)) {
+            try await RepositoryCommitDiff.verifySyncEvent(
+                blocks: car, did: "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa",
+                revision: commit.revision.value, keyResolver: resolver
+            )
+        }
+        await #expect(throws: RepositoryCommitDiffError.revisionMismatch(
+            event: "3jzfcijpj2z2a", commit: commit.revision.value
+        )) {
+            try await RepositoryCommitDiff.verifySyncEvent(
+                blocks: car, did: self.did, revision: "3jzfcijpj2z2a", keyResolver: resolver
+            )
+        }
+        await #expect(throws: RepositoryCommitDiffError.commit(.invalidSignature)) {
+            try await RepositoryCommitDiff.verifySyncEvent(
+                blocks: car, did: self.did, revision: commit.revision.value,
+                keyResolver: FixedRepositorySigningKey(P256Keypair.generate().publicKey)
+            )
+        }
+        // A CAR whose root names a block it does not contain.
+        let tree = try #require(try await repository.store.block(for: commit.dataCID))
+        let rootless = try await PublicRepositoryCAR.encode(
+            rootCID: commit.cid, blocks: [.init(cid: commit.dataCID, bytes: tree)]
+        )
+        await #expect(throws: RepositoryCommitDiffError.missingCommit) {
+            try await RepositoryCommitDiff.verifySyncEvent(
+                blocks: rootless, did: self.did, revision: commit.revision.value, keyResolver: resolver
+            )
+        }
+        // A root that is not a commit at all.
+        let notACommit = try await PublicRepositoryCAR.encode(
+            rootCID: commit.dataCID, blocks: [.init(cid: commit.dataCID, bytes: tree)]
+        )
+        await #expect(throws: RepositoryCommitDiffError.self) {
+            try await RepositoryCommitDiff.verifySyncEvent(
+                blocks: notACommit, did: self.did, revision: commit.revision.value, keyResolver: resolver
+            )
+        }
+    }
+
     @Test("the low-level engine reports new blocks by tree difference and carries the covering proof")
     func engineResult() async throws {
         let repository = try await base(count: 30)

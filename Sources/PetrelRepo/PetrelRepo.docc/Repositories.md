@@ -177,3 +177,12 @@ try await RepositoryCommitDiff.verifyInversion(
 
 ``RepositoryCommitDiff/verify(commitCID:operations:previousDataCID:blocks:keyResolver:expectedDID:limits:policy:)``
 does both steps, and checks the record blocks, in one call.
+
+On a firehose, hand the event's fields straight to
+``RepositoryCommitDiff/verifyCommitEvent(blocks:commitCID:did:revision:operations:previousDataCID:keyResolver:limits:policy:)``
+for a `#commit` event, or to
+``RepositoryCommitDiff/verifySyncEvent(blocks:did:revision:keyResolver:limits:)``
+for a `#sync` event. Both also check that the event's `repo`/`did`, `rev` and
+`commit` are the ones inside the signed commit. Supply a
+``RepositorySigningKeyResolver`` backed by DID resolution; a signature that
+fails against a cached key is retried once against a refreshed one.

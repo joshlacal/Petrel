@@ -53,6 +53,12 @@ public enum RepositoryCommitDiffError: Error, Sendable, Equatable {
     case invalidRecord(path: String)
     /// The same path appears in more than one operation.
     case duplicatePath(path: String)
+    /// The event's `blocks` field is not a well-formed CAR archive.
+    case malformedBlocks(PublicRepositoryCARError)
+    /// The CAR's first root is not the commit the event names.
+    case rootMismatch(root: CID, commit: CID)
+    /// The event's `rev` is not the revision inside the signed commit.
+    case revisionMismatch(event: String, commit: String)
 }
 
 /// A commit diff that passed ``RepositoryCommitDiff/verify(commitCID:operations:previousDataCID:blocks:keyResolver:expectedDID:limits:policy:)``.
@@ -226,5 +232,135 @@ public enum RepositoryCommitDiff {
             operations: operations,
             previousDataCID: previousDataCID
         )
+    }
+
+    // MARK: Firehose events
+
+    /// Verifies a `#commit` event of `com.atproto.sync.subscribeRepos` from
+    /// its own fields, with no repository state.
+    ///
+    /// On top of ``verify(commitCID:operations:previousDataCID:blocks:keyResolver:expectedDID:limits:policy:)``
+    /// this checks the event envelope against what was signed: the CAR's
+    /// first root is the event's `commit`, the commit is for the event's
+    /// `repo`, and its revision is the event's `rev`.
+    ///
+    /// - Parameters:
+    ///   - car: The event's `blocks`.
+    ///   - commitCID: The event's `commit`.
+    ///   - did: The event's `repo`.
+    ///   - revision: The event's `rev`.
+    ///   - operations: The event's `ops`, with `prev` for updates and deletes.
+    ///   - previousDataCID: The event's `prevData`.
+    ///   - keyResolver: Looks up the account's signing key; asked again with
+    ///     a refresh if the signature does not verify.
+    ///   - limits: Bounds on the archive, the tree and record size.
+    ///   - policy: How strictly record content is checked.
+    /// - Throws: ``RepositoryCommitDiffError``.
+    public static func verifyCommitEvent(
+        blocks car: Data,
+        commitCID: CID,
+        did: String,
+        revision: String,
+        operations: [RepositoryCommitOperation],
+        previousDataCID: CID,
+        keyResolver: any RepositorySigningKeyResolver,
+        limits: PublicRepositoryLimits = .standard,
+        policy: RepositoryReadPolicy = .dataModel
+    ) async throws -> VerifiedRepositoryCommitDiff {
+        let store = try await loadEventBlocks(car, commitCID: commitCID, limits: limits)
+        let verified = try await verify(
+            commitCID: commitCID,
+            operations: operations,
+            previousDataCID: previousDataCID,
+            blocks: store,
+            keyResolver: keyResolver,
+            expectedDID: did,
+            limits: limits,
+            policy: policy
+        )
+        try requireRevision(revision, of: verified.commit)
+        return verified
+    }
+
+    /// Verifies a `#sync` event: a signed commit that restates an account's
+    /// current repository head, sent when a consumer should resynchronize.
+    ///
+    /// The event carries only the commit block. This checks that the block
+    /// is present and is the CAR's root, that it is a canonical commit
+    /// signed by the key of the event's `did`, and that its revision is the
+    /// event's `rev`. The returned commit's `data` is the tree root to fetch
+    /// and verify against.
+    ///
+    /// - Parameters:
+    ///   - car: The event's `blocks`.
+    ///   - did: The event's `did`.
+    ///   - revision: The event's `rev`.
+    ///   - keyResolver: Looks up the account's signing key.
+    ///   - limits: Bounds on the archive.
+    /// - Throws: ``RepositoryCommitDiffError``.
+    public static func verifySyncEvent(
+        blocks car: Data,
+        did: String,
+        revision: String,
+        keyResolver: any RepositorySigningKeyResolver,
+        limits: PublicRepositoryLimits = .standard
+    ) async throws -> VerifiedPublicRepositorySignedCommit {
+        let store = InMemoryRepositoryBlockStore()
+        let parsed: PublicRepositoryCARParseResult
+        do {
+            parsed = try await PublicRepositoryCAR.load(
+                from: DataCARByteSource(car), into: store, limits: limits, policy: .dataModel
+            )
+        } catch let error as PublicRepositoryCARError {
+            throw RepositoryCommitDiffError.malformedBlocks(error)
+        }
+        guard let commitBytes = try await store.block(for: parsed.rootCID) else {
+            throw RepositoryCommitDiffError.missingCommit
+        }
+        let commit: VerifiedPublicRepositorySignedCommit
+        do {
+            commit = try await PublicRepositoryCommitCodec.verify(
+                signedCommitBytes: commitBytes,
+                expectedCommitCID: parsed.rootCID,
+                keyResolver: keyResolver,
+                expectedDID: did
+            )
+        } catch let error as PublicRepositoryCommitError {
+            throw RepositoryCommitDiffError.commit(error)
+        }
+        try requireRevision(revision, of: commit)
+        return commit
+    }
+
+    private static func loadEventBlocks(
+        _ car: Data,
+        commitCID: CID,
+        limits: PublicRepositoryLimits
+    ) async throws -> InMemoryRepositoryBlockStore {
+        let store = InMemoryRepositoryBlockStore()
+        let parsed: PublicRepositoryCARParseResult
+        do {
+            // Extra roots and unrelated blocks in a diff are to be ignored.
+            parsed = try await PublicRepositoryCAR.load(
+                from: DataCARByteSource(car), into: store, limits: limits, policy: .dataModel
+            )
+        } catch let error as PublicRepositoryCARError {
+            throw RepositoryCommitDiffError.malformedBlocks(error)
+        }
+        guard parsed.rootCID == commitCID else {
+            throw RepositoryCommitDiffError.rootMismatch(root: parsed.rootCID, commit: commitCID)
+        }
+        return store
+    }
+
+    private static func requireRevision(
+        _ revision: String,
+        of commit: VerifiedPublicRepositorySignedCommit
+    ) throws {
+        guard commit.descriptor.revision.value == revision else {
+            throw RepositoryCommitDiffError.revisionMismatch(
+                event: revision, commit: commit.descriptor.revision.value
+            )
+        }
     }
 }
