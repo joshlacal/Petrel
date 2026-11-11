@@ -241,13 +241,15 @@ extension BskyAgent {
 
             let swap: RecordSwap
             if let existing {
-                guard let ref = existing.strongRef else {
+                // A strongRef carries the CID as text; a record's own CID is always one
+                // that parses.
+                guard let cid = existing.strongRef?.cid.cid else {
                     throw BskyAgentError.invalidResponse(
                         nsid: "com.atproto.repo.getRecord",
                         reason: "Missing or malformed record CID"
                     )
                 }
-                swap = .matches(ref.cid)
+                swap = .matches(cid)
             } else {
                 swap = .mustNotExist
             }

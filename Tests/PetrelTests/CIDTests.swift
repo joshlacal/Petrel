@@ -132,7 +132,7 @@ struct CIDTests {
         let testCID = try CID.fromDAGCBOR(#require("test".data(using: .utf8)))
         let testURI = try ATProtocolURI(uriString: "at://did:plc:test/app.bsky.feed.post/123")
 
-        let strongRef = ComAtprotoRepoStrongRef(uri: testURI, cid: testCID)
+        let strongRef = ComAtprotoRepoStrongRef(uri: testURI, cid: CIDString(testCID))
 
         // Test how StrongRef encodes to CBOR
         let cborValue = try strongRef.toCBORValue()
@@ -160,7 +160,7 @@ struct CIDTests {
         let parentURI = try ATProtocolURI(uriString: "at://did:plc:parent/app.bsky.feed.post/parent123")
 
         // Create reply reference
-        let parentRef = ComAtprotoRepoStrongRef(uri: parentURI, cid: parentCID)
+        let parentRef = ComAtprotoRepoStrongRef(uri: parentURI, cid: CIDString(parentCID))
         let replyRef = AppBskyFeedPost.ReplyRef(root: parentRef, parent: parentRef)
 
         // Create reply post

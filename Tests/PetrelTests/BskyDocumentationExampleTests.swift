@@ -172,7 +172,7 @@ struct BskyDocumentationExampleTests {
         let bsky = try await pds.server.makeAgent()
         let post = try ComAtprotoRepoStrongRef(
             uri: ATProtocolURI(uriString: "at://did:plc:bob/app.bsky.feed.post/3kpost"),
-            cid: CID.fromDAGCBOR(Data("post".utf8))
+            cid: CIDString(CID.fromDAGCBOR(Data("post".utf8)))
         )
         try await exampleSocialGraph(bsky: bsky, post: post, author: DID(didString: "did:plc:bob"))
 

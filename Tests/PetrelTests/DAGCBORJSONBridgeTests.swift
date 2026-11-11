@@ -36,7 +36,7 @@ struct DAGCBORJSONBridgeTests {
         let uri = try ATProtocolURI(
             uriString: "at://did:plc:bridge/app.bsky.feed.post/record"
         )
-        let strongRef = ComAtprotoRepoStrongRef(uri: uri, cid: cid)
+        let strongRef = ComAtprotoRepoStrongRef(uri: uri, cid: CIDString(cid))
         let encoded = try strongRef.encodedDAGCBOR()
         let encodedItem = try #require(try CBOR.decode([UInt8](encoded)))
 

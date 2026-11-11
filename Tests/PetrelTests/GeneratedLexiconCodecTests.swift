@@ -52,11 +52,53 @@ struct GeneratedLexiconCodecTests {
     func cidFormatStringStaysAString() throws {
         let ref = try ComAtprotoRepoStrongRef(
             uri: ATProtocolURI(uriString: "at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/app.bsky.feed.post/3jwdwj2ctlk26"),
-            cid: CID.parse(Self.cidString)
+            cid: CIDString(cidString: Self.cidString)
         )
 
         #expect(try Self.jsonObject(ref)["cid"] as? String == Self.cidString)
         #expect(try ref.encodedDAGCBOR().range(of: Data([0xD8, 0x2A])) == nil)
+        #expect(ref.cid.cid == (try CID.parse(Self.cidString)))
+        #expect(ref.cid == (try CID.parse(Self.cidString)))
+    }
+
+    /// Every string of the official `cid_syntax_valid` vectors is a valid value of a
+    /// `format: cid` field, whatever its multibase, version or hash; `CID`, which parses
+    /// only the forms atproto blesses for links, reads two of the eight.
+    @Test("A record holding any syntactically valid cid string decodes and re-encodes it verbatim",
+          arguments: SyntaxVectors.cases("cid_syntax_valid"))
+    func validCIDStringsRoundTripVerbatim(cid: String) throws {
+        let json = try JSONEncoder().encode(
+            ["uri": "at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/app.bsky.feed.post/3jwdwj2ctlk26", "cid": cid]
+        )
+
+        let ref = try ATProtoDecoding.strictJSONDecoder().decode(ComAtprotoRepoStrongRef.self, from: json)
+        #expect(ref.cid.string == cid)
+        #expect(ref.cid.description == cid)
+        #expect(try Self.jsonObject(ref) == Self.jsonObject(json))
+
+        let untyped = try JSONDecoder().decode([String: ATProtocolValueContainer].self, from: json)
+        #expect(try ref.encodedDAGCBOR() == ATProtocolValueContainer.object(untyped).encodedDAGCBOR())
+    }
+
+    @Test("A string without cid syntax is rejected where a cid is expected",
+          arguments: SyntaxVectors.cases("cid_syntax_invalid"))
+    func invalidCIDStringsAreRejected(cid: String) throws {
+        let json = try JSONEncoder().encode(
+            ["uri": "at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/app.bsky.feed.post/3jwdwj2ctlk26", "cid": cid]
+        )
+
+        #expect(throws: (any Error).self) {
+            try JSONDecoder().decode(ComAtprotoRepoStrongRef.self, from: json)
+        }
+        #expect(throws: ATProtocolError.self) {
+            try CIDString(cidString: cid)
+        }
+    }
+
+    @Test("Both cid vector files are loaded")
+    func cidVectorFilesAreLoaded() throws {
+        #expect(try SyntaxVectors.load("cid_syntax_valid").count == 8)
+        #expect(try !SyntaxVectors.load("cid_syntax_invalid").isEmpty)
     }
 
     // MARK: - Blobs (lex-12)
@@ -303,7 +345,7 @@ struct GeneratedLexiconCodecTests {
 
     @Test("An optional, nullable property distinguishes absent, null and a value")
     func optionalNullablePropertyHasThreeStates() throws {
-        func input(_ swapRecord: ATProtoNullable<CID>?) throws -> ComAtprotoRepoPutRecord.Input {
+        func input(_ swapRecord: ATProtoNullable<CIDString>?) throws -> ComAtprotoRepoPutRecord.Input {
             try ComAtprotoRepoPutRecord.Input(
                 repo: ATIdentifier(string: "did:plc:ewvi7nxzyoun6zhxrhs64oiz"),
                 collection: NSID(nsidString: "app.bsky.actor.profile"),
@@ -320,11 +362,11 @@ struct GeneratedLexiconCodecTests {
         let null = try Self.jsonObject(input(.null))
         #expect(null["swapRecord"] is NSNull)
 
-        let cid = try CID.parse(Self.cidString)
+        let cid = try CIDString(cidString: Self.cidString)
         let value = try Self.jsonObject(input(.value(cid)))
         #expect(value["swapRecord"] as? String == Self.cidString)
 
-        for state in [nil, .null, .value(cid)] as [ATProtoNullable<CID>?] {
+        for state in [nil, .null, .value(cid)] as [ATProtoNullable<CIDString>?] {
             let original = try input(state)
             let decoded = try JSONDecoder().decode(
                 ComAtprotoRepoPutRecord.Input.self,

@@ -448,8 +448,8 @@ struct ATProtocolValueContainerDecodingTests {
             uri: ATProtocolURI(
                 uriString: "at://did:plc:example/app.bsky.feed.post/test"
             ),
-            cid: CID.parse(
-                "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
+            cid: CIDString(
+                cidString: "bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"
             )
         )
 

@@ -12,7 +12,7 @@ private let postCollection = "app.bsky.feed.post"
 private func strongRef(_ uri: String, seed: String = "x") throws -> ComAtprotoRepoStrongRef {
     try ComAtprotoRepoStrongRef(
         uri: ATProtocolURI(uriString: uri),
-        cid: CID.fromDAGCBOR(Data(seed.utf8))
+        cid: CIDString(CID.fromDAGCBOR(Data(seed.utf8)))
     )
 }
 
@@ -652,7 +652,7 @@ struct BskyAgentGenericRecordTests {
             try await agent.putRecord(note, collection: "com.example.note", rkey: "self", swapRecord: .mustNotExist)
         }
 
-        try await agent.putRecord(["note": "v2"], collection: "com.example.note", rkey: "self", swapRecord: .matches(first.cid))
+        try await agent.putRecord(["note": "v2"], collection: "com.example.note", rkey: "self", swapRecord: .matches(#require(first.cid.cid)))
         #expect(pds.server.requests.last?.json?["swapRecord"] == .string(first.cid.string))
 
         try await agent.putRecord(["note": "v3"], collection: "com.example.note", rkey: "self")

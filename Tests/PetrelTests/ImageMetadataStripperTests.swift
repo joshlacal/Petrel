@@ -1080,7 +1080,7 @@ struct BskyImageUploadTests {
 
         let quoted = try ComAtprotoRepoStrongRef(
             uri: ATProtocolURI(uriString: "at://did:plc:bob/app.bsky.feed.post/3kquoted"),
-            cid: CID.fromDAGCBOR(Data("quoted".utf8))
+            cid: CIDString(CID.fromDAGCBOR(Data("quoted".utf8)))
         )
         let post = try await agent.post("with a quote", images: [image], quote: quoted)
         let embed = pds.record(at: post.uri.uriString())?.value["embed"]

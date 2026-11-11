@@ -599,7 +599,7 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         let input = try ComAtprotoSpaceGetBlob.Parameters(
             space: SpaceRef(uriString: "at://did:plc:exact/space/com.example.drive/self"),
             repo: DID(didString: "did:plc:exact"),
-            cid: CID.fromDAGCBOR(Data("exact-auth-limit".utf8))
+            cid: CIDString(CID.fromDAGCBOR(Data("exact-auth-limit".utf8)))
         )
 
         do {

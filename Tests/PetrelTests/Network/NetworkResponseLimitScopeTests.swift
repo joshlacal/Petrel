@@ -158,7 +158,7 @@ struct NetworkResponseLimitScopeTests {
             let input = try ComAtprotoSpaceGetBlob.Parameters(
                 space: SpaceRef(uriString: "at://did:plc:owner/space/com.example.drive/self"),
                 repo: DID(didString: "did:plc:owner"),
-                cid: CID.fromDAGCBOR(Data("response-limit-scope".utf8))
+                cid: CIDString(CID.fromDAGCBOR(Data("response-limit-scope".utf8)))
             )
 
             do {
@@ -236,7 +236,7 @@ struct NetworkResponseLimitScopeTests {
             let input = try ComAtprotoSpaceGetBlob.Parameters(
                 space: SpaceRef(uriString: "at://did:plc:owner/space/com.example.drive/self"),
                 repo: DID(didString: "did:plc:owner"),
-                cid: CID.fromDAGCBOR(Data("post-refresh-retry".utf8))
+                cid: CIDString(CID.fromDAGCBOR(Data("post-refresh-retry".utf8)))
             )
 
             // The first response is a 401; the provider refreshes and retries

@@ -81,7 +81,7 @@ struct BundledCatalogTests {
         let catalog = try LexiconCatalog.bundled()
         let ref = try ComAtprotoRepoStrongRef(
             uri: ATProtocolURI(uriString: "at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/app.bsky.feed.post/3jwdwj2ctlk26"),
-            cid: CID.parse("bafyreidfayvfuwqa7qlnopdjiqrxzs6blmoeu4rujcjtnci5beludirz2a")
+            cid: CIDString(cidString: "bafyreidfayvfuwqa7qlnopdjiqrxzs6blmoeu4rujcjtnci5beludirz2a")
         )
 
         try catalog.validate(ref)
