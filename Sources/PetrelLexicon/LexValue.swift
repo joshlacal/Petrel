@@ -421,11 +421,12 @@ extension LexValue {
             }
         case let .array(items):
             for (index, item) in items.enumerated() {
-                try item.checkDataModel(path: "\(path)/\(index)", depth: depth + 1, options: options)
+                try item.checkDataModel(path: LexPath.appending(path, index), depth: depth + 1, options: options)
             }
         case let .object(fields):
-            for (key, value) in fields {
-                try value.checkDataModel(path: path + "/" + LexPath.escape(key), depth: depth + 1, options: options)
+            // Sorted so the first violation reported is always the same one.
+            for key in fields.keys.sorted() {
+                try fields[key]?.checkDataModel(path: LexPath.appending(path, key), depth: depth + 1, options: options)
             }
             if fields["$link"] != nil {
                 throw LexValueError(.malformedLink, path: path, "\"$link\" is reserved: use LexValue.cidLink")
