@@ -1453,6 +1453,24 @@ public actor NetworkService: NetworkServiceProtocol {
                     return (decompressedData, httpResponse)
 
                 case 401:
+                    // A third-party origin that was sent no account credentials (a handle host,
+                    // a did:web host, any origin other than this client's own service) cannot
+                    // report on the account session. Its 401 must not force a token refresh,
+                    // must not get the request sent again with credentials attached by the auth
+                    // strategy, and must not broadcast an automatic logout.
+                    if case .unauthenticated = policy, authCtx == nil,
+                       !(requestToSend.allHTTPHeaderFields ?? [:]).keys.contains(where: Self.isCredentialHeader),
+                       !Self.isSameOrigin(requestURL, baseURL)
+                    {
+                        LogManager.logInfo(
+                            "Network Service - 401 from a third-party origin that received no credentials; not a session failure."
+                        )
+                        if returnsTerminalHTTPErrorResponses {
+                            return (decompressedData, httpResponse)
+                        }
+                        throw NetworkError.responseError(statusCode: 401)
+                    }
+
                     // Handle unauthorized (401)
                     guard let authProvider = authProvider, let url = requestToSend.url else {
                         LogManager.logError(
@@ -1947,6 +1965,17 @@ public actor NetworkService: NetworkServiceProtocol {
             return false
         }
         return true
+    }
+
+    /// Whether two URLs share scheme, host and effective port.
+    private nonisolated static func isSameOrigin(_ lhs: URL, _ rhs: URL) -> Bool {
+        func origin(_ url: URL) -> (String, String, Int)? {
+            guard let scheme = url.scheme?.lowercased(), let host = url.host?.lowercased() else { return nil }
+            let defaultPort = (scheme == "https" || scheme == "wss") ? 443 : 80
+            return (scheme, host, url.port ?? defaultPort)
+        }
+        guard let left = origin(lhs), let right = origin(rhs) else { return false }
+        return left == right
     }
 
     private nonisolated static func isCredentialHeader(_ name: String) -> Bool {
