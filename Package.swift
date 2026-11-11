@@ -38,6 +38,10 @@ let package = Package(
             name: "PetrelJetstream",
             targets: ["PetrelJetstream"]
         ),
+        .library(
+            name: "PetrelOAuthScopes",
+            targets: ["PetrelOAuthScopes"]
+        ),
         .executable(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
@@ -168,6 +172,12 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        .target(
+            name: "PetrelOAuthScopes",
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .executableTarget(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
@@ -200,6 +210,12 @@ let package = Package(
         .testTarget(
             name: "PetrelPLCTests",
             dependencies: ["PetrelPLC", "PetrelCrypto", "PetrelCore"]
+        ),
+        .testTarget(
+            name: "PetrelOAuthScopesTests",
+            dependencies: ["PetrelOAuthScopes"],
+            exclude: ["UpstreamGoldens"],
+            resources: [.copy("Fixtures")]
         ),
         .testTarget(
             name: "PetrelLoadTests",
