@@ -180,7 +180,19 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
       - name: Install system dependencies
-        run: apt-get update && apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config
+        # The container's resolver is sometimes not ready when the job starts, and
+        # `apt-get update` exits 0 even when every index fetch failed, so the
+        # failure only shows up in `install`. Retry the pair with a growing pause.
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if apt-get update && apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config; then
+              exit 0
+            fi
+            echo "apt attempt ${attempt} failed; retrying in $((attempt * 15))s"
+            sleep $((attempt * 15))
+          done
+          echo "apt-get could not install system dependencies after 6 attempts" >&2
+          exit 1
       - name: Verify pinned Swift
         shell: bash
         run: |
