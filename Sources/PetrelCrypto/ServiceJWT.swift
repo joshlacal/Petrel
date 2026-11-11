@@ -1,6 +1,5 @@
 import Crypto
 import Foundation
-import P256K
 
 /// The claims of an AT Protocol inter-service authentication JWT.
 ///
@@ -109,15 +108,18 @@ public struct ServiceJWTInspection: Sendable, Equatable {
     public var expiresAt: Date { Date(timeIntervalSince1970: TimeInterval(claims.exp)) }
 }
 
-/// Supported signing private keys for minting ATProto service JWTs.
+/// An in-memory signing key for the synchronous `ServiceJWT.mint(…key:…)`
+/// overloads.
 ///
-/// This enum predates ``ATProtoSigner`` and exposes the third-party
-/// `P256K` module's key type. New code should call
-/// `ServiceJWT.mint(issuer:audience:method:eventID:requestBodyDigest:signer:now:lifetime:)`
-/// with a ``P256Keypair``, ``K256Keypair`` or any other ``ATProtoSigner``.
+/// This enum predates ``ATProtoSigner``. New code should call
+/// `ServiceJWT.mint(issuer:audience:lexiconMethod:signer:keyID:nonce:now:lifetime:)`
+/// with a ``P256Keypair``, ``K256Keypair`` or any other ``ATProtoSigner``,
+/// which also covers keys that cannot sign synchronously.
 public enum ServiceJWTSigningKey: @unchecked Sendable {
+    /// A Swift Crypto / CryptoKit P-256 key; tokens are signed `ES256`.
     case p256(P256.Signing.PrivateKey)
-    case secp256k1(P256K.Signing.PrivateKey)
+    /// A K-256 (secp256k1) keypair; tokens are signed `ES256K`.
+    case k256(K256Keypair)
 }
 
 /// AT Protocol inter-service authentication JWTs: minting, inspection, and
@@ -209,7 +211,7 @@ public enum ServiceJWT {
         let alg: String
         switch key {
         case .p256: alg = "ES256"
-        case .secp256k1: alg = "ES256K"
+        case .k256: alg = "ES256K"
         }
         let signingInput = try unsignedToken(
             issuer: issuer,
@@ -228,8 +230,8 @@ public enum ServiceJWT {
         switch key {
         case let .p256(p256Key):
             signatureData = try P256WireSignature.sign(signingInputData, using: p256Key)
-        case let .secp256k1(secpKey):
-            signatureData = try K256Backend.sign(message: signingInputData, privateKey: secpKey.dataRepresentation)
+        case let .k256(keypair):
+            signatureData = try keypair.sign(signingInputData)
         }
 
         return "\(signingInput).\(JWTBase64URL.encode(signatureData))"
@@ -436,29 +438,6 @@ public enum ServiceJWT {
         )
     }
 
-    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). This overload exposes the third-party P256K module's key type and will be removed.")
-    public static func mint(
-        issuer: String,
-        audience: String,
-        method: String,
-        eventID: String,
-        requestBodyDigest: String? = nil,
-        key: P256K.Signing.PrivateKey,
-        now: Date = Date(),
-        lifetime: TimeInterval = defaultLifetime
-    ) throws -> String {
-        try mint(
-            issuer: issuer,
-            audience: audience,
-            method: method,
-            eventID: eventID,
-            requestBodyDigest: requestBodyDigest,
-            key: .secp256k1(key),
-            now: now,
-            lifetime: lifetime
-        )
-    }
-
     /// A legacy spelling of `mint(issuer:audience:method:eventID:requestBodyDigest:key:now:lifetime:)`.
     public static func create(
         issuer: String,
@@ -477,29 +456,6 @@ public enum ServiceJWT {
             eventID: eventID,
             requestBodyDigest: requestBodyDigest,
             key: .p256(key),
-            now: now,
-            lifetime: lifetime
-        )
-    }
-
-    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). This overload exposes the third-party P256K module's key type and will be removed.")
-    public static func create(
-        issuer: String,
-        audience: String,
-        method: String,
-        eventID: String,
-        requestBodyDigest: String? = nil,
-        key: P256K.Signing.PrivateKey,
-        now: Date = Date(),
-        lifetime: TimeInterval = defaultLifetime
-    ) throws -> String {
-        try mint(
-            issuer: issuer,
-            audience: audience,
-            method: method,
-            eventID: eventID,
-            requestBodyDigest: requestBodyDigest,
-            key: .secp256k1(key),
             now: now,
             lifetime: lifetime
         )
@@ -905,29 +861,6 @@ public enum ProxyServiceJWT {
         )
     }
 
-    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). This overload exposes the third-party P256K module's key type and will be removed.")
-    public static func create(
-        issuer: String,
-        audience: String,
-        method: String,
-        eventID: String,
-        requestBodyDigest: String? = nil,
-        key: P256K.Signing.PrivateKey,
-        now: Date = Date(),
-        lifetime: TimeInterval = maximumLifetime
-    ) throws -> String {
-        try ServiceJWT.mint(
-            issuer: issuer,
-            audience: audience,
-            method: method,
-            eventID: eventID,
-            requestBodyDigest: requestBodyDigest,
-            key: .secp256k1(key),
-            now: now,
-            lifetime: lifetime
-        )
-    }
-
     public static func isNSID(_ value: String) -> Bool {
         ServiceJWT.isNSID(value)
     }
@@ -961,29 +894,6 @@ public enum SpaceServiceJWT {
             eventID: eventID,
             requestBodyDigest: requestBodyDigest,
             key: .p256(key),
-            now: now,
-            lifetime: lifetime
-        )
-    }
-
-    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). This overload exposes the third-party P256K module's key type and will be removed.")
-    public static func create(
-        issuer: String,
-        audience: String,
-        method: String,
-        eventID: String,
-        requestBodyDigest: String? = nil,
-        key: P256K.Signing.PrivateKey,
-        now: Date = Date(),
-        lifetime: TimeInterval = lifetime
-    ) throws -> String {
-        try ServiceJWT.mint(
-            issuer: issuer,
-            audience: audience,
-            method: method,
-            eventID: eventID,
-            requestBodyDigest: requestBodyDigest,
-            key: .secp256k1(key),
             now: now,
             lifetime: lifetime
         )

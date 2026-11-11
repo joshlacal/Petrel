@@ -1,7 +1,6 @@
 import Crypto
 import Foundation
 @testable import PetrelCrypto
-import P256K
 import XCTest
 
 final class ServiceJWTTests: XCTestCase {
@@ -59,14 +58,14 @@ final class ServiceJWTTests: XCTestCase {
     // MARK: - Mint & Inspect & Verify (ES256K)
 
     func testES256KMintInspectAndVerifyRoundTrip() throws {
-        let secpKey = try P256K.Signing.PrivateKey()
+        let secpKey = K256Keypair.generate()
         let now = Date(timeIntervalSince1970: 1_700_000_000)
         let token = try ServiceJWT.mint(
             issuer: issuerWeb,
             audience: audience,
             method: "com.atproto.repo.getRecord",
             eventID: "secp-event-999",
-            key: .secp256k1(secpKey),
+            key: .k256(secpKey),
             now: now,
             lifetime: 60
         )
@@ -83,14 +82,14 @@ final class ServiceJWTTests: XCTestCase {
         XCTAssertEqual(inspection.claims.exp, 1_700_000_060)
 
         // Verify with ATProtoJWTVerificationKey
-        let secpVerifier = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.dataRepresentation)
+        let secpVerifier = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.compressedRepresentation)
         let verified = try ServiceJWT.verify(token, publicKey: secpVerifier, now: now)
         XCTAssertEqual(verified.iss, issuerWeb)
         XCTAssertEqual(verified.aud, audience)
         XCTAssertEqual(verified.lxm, "com.atproto.repo.getRecord")
 
         // Verify with PLCDIDVerificationKey
-        let plcKey = PLCDIDVerificationKey.secp256k1(secpKey.publicKey.dataRepresentation)
+        let plcKey = PLCDIDVerificationKey.secp256k1(secpKey.publicKey.compressedRepresentation)
         let verifiedFromPLC = try ServiceJWT.verify(token, publicKey: plcKey, now: now)
         XCTAssertEqual(verifiedFromPLC.iss, issuerWeb)
 
@@ -417,13 +416,13 @@ final class ServiceJWTTests: XCTestCase {
     }
 
     func testWrongCurveVerificationIsRejected() throws {
-        let secpKey = try P256K.Signing.PrivateKey()
+        let secpKey = K256Keypair.generate()
         let es256kToken = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
             method: "app.bsky.actor.getProfile",
             eventID: "curve-mismatch",
-            key: .secp256k1(secpKey)
+            key: .k256(secpKey)
         )
 
         // Attempt to verify ES256K token against P256 public key
@@ -445,7 +444,7 @@ final class ServiceJWTTests: XCTestCase {
         )
 
         // Attempt to verify ES256 token against secp256k1 public key
-        let secpVerifier = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.dataRepresentation)
+        let secpVerifier = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.compressedRepresentation)
         XCTAssertThrowsError(
             try ServiceJWT.verify(
                 es256Token,
@@ -793,15 +792,15 @@ final class ServiceJWTTests: XCTestCase {
         }
 
         // ES256K mint with requestBodyDigest
-        let secpKey = try P256K.Signing.PrivateKey()
-        let verifierSecp = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.dataRepresentation)
+        let secpKey = K256Keypair.generate()
+        let verifierSecp = try ATProtoJWTVerificationKey(secp256k1PublicKey: secpKey.publicKey.compressedRepresentation)
         let tokenSecp = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
             method: "com.atproto.space.notifyDeleted",
             eventID: "req-secp-1",
             requestBodyDigest: digest,
-            key: .secp256k1(secpKey),
+            key: .k256(secpKey),
             now: now
         )
         let verifiedSecp = try ServiceJWT.verify(
