@@ -50,6 +50,11 @@ public struct ServiceJWTInspection: Sendable, Equatable {
 }
 
 /// Supported signing private keys for minting ATProto service JWTs.
+///
+/// This enum predates ``ATProtoSigner`` and exposes the third-party
+/// `secp256k1` module's key type. New code should call
+/// `ServiceJWT.mint(issuer:audience:method:eventID:requestBodyDigest:signer:now:lifetime:)`
+/// with a ``P256Keypair``, ``K256Keypair`` or any other ``ATProtoSigner``.
 public enum ServiceJWTSigningKey: @unchecked Sendable {
     case p256(P256.Signing.PrivateKey)
     case secp256k1(secp256k1.Signing.PrivateKey)
@@ -103,6 +108,87 @@ public enum ServiceJWT {
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
     ) throws -> String {
+        let alg: String
+        switch key {
+        case .p256: alg = "ES256"
+        case .secp256k1: alg = "ES256K"
+        }
+        let signingInput = try unsignedToken(
+            issuer: issuer,
+            audience: audience,
+            method: method,
+            eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
+            algorithm: alg,
+            now: now,
+            lifetime: lifetime
+        )
+        let signingInputData = Data(signingInput.utf8)
+
+        let signatureData: Data
+        switch key {
+        case let .p256(p256Key):
+            signatureData = try P256WireSignature.sign(signingInputData, using: p256Key)
+        case let .secp256k1(secpKey):
+            let ecdsaSig = try secpKey.signature(for: signingInputData)
+            let compact = try ecdsaSig.compactRepresentation
+            guard ATProtoJWTVerificationKey.isCanonicalSecp256k1Signature(compact) else {
+                throw PetrelCryptoError.malformed("secp256k1 signature is not canonical low-S")
+            }
+            signatureData = compact
+        }
+
+        return "\(signingInput).\(JWTBase64URL.encode(signatureData))"
+    }
+
+    /// Mints a service JWT with any ``ATProtoSigner`` — a ``P256Keypair``, a
+    /// ``K256Keypair``, a Secure Enclave key, or a remote signer.
+    ///
+    /// The header `alg` is the signer's ``ATProtoSigner/jwtAlgorithm``
+    /// (`ES256` or `ES256K`). Claims are validated exactly as for the
+    /// key-based overloads.
+    ///
+    /// - Throws: ``PetrelCryptoError/malformed(_:)`` if the claims are
+    ///   invalid or the signer returns something other than a 64-byte
+    ///   compact low-S signature; otherwise whatever the signer throws.
+    public static func mint(
+        issuer: String,
+        audience: String,
+        method: String,
+        eventID: String,
+        requestBodyDigest: String? = nil,
+        signer: any ATProtoSigner,
+        now: Date = Date(),
+        lifetime: TimeInterval = defaultLifetime
+    ) async throws -> String {
+        let signingInput = try unsignedToken(
+            issuer: issuer,
+            audience: audience,
+            method: method,
+            eventID: eventID,
+            requestBodyDigest: requestBodyDigest,
+            algorithm: signer.jwtAlgorithm,
+            now: now,
+            lifetime: lifetime
+        )
+        let signature = try await signer.sign(Data(signingInput.utf8))
+        guard ATProtoSignature.isCanonical(signature, curve: signer.curve) else {
+            throw PetrelCryptoError.malformed("signer did not return a 64-byte compact low-S signature")
+        }
+        return "\(signingInput).\(JWTBase64URL.encode(signature))"
+    }
+
+    /// Validates the claims and returns `base64url(header).base64url(claims)`.
+    private static func unsignedToken(
+        issuer: String,
+        audience: String,
+        method: String,
+        eventID: String,
+        requestBodyDigest: String?,
+        algorithm: String,
+        now: Date,
+        lifetime: TimeInterval
+    ) throws -> String {
         guard serviceIssuerDID(issuer) != nil,
               isPrintable(audience, maximumBytes: 4096),
               isValidNSID(method),
@@ -121,12 +207,6 @@ public enum ServiceJWT {
             throw PetrelCryptoError.malformed("service authentication expiry is invalid")
         }
 
-        let alg: String
-        switch key {
-        case .p256: alg = "ES256"
-        case .secp256k1: alg = "ES256K"
-        }
-
         let claims = Claims(
             iss: issuer,
             aud: audience,
@@ -138,28 +218,10 @@ public enum ServiceJWT {
         )
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.sortedKeys, .withoutEscapingSlashes]
-        let headerData = try encoder.encode(Header(alg: alg, typ: "JWT"))
+        let headerData = try encoder.encode(Header(alg: algorithm, typ: "JWT"))
         let claimsData = try encoder.encode(claims)
 
-        let headerPart = JWTBase64URL.encode(headerData)
-        let payloadPart = JWTBase64URL.encode(claimsData)
-        let signingInput = "\(headerPart).\(payloadPart)"
-        let signingInputData = Data(signingInput.utf8)
-
-        let signatureData: Data
-        switch key {
-        case let .p256(p256Key):
-            signatureData = try P256WireSignature.sign(signingInputData, using: p256Key)
-        case let .secp256k1(secpKey):
-            let ecdsaSig = try secpKey.signature(for: signingInputData)
-            let compact = try ecdsaSig.compactRepresentation
-            guard ATProtoJWTVerificationKey.isCanonicalSecp256k1Signature(compact) else {
-                throw PetrelCryptoError.malformed("secp256k1 signature is not canonical low-S")
-            }
-            signatureData = compact
-        }
-
-        return "\(signingInput).\(JWTBase64URL.encode(signatureData))"
+        return "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(claimsData))"
     }
 
     public static func mint(
@@ -184,6 +246,7 @@ public enum ServiceJWT {
         )
     }
 
+    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). The third-party secp256k1 type will leave Petrel's public API in the next major version.")
     public static func mint(
         issuer: String,
         audience: String,
@@ -228,6 +291,7 @@ public enum ServiceJWT {
         )
     }
 
+    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). The third-party secp256k1 type will leave Petrel's public API in the next major version.")
     public static func create(
         issuer: String,
         audience: String,
@@ -260,9 +324,48 @@ public enum ServiceJWT {
         )
     }
 
+    /// Verifies a service JWT against an already-resolved public key.
+    ///
+    /// The signature must be the 64-byte compact encoding. Either S value
+    /// is accepted: the specification's low-S rule covers signatures over
+    /// CBOR objects and "does not impact JWT signature validation, for
+    /// example service auth tokens", and the reference implementation
+    /// verifies these with `allowMalleableSig: true`. Use the overload with
+    /// `signatureOptions:` to demand low-S.
     public static func verify(
         _ compact: String,
         publicKey: ATProtoJWTVerificationKey,
+        expectedAudience: String? = nil,
+        expectedMethod: String? = nil,
+        expectedRequestBodyDigest: String? = nil,
+        now: Date = Date(),
+        clockSkew: TimeInterval = 60,
+        maximumLifetime: TimeInterval = 5 * 60
+    ) throws -> Claims {
+        try verify(
+            compact,
+            publicKey: publicKey,
+            signatureOptions: .jwt,
+            expectedAudience: expectedAudience,
+            expectedMethod: expectedMethod,
+            expectedRequestBodyDigest: expectedRequestBodyDigest,
+            now: now,
+            clockSkew: clockSkew,
+            maximumLifetime: maximumLifetime
+        )
+    }
+
+    /// Verifies a service JWT under an explicit signature-encoding policy.
+    ///
+    /// - Parameter signatureOptions:
+    ///   ``ATProtoSignatureVerificationOptions/jwt`` (compact, either S) is
+    ///   what the specification asks for;
+    ///   ``ATProtoSignatureVerificationOptions/strict`` additionally
+    ///   rejects high-S.
+    public static func verify(
+        _ compact: String,
+        publicKey: ATProtoJWTVerificationKey,
+        signatureOptions: ATProtoSignatureVerificationOptions,
         expectedAudience: String? = nil,
         expectedMethod: String? = nil,
         expectedRequestBodyDigest: String? = nil,
@@ -295,7 +398,8 @@ public enum ServiceJWT {
         guard try publicKey.verify(
             signature: parsed.signature,
             signingInput: parsed.signingInput,
-            algorithm: parsed.header.alg
+            algorithm: parsed.header.alg,
+            options: signatureOptions
         ) else {
             throw PetrelCryptoError.unauthorized("service authentication signature is invalid")
         }
@@ -328,6 +432,35 @@ public enum ServiceJWT {
             }
         }
         return parsed.claims
+    }
+
+    /// Verifies a service JWT against a validated ``ATProtoPublicKey`` on
+    /// either curve.
+    ///
+    /// - Parameter signatureOptions: Defaults to
+    ///   ``ATProtoSignatureVerificationOptions/jwt``.
+    public static func verify(
+        _ compact: String,
+        publicKey: ATProtoPublicKey,
+        signatureOptions: ATProtoSignatureVerificationOptions = .jwt,
+        expectedAudience: String? = nil,
+        expectedMethod: String? = nil,
+        expectedRequestBodyDigest: String? = nil,
+        now: Date = Date(),
+        clockSkew: TimeInterval = 60,
+        maximumLifetime: TimeInterval = 5 * 60
+    ) throws -> Claims {
+        try verify(
+            compact,
+            publicKey: ATProtoJWTVerificationKey(publicKey),
+            signatureOptions: signatureOptions,
+            expectedAudience: expectedAudience,
+            expectedMethod: expectedMethod,
+            expectedRequestBodyDigest: expectedRequestBodyDigest,
+            now: now,
+            clockSkew: clockSkew,
+            maximumLifetime: maximumLifetime
+        )
     }
 
     public static func verify(
@@ -631,6 +764,7 @@ public enum ProxyServiceJWT {
         )
     }
 
+    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). The third-party secp256k1 type will leave Petrel's public API in the next major version.")
     public static func create(
         issuer: String,
         audience: String,
@@ -687,6 +821,7 @@ public enum SpaceServiceJWT {
         )
     }
 
+    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). The third-party secp256k1 type will leave Petrel's public API in the next major version.")
     public static func create(
         issuer: String,
         audience: String,
