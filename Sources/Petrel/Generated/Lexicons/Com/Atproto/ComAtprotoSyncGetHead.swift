@@ -18,17 +18,17 @@ public enum ComAtprotoSyncGetHead {
     }
 
     public struct Output: ATProtocolCodable {
-        public let root: CID
+        public let root: CIDString
 
         public init(
-            root: CID
+            root: CIDString
         ) {
             self.root = root
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            root = try container.decode(CID.self, forKey: .root)
+            root = try container.decode(CIDString.self, forKey: .root)
         }
 
         public func encode(to encoder: Encoder) throws {

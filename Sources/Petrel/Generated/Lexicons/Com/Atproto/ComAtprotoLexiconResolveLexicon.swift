@@ -19,14 +19,14 @@ public enum ComAtprotoLexiconResolveLexicon {
 
     public struct Output: ATProtocolCodable {
         /// The CID of the lexicon schema record.
-        public let cid: CID
+        public let cid: CIDString
         /// The resolved lexicon schema record.
         public let schema: ComAtprotoLexiconSchema
         /// The AT-URI of the lexicon schema record.
         public let uri: ATProtocolURI
 
         public init(
-            cid: CID,
+            cid: CIDString,
             schema: ComAtprotoLexiconSchema,
             uri: ATProtocolURI
         ) {
@@ -37,7 +37,7 @@ public enum ComAtprotoLexiconResolveLexicon {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             schema = try container.decode(ComAtprotoLexiconSchema.self, forKey: .schema)
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
         }

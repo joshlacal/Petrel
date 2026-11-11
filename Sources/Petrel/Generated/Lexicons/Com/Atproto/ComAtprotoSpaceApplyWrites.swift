@@ -270,7 +270,7 @@ public enum ComAtprotoSpaceApplyWrites {
         public static let typeIdentifier = "com.atproto.space.applyWrites#createResult"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let validationStatus: String?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -278,7 +278,7 @@ public enum ComAtprotoSpaceApplyWrites {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             validationStatus: String? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -292,7 +292,7 @@ public enum ComAtprotoSpaceApplyWrites {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus, rejectingNull: strict)
             } catch {
@@ -369,7 +369,7 @@ public enum ComAtprotoSpaceApplyWrites {
         public static let typeIdentifier = "com.atproto.space.applyWrites#updateResult"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let validationStatus: String?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -377,7 +377,7 @@ public enum ComAtprotoSpaceApplyWrites {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             validationStatus: String? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -391,7 +391,7 @@ public enum ComAtprotoSpaceApplyWrites {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus, rejectingNull: strict)
             } catch {

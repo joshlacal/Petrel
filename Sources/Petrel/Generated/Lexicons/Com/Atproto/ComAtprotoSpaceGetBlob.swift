@@ -10,12 +10,12 @@ public enum ComAtprotoSpaceGetBlob {
     public struct Parameters: Parametrizable {
         public let space: SpaceRef
         public let repo: DID
-        public let cid: CID
+        public let cid: CIDString
 
         public init(
             space: SpaceRef,
             repo: DID,
-            cid: CID
+            cid: CIDString
         ) {
             self.space = space
             self.repo = repo

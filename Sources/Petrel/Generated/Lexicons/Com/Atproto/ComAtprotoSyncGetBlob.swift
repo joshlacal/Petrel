@@ -9,11 +9,11 @@ public enum ComAtprotoSyncGetBlob {
 
     public struct Parameters: Parametrizable {
         public let did: DID
-        public let cid: CID
+        public let cid: CIDString
 
         public init(
             did: DID,
-            cid: CID
+            cid: CIDString
         ) {
             self.did = did
             self.cid = cid

@@ -11,7 +11,7 @@ public enum ComAtprotoRepoListRecords {
         public static let typeIdentifier = "com.atproto.repo.listRecords#record"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let value: ATProtocolValueContainer
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -19,7 +19,7 @@ public enum ComAtprotoRepoListRecords {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             value: ATProtocolValueContainer,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -32,7 +32,7 @@ public enum ComAtprotoRepoListRecords {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }

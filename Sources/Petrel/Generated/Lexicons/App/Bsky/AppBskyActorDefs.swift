@@ -1761,7 +1761,7 @@ public struct AppBskyActorDefs {
 
         /// The app.bsky.actor.link record, e.g. for reporting the link.
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         /// The link destination.
         public let url: URI
         public let title: String?
@@ -1774,7 +1774,7 @@ public struct AppBskyActorDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             url: URI,
             title: String? = nil,
             icon: URI? = nil,
@@ -1794,7 +1794,7 @@ public struct AppBskyActorDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             url = try container.decode(URI.self, forKey: .url)
             do {
                 title = try container.decodeIfPresent(String.self, forKey: .title, rejectingNull: strict)
@@ -4677,7 +4677,7 @@ public struct AppBskyActorDefs {
         public static let typeIdentifier = "app.bsky.actor.defs#statusView"
 
         public let uri: ATProtocolURI?
-        public let cid: CID?
+        public let cid: CIDString?
         /// The status for the account.
         public let status: String
         public let record: ATProtocolValueContainer
@@ -4696,7 +4696,7 @@ public struct AppBskyActorDefs {
 
         public init(
             uri: ATProtocolURI? = nil,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             status: String,
             record: ATProtocolValueContainer,
             embed: StatusViewEmbedUnion? = nil,
@@ -4732,7 +4732,7 @@ public struct AppBskyActorDefs {
                 uri = nil
             }
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and

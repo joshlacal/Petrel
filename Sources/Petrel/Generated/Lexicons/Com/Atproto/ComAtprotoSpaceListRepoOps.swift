@@ -14,8 +14,8 @@ public enum ComAtprotoSpaceListRepoOps {
         public let rev: TID
         public let collection: NSID
         public let rkey: RecordKey
-        public let cid: CID?
-        public let prev: CID?
+        public let cid: CIDString?
+        public let prev: CIDString?
         /// The record's current value, inlined for create and update operations. Omitted when excludeValues is set, for deletes, or when the value has been superseded by a later operation.
         public let value: ATProtocolValueContainer?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
@@ -26,8 +26,8 @@ public enum ComAtprotoSpaceListRepoOps {
             rev: TID,
             collection: NSID,
             rkey: RecordKey,
-            cid: CID?,
-            prev: CID?,
+            cid: CIDString?,
+            prev: CIDString?,
             value: ATProtocolValueContainer? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -55,7 +55,7 @@ public enum ComAtprotoSpaceListRepoOps {
                     )
                 )
             }
-            cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            cid = try container.decodeIfPresent(CIDString.self, forKey: .cid)
             guard container.contains(.prev) else {
                 throw DecodingError.keyNotFound(
                     CodingKeys.prev,
@@ -65,7 +65,7 @@ public enum ComAtprotoSpaceListRepoOps {
                     )
                 )
             }
-            prev = try container.decodeIfPresent(CID.self, forKey: .prev)
+            prev = try container.decodeIfPresent(CIDString.self, forKey: .prev)
             do {
                 value = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .value, rejectingNull: strict)
             } catch {

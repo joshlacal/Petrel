@@ -268,7 +268,7 @@ public enum ComAtprotoRepoApplyWrites {
         public static let typeIdentifier = "com.atproto.repo.applyWrites#createResult"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let validationStatus: String?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -276,7 +276,7 @@ public enum ComAtprotoRepoApplyWrites {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             validationStatus: String? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -290,7 +290,7 @@ public enum ComAtprotoRepoApplyWrites {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus, rejectingNull: strict)
             } catch {
@@ -367,7 +367,7 @@ public enum ComAtprotoRepoApplyWrites {
         public static let typeIdentifier = "com.atproto.repo.applyWrites#updateResult"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let validationStatus: String?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -375,7 +375,7 @@ public enum ComAtprotoRepoApplyWrites {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             validationStatus: String? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -389,7 +389,7 @@ public enum ComAtprotoRepoApplyWrites {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus, rejectingNull: strict)
             } catch {
@@ -514,13 +514,13 @@ public enum ComAtprotoRepoApplyWrites {
         public let validate: Bool?
         public let writes: [InputWritesUnion]
         /// If provided, the entire operation will fail if the current repo commit CID does not match this value. Used to prevent conflicting repo mutations.
-        public let swapCommit: CID?
+        public let swapCommit: CIDString?
 
         public init(
             repo: ATIdentifier,
             validate: Bool? = nil,
             writes: [InputWritesUnion],
-            swapCommit: CID? = nil
+            swapCommit: CIDString? = nil
         ) {
             self.repo = repo
             self.validate = validate
@@ -534,7 +534,7 @@ public enum ComAtprotoRepoApplyWrites {
             repo = try container.decode(ATIdentifier.self, forKey: .repo)
             validate = try container.decodeIfPresent(Bool.self, forKey: .validate, rejectingNull: strict)
             writes = try container.decode([InputWritesUnion].self, forKey: .writes)
-            swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit, rejectingNull: strict)
+            swapCommit = try container.decodeIfPresent(CIDString.self, forKey: .swapCommit, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {

@@ -28,12 +28,12 @@ public enum ComAtprotoSpaceGetRecord {
 
     public struct Output: ATProtocolCodable {
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let value: ATProtocolValueContainer
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             value: ATProtocolValueContainer
         ) {
             self.uri = uri
@@ -44,7 +44,7 @@ public enum ComAtprotoSpaceGetRecord {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
         }
 

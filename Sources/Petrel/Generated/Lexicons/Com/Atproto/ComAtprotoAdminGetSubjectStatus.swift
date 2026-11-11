@@ -10,12 +10,12 @@ public enum ComAtprotoAdminGetSubjectStatus {
     public struct Parameters: Parametrizable {
         public let did: DID?
         public let uri: ATProtocolURI?
-        public let blob: CID?
+        public let blob: CIDString?
 
         public init(
             did: DID? = nil,
             uri: ATProtocolURI? = nil,
-            blob: CID? = nil
+            blob: CIDString? = nil
         ) {
             self.did = did
             self.uri = uri

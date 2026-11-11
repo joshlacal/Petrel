@@ -10,7 +10,7 @@ public enum AppBskyGraphDefs {
         public static let typeIdentifier = "app.bsky.graph.defs#listViewBasic"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let name: String
         public let purpose: ListPurpose
         public let avatar: URI?
@@ -24,7 +24,7 @@ public enum AppBskyGraphDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             name: String,
             purpose: ListPurpose,
             avatar: URI? = nil,
@@ -50,7 +50,7 @@ public enum AppBskyGraphDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             name = try container.decode(String.self, forKey: .name)
             purpose = try container.decode(ListPurpose.self, forKey: .purpose)
             do {
@@ -241,7 +241,7 @@ public enum AppBskyGraphDefs {
         public static let typeIdentifier = "app.bsky.graph.defs#listView"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let creator: AppBskyActorDefs.ProfileView
         public let name: String
         public let purpose: ListPurpose
@@ -258,7 +258,7 @@ public enum AppBskyGraphDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             creator: AppBskyActorDefs.ProfileView,
             name: String,
             purpose: ListPurpose,
@@ -290,7 +290,7 @@ public enum AppBskyGraphDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
             name = try container.decode(String.self, forKey: .name)
             purpose = try container.decode(ListPurpose.self, forKey: .purpose)
@@ -623,7 +623,7 @@ public enum AppBskyGraphDefs {
         public static let typeIdentifier = "app.bsky.graph.defs#starterPackView"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let record: ATProtocolValueContainer
         public let creator: AppBskyActorDefs.ProfileViewBasic
         public let list: ListViewBasic?
@@ -639,7 +639,7 @@ public enum AppBskyGraphDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             record: ATProtocolValueContainer,
             creator: AppBskyActorDefs.ProfileViewBasic,
             list: ListViewBasic? = nil,
@@ -669,7 +669,7 @@ public enum AppBskyGraphDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
             creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .creator)
             do {
@@ -893,7 +893,7 @@ public enum AppBskyGraphDefs {
         public static let typeIdentifier = "app.bsky.graph.defs#starterPackViewBasic"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let record: ATProtocolValueContainer
         public let creator: AppBskyActorDefs.ProfileViewBasic
         public let listItemCount: Int?
@@ -907,7 +907,7 @@ public enum AppBskyGraphDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             record: ATProtocolValueContainer,
             creator: AppBskyActorDefs.ProfileViewBasic,
             listItemCount: Int? = nil,
@@ -933,7 +933,7 @@ public enum AppBskyGraphDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
             creator = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .creator)
             do {

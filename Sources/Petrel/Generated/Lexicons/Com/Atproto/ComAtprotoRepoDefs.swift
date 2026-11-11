@@ -9,14 +9,14 @@ public enum ComAtprotoRepoDefs {
     public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.repo.defs#commitMeta"
 
-        public let cid: CID
+        public let cid: CIDString
         public let rev: TID
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            cid: CID,
+            cid: CIDString,
             rev: TID,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -27,7 +27,7 @@ public enum ComAtprotoRepoDefs {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             rev = try container.decode(TID.self, forKey: .rev)
             extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }

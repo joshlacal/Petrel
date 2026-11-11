@@ -9,11 +9,11 @@ public enum AppBskyBookmarkCreateBookmark {
 
     public struct Input: ATProtocolCodable {
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
 
         public init(
             uri: ATProtocolURI,
-            cid: CID
+            cid: CIDString
         ) {
             self.uri = uri
             self.cid = cid
@@ -22,7 +22,7 @@ public enum AppBskyBookmarkCreateBookmark {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
         }
 
         public func encode(to encoder: Encoder) throws {

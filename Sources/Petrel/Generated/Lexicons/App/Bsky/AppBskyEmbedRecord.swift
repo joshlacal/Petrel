@@ -125,7 +125,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.record#viewRecord"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let author: AppBskyActorDefs.ProfileViewBasic
         /// The record data itself.
         public let value: ATProtocolValueContainer
@@ -146,7 +146,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             author: AppBskyActorDefs.ProfileViewBasic,
             value: ATProtocolValueContainer,
             labels: [ComAtprotoLabelDefs.Label]? = nil,
@@ -180,7 +180,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             author = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .author)
             value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
             do {

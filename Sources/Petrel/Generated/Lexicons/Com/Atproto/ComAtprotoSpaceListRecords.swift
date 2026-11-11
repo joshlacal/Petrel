@@ -12,7 +12,7 @@ public enum ComAtprotoSpaceListRecords {
 
         public let collection: NSID
         public let rkey: RecordKey
-        public let cid: CID
+        public let cid: CIDString
         /// The record's value. Inlined by default; omitted when excludeValues is set.
         public let value: ATProtocolValueContainer?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
@@ -22,7 +22,7 @@ public enum ComAtprotoSpaceListRecords {
         public init(
             collection: NSID,
             rkey: RecordKey,
-            cid: CID,
+            cid: CIDString,
             value: ATProtocolValueContainer? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -38,7 +38,7 @@ public enum ComAtprotoSpaceListRecords {
             let strict = decoder.isATProtoStrictDecoding
             collection = try container.decode(NSID.self, forKey: .collection)
             rkey = try container.decode(RecordKey.self, forKey: .rkey)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 value = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .value, rejectingNull: strict)
             } catch {

@@ -10,7 +10,7 @@ public enum ComAtprotoServerCheckAccountStatus {
     public struct Output: ATProtocolCodable {
         public let activated: Bool
         public let validDid: Bool
-        public let repoCommit: CID
+        public let repoCommit: CIDString
         public let repoRev: String
         public let repoBlocks: Int
         public let indexedRecords: Int
@@ -21,7 +21,7 @@ public enum ComAtprotoServerCheckAccountStatus {
         public init(
             activated: Bool,
             validDid: Bool,
-            repoCommit: CID,
+            repoCommit: CIDString,
             repoRev: String,
             repoBlocks: Int,
             indexedRecords: Int,
@@ -44,7 +44,7 @@ public enum ComAtprotoServerCheckAccountStatus {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             activated = try container.decode(Bool.self, forKey: .activated)
             validDid = try container.decode(Bool.self, forKey: .validDid)
-            repoCommit = try container.decode(CID.self, forKey: .repoCommit)
+            repoCommit = try container.decode(CIDString.self, forKey: .repoCommit)
             repoRev = try container.decode(String.self, forKey: .repoRev)
             repoBlocks = try container.decode(Int.self, forKey: .repoBlocks)
             indexedRecords = try container.decode(Int.self, forKey: .indexedRecords)

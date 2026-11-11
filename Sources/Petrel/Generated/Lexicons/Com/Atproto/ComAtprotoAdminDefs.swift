@@ -483,7 +483,7 @@ public enum ComAtprotoAdminDefs {
         public static let typeIdentifier = "com.atproto.admin.defs#repoBlobRef"
 
         public let did: DID
-        public let cid: CID
+        public let cid: CIDString
         public let recordUri: ATProtocolURI?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -491,7 +491,7 @@ public enum ComAtprotoAdminDefs {
 
         public init(
             did: DID,
-            cid: CID,
+            cid: CIDString,
             recordUri: ATProtocolURI? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -505,7 +505,7 @@ public enum ComAtprotoAdminDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             did = try container.decode(DID.self, forKey: .did)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 recordUri = try container.decodeIfPresent(ATProtocolURI.self, forKey: .recordUri, rejectingNull: strict)
             } catch {

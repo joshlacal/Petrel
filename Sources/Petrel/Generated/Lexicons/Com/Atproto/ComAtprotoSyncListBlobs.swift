@@ -28,11 +28,11 @@ public enum ComAtprotoSyncListBlobs {
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-        public let cids: [CID]
+        public let cids: [CIDString]
 
         public init(
             cursor: String? = nil,
-            cids: [CID]
+            cids: [CIDString]
         ) {
             self.cursor = cursor
             self.cids = cids
@@ -51,7 +51,7 @@ public enum ComAtprotoSyncListBlobs {
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-            cids = try container.decode([CID].self, forKey: .cids)
+            cids = try container.decode([CIDString].self, forKey: .cids)
         }
 
         public func encode(to encoder: Encoder) throws {

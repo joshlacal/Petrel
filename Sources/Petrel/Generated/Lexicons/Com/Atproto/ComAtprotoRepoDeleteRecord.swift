@@ -15,16 +15,16 @@ public enum ComAtprotoRepoDeleteRecord {
         /// The Record Key.
         public let rkey: RecordKey
         /// Compare and swap with the previous record by CID.
-        public let swapRecord: CID?
+        public let swapRecord: CIDString?
         /// Compare and swap with the previous commit by CID.
-        public let swapCommit: CID?
+        public let swapCommit: CIDString?
 
         public init(
             repo: ATIdentifier,
             collection: NSID,
             rkey: RecordKey,
-            swapRecord: CID? = nil,
-            swapCommit: CID? = nil
+            swapRecord: CIDString? = nil,
+            swapCommit: CIDString? = nil
         ) {
             self.repo = repo
             self.collection = collection
@@ -39,8 +39,8 @@ public enum ComAtprotoRepoDeleteRecord {
             repo = try container.decode(ATIdentifier.self, forKey: .repo)
             collection = try container.decode(NSID.self, forKey: .collection)
             rkey = try container.decode(RecordKey.self, forKey: .rkey)
-            swapRecord = try container.decodeIfPresent(CID.self, forKey: .swapRecord, rejectingNull: strict)
-            swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit, rejectingNull: strict)
+            swapRecord = try container.decodeIfPresent(CIDString.self, forKey: .swapRecord, rejectingNull: strict)
+            swapCommit = try container.decodeIfPresent(CIDString.self, forKey: .swapCommit, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {

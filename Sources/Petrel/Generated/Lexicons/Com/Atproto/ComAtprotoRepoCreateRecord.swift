@@ -19,7 +19,7 @@ public enum ComAtprotoRepoCreateRecord {
         /// The record itself. Must contain a $type field.
         public let record: ATProtocolValueContainer
         /// Compare and swap with the previous commit by CID.
-        public let swapCommit: CID?
+        public let swapCommit: CIDString?
 
         public init(
             repo: ATIdentifier,
@@ -27,7 +27,7 @@ public enum ComAtprotoRepoCreateRecord {
             rkey: RecordKey? = nil,
             validate: Bool? = nil,
             record: ATProtocolValueContainer,
-            swapCommit: CID? = nil
+            swapCommit: CIDString? = nil
         ) {
             self.repo = repo
             self.collection = collection
@@ -45,7 +45,7 @@ public enum ComAtprotoRepoCreateRecord {
             rkey = try container.decodeIfPresent(RecordKey.self, forKey: .rkey, rejectingNull: strict)
             validate = try container.decodeIfPresent(Bool.self, forKey: .validate, rejectingNull: strict)
             record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
-            swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit, rejectingNull: strict)
+            swapCommit = try container.decodeIfPresent(CIDString.self, forKey: .swapCommit, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -93,13 +93,13 @@ public enum ComAtprotoRepoCreateRecord {
 
     public struct Output: ATProtocolCodable {
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let commit: ComAtprotoRepoDefs.CommitMeta?
         public let validationStatus: String?
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             commit: ComAtprotoRepoDefs.CommitMeta? = nil,
             validationStatus: String? = nil
         ) {
@@ -113,7 +113,7 @@ public enum ComAtprotoRepoCreateRecord {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit, rejectingNull: strict)
             } catch {

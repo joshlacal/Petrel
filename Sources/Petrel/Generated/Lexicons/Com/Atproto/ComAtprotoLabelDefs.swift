@@ -17,7 +17,7 @@ public enum ComAtprotoLabelDefs {
         /// AT URI of the record, repository (account), or other resource that this label applies to.
         public let uri: URI
         /// Optionally, CID specifying the specific version of 'uri' resource this label applies to.
-        public let cid: CID?
+        public let cid: CIDString?
         /// The short string name of the value or type of this label.
         public let val: String
         /// If true, this is a negation label, overwriting a previous label.
@@ -36,7 +36,7 @@ public enum ComAtprotoLabelDefs {
             ver: Int? = nil,
             src: DID,
             uri: URI,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             val: String,
             neg: Bool? = nil,
             cts: ATProtocolDate,
@@ -72,7 +72,7 @@ public enum ComAtprotoLabelDefs {
             src = try container.decode(DID.self, forKey: .src)
             uri = try container.decode(URI.self, forKey: .uri)
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and

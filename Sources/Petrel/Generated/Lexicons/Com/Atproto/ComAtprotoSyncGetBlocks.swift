@@ -9,11 +9,11 @@ public enum ComAtprotoSyncGetBlocks {
 
     public struct Parameters: Parametrizable {
         public let did: DID
-        public let cids: [CID]
+        public let cids: [CIDString]
 
         public init(
             did: DID,
-            cids: [CID]
+            cids: [CIDString]
         ) {
             self.did = did
             self.cids = cids

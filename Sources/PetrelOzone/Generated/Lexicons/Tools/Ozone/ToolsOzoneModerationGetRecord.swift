@@ -10,11 +10,11 @@ public enum ToolsOzoneModerationGetRecord {
 
     public struct Parameters: Parametrizable {
         public let uri: ATProtocolURI
-        public let cid: CID?
+        public let cid: CIDString?
 
         public init(
             uri: ATProtocolURI,
-            cid: CID? = nil
+            cid: CIDString? = nil
         ) {
             self.uri = uri
             self.cid = cid

@@ -8,14 +8,14 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.repo.strongRef"
 
     public let uri: ATProtocolURI
-    public let cid: CID
+    public let cid: CIDString
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
     public let extraFields: [String: ATProtocolValueContainer]
 
     public init(
         uri: ATProtocolURI,
-        cid: CID,
+        cid: CIDString,
         extraFields: [String: ATProtocolValueContainer] = [:]
     ) {
         self.uri = uri
@@ -26,7 +26,7 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-        cid = try container.decode(CID.self, forKey: .cid)
+        cid = try container.decode(CIDString.self, forKey: .cid)
         extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 

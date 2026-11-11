@@ -10,7 +10,7 @@ public enum AppBskyFeedDefs {
         public static let typeIdentifier = "app.bsky.feed.defs#postView"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let author: AppBskyActorDefs.ProfileViewBasic
         public let record: ATProtocolValueContainer
         public let embed: PostViewEmbedUnion?
@@ -31,7 +31,7 @@ public enum AppBskyFeedDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             author: AppBskyActorDefs.ProfileViewBasic,
             record: ATProtocolValueContainer,
             embed: PostViewEmbedUnion? = nil,
@@ -69,7 +69,7 @@ public enum AppBskyFeedDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             author = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .author)
             record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
             do {
@@ -1130,7 +1130,7 @@ public enum AppBskyFeedDefs {
 
         public let by: AppBskyActorDefs.ProfileViewBasic
         public let uri: ATProtocolURI?
-        public let cid: CID?
+        public let cid: CIDString?
         public let indexedAt: ATProtocolDate
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -1139,7 +1139,7 @@ public enum AppBskyFeedDefs {
         public init(
             by: AppBskyActorDefs.ProfileViewBasic,
             uri: ATProtocolURI? = nil,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             indexedAt: ATProtocolDate,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -1165,7 +1165,7 @@ public enum AppBskyFeedDefs {
                 uri = nil
             }
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
@@ -1682,7 +1682,7 @@ public enum AppBskyFeedDefs {
         public static let typeIdentifier = "app.bsky.feed.defs#generatorView"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let did: DID
         public let creator: AppBskyActorDefs.ProfileView
         public let displayName: String
@@ -1701,7 +1701,7 @@ public enum AppBskyFeedDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             did: DID,
             creator: AppBskyActorDefs.ProfileView,
             displayName: String,
@@ -1737,7 +1737,7 @@ public enum AppBskyFeedDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             did = try container.decode(DID.self, forKey: .did)
             creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
             displayName = try container.decode(String.self, forKey: .displayName)
@@ -2312,7 +2312,7 @@ public enum AppBskyFeedDefs {
         public static let typeIdentifier = "app.bsky.feed.defs#threadgateView"
 
         public let uri: ATProtocolURI?
-        public let cid: CID?
+        public let cid: CIDString?
         public let record: ATProtocolValueContainer?
         public let lists: [AppBskyGraphDefs.ListViewBasic]?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
@@ -2321,7 +2321,7 @@ public enum AppBskyFeedDefs {
 
         public init(
             uri: ATProtocolURI? = nil,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             record: ATProtocolValueContainer? = nil,
             lists: [AppBskyGraphDefs.ListViewBasic]? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
@@ -2347,7 +2347,7 @@ public enum AppBskyFeedDefs {
                 uri = nil
             }
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and

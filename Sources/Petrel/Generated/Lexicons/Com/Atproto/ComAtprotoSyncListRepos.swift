@@ -12,7 +12,7 @@ public enum ComAtprotoSyncListRepos {
 
         public let did: DID
         /// Current repo commit CID
-        public let head: CID
+        public let head: CIDString
         public let rev: TID
         public let active: Bool?
         /// If active=false, this optional field indicates a possible reason for why the account is not active. If active=false and no status is supplied, then the host makes no claim for why the repository is no longer being hosted.
@@ -23,7 +23,7 @@ public enum ComAtprotoSyncListRepos {
 
         public init(
             did: DID,
-            head: CID,
+            head: CIDString,
             rev: TID,
             active: Bool? = nil,
             status: String? = nil,
@@ -41,7 +41,7 @@ public enum ComAtprotoSyncListRepos {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             did = try container.decode(DID.self, forKey: .did)
-            head = try container.decode(CID.self, forKey: .head)
+            head = try container.decode(CIDString.self, forKey: .head)
             rev = try container.decode(TID.self, forKey: .rev)
             do {
                 active = try container.decodeIfPresent(Bool.self, forKey: .active, rejectingNull: strict)

@@ -212,7 +212,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
     public struct View: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.video#view"
 
-        public let cid: CID
+        public let cid: CIDString
         public let playlist: URI
         public let thumbnail: URI?
         public let alt: String?
@@ -224,7 +224,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            cid: CID,
+            cid: CIDString,
             playlist: URI,
             thumbnail: URI? = nil,
             alt: String? = nil,
@@ -244,7 +244,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             playlist = try container.decode(URI.self, forKey: .playlist)
             do {
                 thumbnail = try container.decodeIfPresent(URI.self, forKey: .thumbnail, rejectingNull: strict)

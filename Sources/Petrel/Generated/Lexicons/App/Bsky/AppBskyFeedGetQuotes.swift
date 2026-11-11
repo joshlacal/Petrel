@@ -9,14 +9,14 @@ public enum AppBskyFeedGetQuotes {
 
     public struct Parameters: Parametrizable {
         public let uri: ATProtocolURI
-        public let cid: CID?
+        public let cid: CIDString?
         public let limit: Int?
         public let cursor: String?
         public let sort: String?
 
         public init(
             uri: ATProtocolURI,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             limit: Int? = nil,
             cursor: String? = nil,
             sort: String? = nil
@@ -31,13 +31,13 @@ public enum AppBskyFeedGetQuotes {
 
     public struct Output: ATProtocolCodable {
         public let uri: ATProtocolURI
-        public let cid: CID?
+        public let cid: CIDString?
         public let cursor: String?
         public let posts: [AppBskyFeedDefs.PostView]
 
         public init(
             uri: ATProtocolURI,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             cursor: String? = nil,
             posts: [AppBskyFeedDefs.PostView]
         ) {
@@ -52,7 +52,7 @@ public enum AppBskyFeedGetQuotes {
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and

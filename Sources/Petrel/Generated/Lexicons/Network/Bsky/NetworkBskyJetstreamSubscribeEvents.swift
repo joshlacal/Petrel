@@ -26,7 +26,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         /// The record decoded to JSON. Absent for deletes.
         public let record: ATProtocolValueContainer?
         /// CID of the record. Absent for deletes.
-        public let cid: CID?
+        public let cid: CIDString?
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
         public let extraFields: [String: ATProtocolValueContainer]
@@ -40,7 +40,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             collection: NSID,
             rkey: RecordKey,
             record: ATProtocolValueContainer? = nil,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.seq = seq
@@ -76,7 +76,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
                 record = nil
             }
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and

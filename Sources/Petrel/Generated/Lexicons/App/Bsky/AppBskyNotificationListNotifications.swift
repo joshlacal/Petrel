@@ -11,7 +11,7 @@ public enum AppBskyNotificationListNotifications {
         public static let typeIdentifier = "app.bsky.notification.listNotifications#notification"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let author: AppBskyActorDefs.ProfileView
         /// The reason why this notification was delivered - e.g. your post was liked, or you received a new follower.
         public let reason: String
@@ -28,7 +28,7 @@ public enum AppBskyNotificationListNotifications {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             author: AppBskyActorDefs.ProfileView,
             reason: String,
             reasonSubject: ATProtocolURI? = nil,
@@ -56,7 +56,7 @@ public enum AppBskyNotificationListNotifications {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             author = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .author)
             reason = try container.decode(String.self, forKey: .reason)
             do {

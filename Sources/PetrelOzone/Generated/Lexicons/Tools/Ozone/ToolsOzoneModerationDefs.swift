@@ -361,7 +361,7 @@ public enum ToolsOzoneModerationDefs {
         public let id: Int
         public let subject: SubjectStatusViewSubjectUnion
         public let hosting: SubjectStatusViewHostingUnion?
-        public let subjectBlobCids: [CID]?
+        public let subjectBlobCids: [CIDString]?
         public let subjectRepoHandle: String?
         /// Timestamp referencing when the last update was made to the moderation status of the subject
         public let updatedAt: ATProtocolDate
@@ -398,7 +398,7 @@ public enum ToolsOzoneModerationDefs {
             id: Int,
             subject: SubjectStatusViewSubjectUnion,
             hosting: SubjectStatusViewHostingUnion? = nil,
-            subjectBlobCids: [CID]? = nil,
+            subjectBlobCids: [CIDString]? = nil,
             subjectRepoHandle: String? = nil,
             updatedAt: ATProtocolDate,
             createdAt: ATProtocolDate,
@@ -462,7 +462,7 @@ public enum ToolsOzoneModerationDefs {
                 hosting = nil
             }
             do {
-                subjectBlobCids = try container.decodeIfPresent([CID].self, forKey: .subjectBlobCids, rejectingNull: strict)
+                subjectBlobCids = try container.decodeIfPresent([CIDString].self, forKey: .subjectBlobCids, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
@@ -4184,7 +4184,7 @@ public enum ToolsOzoneModerationDefs {
 
         public let comment: String?
         public let op: String
-        public let cid: CID?
+        public let cid: CIDString?
         public let timestamp: ATProtocolDate
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -4193,7 +4193,7 @@ public enum ToolsOzoneModerationDefs {
         public init(
             comment: String? = nil,
             op: String,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             timestamp: ATProtocolDate,
             extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
@@ -4219,7 +4219,7 @@ public enum ToolsOzoneModerationDefs {
             }
             op = try container.decode(String.self, forKey: .op)
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
@@ -5222,9 +5222,9 @@ public enum ToolsOzoneModerationDefs {
         public static let typeIdentifier = "tools.ozone.moderation.defs#recordView"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let value: ATProtocolValueContainer
-        public let blobCids: [CID]
+        public let blobCids: [CIDString]
         public let indexedAt: ATProtocolDate
         public let moderation: Moderation
         public let repo: RepoView
@@ -5234,9 +5234,9 @@ public enum ToolsOzoneModerationDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             value: ATProtocolValueContainer,
-            blobCids: [CID],
+            blobCids: [CIDString],
             indexedAt: ATProtocolDate,
             moderation: Moderation,
             repo: RepoView,
@@ -5255,9 +5255,9 @@ public enum ToolsOzoneModerationDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
-            blobCids = try container.decode([CID].self, forKey: .blobCids)
+            blobCids = try container.decode([CIDString].self, forKey: .blobCids)
             indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             moderation = try container.decode(Moderation.self, forKey: .moderation)
             repo = try container.decode(RepoView.self, forKey: .repo)
@@ -5353,7 +5353,7 @@ public enum ToolsOzoneModerationDefs {
         public static let typeIdentifier = "tools.ozone.moderation.defs#recordViewDetail"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let value: ATProtocolValueContainer
         public let blobs: [BlobView]
         public let labels: [ComAtprotoLabelDefs.Label]?
@@ -5366,7 +5366,7 @@ public enum ToolsOzoneModerationDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             value: ATProtocolValueContainer,
             blobs: [BlobView],
             labels: [ComAtprotoLabelDefs.Label]? = nil,
@@ -5390,7 +5390,7 @@ public enum ToolsOzoneModerationDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
             blobs = try container.decode([BlobView].self, forKey: .blobs)
             do {
@@ -5791,7 +5791,7 @@ public enum ToolsOzoneModerationDefs {
     public struct BlobView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "tools.ozone.moderation.defs#blobView"
 
-        public let cid: CID
+        public let cid: CIDString
         public let mimeType: String
         public let size: Int
         public let createdAt: ATProtocolDate
@@ -5802,7 +5802,7 @@ public enum ToolsOzoneModerationDefs {
         public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            cid: CID,
+            cid: CIDString,
             mimeType: String,
             size: Int,
             createdAt: ATProtocolDate,
@@ -5822,7 +5822,7 @@ public enum ToolsOzoneModerationDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             mimeType = try container.decode(String.self, forKey: .mimeType)
             size = try container.decode(Int.self, forKey: .size)
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)

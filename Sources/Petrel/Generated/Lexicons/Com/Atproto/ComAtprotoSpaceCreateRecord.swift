@@ -117,12 +117,12 @@ public enum ComAtprotoSpaceCreateRecord {
     public struct Output: ATProtocolCodable {
         /// URI of the created record.
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let validationStatus: String?
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             validationStatus: String? = nil
         ) {
             self.uri = uri
@@ -134,7 +134,7 @@ public enum ComAtprotoSpaceCreateRecord {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus, rejectingNull: strict)
             } catch {

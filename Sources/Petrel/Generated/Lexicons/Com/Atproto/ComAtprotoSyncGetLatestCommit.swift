@@ -18,11 +18,11 @@ public enum ComAtprotoSyncGetLatestCommit {
     }
 
     public struct Output: ATProtocolCodable {
-        public let cid: CID
+        public let cid: CIDString
         public let rev: TID
 
         public init(
-            cid: CID,
+            cid: CIDString,
             rev: TID
         ) {
             self.cid = cid
@@ -31,7 +31,7 @@ public enum ComAtprotoSyncGetLatestCommit {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             rev = try container.decode(TID.self, forKey: .rev)
         }
 

@@ -11,13 +11,13 @@ public enum ComAtprotoRepoGetRecord {
         public let repo: ATIdentifier
         public let collection: NSID
         public let rkey: RecordKey
-        public let cid: CID?
+        public let cid: CIDString?
 
         public init(
             repo: ATIdentifier,
             collection: NSID,
             rkey: RecordKey,
-            cid: CID? = nil
+            cid: CIDString? = nil
         ) {
             self.repo = repo
             self.collection = collection
@@ -28,12 +28,12 @@ public enum ComAtprotoRepoGetRecord {
 
     public struct Output: ATProtocolCodable {
         public let uri: ATProtocolURI
-        public let cid: CID?
+        public let cid: CIDString?
         public let value: ATProtocolValueContainer
 
         public init(
             uri: ATProtocolURI,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             value: ATProtocolValueContainer
         ) {
             self.uri = uri
@@ -46,7 +46,7 @@ public enum ComAtprotoRepoGetRecord {
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and

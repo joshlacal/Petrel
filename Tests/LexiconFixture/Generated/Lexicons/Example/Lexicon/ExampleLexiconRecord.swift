@@ -779,7 +779,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
         /// an at-uri string
         public let aturi: ATProtocolURI?
         /// a cid string (not a cid-link)
-        public let cid: CID?
+        public let cid: CIDString?
         /// a datetime string
         public let datetime: ATProtocolDate?
         /// a language string
@@ -800,7 +800,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
             atidentifier: ATIdentifier? = nil,
             nsid: NSID? = nil,
             aturi: ATProtocolURI? = nil,
-            cid: CID? = nil,
+            cid: CIDString? = nil,
             datetime: ATProtocolDate? = nil,
             language: LanguageCodeContainer? = nil,
             uri: URI? = nil,
@@ -876,7 +876,7 @@ public struct ExampleLexiconRecord: ATProtocolCodable, ATProtocolValue {
                 aturi = nil
             }
             do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid, rejectingNull: strict)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and

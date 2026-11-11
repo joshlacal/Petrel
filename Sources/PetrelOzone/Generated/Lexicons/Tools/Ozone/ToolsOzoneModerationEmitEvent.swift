@@ -228,7 +228,7 @@ public enum ToolsOzoneModerationEmitEvent {
     public struct Input: ATProtocolCodable {
         public let event: InputEventUnion
         public let subject: InputSubjectUnion
-        public let subjectBlobCids: [CID]?
+        public let subjectBlobCids: [CIDString]?
         public let createdBy: DID
         public let modTool: ToolsOzoneModerationDefs.ModTool?
         /// An optional external ID for the event, used to deduplicate events from external systems. Fails when an event of same type with the same external ID exists for the same subject.
@@ -239,7 +239,7 @@ public enum ToolsOzoneModerationEmitEvent {
         public init(
             event: InputEventUnion,
             subject: InputSubjectUnion,
-            subjectBlobCids: [CID]? = nil,
+            subjectBlobCids: [CIDString]? = nil,
             createdBy: DID,
             modTool: ToolsOzoneModerationDefs.ModTool? = nil,
             externalId: String? = nil,
@@ -259,7 +259,7 @@ public enum ToolsOzoneModerationEmitEvent {
             let strict = decoder.isATProtoStrictDecoding
             event = try container.decode(InputEventUnion.self, forKey: .event)
             subject = try container.decode(InputSubjectUnion.self, forKey: .subject)
-            subjectBlobCids = try container.decodeIfPresent([CID].self, forKey: .subjectBlobCids, rejectingNull: strict)
+            subjectBlobCids = try container.decodeIfPresent([CIDString].self, forKey: .subjectBlobCids, rejectingNull: strict)
             createdBy = try container.decode(DID.self, forKey: .createdBy)
             modTool = try container.decodeIfPresent(ToolsOzoneModerationDefs.ModTool.self, forKey: .modTool, rejectingNull: strict)
             externalId = try container.decodeIfPresent(String.self, forKey: .externalId, rejectingNull: strict)

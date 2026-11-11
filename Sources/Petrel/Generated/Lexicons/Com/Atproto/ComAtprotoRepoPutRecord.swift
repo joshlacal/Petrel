@@ -19,9 +19,9 @@ public enum ComAtprotoRepoPutRecord {
         /// The record to write.
         public let record: ATProtocolValueContainer
         /// Compare and swap with the previous record by CID. WARNING: nullable and optional field; may cause problems with golang implementation
-        public let swapRecord: ATProtoNullable<CID>?
+        public let swapRecord: ATProtoNullable<CIDString>?
         /// Compare and swap with the previous commit by CID.
-        public let swapCommit: CID?
+        public let swapCommit: CIDString?
 
         public init(
             repo: ATIdentifier,
@@ -29,8 +29,8 @@ public enum ComAtprotoRepoPutRecord {
             rkey: RecordKey,
             validate: Bool? = nil,
             record: ATProtocolValueContainer,
-            swapRecord: ATProtoNullable<CID>? = nil,
-            swapCommit: CID? = nil
+            swapRecord: ATProtoNullable<CIDString>? = nil,
+            swapCommit: CIDString? = nil
         ) {
             self.repo = repo
             self.collection = collection
@@ -51,14 +51,14 @@ public enum ComAtprotoRepoPutRecord {
             record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
             if container.contains(.swapRecord) {
                 if try container.decodeNil(forKey: .swapRecord) {
-                    swapRecord = ATProtoNullable<CID>.null
+                    swapRecord = ATProtoNullable<CIDString>.null
                 } else {
-                    swapRecord = try ATProtoNullable<CID>.value(container.decode(CID.self, forKey: .swapRecord))
+                    swapRecord = try ATProtoNullable<CIDString>.value(container.decode(CIDString.self, forKey: .swapRecord))
                 }
             } else {
                 swapRecord = nil
             }
-            swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit, rejectingNull: strict)
+            swapCommit = try container.decodeIfPresent(CIDString.self, forKey: .swapCommit, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -110,13 +110,13 @@ public enum ComAtprotoRepoPutRecord {
 
     public struct Output: ATProtocolCodable {
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let commit: ComAtprotoRepoDefs.CommitMeta?
         public let validationStatus: String?
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             commit: ComAtprotoRepoDefs.CommitMeta? = nil,
             validationStatus: String? = nil
         ) {
@@ -130,7 +130,7 @@ public enum ComAtprotoRepoPutRecord {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
                 commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit, rejectingNull: strict)
             } catch {

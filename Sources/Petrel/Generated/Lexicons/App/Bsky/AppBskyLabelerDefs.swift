@@ -10,7 +10,7 @@ public enum AppBskyLabelerDefs {
         public static let typeIdentifier = "app.bsky.labeler.defs#labelerView"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let creator: AppBskyActorDefs.ProfileView
         public let likeCount: Int?
         public let viewer: LabelerViewerState?
@@ -22,7 +22,7 @@ public enum AppBskyLabelerDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             creator: AppBskyActorDefs.ProfileView,
             likeCount: Int? = nil,
             viewer: LabelerViewerState? = nil,
@@ -44,7 +44,7 @@ public enum AppBskyLabelerDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
             do {
                 likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount, rejectingNull: strict)
@@ -187,7 +187,7 @@ public enum AppBskyLabelerDefs {
         public static let typeIdentifier = "app.bsky.labeler.defs#labelerViewDetailed"
 
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let creator: AppBskyActorDefs.ProfileView
         public let policies: AppBskyLabelerDefs.LabelerPolicies
         public let likeCount: Int?
@@ -206,7 +206,7 @@ public enum AppBskyLabelerDefs {
 
         public init(
             uri: ATProtocolURI,
-            cid: CID,
+            cid: CIDString,
             creator: AppBskyActorDefs.ProfileView,
             policies: AppBskyLabelerDefs.LabelerPolicies,
             likeCount: Int? = nil,
@@ -236,7 +236,7 @@ public enum AppBskyLabelerDefs {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            cid = try container.decode(CID.self, forKey: .cid)
+            cid = try container.decode(CIDString.self, forKey: .cid)
             creator = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .creator)
             policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: .policies)
             do {
