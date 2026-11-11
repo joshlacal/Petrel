@@ -1,0 +1,35 @@
+{
+  "did": "did:plc:z72i7hdynmk6r22z27h6tvur",
+  "handle": "bsky.app",
+  "displayName": "Bluesky",
+  "avatar": "https://cdn.bsky.app/img/avatar/plain/did:plc:z72i7hdynmk6r22z27h6tvur/bafkreihwihm6kpd6zuwhhlro75p5qks5qtrcu55jp3gddbfjsieiv7wuka",
+  "associated": {
+    "lists": 26,
+    "feedgens": 7,
+    "starterPacks": 23,
+    "labeler": false,
+    "chat": {
+      "allowIncoming": "none"
+    },
+    "activitySubscription": {
+      "allowSubscriptions": "followers"
+    }
+  },
+  "labels": [],
+  "createdAt": "2023-04-12T04:53:57.057Z",
+  "verification": {
+    "verifications": [],
+    "verifiedStatus": "none",
+    "trustedVerifierStatus": "valid"
+  },
+  "description": "official Bluesky account (check username👆)\n\nBugs, feature requests, feedback: support@bsky.app",
+  "indexedAt": "2026-11-04T15:41:10.973Z",
+  "banner": "https://cdn.bsky.app/img/banner/plain/did:plc:z72i7hdynmk6r22z27h6tvur/bafkreichzyovokfzmymz36p5jibbjrhsur6n7hjnzxrpbt5jaydp2szvna",
+  "followersCount": 35617010,
+  "followsCount": 41,
+  "postsCount": 919,
+  "pinnedPost": {
+    "cid": "bafyreicnt42y6vo6pfpvyro234ac4o6ijug6adwwrh7awflgrqlt4zibxq",
+    "uri": "at://did:plc:z72i7hdynmk6r22z27h6tvur/app.bsky.feed.post/3l6oveex3ii2l"
+  }
+}
