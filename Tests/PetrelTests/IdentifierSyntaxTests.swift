@@ -296,6 +296,26 @@ struct DIDSyntaxTests {
         #expect(DID.isValidAtprotoDID(string) == (expected != nil))
     }
 
+    /// A localhost port must be a real port number, 1 through 65535, as in the
+    /// reference implementation and `PetrelPLC`.
+    @Test("a localhost did:web port must be 1 through 65535", arguments: [
+        ("did:web:localhost%3A1", true),
+        ("did:web:localhost%3A8080", true),
+        ("did:web:localhost%3a8080", true),
+        ("did:web:localhost%3A65535", true),
+        ("did:web:localhost%3A0", false),
+        ("did:web:localhost%3A65536", false),
+        ("did:web:localhost%3A99999", false),
+        ("did:web:localhost%3A99999999999999999999999999", false),
+        ("did:web:localhost%3A", false),
+        ("did:web:localhost%3A80a", false),
+        ("did:web:localhost%3A-1", false),
+    ])
+    func localhostPortRange(_ string: String, _ expected: Bool) {
+        #expect(DID.isValidAtprotoDID(string) == expected)
+        #expect(((try? DID(didString: string))?.isAtprotoDID ?? false) == expected)
+    }
+
     @Test("localhost did:web can be refused outside development")
     func localhostIsOptional() {
         #expect(DID.isValidAtprotoDID("did:web:localhost%3A8080", allowLocalhost: true))

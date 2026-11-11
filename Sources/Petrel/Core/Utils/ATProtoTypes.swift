@@ -1099,7 +1099,7 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     /// - `did:web`: a bare hostname with no path segments and no port; the
     ///   hostname must be a valid handle-style domain outside the reserved
     ///   top-level domains (``Handle/disallowedTLDs``). `localhost`, with an
-    ///   optional `%3A<port>`, is accepted for development.
+    ///   optional `%3A<port>` (1–65535), is accepted for development.
     ///
     /// See "Blessed DID Methods" in https://atproto.com/specs/did.
     public var atprotoMethod: AtprotoMethod? {
@@ -1140,8 +1140,12 @@ public struct DID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
         var host = identifier
         var hasPort = false
         if let escape = identifier.range(of: "%3A", options: .caseInsensitive) {
-            let port = identifier[escape.upperBound...]
-            guard !port.isEmpty, port.utf8.allSatisfy(SyntaxByte.isDigit) else { return nil }
+            let portText = identifier[escape.upperBound...]
+            guard !portText.isEmpty, portText.utf8.allSatisfy(SyntaxByte.isDigit),
+                  let port = Int(portText), (1 ... 65535).contains(port)
+            else {
+                return nil
+            }
             host = String(identifier[..<escape.lowerBound])
             hasPort = true
         }
@@ -1611,10 +1615,15 @@ public struct RecordKey: ATProtocolValue, CustomStringConvertible, QueryParamete
 /// A TID is a 64-bit integer written as 13 characters of the base32-sortable
 /// alphabet `234567abcdefghijklmnopqrstuvwxyz` (https://atproto.com/specs/tid).
 /// Thirteen characters carry 65 bits, so the first character is limited to
-/// `234567abcdefghij`. Within the integer, the top bit is zero in every
-/// generated TID, the next 53 bits are microseconds since the UNIX epoch and the
-/// low 10 bits are a clock identifier. TIDs sort the same way as strings and as
-/// integers, and therefore by time.
+/// `234567abcdefghij`. Within the integer, the top bit is reserved as zero, the
+/// next 53 bits are microseconds since the UNIX epoch and the low 10 bits are a
+/// clock identifier. TIDs sort the same way as strings and as integers, and
+/// therefore by time.
+///
+/// The first-character rule is the whole of the syntax check, and it is slightly
+/// wider than the layout: `c` through `j` set the reserved top bit. Such a
+/// string is accepted, as the specification's syntax requires, and reports
+/// ``hasHighBitSet``; ``TIDGenerator`` never produces one.
 ///
 /// ```swift
 /// let tid = try TID(tidString: "3jzfcijpj2z2a")
@@ -1670,6 +1679,15 @@ public struct TID: ATProtocolValue, CustomStringConvertible, QueryParameterConve
     /// Microseconds since the UNIX epoch (the 53-bit timestamp field).
     public var timestampMicros: UInt64 {
         (value >> 10) & TID.timestampMask
+    }
+
+    /// Whether the top bit of the 64-bit value is set, which the TID layout
+    /// reserves as zero. True exactly when the first character is one of
+    /// `cdefghij`. Such a TID is valid syntax but cannot come from a conforming
+    /// generator, sorts after every TID that can, and loses that bit if rebuilt
+    /// from ``timestampMicros`` and ``clockID``.
+    public var hasHighBitSet: Bool {
+        value >> 63 == 1
     }
 
     /// The 10-bit clock identifier (0–1023) of the generator that made this TID.

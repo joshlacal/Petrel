@@ -69,7 +69,8 @@ public actor TIDGenerator {
 
     /// Generates a TID that is also greater than `previous` — for example the
     /// current repository revision, which may have been produced by another
-    /// generator or another machine.
+    /// generator or another machine. The result always sorts after `previous`,
+    /// as an integer and as a string, or the call throws.
     ///
     /// When `previous` is ahead of this generator (its clock was fast), the
     /// result is `previous` plus one microsecond. That value is not adopted as
@@ -77,12 +78,22 @@ public actor TIDGenerator {
     /// every later identifier into the future; pass each result back as the next
     /// `previous` to keep such a chain increasing.
     ///
-    /// Throws ``ATProtocolError/invalidTID(_:)`` if `previous` already carries
-    /// the largest timestamp a TID can hold, since nothing can follow it.
+    /// Throws ``ATProtocolError/invalidTID(_:)`` when nothing this generator can
+    /// produce would sort after `previous`:
+    ///
+    /// - `previous` has the top bit of its 64-bit value set
+    ///   (``TID/hasHighBitSet``). Such a TID is valid syntax, but every generated
+    ///   TID keeps that bit clear and so sorts before it.
+    /// - `previous` already carries the largest timestamp a TID can hold.
     public func next(after previous: TID?) throws -> TID {
-        let timestamp = advance()
-        guard let previous, previous.timestampMicros >= timestamp else {
-            return TID(timestampBits: timestamp, clockBits: UInt64(clockID))
+        let candidate = TID(timestampBits: advance(), clockBits: UInt64(clockID))
+        guard let previous, candidate <= previous else {
+            return candidate
+        }
+        guard !previous.hasHighBitSet else {
+            throw ATProtocolError.invalidTID(
+                "No generated TID can follow \(previous.toString()): its high bit is set, which the TID layout reserves as zero"
+            )
         }
         guard previous.timestampMicros < Self.timestampMask else {
             throw ATProtocolError.invalidTID(

@@ -174,7 +174,76 @@ struct TIDGeneratorStressTests {
 
         // Nothing can follow the largest timestamp.
         let last = try TID(timestampMicros: (1 << 53) - 1, clockID: 0)
+        #expect(!last.hasHighBitSet)
         await #expect(throws: ATProtocolError.self) { try await generator.next(after: last) }
+    }
+
+    // MARK: - Revisions with the high bit set
+
+    /// Thirteen base32 characters carry 65 bits. The syntax limits the first
+    /// character to `234567abcdefghij` (values 0–15), which clears bit 64 but not
+    /// bit 63: `c` through `j` (values 8–15) set the top bit of the 64-bit
+    /// integer. Such a TID is valid syntax, yet no generated TID — whose top bit
+    /// is always zero — can sort after it.
+    @Test("first characters 2-7, a, b leave the high bit clear and can be followed", arguments: Array("234567ab"))
+    func lowFirstCharactersCanBeFollowed(_ first: Character) async throws {
+        let generator = TIDGenerator(clockID: 0, clock: { 1_700_000_000_000_000 })
+        let previous = try TID(tidString: String(first) + "222222222222")
+        #expect(!previous.hasHighBitSet)
+        let next = try await generator.next(after: previous)
+        #expect(next > previous)
+        #expect(next.toString() > previous.toString())
+    }
+
+    @Test("first characters c-j set the high bit and cannot be followed", arguments: Array("cdefghij"))
+    func highFirstCharactersCannotBeFollowed(_ first: Character) async throws {
+        let generator = TIDGenerator(clockID: 0, clock: { 1_700_000_000_000_000 })
+        let string = String(first) + "222222222222"
+        // Valid syntax: the specification's first-character set includes c-j.
+        #expect(TID.isValidTID(string))
+        let previous = try TID(tidString: string)
+        #expect(previous.hasHighBitSet)
+
+        // Every TID a generator can produce sorts below it, so returning one would
+        // silently break a revision chain.
+        let largestGenerated = try TID(timestampMicros: (1 << 53) - 1, clockID: 1023)
+        #expect(largestGenerated < previous)
+        #expect(largestGenerated.toString() < string)
+
+        do {
+            let next = try await generator.next(after: previous)
+            Issue.record("expected an error, got \(next), which sorts below \(previous)")
+        } catch let error as ATProtocolError {
+            guard case .invalidTID = error else {
+                Issue.record("expected .invalidTID, got \(error)")
+                return
+            }
+        }
+    }
+
+    /// The case from review: clock 1_700_000_000_000_000, clock identifier 0 and
+    /// previous `c222222222222` used to return `3ke6kg3wk2222`, an older TID.
+    @Test("an external revision with the high bit set is refused, not answered with an older TID")
+    func highBitRevisionIsRefused() async throws {
+        let generator = TIDGenerator(clockID: 0, clock: { 1_700_000_000_000_000 })
+        let previous = try TID(tidString: "c222222222222")
+        await #expect(throws: ATProtocolError.self) { try await generator.next(after: previous) }
+
+        // The refusal does not disturb the generator.
+        let ordinary = await generator.nextTID()
+        #expect(ordinary.timestampMicros >= 1_700_000_000_000_000)
+        #expect(ordinary.timestampMicros < 1_700_000_000_000_010)
+    }
+
+    /// Same timestamp as the clock but a larger clock identifier: the result must
+    /// still sort after `previous`.
+    @Test("a revision at the clock's own microsecond with a larger clock identifier is exceeded")
+    func sameMicrosecondLargerClockIdentifier() async throws {
+        let generator = TIDGenerator(clockID: 3, clock: { 1_700_000_000_000_000 })
+        let previous = try TID(timestampMicros: 1_700_000_000_000_000, clockID: 9)
+        let next = try await generator.next(after: previous)
+        #expect(next > previous)
+        #expect(next.timestampMicros == 1_700_000_000_000_001)
     }
 
     @Test("every generated identifier is a valid TID")
