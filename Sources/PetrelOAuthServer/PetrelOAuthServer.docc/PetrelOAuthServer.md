@@ -13,7 +13,7 @@ The server is a value with one entry point. ``OAuthAuthorizationServer`` takes a
 | Accounts and passwords | ``OAuthAccountAuthenticating`` | none (the host's account system) |
 | Persistence | ``OAuthServerStore`` | ``InMemoryOAuthStore`` |
 | Client discovery | ``OAuthClientResolving`` | ``OAuthClientMetadataLoader``, ``StaticOAuthClientResolver`` |
-| Outbound HTTP | ``OAuthRemoteTransport`` | ``URLSessionOAuthRemoteTransport`` |
+| Outbound HTTP | ``OAuthRemoteTransport`` | `PinnedNIOOAuthRemoteTransport` (in the `Server` package's `PetrelOAuthServerHummingbird`); ``URLSessionOAuthRemoteTransport`` only with ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport`` |
 | Permission sets | ``OAuthLexiconResolving`` | ``CachingOAuthLexiconResolver``, ``StaticOAuthLexiconResolver`` |
 | Authorization Interface | ``OAuthInterfaceRendering`` | ``OAuthDefaultInterface`` |
 | Time and randomness | ``OAuthClock``, ``OAuthRandomSource`` | ``SystemOAuthClock``, ``SystemOAuthRandomSource`` |

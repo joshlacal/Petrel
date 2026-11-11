@@ -22,6 +22,9 @@ struct DocumentationExampleTests {
         let secret = Data((0 ..< 32).map { _ in UInt8.random(in: .min ... .max) })
 
         let store = InMemoryOAuthStore()
+        // A transport that pins each connection to the approved DNS answers,
+        // such as PinnedNIOOAuthRemoteTransport from PetrelOAuthServerHummingbird.
+        let transport: any OAuthRemoteTransport = StubTransport()
         let server = try OAuthAuthorizationServer(
             configuration: OAuthAuthorizationServerConfiguration(
                 issuer: #require(URL(string: "https://pds.example.com")),
@@ -30,7 +33,7 @@ struct DocumentationExampleTests {
             store: store,
             accounts: MyAccounts(),
             clients: OAuthClientMetadataLoader(
-                fetcher: OAuthRemoteDocumentFetcher(policy: OAuthRemoteFetchPolicy()),
+                fetcher: OAuthRemoteDocumentFetcher(policy: OAuthRemoteFetchPolicy(), transport: transport),
                 cache: store
             )
         )

@@ -31,6 +31,9 @@ struct MyAccounts: OAuthAccountAuthenticating {
 
 ```swift
 let store = InMemoryOAuthStore()
+// A transport that pins each connection to the approved DNS answers,
+// such as PinnedNIOOAuthRemoteTransport from PetrelOAuthServerHummingbird.
+let transport: any OAuthRemoteTransport = PinnedNIOOAuthRemoteTransport()
 let server = try OAuthAuthorizationServer(
     configuration: OAuthAuthorizationServerConfiguration(
         issuer: URL(string: "https://pds.example.com")!,
@@ -39,13 +42,15 @@ let server = try OAuthAuthorizationServer(
     store: store,
     accounts: MyAccounts(),
     clients: OAuthClientMetadataLoader(
-        fetcher: OAuthRemoteDocumentFetcher(policy: OAuthRemoteFetchPolicy()),
+        fetcher: OAuthRemoteDocumentFetcher(policy: OAuthRemoteFetchPolicy(), transport: transport),
         cache: store
     )
 )
 ```
 
 The issuer is the origin clients reach the server at. Every endpoint URL, the `iss` response parameter and every DPoP check is derived from it, never from request headers, so the server behaves the same behind a reverse proxy.
+
+Client metadata documents are fetched from URLs that clients choose, so the transport must connect only to the addresses the fetcher has checked are public. A transport that resolves the host name again itself can be steered to your internal network by a host whose DNS answers change between the check and the connection (DNS rebinding). ``OAuthRemoteDocumentFetcher`` therefore refuses a transport whose ``OAuthRemoteTransport/pinsConnectionsToApprovedPeers`` is false. `URLSession` cannot pin, so ``URLSessionOAuthRemoteTransport`` is usable only with ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport``, and only where outbound traffic is already confined to the public internet.
 
 ``InMemoryOAuthStore`` loses sessions on restart. For production, implement the store protocols behind ``OAuthServerStore`` on your database; each method documents the transaction it must be.
 

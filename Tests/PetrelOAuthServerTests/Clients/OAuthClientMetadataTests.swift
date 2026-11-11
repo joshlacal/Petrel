@@ -174,6 +174,13 @@ struct OAuthClientMetadataTests {
 
 /// A transport that serves canned responses and records what it was asked.
 final class StubTransport: OAuthRemoteTransport, @unchecked Sendable {
+    /// Test double: answers without a network, so it may claim to pin.
+    let pinsConnectionsToApprovedPeers: Bool
+
+    init(pins: Bool = true) {
+        pinsConnectionsToApprovedPeers = pins
+    }
+
     struct Canned {
         var status = 200
         var contentType: String? = "application/json"
@@ -291,7 +298,8 @@ struct OAuthClientMetadataLoaderTests {
     }
 
     @Test("responses that are not an exact 200 JSON document are refused", arguments: [
-        "201", "404", "redirect", "text/html", "no content type", "empty", "not json", "duplicate members",
+        "201", "404", "redirect", "text/html", "no content type", "empty content type", "only semicolons",
+        "blank before parameters", "empty", "not json", "duplicate members",
         "client_id mismatch", "no peer proof", "peer not in DNS answer",
     ])
     func refusedResponses(scenario: String) async throws {
@@ -302,6 +310,10 @@ struct OAuthClientMetadataLoaderTests {
         case "redirect": canned.redirectCount = 1
         case "text/html": canned.contentType = "text/html"
         case "no content type": canned.contentType = nil
+        // Each of these once trapped instead of being refused.
+        case "empty content type": canned.contentType = ""
+        case "only semicolons": canned.contentType = ";;"
+        case "blank before parameters": canned.contentType = " ; charset=utf-8"
         case "empty": canned.body = Data()
         case "not json": canned.body = Data("<html>".utf8)
         case "duplicate members": canned.body = Data(#"{"client_id":"a","client_id":"b"}"#.utf8)
@@ -352,6 +364,37 @@ struct OAuthClientMetadataLoaderTests {
             }
         }
         #expect(transport.requests.isEmpty)
+    }
+
+    @Test("a transport that does not pin its connection is refused unless the host accepts the risk")
+    func unpinnedTransport() async throws {
+        // DNS rebinding: a transport that resolves the host again itself can
+        // be sent to a private address after the fetcher approved public ones.
+        let transport = StubTransport(pins: false)
+        try transport.serve(Self.clientID, .init(body: document()))
+        let url = try #require(URL(string: Self.clientID))
+        let refusing = try OAuthClientMetadataLoader(
+            fetcher: OAuthRemoteDocumentFetcher(policy: OAuthRemoteFetchPolicy(), resolver: StubResolver(), transport: transport),
+            cache: InMemoryOAuthStore()
+        )
+        await #expect(throws: OAuthServerError.self) { _ = try await refusing.resolve(clientID: url) }
+        #expect(transport.requests.isEmpty)
+
+        let accepting = try OAuthClientMetadataLoader(
+            fetcher: OAuthRemoteDocumentFetcher(
+                policy: OAuthRemoteFetchPolicy(allowsUnpinnedTransport: true),
+                resolver: StubResolver(),
+                transport: transport
+            ),
+            cache: InMemoryOAuthStore()
+        )
+        _ = try await accepting.resolve(clientID: url)
+        #expect(transport.requests == [Self.clientID])
+    }
+
+    @Test("URLSessionOAuthRemoteTransport says it does not pin")
+    func urlSessionDoesNotPin() {
+        #expect(URLSessionOAuthRemoteTransport().pinsConnectionsToApprovedPeers == false)
     }
 
     @Test("loopback clients need no fetch and can be disabled")

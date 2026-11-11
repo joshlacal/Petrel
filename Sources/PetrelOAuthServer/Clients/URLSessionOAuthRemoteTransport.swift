@@ -3,7 +3,17 @@ import Foundation
     import FoundationNetworking
 #endif
 
-/// The default ``OAuthRemoteTransport``, built on `URLSession`.
+/// An ``OAuthRemoteTransport`` built on `URLSession`. It does not pin.
+///
+/// `URLSession` resolves the host name itself when it connects and cannot be
+/// pointed at an approved address while still verifying TLS for the host
+/// name, so `approvedPeers` cannot be honoured: a host that changes its DNS
+/// answers between the fetcher's check and the connection (DNS rebinding)
+/// can steer the request to a private address. The fetcher therefore refuses
+/// this transport unless the policy sets
+/// ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport``, which is reasonable
+/// only where outbound traffic is already confined to the public internet.
+/// For a pinning transport see ``OAuthRemoteTransport``.
 ///
 /// Each request runs on an ephemeral session with no cookies, credentials or
 /// cache. Redirects are never followed (the profile requires the metadata
@@ -15,6 +25,9 @@ import Foundation
 public struct URLSessionOAuthRemoteTransport: OAuthRemoteTransport {
     /// Creates the transport.
     public init() {}
+
+    /// Always false: see the type's discussion.
+    public var pinsConnectionsToApprovedPeers: Bool { false }
 
     public func get(
         url: URL,

@@ -113,6 +113,18 @@ public struct OAuthRemoteFetchPolicy: Sendable, Equatable {
     /// supply the proof (Apple platforms) and false elsewhere, where the
     /// before-and-after resolution check still applies.
     public let requiresConnectedPeerProof: Bool
+    /// Whether the fetcher may use a transport whose
+    /// ``OAuthRemoteTransport/pinsConnectionsToApprovedPeers`` is false.
+    ///
+    /// Such a transport resolves the host name again when it connects, so a
+    /// host whose DNS answers change between the fetcher's check and the
+    /// connection (DNS rebinding) can steer the request to a private address.
+    /// The before-and-after resolution check and, where the transport reports
+    /// it, the connected-peer check narrow that window but do not close it:
+    /// the request has been sent by the time either runs. Leave this false
+    /// unless outbound traffic is already confined to the public internet,
+    /// for example by an egress proxy or firewall that refuses private ranges.
+    public let allowsUnpinnedTransport: Bool
 
     /// The platform default for ``requiresConnectedPeerProof``.
     public static var defaultRequiresConnectedPeerProof: Bool {
@@ -129,7 +141,8 @@ public struct OAuthRemoteFetchPolicy: Sendable, Equatable {
         networkAllowlist: OAuthRemoteNetworkAllowlist = .init(),
         maximumBodyBytes: Int = 256 * 1024,
         timeout: TimeInterval = 5,
-        requiresConnectedPeerProof: Bool = OAuthRemoteFetchPolicy.defaultRequiresConnectedPeerProof
+        requiresConnectedPeerProof: Bool = OAuthRemoteFetchPolicy.defaultRequiresConnectedPeerProof,
+        allowsUnpinnedTransport: Bool = false
     ) throws {
         guard (1024 ... 1_048_576).contains(maximumBodyBytes), timeout > 0, timeout <= 30, timeout.isFinite else {
             throw OAuthServerError.malformed("OAuth remote fetch policy bounds are invalid")
@@ -139,6 +152,7 @@ public struct OAuthRemoteFetchPolicy: Sendable, Equatable {
         self.maximumBodyBytes = maximumBodyBytes
         self.timeout = timeout
         self.requiresConnectedPeerProof = requiresConnectedPeerProof
+        self.allowsUnpinnedTransport = allowsUnpinnedTransport
     }
 
     /// Checks the URL's scheme, credentials, fragment and any IP literal, and returns its host.
@@ -475,8 +489,19 @@ public struct OAuthRemoteHTTPResponse: Sendable {
     }
 }
 
-/// Performs the GET for a remote document. The default is ``URLSessionOAuthRemoteTransport``.
+/// Performs the GET for a remote document.
+///
+/// A transport used in production must connect only to a member of
+/// `approvedPeers` and say so through ``pinsConnectionsToApprovedPeers``;
+/// `PinnedNIOOAuthRemoteTransport` in the `PetrelOAuthServerHummingbird`
+/// library of Petrel's `Server` package is one. ``URLSessionOAuthRemoteTransport``
+/// cannot pin, and the fetcher refuses it unless the policy sets
+/// ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport``.
 public protocol OAuthRemoteTransport: Sendable {
+    /// True when every connection goes to a literal address from
+    /// `approvedPeers`, with no name resolution of its own. Defaults to false.
+    var pinsConnectionsToApprovedPeers: Bool { get }
+
     /// `approvedPeers` is the exact, policy-checked result of the DNS lookup
     /// immediately preceding this request. A production transport must select
     /// a literal member of this set before any HTTP bytes are sent.
@@ -486,6 +511,11 @@ public protocol OAuthRemoteTransport: Sendable {
         timeout: TimeInterval,
         maximumBodyBytes: Int
     ) async throws -> OAuthRemoteHTTPResponse
+}
+
+extension OAuthRemoteTransport {
+    /// A transport pins only if it says so.
+    public var pinsConnectionsToApprovedPeers: Bool { false }
 }
 
 /// Applies the complete local policy around a single GET. It intentionally has
@@ -498,10 +528,15 @@ public struct OAuthRemoteDocumentFetcher: Sendable {
     private let transport: any OAuthRemoteTransport
 
     /// Creates a fetcher.
+    ///
+    /// - Parameter transport: performs the GET. It must pin its connection to
+    ///   the approved addresses (``OAuthRemoteTransport/pinsConnectionsToApprovedPeers``)
+    ///   unless `policy` sets ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport``;
+    ///   otherwise every fetch fails before any network access.
     public init(
         policy: OAuthRemoteFetchPolicy,
         resolver: any OAuthHostnameResolving = SystemOAuthHostnameResolver(),
-        transport: any OAuthRemoteTransport = URLSessionOAuthRemoteTransport()
+        transport: any OAuthRemoteTransport
     ) {
         self.policy = policy
         self.resolver = resolver
@@ -533,6 +568,12 @@ public struct OAuthRemoteDocumentFetcher: Sendable {
     fileprivate func fetchValidatedResponse(from url: URL) async throws
         -> (body: Data, headers: [String: [String]])
     {
+        guard transport.pinsConnectionsToApprovedPeers || policy.allowsUnpinnedTransport else {
+            throw OAuthServerError.unavailable(
+                "OAuth remote transport does not pin connections to the approved addresses; "
+                    + "use a pinning transport or set OAuthRemoteFetchPolicy.allowsUnpinnedTransport"
+            )
+        }
         let host = try policy.validateURL(url)
         let preflightPeers = Set(try await resolveOAuthHostname(
             resolver, host: host, timeout: policy.timeout
@@ -623,7 +664,10 @@ public struct OAuthRemoteDocumentFetcher: Sendable {
     /// never the media-type string: the bytes are validated as JSON either
     /// way, and the caller's decoder decides what they may mean.
     private func isJSONContentType(_ value: String) -> Bool {
-        let mediaType = value.split(separator: ";", maxSplits: 1)[0].trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        // Keep empty pieces: an empty or ";"-only value must be refused, and
+        // splitting it with empty pieces omitted yields no first element.
+        let mediaType = (value.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false).first ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
         if mediaType == "application/json" { return true }
         guard mediaType.hasSuffix("+json"), mediaType.utf8.count <= 127,
               let slash = mediaType.firstIndex(of: "/"),

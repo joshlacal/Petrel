@@ -44,7 +44,10 @@ public struct ExampleServer: Sendable {
     }
     let resolver: any OAuthClientResolving = try clients.isEmpty
       ? OAuthClientMetadataLoader(
-        fetcher: OAuthRemoteDocumentFetcher(policy: OAuthRemoteFetchPolicy()),
+        fetcher: OAuthRemoteDocumentFetcher(
+          policy: OAuthRemoteFetchPolicy(),
+          transport: PinnedNIOOAuthRemoteTransport()
+        ),
         cache: store
       )
       : StaticOAuthClientResolver(clients)

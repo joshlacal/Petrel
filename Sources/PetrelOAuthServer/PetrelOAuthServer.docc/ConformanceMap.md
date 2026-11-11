@@ -20,7 +20,7 @@ Each row names a requirement, the type that implements it, and the test suite in
 | Requirement | Implemented in | Tested by |
 |---|---|---|
 | `client_id` is an https URL without a port | ``OAuthClientMetadata`` | `OAuthClientMetadataTests.clientIDRules` |
-| Metadata fetch: exact 200, JSON content type, no redirects, public addresses only, bounded size and time | ``OAuthRemoteDocumentFetcher``, ``URLSessionOAuthRemoteTransport`` | `OAuthClientMetadataLoaderTests` |
+| Metadata fetch: exact 200, JSON content type, no redirects, public addresses only, bounded size and time | ``OAuthRemoteDocumentFetcher``; connections pinned to the checked addresses (``OAuthRemoteTransport/pinsConnectionsToApprovedPeers``) | `OAuthClientMetadataLoaderTests`, `PinnedNIOOAuthRemoteTransportTests` |
 | Metadata caching with prompt re-fetch of confidential keys | ``OAuthClientMetadataLoader`` | `OAuthClientMetadataLoaderTests.fetchAndCache`, `OAuthTokenEndpointTests.keyRemovedFromJWKS` |
 | Field validation (`client_id` match, application type, grants, scope, response types, redirect URIs, DPoP binding, signing algorithm, `jwks` or `jwks_uri`, display URIs) | ``OAuthClientMetadata`` | `OAuthClientMetadataTests.invalidDocuments`, `.confidentialClients` |
 | Loopback development clients | ``OAuthClientMetadata`` | `OAuthClientMetadataTests.loopbackClients`, `OAuthEndToEndFlowTests.loopbackClientFlow` |
