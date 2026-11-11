@@ -159,6 +159,10 @@ public final class HardenedIdentityHTTPTransport: IdentityHTTPTransport {
 
         do {
             return try await IdentityDeadline.run(seconds: request.timeout, describing: "GET \(urlString)") {
+                // IdentityDeadline returns at the limit without waiting for this closure. Keep the
+                // transport alive until the request ends: its deinit invalidates the session, and
+                // creating a task on an invalidated session traps.
+                defer { withExtendedLifetime(self) {} }
                 if !permittedByFixture {
                     guard try await NetworkService.validateURL(url) else {
                         throw IdentityError.blockedByNetworkPolicy(url: urlString)
