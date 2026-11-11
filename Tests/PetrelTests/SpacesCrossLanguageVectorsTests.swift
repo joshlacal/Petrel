@@ -133,7 +133,20 @@ private func loadSpacesVectors() throws -> AtprotoSpacesVectorsV1 {
     let siblingVectors = petrelRoot
         .deletingLastPathComponent()
         .appendingPathComponent("catbird-atproto/atproto-spaces/tests/vectors/atproto_spaces_v1.json")
-    let data = try Data(contentsOf: siblingVectors)
+    // In the multi-repo workspace the sibling catbird-atproto checkout is the source of truth.
+    // A standalone Petrel checkout (GitHub CI, SwiftPM consumers) has no sibling, so it reads
+    // the copy vendored under Tests/PetrelTests/Vectors.
+    let url: URL
+    if FileManager.default.fileExists(atPath: siblingVectors.path) {
+        url = siblingVectors
+    } else if let vendored = Bundle.module.url(
+        forResource: "atproto_spaces_v1", withExtension: "json", subdirectory: "Vectors"
+    ) {
+        url = vendored
+    } else {
+        throw CocoaError(.fileNoSuchFile)
+    }
+    let data = try Data(contentsOf: url)
     return try JSONDecoder().decode(AtprotoSpacesVectorsV1.self, from: data)
 }
 
