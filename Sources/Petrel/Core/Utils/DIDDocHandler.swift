@@ -7,11 +7,32 @@
 
 import Foundation
 
+/// A DID document, reduced to the parts AT Protocol reads.
+///
+/// Decoding is tolerant of everything the W3C DID Core data model allows that AT Protocol has
+/// no use for, so one unusual entry does not make an otherwise usable document unreadable:
+///
+/// - `@context` may be a single string or an array; non-string members are skipped.
+/// - a `service` entry whose `serviceEndpoint` is a map or a set, rather than a URI string, is
+///   left out of ``service``. AT Protocol defines only URI endpoints.
+/// - a `verificationMethod` entry without `id`, `type` or `controller` is left out of
+///   ``verificationMethod``. An entry that has those but no `publicKeyMultibase` (for example
+///   one that uses `publicKeyJwk`) is kept with an empty ``VerificationMethod/publicKeyMultibase``
+///   and never yields a key.
+///
+/// `id` is required. Use the AT Protocol accessors (``claimedHandle``, ``pdsEndpoint``,
+/// ``atprotoSigningKey()``, ``serviceEndpoint(_:)``) rather than reading the arrays directly;
+/// they apply the first-match, controller and endpoint rules of the DID specification.
 public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
+    /// The JSON-LD contexts, in document order.
     public let context: [String]
+    /// The DID the document describes.
     public let id: String
+    /// Alternative identifiers. A handle appears as `at://<handle>`.
     public let alsoKnownAs: [String]
+    /// The verification methods with a readable `id`, `type` and `controller`.
     public let verificationMethod: [VerificationMethod]
+    /// The services with a string `serviceEndpoint`.
     public let service: [Service]
 
     public init(
@@ -29,11 +50,39 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
     }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        self.context = try container.decodeIfPresent([String].self, forKey: .context) ?? []
+        if let single = try? container.decode(String.self, forKey: .context) {
+            self.context = [single]
+        } else {
+            self.context = Self.decodeTolerantly(String.self, from: container, forKey: .context)
+        }
         self.id = try container.decode(String.self, forKey: .id)
-        self.alsoKnownAs = try container.decodeIfPresent([String].self, forKey: .alsoKnownAs) ?? []
-        self.verificationMethod = try container.decodeIfPresent([VerificationMethod].self, forKey: .verificationMethod) ?? []
-        self.service = try container.decodeIfPresent([Service].self, forKey: .service) ?? []
+        self.alsoKnownAs = Self.decodeTolerantly(String.self, from: container, forKey: .alsoKnownAs)
+        self.verificationMethod = Self.decodeTolerantly(
+            VerificationMethod.self, from: container, forKey: .verificationMethod
+        )
+        self.service = Self.decodeTolerantly(Service.self, from: container, forKey: .service)
+    }
+
+    /// One array element that decodes to `nil` instead of failing the whole array.
+    private struct Tolerant<Element: Decodable>: Decodable {
+        let element: Element?
+
+        init(from decoder: Decoder) throws {
+            element = try? Element(from: decoder)
+        }
+    }
+
+    /// The elements of the array at `key` that decode as `Element`, in order. A missing key, a
+    /// value that is not an array, and elements of another shape all contribute nothing.
+    private static func decodeTolerantly<Element: Decodable>(
+        _: Element.Type,
+        from container: KeyedDecodingContainer<CodingKeys>,
+        forKey key: CodingKeys
+    ) -> [Element] {
+        guard let elements = try? container.decode([Tolerant<Element>].self, forKey: key) else {
+            return []
+        }
+        return elements.compactMap(\.element)
     }
 
     enum CodingKeys: String, CodingKey {
@@ -75,9 +124,13 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
     }
 }
 
+/// A `service` entry of a DID document whose endpoint is a URI string.
 public struct Service: ATProtocolCodable, ATProtocolValue {
+    /// The entry's id: a fragment (`#atproto_pds`) or a full DID URL (`did:plc:…#atproto_pds`).
     public let id: String
+    /// The service type, such as `AtprotoPersonalDataServer`.
     public let type: String
+    /// The endpoint, unvalidated. ``DIDDocument/serviceEndpoint(_:)`` returns it as a checked URL.
     public let serviceEndpoint: String
 
     public init(id: String, type: String, serviceEndpoint: String) {
@@ -111,10 +164,16 @@ public struct Service: ATProtocolCodable, ATProtocolValue {
     }
 }
 
+/// A `verificationMethod` entry of a DID document.
 public struct VerificationMethod: ATProtocolCodable, ATProtocolValue {
+    /// The entry's id: a fragment (`#atproto`) or a full DID URL (`did:plc:…#atproto`).
     public let id: String
+    /// `Multikey`, or one of the legacy types `EcdsaSecp256r1VerificationKey2019` and
+    /// `EcdsaSecp256k1VerificationKey2019`.
     public let type: String
+    /// The DID that controls the key. AT Protocol requires it to be the document's own DID.
     public let controller: String
+    /// The multibase-encoded public key, or an empty string when the entry has none.
     public let publicKeyMultibase: String
 
     public init(id: String, type: String, controller: String, publicKeyMultibase: String) {
