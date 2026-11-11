@@ -618,6 +618,12 @@ extension OAuthCore {
     ) async throws -> (Data, HTTPURLResponse) {
         guard response.statusCode == 401 else { return (data, response) }
 
+        // A takedown, suspension or deactivation is not an expired token:
+        // refreshing cannot fix it, and the caller needs to know which it is.
+        if let statusError = AccountStatusError(xrpcErrorBody: data) {
+            throw statusError
+        }
+
         switch try await refreshTokenIfNeeded(forceRefresh: true) {
         case .refreshedSuccessfully:
             let (newRequest, _) = try await prepareAuthenticatedRequestWithContext(request)

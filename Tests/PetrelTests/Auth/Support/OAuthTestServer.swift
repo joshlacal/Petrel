@@ -256,6 +256,8 @@ final class FakeOAuthServer: OAuthTestBackend, @unchecked Sendable {
     /// the reference PDS does) or signals it only through `WWW-Authenticate`
     /// (all RFC 9449 §9 requires).
     var resourceNonceErrorInBody = true
+    /// The hosting status `com.atproto.server.getSession` reports.
+    var sessionStatus: (active: Bool?, status: String?) = (true, nil)
     /// Forces these endpoints to fail with the given status and OAuth error code.
     var forcedErrors: [Endpoint: (status: Int, error: String)] = [:]
 
@@ -722,7 +724,10 @@ final class FakeOAuthServer: OAuthTestBackend, @unchecked Sendable {
         if let forced = forcedErrors[.resource] {
             return (forced.status, headers, ["error": forced.error, "message": forced.error])
         }
-        return (200, headers, ["did": grant.sub, "handle": "user.test", "active": true])
+        var session: [String: Any] = ["did": grant.sub, "handle": "user.test"]
+        session["active"] = sessionStatus.active
+        session["status"] = sessionStatus.status
+        return (200, headers, session)
     }
 
     // MARK: Helpers
@@ -848,3 +853,9 @@ struct OAuthTestClient {
         return (data, try #require(response as? HTTPURLResponse))
     }
 }
+
+// Older toolchains require the explicit conformance for strict-concurrency;
+// newer SDKs mark URLProtocol's inherited Sendable unavailable and warn on it.
+#if compiler(<6.2)
+    extension OAuthTestURLProtocol: @unchecked Sendable {}
+#endif

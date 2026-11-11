@@ -10,11 +10,14 @@ import Foundation
     import FoundationNetworking
 #endif
 
-/// Authentication strategy for legacy username/password authentication (App Passwords).
-/// Handles:
-/// - DID resolution and session creation via `com.atproto.server.createSession`
-/// - Bearer token session management
-/// - Token refresh via `com.atproto.server.refreshSession`
+/// Authentication strategy for app-password sessions (`com.atproto.server.*Session`).
+///
+/// - Signs in with a handle, a DID or an email address, optionally with an
+///   email auth-factor token, against the account's own PDS.
+/// - Uses Bearer tokens; refreshes with `refreshSession` and ends the session
+///   with `deleteSession` on logout.
+/// - Reports takedown, suspension and deactivation as ``AccountStatusError``
+///   and keeps the hosting status the server returned.
 actor LegacyPasswordStrategy: AuthStrategy {
     // MARK: - Properties
 
@@ -35,6 +38,13 @@ actor LegacyPasswordStrategy: AuthStrategy {
     private let minimumRefreshIntervalAfterSuccess: TimeInterval = 30.0
     private var usedRefreshTokens: Set<String> = []
     private var activeRefreshTasks: [String: Task<TokenRefreshResult, Error>] = [:]
+    /// The hosting status each account's server last reported, by DID.
+    private var accountStatuses: [String: AccountStatus] = [:]
+
+    /// The hosting status `did`'s server reported at sign-in or the last refresh.
+    func lastKnownAccountStatus(for did: String) -> AccountStatus? {
+        accountStatuses[did]
+    }
 
     // MARK: - Initialization
 
@@ -78,157 +88,208 @@ actor LegacyPasswordStrategy: AuthStrategy {
         bskyAppViewDID: String?,
         bskyChatDID: String?
     ) async throws -> (did: String, handle: String?, pdsURL: URL) {
-        LogManager.logInfo(
-            "Starting legacy password authentication for identifier: \(identifier)",
-            category: .authentication
+        try await loginWithPassword(
+            identifier: identifier,
+            password: password,
+            authFactorToken: nil,
+            bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID
         )
+    }
 
-        // Resolve handle to DID and PDS URL
+    /// Signs in with an app password (or account password).
+    ///
+    /// - Parameters:
+    ///   - identifier: A handle, a DID, or the account's email address. A handle
+    ///     or DID is resolved to its PDS and the session is created there; an
+    ///     email address cannot be resolved, so the session is created at the
+    ///     service this client was configured with.
+    ///   - password: The app password.
+    ///   - authFactorToken: The emailed sign-in code, when the server asked for
+    ///     one by failing a first attempt with ``AuthFactorTokenRequiredError``.
+    func loginWithPassword(
+        identifier: String,
+        password: String,
+        authFactorToken: String?,
+        bskyAppViewDID: String?,
+        bskyChatDID: String?
+    ) async throws -> (did: String, handle: String?, pdsURL: URL) {
         await emitProgress(.resolvingHandle(identifier))
 
-        LogManager.logError("[E2E-TRACE] Resolving handle to DID: \(identifier)", category: .authentication)
-        let did: String
-        do {
-            did = try await didResolver.resolveHandleToDID(handle: identifier)
-            LogManager.logError("[E2E-TRACE] DID resolved: \(did)", category: .authentication)
-        } catch {
-            LogManager.logError("[E2E-TRACE] DID resolution FAILED: \(error)", category: .authentication)
-            throw error
+        // Work out which server to ask, and which account it must answer for.
+        let expectedDID: String?
+        let loginServer: URL
+        if identifier.hasPrefix("did:") {
+            expectedDID = identifier
+            loginServer = try await didResolver.resolveDIDToPDSURL(did: identifier)
+        } else if identifier.contains("@") {
+            expectedDID = nil
+            loginServer = await networkService.baseURL
+        } else {
+            let did = try await didResolver.resolveHandleToDID(handle: identifier)
+            expectedDID = did
+            loginServer = try await didResolver.resolveDIDToPDSURL(did: did)
         }
 
-        let pdsURL: URL
-        do {
-            pdsURL = try await didResolver.resolveDIDToPDSURL(did: did)
-            LogManager.logError("[E2E-TRACE] PDS URL resolved: \(pdsURL.absoluteString)", category: .authentication)
-        } catch {
-            LogManager.logError("[E2E-TRACE] PDS URL resolution FAILED: \(error)", category: .authentication)
-            throw error
-        }
-
-        LogManager.logInfo(
-            "Resolved identifier to DID: \(LogManager.logDID(did)), PDS: \(pdsURL.absoluteString)",
-            category: .authentication
-        )
-
-        // Create session using com.atproto.server.createSession
         await emitProgress(.creatingSession)
 
-        let sessionInput = ComAtprotoServerCreateSession.Input(
-            identifier: identifier,
-            password: password
+        var request = URLRequest(url: loginServer.appendingPathComponent("xrpc/com.atproto.server.createSession"))
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.httpBody = try JSONCoders.encode(
+            ComAtprotoServerCreateSession.Input(
+                identifier: identifier, password: password, authFactorToken: authFactorToken
+            )
         )
 
-        // Make direct unauthenticated exact-origin HTTP call to createSession without mutating baseURL
-        LogManager.logError("[E2E-TRACE] Calling createSession DIRECTLY on PDS: \(pdsURL.absoluteString)", category: .authentication)
-        let (responseCode, sessionOutput): (Int, ComAtprotoServerCreateSession.Output?)
-        do {
-            let createSessionURL = pdsURL.appendingPathComponent("xrpc/com.atproto.server.createSession")
-            var request = URLRequest(url: createSessionURL)
-            request.httpMethod = "POST"
-            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            request.httpBody = try JSONCoders.encode(sessionInput)
-
-            let (data, response) = try await networkService.executeUnauthenticatedRequest(request)
-            guard let httpResponse = response as? HTTPURLResponse else {
-                throw AuthError.invalidResponse
-            }
-            responseCode = httpResponse.statusCode
-
-            if responseCode == 200 {
-                sessionOutput = try JSONCoders.decode(ComAtprotoServerCreateSession.Output.self, from: data)
-            } else {
-                // Log error response body for debugging
-                if let errorBody = String(data: data, encoding: .utf8) {
-                    LogManager.logError("[E2E-TRACE] createSession error response: \(errorBody)", category: .authentication)
-                }
-                sessionOutput = nil
-            }
-            LogManager.logError("[E2E-TRACE] createSession returned code: \(responseCode)", category: .authentication)
-        } catch {
-            LogManager.logError("[E2E-TRACE] createSession THREW: \(error)", category: .authentication)
-            throw error
+        // Sent with no credentials of any signed-in account, and never redirected.
+        let (data, response) = try await networkService.executeUnauthenticatedRequest(request)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw AuthError.invalidResponse
         }
-        guard responseCode == 200, let output = sessionOutput else {
-            LogManager.logError("Failed to create session: HTTP \(responseCode)", category: .authentication)
-            throw AuthError.invalidCredentials
+        guard httpResponse.statusCode == 200 else {
+            LogManager.logError(
+                "createSession failed with HTTP \(httpResponse.statusCode)", category: .authentication
+            )
+            throw Self.sessionError(status: httpResponse.statusCode, body: data)
+        }
+        let output = try JSONCoders.decode(ComAtprotoServerCreateSession.Output.self, from: data)
+        let did = output.did.description
+
+        // The server must have signed in the account that was asked for.
+        if let expectedDID, did != expectedDID {
+            LogManager.logError(
+                "createSession returned a session for a different account than the one requested; discarding it",
+                category: .authentication
+            )
+            await deleteServerSession(refreshToken: output.refreshJwt, pdsURL: loginServer)
+            throw AuthError.invalidResponse
         }
 
-        LogManager.logInfo(
-            "Successfully created legacy session for DID: \(LogManager.logDID(output.did.description))",
-            category: .authentication
-        )
+        // An email sign-in went to the configured service, which may be an
+        // entryway: the account's own PDS comes from its DID document.
+        let pdsURL = expectedDID == nil
+            ? try await didResolver.resolveDIDToPDSURL(did: did)
+            : loginServer
 
-        // Create session object with legacy tokens (JWT-based, not DPoP)
-        // Parse actual expiration from the JWT token
-        let actualExpiresIn = parseJWTExpiration(output.accessJwt) ?? 3600 // Fallback to 1 hour
-        LogManager.logError("[E2E-TRACE] JWT parsed expiresIn: \(actualExpiresIn) seconds", category: .authentication)
+        let status = AccountStatus(active: output.active, status: output.status)
+        accountStatuses[did] = status
 
         let newSession = Session(
             accessToken: output.accessJwt,
             refreshToken: output.refreshJwt,
             createdAt: Date(),
-            expiresIn: actualExpiresIn,
-            tokenType: .bearer, // Legacy auth uses Bearer tokens, not DPoP
-            did: output.did.description
+            expiresIn: Self.jwtLifetime(output.accessJwt),
+            tokenType: .bearer, // app-password sessions use Bearer tokens, not DPoP
+            did: did
         )
 
-        // Create or update account
-        var account = await accountManager.getAccount(did: output.did.description)
-        let isNewAccount = account == nil
-
-        if isNewAccount {
-            account = Account(
-                did: output.did.description,
-                handle: output.handle.description,
-                pdsURL: pdsURL,
-                protectedResourceMetadata: nil,
-                authorizationServerMetadata: nil,
-                bskyAppViewDID: bskyAppViewDID ?? "did:web:api.bsky.app#bsky_appview",
-                bskyChatDID: bskyChatDID ?? "did:web:api.bsky.chat#bsky_chat"
-            )
-        } else {
-            account?.handle = output.handle.description
-            account?.pdsURL = pdsURL
-            if let appViewDID = bskyAppViewDID {
-                account?.bskyAppViewDID = appViewDID
-            }
-            if let chatDID = bskyChatDID {
-                account?.bskyChatDID = chatDID
-            }
+        var account = await accountManager.getAccount(did: did) ?? Account(
+            did: did,
+            handle: output.handle.description,
+            pdsURL: pdsURL,
+            protectedResourceMetadata: nil,
+            authorizationServerMetadata: nil,
+            bskyAppViewDID: bskyAppViewDID ?? "did:web:api.bsky.app#bsky_appview",
+            bskyChatDID: bskyChatDID ?? "did:web:api.bsky.chat#bsky_chat"
+        )
+        account.handle = output.handle.description
+        account.pdsURL = pdsURL
+        // An app-password session has no authorization server.
+        account.authorizationServerMetadata = nil
+        if let bskyAppViewDID {
+            account.bskyAppViewDID = bskyAppViewDID
+        }
+        if let bskyChatDID {
+            account.bskyChatDID = bskyChatDID
         }
 
-        guard let finalAccount = account else {
-            LogManager.logError("Failed to create account for legacy auth")
-            throw AuthError.invalidResponse
-        }
+        try await storage.saveAccountAndSession(account, session: newSession, for: did)
+        try await accountManager.updateAccountFromStorage(did: did)
+        try await accountManager.setCurrentAccount(did: did)
+        await networkService.setBaseURL(account.pdsURL)
 
-        // Save session and account
-        try await storage.saveAccountAndSession(finalAccount, session: newSession, for: output.did.description)
-
-        // Update account manager
-        try await accountManager.updateAccountFromStorage(did: output.did.description)
-        try await accountManager.setCurrentAccount(did: output.did.description)
-
-        // Update network service
-        await networkService.setBaseURL(finalAccount.pdsURL)
-
-        // Reset circuit breaker for this DID since we have a fresh valid session
-        await refreshCircuitBreaker.reset(for: output.did.description)
+        // A fresh valid session supersedes any earlier refresh failures.
+        await refreshCircuitBreaker.reset(for: did)
 
         LogManager.logInfo(
-            "Legacy authentication completed successfully for DID: \(LogManager.logDID(output.did.description))",
+            "App-password sign-in completed for DID: \(LogManager.logDID(did)) (\(status))",
             category: .authentication
         )
+        return (did: did, handle: account.handle, pdsURL: account.pdsURL)
+    }
 
-        return (did: output.did.description, handle: finalAccount.handle, pdsURL: finalAccount.pdsURL)
+    /// Maps a failed `createSession` / `refreshSession` response to a typed error.
+    static func sessionError(status: Int, body: Data) -> Error {
+        let xrpcError = try? JSONDecoder().decode(XRPCErrorBody.self, from: body)
+        if let xrpcError {
+            if let statusError = AccountStatusError(xrpcErrorName: xrpcError.error, message: xrpcError.message) {
+                return statusError
+            }
+            if xrpcError.error == "AuthFactorTokenRequired" {
+                return AuthFactorTokenRequiredError()
+            }
+        }
+        switch status {
+        case 401:
+            return AuthError.invalidCredentials
+        case 429:
+            return AuthError.rateLimited
+        default:
+            return AuthError.serverError(
+                status, xrpcError.map { [$0.error, $0.message].compactMap { $0 }.joined(separator: ": ") }
+            )
+        }
     }
 
     func logout() async throws {
         guard let did = await accountManager.getCurrentAccount()?.did else { return }
 
+        await revokeSession(for: did)
+
         try await storage.deleteSession(for: did)
+        accountStatuses.removeValue(forKey: did)
         await accountManager.clearCurrentAccount()
+    }
+
+    /// Ends `did`'s session at its PDS (`com.atproto.server.deleteSession`),
+    /// leaving local state untouched.
+    /// - Returns: `true` only when the server confirmed.
+    @discardableResult
+    func revokeSession(for did: String) async -> Bool {
+        guard let session = try? await storage.getSession(for: did),
+              session.tokenType == .bearer,
+              let refreshToken = session.refreshToken,
+              let account = await accountManager.getAccount(did: did)
+        else {
+            return false
+        }
+        return await deleteServerSession(refreshToken: refreshToken, pdsURL: account.pdsURL)
+    }
+
+    @discardableResult
+    private func deleteServerSession(refreshToken: String, pdsURL: URL) async -> Bool {
+        var request = URLRequest(url: pdsURL.appendingPathComponent("xrpc/com.atproto.server.deleteSession"))
+        request.httpMethod = "POST"
+        // deleteSession is authorized by the refresh token, not the access token.
+        request.setValue("Bearer \(refreshToken)", forHTTPHeaderField: "Authorization")
+        do {
+            let (_, response) = try await networkService.executeAuthProtocolRequest(request)
+            guard response.statusCode == 200 else {
+                LogManager.logError(
+                    "deleteSession was refused with HTTP \(response.statusCode); the session may remain valid",
+                    category: .authentication
+                )
+                return false
+            }
+            return true
+        } catch {
+            LogManager.logError(
+                "deleteSession failed (\(error)); the session may remain valid", category: .authentication
+            )
+            return false
+        }
     }
 
     func cancelOAuthFlow() async {
@@ -358,7 +419,16 @@ actor LegacyPasswordStrategy: AuthStrategy {
         activeRefreshTasks[did] = task
         defer { activeRefreshTasks.removeValue(forKey: did) }
 
-        return try await task.value
+        do {
+            return try await task.value
+        } catch {
+            // Only a definitive rejection spends the token; after a transport or
+            // server failure the same refresh token is still the valid one.
+            if (error as? AuthError) != .invalidCredentials, !(error is AccountStatusError) {
+                usedRefreshTokens.remove(refreshToken)
+            }
+            throw error
+        }
     }
 
     func handleUnauthorizedResponse(
@@ -367,6 +437,14 @@ actor LegacyPasswordStrategy: AuthStrategy {
         for request: URLRequest
     ) async throws -> (Data, HTTPURLResponse) {
         guard response.statusCode == 401 else { return (data, response) }
+
+        // A takedown, suspension or deactivation is not an expired token.
+        if let statusError = AccountStatusError(xrpcErrorBody: data) {
+            if let did = await accountManager.getCurrentAccount()?.did {
+                accountStatuses[did] = statusError.status
+            }
+            throw statusError
+        }
 
         let result = try await refreshTokenIfNeeded(forceRefresh: true)
 
@@ -388,158 +466,121 @@ actor LegacyPasswordStrategy: AuthStrategy {
     // MARK: - Private Helpers
 
     private func performLegacyTokenRefresh(for did: String) async throws -> TokenRefreshResult {
-        LogManager.logInfo("🔄 performLegacyTokenRefresh: Starting legacy refresh for DID: \(LogManager.logDID(did))")
-
-        // Get the session and account
         guard let session = try? await storage.getSession(for: did),
-              let refreshToken = session.refreshToken
+              let refreshToken = session.refreshToken,
+              let account = await accountManager.getAccount(did: did)
         else {
             LogManager.logError(
-                "performLegacyTokenRefresh: No session or refresh token found for DID: \(LogManager.logDID(did))"
+                "No session, refresh token or account for DID: \(LogManager.logDID(did)); cannot refresh"
             )
             throw AuthError.tokenRefreshFailed
         }
 
-        guard let account = await accountManager.getAccount(did: did) else {
-            LogManager.logError(
-                "performLegacyTokenRefresh: Could not retrieve account for DID: \(LogManager.logDID(did))"
-            )
-            throw AuthError.tokenRefreshFailed
-        }
-
-        LogManager.logDebug("performLegacyTokenRefresh: Using PDS: \(account.pdsURL.absoluteString)")
-
-        // Temporarily update network service to point to the user's PDS
-        let originalBaseURL = await networkService.baseURL
-        await networkService.setBaseURL(account.pdsURL)
-
-        // Create a URLRequest for the refresh endpoint
-        let endpoint = "\(account.pdsURL.absoluteString)/xrpc/com.atproto.server.refreshSession"
-        guard let url = URL(string: endpoint) else {
-            await networkService.setBaseURL(originalBaseURL)
-            LogManager.logError("performLegacyTokenRefresh: Invalid endpoint URL: \(endpoint)")
-            throw AuthError.invalidOAuthConfiguration
-        }
-
-        var request = URLRequest(url: url)
+        var request = URLRequest(
+            url: account.pdsURL.appendingPathComponent("xrpc/com.atproto.server.refreshSession")
+        )
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Accept")
+        // refreshSession is authorized by the refresh token. It is sent as built,
+        // straight to the account's PDS: the shared base URL is left alone and the
+        // access token is never substituted for it.
         request.setValue("Bearer \(refreshToken)", forHTTPHeaderField: "Authorization")
 
+        lastRefreshAttempt[did] = Date()
+        let data: Data
+        let response: HTTPURLResponse
         do {
-            LogManager.logDebug("performLegacyTokenRefresh: Sending refresh request to \(endpoint)")
-            let (data, response) = try await networkService.request(request, skipTokenRefresh: true)
+            (data, response) = try await networkService.executeAuthProtocolRequest(request)
+        } catch {
+            await refreshCircuitBreaker.recordFailure(for: did, kind: .network)
+            throw (error as? NetworkError).map(AuthError.networkError) ?? error
+        }
 
-            // Restore original base URL
-            await networkService.setBaseURL(originalBaseURL)
-
-            guard let httpResponse = response as? HTTPURLResponse else {
-                LogManager.logError("performLegacyTokenRefresh: Response was not HTTPURLResponse")
-                throw AuthError.invalidResponse
-            }
-
-            // Log response status for debugging
-            if (200 ..< 300).contains(httpResponse.statusCode) {
-                LogManager.logInfo("✅ performLegacyTokenRefresh: Success (HTTP \(httpResponse.statusCode))")
-
-                // Parse the refresh response
-                let refreshResponse = try JSONCoders.decode(LegacyRefreshSessionResponse.self, from: data)
-
-                // Parse actual expiration from the refreshed JWT
-                let actualExpiresIn = parseJWTExpiration(refreshResponse.accessJwt) ?? 3600
-                LogManager.logError("[E2E-TRACE] Refreshed JWT expiresIn: \(actualExpiresIn) seconds", category: .authentication)
-
-                // Create new session with updated tokens
-                let newSession = Session(
-                    accessToken: refreshResponse.accessJwt,
-                    refreshToken: refreshResponse.refreshJwt,
-                    createdAt: Date(),
-                    expiresIn: actualExpiresIn,
-                    tokenType: .bearer,
-                    did: did
-                )
-
-                // Update account handle if changed
-                var updatedAccount = account
-                updatedAccount.handle = refreshResponse.handle
-
-                // Save updated session
-                try await storage.saveAccountAndSession(updatedAccount, session: newSession, for: did)
-                try await accountManager.updateAccountFromStorage(did: did)
-
-                // Record success
-                lastSuccessfulRefresh[did] = Date()
-                lastRefreshAttempt[did] = Date()
-                await refreshCircuitBreaker.recordSuccess(for: did)
-
-                return .refreshedSuccessfully
-            } else {
-                let responsePreview = String(data: data.prefix(500), encoding: .utf8) ?? "<non-utf8>"
-                LogManager.logError(
-                    "❌ performLegacyTokenRefresh: Failed (HTTP \(httpResponse.statusCode)). Response: \(responsePreview)"
-                )
-
-                // Record failure
-                lastRefreshAttempt[did] = Date()
-                await refreshCircuitBreaker.recordFailure(for: did, kind: .invalidGrant)
-
+        guard (200 ..< 300).contains(response.statusCode) else {
+            LogManager.logError("refreshSession failed with HTTP \(response.statusCode)", category: .authentication)
+            if (500 ..< 600).contains(response.statusCode) {
+                await refreshCircuitBreaker.recordFailure(for: did, kind: .server)
                 throw AuthError.tokenRefreshFailed
             }
-        } catch {
-            // Restore original base URL on error
-            await networkService.setBaseURL(originalBaseURL)
-            LogManager.logError("performLegacyTokenRefresh: Network error: \(error.localizedDescription)")
-
-            // Record failure
-            lastRefreshAttempt[did] = Date()
-            await refreshCircuitBreaker.recordFailure(for: did, kind: .network)
-
-            throw error
+            await refreshCircuitBreaker.recordFailure(for: did, kind: .invalidGrant)
+            let error = Self.sessionError(status: response.statusCode, body: data)
+            if let statusError = error as? AccountStatusError {
+                accountStatuses[did] = statusError.status
+                throw statusError
+            }
+            // Any other 4xx means the refresh token is no longer good.
+            throw AuthError.invalidCredentials
         }
+
+        let refreshed = try JSONCoders.decode(LegacyRefreshSessionResponse.self, from: data)
+        guard refreshed.did == did else {
+            LogManager.logError(
+                "refreshSession returned a session for a different account; discarding it", category: .authentication
+            )
+            await refreshCircuitBreaker.recordFailure(for: did, kind: .invalidGrant)
+            throw AuthError.invalidCredentials
+        }
+        accountStatuses[did] = AccountStatus(active: refreshed.active, status: refreshed.status)
+
+        let newSession = Session(
+            accessToken: refreshed.accessJwt,
+            refreshToken: refreshed.refreshJwt,
+            createdAt: Date(),
+            expiresIn: Self.jwtLifetime(refreshed.accessJwt),
+            tokenType: .bearer,
+            did: did
+        )
+        var updatedAccount = account
+        updatedAccount.handle = refreshed.handle
+
+        try await storage.saveAccountAndSession(updatedAccount, session: newSession, for: did)
+        try await accountManager.updateAccountFromStorage(did: did)
+
+        lastSuccessfulRefresh[did] = Date()
+        await refreshCircuitBreaker.recordSuccess(for: did)
+        return .refreshedSuccessfully
     }
 
     private func emitProgress(_ event: AuthProgressEvent) async {
         await progressDelegate?.authenticationProgress(event)
     }
 
-    /// Parse expiration time from a JWT access token
-    /// Returns the number of seconds until expiration, or nil if parsing fails
-    private func parseJWTExpiration(_ jwt: String) -> TimeInterval? {
+    /// Lifetime assumed for an access JWT whose `exp`/`iat` cannot be read. The
+    /// PDS issues two-hour app-password access tokens; assuming less only costs
+    /// an earlier refresh.
+    static let assumedAccessTokenLifetime: TimeInterval = 3600
+
+    /// The lifetime (`exp` − `iat`) of an app-password access JWT.
+    static func jwtLifetime(_ jwt: String) -> TimeInterval {
         let parts = jwt.split(separator: ".")
-        guard parts.count >= 2 else { return nil }
+        guard parts.count >= 2 else { return assumedAccessTokenLifetime }
 
         var base64 = String(parts[1])
-        // Add padding if needed
+            .replacingOccurrences(of: "-", with: "+")
+            .replacingOccurrences(of: "_", with: "/")
         while base64.count % 4 != 0 {
             base64.append("=")
         }
-        // Replace URL-safe characters
-        base64 = base64.replacingOccurrences(of: "-", with: "+")
-        base64 = base64.replacingOccurrences(of: "_", with: "/")
-
-        guard let data = Data(base64Encoded: base64) else { return nil }
-
-        do {
-            if let json = try JSONSerialization.jsonObject(with: data) as? [String: Any],
-               let exp = json["exp"] as? TimeInterval,
-               let iat = json["iat"] as? TimeInterval
-            {
-                let expiresIn = exp - iat
-                return expiresIn > 0 ? expiresIn : nil
-            }
-        } catch {
-            LogManager.logError("[E2E-TRACE] Failed to parse JWT: \(error)", category: .authentication)
+        guard let data = Data(base64Encoded: base64),
+              let claims = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let exp = claims["exp"] as? TimeInterval,
+              let iat = claims["iat"] as? TimeInterval,
+              exp > iat
+        else {
+            return assumedAccessTokenLifetime
         }
-        return nil
+        return exp - iat
     }
 }
 
 // MARK: - Response Models
 
-/// Response model for legacy `com.atproto.server.refreshSession`
+/// Response model for `com.atproto.server.refreshSession`.
 private struct LegacyRefreshSessionResponse: Codable {
     let accessJwt: String
     let refreshJwt: String
     let handle: String
     let did: String
+    let active: Bool?
+    let status: String?
 }

@@ -75,6 +75,10 @@ public enum OAuthConfigurationError: Error, LocalizedError, Equatable, Sendable 
     case invalidClientID(String)
     /// The redirect URI is not one the profile allows for this client ID.
     case invalidRedirectURI(String)
+    /// The client's authentication mode does not offer the operation — for
+    /// example an OAuth flow on an app-password client, or any sign-in on a
+    /// client created without authentication.
+    case unsupportedByAuthMode
 
     public var errorDescription: String? {
         switch self {
@@ -84,6 +88,8 @@ public enum OAuthConfigurationError: Error, LocalizedError, Equatable, Sendable 
             return "'\(clientID)' is not a valid atproto OAuth client ID: it must be an https URL without a port, or http://localhost for development."
         case let .invalidRedirectURI(redirectURI):
             return "'\(redirectURI)' is not a valid redirect URI for this client ID."
+        case .unsupportedByAuthMode:
+            return "This client's authentication mode does not support the operation."
         }
     }
 }

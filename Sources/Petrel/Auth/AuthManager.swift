@@ -228,7 +228,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         bskyChatDID: String? = nil
     ) async throws -> (url: URL, state: String) {
         guard let strategy = activeStrategy as? any OAuthCoreBackedStrategy else {
-            throw AuthError.invalidOAuthConfiguration
+            throw OAuthConfigurationError.unsupportedByAuthMode
         }
         return try await strategy.startOAuthFlow(
             target: target,
@@ -244,15 +244,55 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     ///   for sessions that are not direct OAuth sessions.
     @discardableResult
     func revokeSession(for did: String) async -> Bool {
-        guard let strategy = activeStrategy as? any OAuthCoreBackedStrategy else { return false }
-        return await strategy.revokeSession(for: did)
+        if let strategy = activeStrategy as? any OAuthCoreBackedStrategy {
+            return await strategy.revokeSession(for: did)
+        }
+        if let strategy = activeStrategy as? LegacyPasswordStrategy {
+            return await strategy.revokeSession(for: did)
+        }
+        return false
+    }
+
+    /// Signs in with an app password and an optional emailed auth-factor token.
+    /// Only the app-password strategy supports this.
+    func loginWithPassword(
+        identifier: String,
+        password: String,
+        authFactorToken: String?,
+        bskyAppViewDID: String?,
+        bskyChatDID: String?
+    ) async throws -> (did: String, handle: String?, pdsURL: URL) {
+        guard let strategy = activeStrategy as? LegacyPasswordStrategy else {
+            throw OAuthConfigurationError.unsupportedByAuthMode
+        }
+        return try await strategy.loginWithPassword(
+            identifier: identifier,
+            password: password,
+            authFactorToken: authFactorToken,
+            bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID
+        )
+    }
+
+    /// The hosting status the account's server reported when its app-password
+    /// session was created or last refreshed, if this strategy tracks one.
+    func lastKnownAccountStatus(for did: String) async -> AccountStatus? {
+        guard let strategy = activeStrategy as? LegacyPasswordStrategy else { return nil }
+        return await strategy.lastKnownAccountStatus(for: did)
+    }
+
+    /// Whether the active strategy runs the OAuth flow against the authorization
+    /// server itself (public, confidential or CAB), as opposed to app-password
+    /// or gateway sessions.
+    var supportsDirectOAuth: Bool {
+        activeStrategy is any OAuthCoreBackedStrategy
     }
 
     /// Switches the OAuth client to confidential-client authentication with
     /// assertions signed in process (`private_key_jwt`).
     func useClientAssertionSigner(_ signer: any OAuthClientAssertionSigner) async throws {
         guard currentMode == .publicOAuth else {
-            throw AuthError.invalidOAuthConfiguration
+            throw OAuthConfigurationError.unsupportedByAuthMode
         }
         await activeStrategy.cancelOAuthFlow()
         activeStrategy = PublicOAuthStrategy(

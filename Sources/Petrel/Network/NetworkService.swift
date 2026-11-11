@@ -1666,6 +1666,11 @@ public actor NetworkService: NetworkServiceProtocol {
                                 "Network Service - Successfully handled non-nonce 401 via authProvider."
                             )
                             return (retryData, retryResponse) // Return the result of the successful handling
+                        } catch let statusError as AccountStatusError {
+                            // The server refused because of the account's hosting
+                            // status, not its credentials: report that, and leave
+                            // the session alone for the app to act on.
+                            throw statusError
                         } catch {
                             LogManager.logError(
                                 "Network Service - authProvider failed to handle non-nonce 401: \(error). Giving up."
@@ -1970,17 +1975,25 @@ public actor NetworkService: NetworkServiceProtocol {
         )
     }
 
-    /// Sends an OAuth protocol request (server metadata, pushed authorization
-    /// request, token, revocation) exactly as the OAuth layer built it.
+    /// The authentication provider installed on this service, for the
+    /// hand-written authentication API layered over `ATProtoClient`.
+    var authenticationProvider: AuthenticationProvider? {
+        authProvider
+    }
+
+    /// Sends an authentication-protocol request (OAuth server metadata, pushed
+    /// authorization request, token, revocation; app-password session refresh
+    /// and deletion) exactly as the authentication layer built it.
     ///
-    /// Unlike `request(_:)`, nothing is inferred from the URL: no account
-    /// credentials are attached, the caller's `DPoP` proof is kept, no response
-    /// nonce is filed under the active account, and redirects are never followed,
-    /// so a proof or authorization code cannot be forwarded to another origin.
-    func executeOAuthProtocolRequest(
+    /// Unlike `request(_:)`, nothing is inferred from the URL: the caller's own
+    /// `DPoP` proof and `Authorization` header are kept and the active account's
+    /// credentials are never substituted for them, no response nonce is filed
+    /// under the active account, and redirects are never followed, so a proof,
+    /// authorization code or refresh token cannot be forwarded to another origin.
+    func executeAuthProtocolRequest(
         _ request: URLRequest
     ) async throws -> (Data, HTTPURLResponse) {
-        let (data, response) = try await executeUnauthenticatedRequest(request, strippingDPoP: false)
+        let (data, response) = try await executeUnauthenticatedRequest(request, keepingCallerCredentials: true)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.requestFailed
         }
@@ -1989,7 +2002,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
     func executeUnauthenticatedRequest(
         _ request: URLRequest,
-        strippingDPoP: Bool = true
+        keepingCallerCredentials: Bool = false
     ) async throws -> (Data, URLResponse) {
         guard let url = request.url else {
             throw NetworkError.invalidURL
@@ -2000,7 +2013,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         var sanitizedRequest = request
         for header in ["Authorization", "DPoP", "Cookie", "Proxy-Authorization", "atproto-proxy"] {
-            if header == "DPoP", !strippingDPoP { continue }
+            if keepingCallerCredentials, header == "DPoP" || header == "Authorization" { continue }
             sanitizedRequest.setValue(nil, forHTTPHeaderField: header)
         }
         if let userAgent = userAgent {

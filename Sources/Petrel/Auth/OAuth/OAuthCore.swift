@@ -846,7 +846,7 @@ actor OAuthCore {
     /// failures surface as `NetworkError`; cancellation is passed through.
     private func sendToAuthorizationServer(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
         do {
-            return try await networkService.executeOAuthProtocolRequest(request)
+            return try await networkService.executeAuthProtocolRequest(request)
         } catch let error as NetworkError {
             throw error
         } catch is CancellationError {
