@@ -228,6 +228,32 @@ struct ServiceAuthInteropTests {
         #expect(inspection.lexiconMethod == vector.ts.payload?.lxm)
     }
 
+    @Test(
+        "The pinned-key primitive honours allowMalleable for DER signatures",
+        arguments: document.vectors.filter { $0.petrel?.okWith == "allowMalleable" }
+    )
+    func pinnedKeyPrimitiveAllowMalleable(_ vector: Vector) throws {
+        let key = try Self.publicKey(vector.verifier.refreshedKey)
+        // Refused by default: a DER signature is not a JWS signature.
+        #expect(throws: (any Error).self) {
+            try ServiceJWT.verify(
+                vector.token, publicKey: key,
+                expectedAudience: vector.verifier.audience, expectedMethod: vector.verifier.lxm, now: Self.now
+            )
+        }
+        // Accepted on explicit opt-in, through both pinned-key overloads.
+        let claims = try ServiceJWT.verify(
+            vector.token, publicKey: key, signatureOptions: .allowMalleable,
+            expectedAudience: vector.verifier.audience, expectedMethod: vector.verifier.lxm, now: Self.now
+        )
+        #expect(claims.exp == vector.ts.payload?.exp)
+        let viaJWTKey = try ServiceJWT.verify(
+            vector.token, publicKey: ATProtoJWTVerificationKey(key), signatureOptions: .allowMalleable,
+            expectedAudience: vector.verifier.audience, expectedMethod: vector.verifier.lxm, now: Self.now
+        )
+        #expect(viaJWTKey == claims)
+    }
+
     // MARK: Petrel → reference
 
     struct MintedDocument: Codable, Sendable {

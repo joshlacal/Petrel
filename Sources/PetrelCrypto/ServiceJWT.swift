@@ -557,7 +557,9 @@ public enum ServiceJWT {
         guard isValidTimePolicy(clockSkew: clockSkew, maximumLifetime: maximumLifetime) else {
             throw PetrelCryptoError.malformed("service authentication time policy is invalid")
         }
-        let parsed = try parse(compact)
+        // DER is admitted at parse time only when the caller opted into it;
+        // the signature check below still applies the full policy.
+        let parsed = try parse(compact, allowDERSignature: signatureOptions.allowDER)
         try validateShape(parsed.header, claims: parsed.claims)
         if let expectedAudience {
             guard parsed.claims.aud == expectedAudience else {
