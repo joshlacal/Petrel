@@ -172,6 +172,17 @@ let package = Package(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
         ),
+        // Compiled example for the event-stream consumers: `swift run FirehoseDemo`.
+        .executableTarget(
+            name: "FirehoseDemo",
+            dependencies: ["Petrel", "PetrelFirehose", "PetrelJetstream"],
+            path: "Examples",
+            exclude: ["README.md", "SimplePostCLI.swift", "PostCLIDemo"],
+            sources: ["FirehoseDemo.swift"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .testTarget(
             name: "PetrelTests",
             dependencies: ["Petrel", "PetrelCrypto"],
