@@ -37,7 +37,7 @@ Because a canonical string may not parse back, it is not always the right thing 
 | `rpc` with audience `did:web:example.com#a%41` | `…?aud=did:web:example.com%23a%41` (reads back as `#aA`) | `…?aud=did:web:example.com%23a%2541` |
 | everything else | the canonical string | the same |
 
-The scope a denial names — `scopeNeeded(for:)` on each permission type, and ``ScopeDenied/needed`` — is written the same way, so requesting it always grants the request that was denied. The reference writes the canonical form there too, so for an audience containing a literal `%41` it names a scope for another service.
+The scope a denial names — `scopeNeeded(for:)` on each permission type, and ``ScopeDenied/needed`` — is written the same way, so requesting it always grants the request that was denied. The reference writes the canonical form there too, so for an audience containing a literal `%41` it names a scope for another service. Where no scope can grant the request — a collection that is not an NSID, a malformed media type, a service without a fragment or ending in a bare `%` — `scopeNeeded(for:)` still formats a string, as the reference does, and that string does not parse. `grantingScope(for:)` is the checked form: it returns the same string only when it parses back as a permission covering the request, and throws otherwise. Use it wherever the string will be requested or stored.
 
 ``ATProtoScopeSet/init(_:)`` keeps the typed scopes it is given and stores their `scopeString`, so a set built from typed scopes grants exactly what the values say and serialises to something a server reads the same way. Whether one scope covers another (`covers(_:)`) is decided from what the scopes grant, never from their spelling.
 

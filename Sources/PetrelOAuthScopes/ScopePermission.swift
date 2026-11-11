@@ -155,8 +155,38 @@ public protocol ScopePermission: ScopeFamily {
     /// Whether this permission covers `target`.
     func matches(_ target: Target) -> Bool
     /// The narrowest scope string that would cover `target`, for the message
-    /// of a denial (`scopes-set.ts:49-57`). Total over `Target`.
+    /// of a denial (`scopes-set.ts:49-57`). Total over `Target`: like the
+    /// reference, it formats a target no scope can grant (a collection that
+    /// is not an NSID, a service without a fragment), and the result then
+    /// does not parse. Use ``grantingScope(for:)`` where the string will be
+    /// requested or acted on.
     static func scopeNeeded(for target: Target) throws(ScopeParseError) -> String
+}
+
+public extension ScopePermission {
+    /// The narrowest scope string that grants `target`: ``scopeNeeded(for:)``,
+    /// checked to parse back as a permission of this family that covers
+    /// `target`.
+    ///
+    /// Use this where the string will be requested or stored — an
+    /// authorization server naming the scope a client should ask for, say,
+    /// when `target` comes from a request it does not control.
+    ///
+    /// - Throws: the parse error when the string does not parse (no scope can
+    ///   name `target`, such as a service ending in a bare `%`), or
+    ///   ``ScopeParseError/forbiddenParameterCombination(prefix:detail:)``
+    ///   when it parses but does not cover `target` (a media type that is not
+    ///   a concrete `type/subtype`).
+    static func grantingScope(for target: Target) throws(ScopeParseError) -> String {
+        let string = try scopeNeeded(for: target)
+        let permission = try parse(string)
+        guard permission.matches(target) else {
+            throw .forbiddenParameterCombination(
+                prefix: schema.prefix, detail: "no scope grants this request; \(string) would not cover it"
+            )
+        }
+        return string
+    }
 }
 
 /// Any scope value an AT Protocol authorization server understands.

@@ -80,6 +80,10 @@ struct OAuthScopesRepoRpcTests {
         // scopes/repo-permission.test.ts:106-116 — malformed input still formats.
         #expect(try RepoPermission.scopeNeeded(for: .init(collection: "invalid", action: .create))
             == "repo:invalid?action=create")
+        // grantingScope is the checked form: no scope grants that collection.
+        #expect(throws: ScopeParseError.self) {
+            try RepoPermission.grantingScope(for: .init(collection: "invalid", action: .create))
+        }
     }
 
     // MARK: rpc

@@ -104,12 +104,18 @@ struct ScopeLosslessRoundTripTests {
 
     @Test("the scope a denial names covers the request that was denied")
     func scopeNeededCoversTarget() throws {
-        // Only services a scope can name: `#svc%` is not a valid audience, so
-        // no scope grants it and there is nothing a denial could name.
-        for aud in Self.auds where (try? ATProtoScope.rpc(lxm: ["*"], aud: aud)) != nil {
+        for aud in Self.auds {
+            // `#svc%` is not a valid audience: no scope grants it, so there is
+            // nothing a denial could name, and scopeNeeded says so by throwing.
+            let nameable = (try? ATProtoScope.rpc(lxm: ["*"], aud: aud)) != nil
             for lxm in Self.methods {
                 let target = RpcPermission.Target(lxm: lxm, aud: aud)
+                guard nameable else {
+                    #expect(throws: ScopeParseError.self, "\(aud)") { try RpcPermission.grantingScope(for: target) }
+                    continue
+                }
                 let needed = try RpcPermission.scopeNeeded(for: target)
+                #expect(try RpcPermission.grantingScope(for: target) == needed)
                 #expect(ATProtoScopeSet(scope: "atproto \(needed)").allowsRPC(target), "\(needed) for \(aud)")
                 let denied = #expect(throws: ScopeDenied.self) {
                     try ATProtoScopeSet(scope: "atproto").requireRPC(target)
@@ -140,6 +146,23 @@ struct ScopeLosslessRoundTripTests {
         #expect(needed == "rpc:com.example.method?aud=did:web:example.com%23svc%2541")
         #expect(!ATProtoScopeSet(scope: "atproto \(needed)")
             .allowsRPC(.init(lxm: "com.example.method", aud: "did:web:example.com#svcA")))
+    }
+
+    @Test("a request no scope can grant has no granting scope")
+    func unnameableTargetsHaveNoGrantingScope() throws {
+        #expect(throws: ScopeParseError.self) {
+            try RpcPermission.grantingScope(for: .init(lxm: "app.example.getFeed", aud: "did:web:api.example.com#svc%"))
+        }
+        #expect(throws: ScopeParseError.self) {
+            try RpcPermission.grantingScope(for: .init(lxm: "app.example.getFeed", aud: "did:web:example.com"))
+        }
+        #expect(throws: ScopeParseError.self) { try BlobPermission.grantingScope(for: .init(mime: "image/*")) }
+        #expect(throws: ScopeParseError.self) {
+            try RepoPermission.grantingScope(for: .init(collection: "invalid", action: .create))
+        }
+        // And for a request one can grant, it is scopeNeeded's string.
+        let target = RpcPermission.Target(lxm: "app.example.getFeed", aud: "did:web:example.com#svc%41")
+        #expect(try RpcPermission.grantingScope(for: target) == RpcPermission.scopeNeeded(for: target))
     }
 
     @Test("a type wildcard does not absorb a pattern whose type is only canonically equivalent")

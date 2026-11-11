@@ -179,9 +179,9 @@ public struct RpcPermission: ScopePermission {
     /// (`scopes/rpc-permission.ts:84-89`). The target is not validated.
     ///
     /// The string is the canonical form, except that a `+` or `%` in a value
-    /// stays percent-encoded, so it always parses back to a scope covering
-    /// `target` (the reference's canonical form would read a literal `%41` as
-    /// `A`).
+    /// stays percent-encoded, so it parses back to a scope covering `target`
+    /// (the reference's canonical form would read a literal `%41` as `A`),
+    /// whenever any scope can grant `target`; see ``grantingScope(for:)``.
     public static func scopeNeeded(for target: Target) throws(ScopeParseError) -> String {
         var values = ScopeParameterValues()
         values.set("lxm", [target.lxm])
