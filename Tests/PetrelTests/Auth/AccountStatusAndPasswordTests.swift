@@ -32,6 +32,8 @@ final class FakePasswordPDS: OAuthTestBackend, @unchecked Sendable {
     /// Makes `createSession` answer for this DID whatever was asked (a misbehaving server).
     var createSessionDIDOverride: String?
     var forcedStatus: [String: Int] = [:]
+    /// Lifetime, in seconds, of the access JWTs issued (`exp` − `iat`).
+    var accessTokenLifetime = 7200
 
     private let lock = NSLock()
     private var accounts: [String: Account] = [:]
@@ -102,7 +104,7 @@ final class FakePasswordPDS: OAuthTestBackend, @unchecked Sendable {
     private func issue(for account: Account) -> [String: Any] {
         counter += 1
         let now = Int(Date().timeIntervalSince1970)
-        let claims = try! JSONSerialization.data(withJSONObject: ["iat": now, "exp": now + 7200, "sub": account.did])
+        let claims = try! JSONSerialization.data(withJSONObject: ["iat": now, "exp": now + accessTokenLifetime, "sub": account.did])
         let accessJwt = "eyJhbGciOiJIUzI1NiJ9.\(TestJOSE.base64URLEncode(claims)).access\(counter)"
         let refreshJwt = "refresh-jwt-\(counter)"
         accessTokens[accessJwt] = account.did
@@ -139,10 +141,13 @@ final class FakePasswordPDS: OAuthTestBackend, @unchecked Sendable {
     }
 
     private func refreshSession(_ bearer: String?) -> (Int, [String: Any]) {
-        guard let bearer, let did = refreshTokens.removeValue(forKey: bearer), let account = accounts[did] else {
+        guard let bearer, let did = refreshTokens[bearer], let account = accounts[did] else {
             return (400, ["error": "InvalidToken", "message": "refresh token required"])
         }
+        // As in the reference PDS, the account's status is checked before the
+        // refresh token is rotated: a refusal leaves the token valid.
         if let refusal = statusRefusal(account) { return refusal }
+        refreshTokens.removeValue(forKey: bearer)
         return (200, issue(for: account))
     }
 
@@ -448,6 +453,43 @@ struct AccountStatusAndPasswordTests {
         }
     }
 
+    @Test("A refresh refused for the account's status, on the way to an ordinary request, reaches the caller as the status")
+    func proactiveRefreshRefusedForStatus() async throws {
+        let pds = FakePasswordPDS()
+        pds.add(Self.alice)
+        pds.accessTokenLifetime = 1 // due for refresh before the next request
+        try await withOAuthTestNetwork([pds]) {
+            let client = await makeClient(namespace: "password.proactive.takedown", pds: pds)
+            _ = try await signIn(client)
+            try await Task.sleep(nanoseconds: 1_100_000_000)
+            pds.setStatus((false, "suspended"), for: Self.aliceDID)
+
+            // The request itself is never sent: preparing it refreshes, and the
+            // refresh is what the server refuses.
+            let error = await #expect(throws: AccountStatusError.self) {
+                _ = try await getSession(client, pds: pds)
+            }
+            #expect(error?.status == AccountStatus(isActive: false, reason: .suspended))
+            #expect(pds.requests(to: "refreshSession").map(\.status) == [401])
+            #expect(pds.requests(to: "getSession").isEmpty)
+            let stored = try await client.storage.getSession(for: Self.aliceDID)
+            #expect(stored != nil)
+
+            // The refusal did not spend the refresh token or trip the circuit
+            // breaker: asked again, the caller is told the status again…
+            for _ in 0 ..< 4 {
+                await #expect(throws: AccountStatusError.self) {
+                    _ = try await client.strategy.refreshTokenIfNeeded(forceRefresh: true)
+                }
+            }
+            // …and once the account is reinstated the same session refreshes and works.
+            pds.setStatus((true, nil), for: Self.aliceDID)
+            pds.accessTokenLifetime = 7200
+            #expect(try await client.strategy.refreshTokenIfNeeded(forceRefresh: true) == .refreshedSuccessfully)
+            #expect(try await getSession(client, pds: pds).statusCode == 200)
+        }
+    }
+
     @Test("Logout ends the session at the PDS with the refresh JWT, then forgets it")
     func logoutDeletesSession() async throws {
         let pds = FakePasswordPDS()
@@ -575,6 +617,44 @@ struct ATProtoClientAuthenticationTests {
             try await client.logout()
             #expect(server.isRevoked(sub: Self.aliceDID))
             #expect(!(await client.hasValidSession()))
+        }
+    }
+
+    @Test("App-password client: fetchAccountStatus returns the status when the refresh before the request is refused")
+    func fetchAccountStatusThroughRefusedRefresh() async throws {
+        let pds = FakePasswordPDS()
+        pds.add(FakePasswordPDS.Account(
+            did: Self.aliceDID, handle: "alice.test", email: "alice@example.com", password: "app-password"
+        ))
+        pds.accessTokenLifetime = 1
+        try await withOAuthTestNetwork([pds]) {
+            let resolver = OAuthTestDIDResolver()
+            resolver.register(did: Self.aliceDID, handle: "alice.test", pds: pds.url)
+            let client = try await ATProtoClient(
+                baseURL: pds.url,
+                oauthConfig: OAuthConfig(
+                    clientId: OAuthTestClient.clientID, redirectUri: OAuthTestClient.redirectURI, scope: "atproto"
+                ),
+                namespace: "client.password.status",
+                authMode: .legacy,
+                didResolver: resolver
+            )
+            try await client.loginWithPassword(identifier: "alice.test", password: "app-password")
+            #expect(try await client.fetchAccountStatus() == .active)
+
+            try await Task.sleep(nanoseconds: 1_100_000_000)
+            pds.setStatus((false, "takendown"), for: Self.aliceDID)
+            #expect(try await client.fetchAccountStatus() == AccountStatus(isActive: false, reason: .takendown))
+            #expect(await client.lastKnownAccountStatus() == AccountStatus(isActive: false, reason: .takendown))
+            // It was the refresh that was refused; the status request was never sent.
+            #expect(pds.requests(to: "refreshSession").last?.status == 401)
+            #expect(pds.requests(to: "getSession").filter { $0.status == 401 }.isEmpty)
+
+            // An ordinary generated call reports the status too, not a generic failure.
+            let error = await #expect(throws: AccountStatusError.self) {
+                _ = try await client.com.atproto.server.getSession()
+            }
+            #expect(error?.status.reason == .takendown)
         }
     }
 

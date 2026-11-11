@@ -1270,7 +1270,18 @@ actor OAuthCore {
 
             if let task = activeRefreshTasks[did] { return try await task.value }
 
-            guard let refreshToken = session.refreshToken else { throw AuthError.tokenRefreshFailed }
+            guard let refreshToken = session.refreshToken else {
+                // A session granted without a refresh token (the client did not
+                // declare the refresh_token grant) is good for as long as its
+                // access token is: there is nothing to refresh it with, so it
+                // must not be refused while the token still works.
+                if !forceRefresh, !session.isExpired { return .stillValid }
+                LogManager.logInfo(
+                    "Session for DID \(LogManager.logDID(did)) has no refresh token and its access token can no longer be used; the user must sign in again",
+                    category: .authentication
+                )
+                throw AuthError.tokenRefreshFailed
+            }
             if usedRefreshTokens.contains(refreshToken) {
                 // Either the server definitively rejected this token, or a refresh
                 // that finished while this call was reading the session has already

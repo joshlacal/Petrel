@@ -2833,6 +2833,10 @@ public actor NetworkService: NetworkServiceProtocol {
             return (request, nil)
         } catch is CancellationError {
             throw CancellationError()
+        } catch let statusError as AccountStatusError {
+            // A refresh refused because the account is taken down, suspended or
+            // deactivated: the caller needs that status, not a generic failure.
+            throw statusError
         } catch {
             LogManager.logError("Failed to prepare authenticated request for \(LogManager.sanitizeURLForLogging(url)): \(error)")
             if let authErr = error as? AuthError {

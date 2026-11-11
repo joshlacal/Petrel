@@ -301,6 +301,90 @@ struct OAuthRefreshConformanceTests {
         }
     }
 
+    // MARK: - Sessions without a refresh token
+
+    /// A server answering a client that did not declare the refresh_token grant.
+    private func serverWithoutRefreshTokens() -> FakeOAuthServer {
+        let server = FakeOAuthServer()
+        server.tokenResponseTransform = { response, _ in
+            var response = response
+            response.removeValue(forKey: "refresh_token")
+            return response
+        }
+        return server
+    }
+
+    @Test("A session granted without a refresh token works for as long as its access token does")
+    func sessionWithoutRefreshTokenIsUsable() async throws {
+        let server = serverWithoutRefreshTokens()
+        try await withOAuthTestNetwork([server]) {
+            let client = await OAuthTestClient.make(namespace: "refresh.none.usable", server: server)
+            try await client.signIn(handle: "alice.test", did: Self.aliceDID, server: server)
+            let session = try #require(try await client.storage.getSession(for: Self.aliceDID))
+            #expect(session.refreshToken == nil)
+
+            // Its very first authenticated request goes through, and so do later ones.
+            #expect(try await client.getSession().1.statusCode == 200)
+            #expect(try await client.getSession().1.statusCode == 200)
+            #expect(try await client.strategy.refreshTokenIfNeeded() == .stillValid)
+            #expect(refreshRequests(server).isEmpty)
+            #expect(try await client.storage.getSession(for: Self.aliceDID) == session)
+
+            // Logging out revokes the access token, there being nothing else to revoke.
+            try await client.strategy.logout()
+            #expect(server.requests(to: .revoke).last?.form["token"] == session.accessToken)
+            #expect(server.isRevoked(sub: Self.aliceDID))
+        }
+    }
+
+    @Test("Without a refresh token, the last stretch before expiry is still usable")
+    func sessionWithoutRefreshTokenNearExpiry() async throws {
+        let server = serverWithoutRefreshTokens()
+        try await withOAuthTestNetwork([server]) {
+            let client = await OAuthTestClient.make(namespace: "refresh.none.nearexpiry", server: server)
+            try await client.signIn(handle: "alice.test", did: Self.aliceDID, server: server)
+            let account = try #require(try await client.storage.getAccount(for: Self.aliceDID))
+            let session = try #require(try await client.storage.getSession(for: Self.aliceDID))
+
+            // The same tokens, 55 minutes into their hour: inside the refresh
+            // lead time, where a session with a refresh token would refresh.
+            let aging = Session(
+                accessToken: session.accessToken, refreshToken: nil,
+                createdAt: Date().addingTimeInterval(-3550), expiresIn: 3600,
+                tokenType: .dpop, did: Self.aliceDID, grantedScopes: session.grantedScopes
+            )
+            #expect(aging.isExpiringSoon && !aging.isExpired)
+            try await client.storage.saveAccountAndSession(account, session: aging, for: Self.aliceDID)
+
+            #expect(try await client.strategy.refreshTokenIfNeeded() == .stillValid)
+            #expect(try await client.getSession().1.statusCode == 200)
+            #expect(refreshRequests(server).isEmpty)
+        }
+    }
+
+    @Test("Without a refresh token, an expired or rejected access token ends the session with a typed error")
+    func sessionWithoutRefreshTokenExpires() async throws {
+        let server = serverWithoutRefreshTokens()
+        server.accessTokenLifetime = 0 // expired on arrival
+        try await withOAuthTestNetwork([server]) {
+            let client = await OAuthTestClient.make(namespace: "refresh.none.expired", server: server)
+            try await client.signIn(handle: "alice.test", did: Self.aliceDID, server: server)
+
+            await #expect(throws: AuthError.tokenRefreshFailed) {
+                _ = try await client.strategy.refreshTokenIfNeeded()
+            }
+            await #expect(throws: AuthError.tokenRefreshFailed) {
+                _ = try await client.strategy.refreshTokenIfNeeded(forceRefresh: true)
+            }
+            // The same typed error reaches a caller making an ordinary request.
+            await #expect(throws: AuthError.tokenRefreshFailed) {
+                _ = try await client.getSession()
+            }
+            #expect(refreshRequests(server).isEmpty)
+            #expect(server.requests(to: .resource).isEmpty)
+        }
+    }
+
     // MARK: - Recovery
 
     @Test("An access token the resource server no longer accepts is refreshed and the request replayed")

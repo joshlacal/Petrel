@@ -406,8 +406,8 @@ actor LegacyPasswordStrategy: AuthStrategy {
 
         // Check if token is still valid
         if !forceRefresh && !session.isExpiringSoon {
-            lastSuccessfulRefresh[did] = Date()
-            await refreshCircuitBreaker.recordSuccess(for: did)
+            // Not a refresh: it must not start the "just refreshed" window below,
+            // or a token that comes due inside that window would not be refreshed.
             return .stillValid
         }
 
@@ -422,9 +422,10 @@ actor LegacyPasswordStrategy: AuthStrategy {
         do {
             return try await task.value
         } catch {
-            // Only a definitive rejection spends the token; after a transport or
-            // server failure the same refresh token is still the valid one.
-            if (error as? AuthError) != .invalidCredentials, !(error is AccountStatusError) {
+            // Only a definitive rejection spends the token. After a transport or
+            // server failure, or a refusal for the account's hosting status (the
+            // server refuses before it rotates), the same token is still the one.
+            if (error as? AuthError) != .invalidCredentials {
                 usedRefreshTokens.remove(refreshToken)
             }
             throw error
@@ -516,13 +517,14 @@ actor LegacyPasswordStrategy: AuthStrategy {
                 await refreshCircuitBreaker.recordFailure(for: did, kind: .server)
                 throw AuthError.tokenRefreshFailed
             }
-            await refreshCircuitBreaker.recordFailure(for: did, kind: .invalidGrant)
-            let error = Self.sessionError(status: response.statusCode, body: data)
-            if let statusError = error as? AccountStatusError {
+            if let statusError = Self.sessionError(status: response.statusCode, body: data) as? AccountStatusError {
+                // The account's hosting status, not a fault of the token: nothing
+                // for the circuit breaker to count, and the status is what to report.
                 accountStatuses[did] = statusError.status
                 throw statusError
             }
             // Any other 4xx means the refresh token is no longer good.
+            await refreshCircuitBreaker.recordFailure(for: did, kind: .invalidGrant)
             throw AuthError.invalidCredentials
         }
 
