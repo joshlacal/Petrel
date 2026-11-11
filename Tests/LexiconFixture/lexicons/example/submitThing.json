@@ -1,0 +1,43 @@
+{
+  "lexicon": 1,
+  "id": "io.my-site.4ever.deep.nested.ns.submitThing",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "Seven segments, a hyphenated one and one that starts with a digit. The input is a ref and the output a union.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "ref",
+          "ref": "#thing"
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "union",
+          "refs": [
+            "#thing",
+            "com.example.widget.defs#gadget"
+          ]
+        }
+      }
+    },
+    "thing": {
+      "type": "object",
+      "required": [
+        "name"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "maxLength": 64
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}

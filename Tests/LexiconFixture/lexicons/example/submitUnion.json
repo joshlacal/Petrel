@@ -1,0 +1,20 @@
+{
+  "lexicon": 1,
+  "id": "com.example.widget.submitUnion",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "A procedure whose input is a union of refs.",
+      "input": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "union",
+          "refs": [
+            "com.example.widget.defs#gadget",
+            "com.example.widget.note"
+          ]
+        }
+      }
+    }
+  }
+}

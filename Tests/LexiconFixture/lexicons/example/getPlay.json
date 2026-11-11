@@ -1,0 +1,49 @@
+{
+  "lexicon": 1,
+  "id": "fm.example.alpha.feed.getPlay",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "A five-segment NSID.",
+      "parameters": {
+        "type": "params",
+        "required": [
+          "play"
+        ],
+        "properties": {
+          "play": {
+            "type": "string",
+            "format": "at-uri"
+          },
+          "max-age": {
+            "type": "integer",
+            "description": "A parameter whose name is not a Swift identifier."
+          },
+          "default": {
+            "type": "boolean",
+            "description": "A parameter named like a Swift keyword."
+          },
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "ref",
+          "ref": "com.example.widget.defs#gadget"
+        }
+      },
+      "errors": [
+        {
+          "name": "PlayNotFound",
+          "description": "No such play."
+        }
+      ]
+    }
+  }
+}

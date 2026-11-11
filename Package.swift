@@ -285,5 +285,21 @@ let package = Package(
             name: "PetrelLoadTests",
             dependencies: ["PetrelLoad"]
         ),
+        // A module generated from third-party lexicons with the overlay manifest in
+        // Tests/LexiconFixture/lexgen.json. It is not a product: it exists so that every
+        // build and test run compiles generator output for lexicons Petrel does not ship.
+        .target(
+            name: "PetrelLexiconFixture",
+            dependencies: ["Petrel"],
+            path: "Tests/LexiconFixture/Generated",
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .testTarget(
+            name: "PetrelLexiconFixtureTests",
+            dependencies: ["PetrelLexiconFixture", "Petrel"],
+            resources: [.copy("Vectors")]
+        ),
     ]
 )

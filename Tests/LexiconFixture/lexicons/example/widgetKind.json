@@ -1,0 +1,23 @@
+{
+  "lexicon": 1,
+  "id": "com.example.widget.kind",
+  "defs": {
+    "main": {
+      "type": "string",
+      "description": "A lexicon whose main definition is a string.",
+      "knownValues": [
+        "simple",
+        "complex"
+      ]
+    },
+    "detail": {
+      "type": "object",
+      "description": "A sibling of a non-object main.",
+      "properties": {
+        "note": {
+          "type": "string"
+        }
+      }
+    }
+  }
+}
