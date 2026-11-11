@@ -1,6 +1,6 @@
 import Crypto
 import Foundation
-@preconcurrency import secp256k1
+import P256K
 
 /// Standard ATProto inter-service authentication claims.
 public struct ServiceJWTClaims: Codable, Sendable, Equatable {
@@ -52,12 +52,12 @@ public struct ServiceJWTInspection: Sendable, Equatable {
 /// Supported signing private keys for minting ATProto service JWTs.
 ///
 /// This enum predates ``ATProtoSigner`` and exposes the third-party
-/// `secp256k1` module's key type. New code should call
+/// `P256K` module's key type. New code should call
 /// `ServiceJWT.mint(issuer:audience:method:eventID:requestBodyDigest:signer:now:lifetime:)`
 /// with a ``P256Keypair``, ``K256Keypair`` or any other ``ATProtoSigner``.
 public enum ServiceJWTSigningKey: @unchecked Sendable {
     case p256(P256.Signing.PrivateKey)
-    case secp256k1(secp256k1.Signing.PrivateKey)
+    case secp256k1(P256K.Signing.PrivateKey)
 }
 
 /// ATProto inter-service JWT minting, inspection, and verification.
@@ -130,12 +130,7 @@ public enum ServiceJWT {
         case let .p256(p256Key):
             signatureData = try P256WireSignature.sign(signingInputData, using: p256Key)
         case let .secp256k1(secpKey):
-            let ecdsaSig = try secpKey.signature(for: signingInputData)
-            let compact = try ecdsaSig.compactRepresentation
-            guard ATProtoJWTVerificationKey.isCanonicalSecp256k1Signature(compact) else {
-                throw PetrelCryptoError.malformed("secp256k1 signature is not canonical low-S")
-            }
-            signatureData = compact
+            signatureData = try K256Backend.sign(message: signingInputData, privateKey: secpKey.dataRepresentation)
         }
 
         return "\(signingInput).\(JWTBase64URL.encode(signatureData))"
@@ -246,14 +241,14 @@ public enum ServiceJWT {
         )
     }
 
-    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). The third-party secp256k1 type will leave Petrel's public API in the next major version.")
+    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). This overload exposes the third-party P256K module's key type and will be removed.")
     public static func mint(
         issuer: String,
         audience: String,
         method: String,
         eventID: String,
         requestBodyDigest: String? = nil,
-        key: secp256k1.Signing.PrivateKey,
+        key: P256K.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
     ) throws -> String {
@@ -291,14 +286,14 @@ public enum ServiceJWT {
         )
     }
 
-    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). The third-party secp256k1 type will leave Petrel's public API in the next major version.")
+    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). This overload exposes the third-party P256K module's key type and will be removed.")
     public static func create(
         issuer: String,
         audience: String,
         method: String,
         eventID: String,
         requestBodyDigest: String? = nil,
-        key: secp256k1.Signing.PrivateKey,
+        key: P256K.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = defaultLifetime
     ) throws -> String {
@@ -763,14 +758,14 @@ public enum ProxyServiceJWT {
         )
     }
 
-    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). The third-party secp256k1 type will leave Petrel's public API in the next major version.")
+    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). This overload exposes the third-party P256K module's key type and will be removed.")
     public static func create(
         issuer: String,
         audience: String,
         method: String,
         eventID: String,
         requestBodyDigest: String? = nil,
-        key: secp256k1.Signing.PrivateKey,
+        key: P256K.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = maximumLifetime
     ) throws -> String {
@@ -820,14 +815,14 @@ public enum SpaceServiceJWT {
         )
     }
 
-    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). The third-party secp256k1 type will leave Petrel's public API in the next major version.")
+    @available(*, deprecated, message: "Pass a K256Keypair to the signer: overload (or wrap the key in ServiceJWTSigningKey.secp256k1). This overload exposes the third-party P256K module's key type and will be removed.")
     public static func create(
         issuer: String,
         audience: String,
         method: String,
         eventID: String,
         requestBodyDigest: String? = nil,
-        key: secp256k1.Signing.PrivateKey,
+        key: P256K.Signing.PrivateKey,
         now: Date = Date(),
         lifetime: TimeInterval = lifetime
     ) throws -> String {

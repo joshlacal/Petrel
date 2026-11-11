@@ -1,4 +1,4 @@
-// swift-tools-version: 6.0
+// swift-tools-version: 6.1
 
 import PackageDescription
 
@@ -52,7 +52,9 @@ let package = Package(
         .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMajor(from: "3.0.0")),
         .package(url: "https://github.com/apple/swift-log.git", .upToNextMajor(from: "1.0.0")),
         .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
-        .package(url: "https://github.com/GigaBitcoin/secp256k1.swift.git", exact: "0.15.0"),
+        // 0.x: every minor may change API, so the range stops at the next
+        // minor. Only Sources/PetrelCrypto/K256Backend.swift uses the module.
+        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1.git", .upToNextMinor(from: "0.24.0")),
         // Pinned to 1.5.7: release tag ships Package.swift with the `libzstd` product.
         .package(url: "https://github.com/facebook/zstd.git", .upToNextMinor(from: "1.5.7")),
     ],
@@ -87,7 +89,7 @@ let package = Package(
             dependencies: [
                 "CPetrelBLAKE3",
                 .product(name: "Crypto", package: "swift-crypto"),
-                .product(name: "secp256k1", package: "secp256k1.swift"),
+                .product(name: "P256K", package: "swift-secp256k1"),
             ],
             swiftSettings: [
                 .swiftLanguageMode(.v6),

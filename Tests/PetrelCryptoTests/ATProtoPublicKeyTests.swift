@@ -1,7 +1,7 @@
 import Crypto
 import Foundation
 import PetrelCrypto
-import secp256k1
+import P256K
 import Testing
 
 @Suite("Public key encodings: did:key, Multikey, legacy multibase")
@@ -200,7 +200,7 @@ struct ATProtoPublicKeyTests {
         // base58btc(e7 01 || point), computed with an independent encoder.
         #expect(keypair.didKey == "did:key:zQ3shVc2UkAfJCdc1TR8E66J85h48P43r93q8jGPkPpjF9Ef9")
 
-        let libraryKey = try secp256k1.Signing.PrivateKey(dataRepresentation: keypair.exportRawRepresentation())
+        let libraryKey = try P256K.Signing.PrivateKey(dataRepresentation: keypair.exportRawRepresentation())
         let legacy = PLCDIDVerificationKey.secp256k1(libraryKey.publicKey.dataRepresentation)
         #expect(legacy.didKey == keypair.didKey)
     }

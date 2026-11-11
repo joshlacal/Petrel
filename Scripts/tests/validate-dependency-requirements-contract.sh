@@ -33,16 +33,21 @@ expected = {
         "0.7.0",
         "0.8.0",
     ),
-}
-# PetrelCrypto's existing ES256K/PLC implementation uses this exact release.
-# Keep its source and requirement separate from the reviewed bounded ranges;
-# accepting a newer version or a range requires another explicit policy review.
-expected_exact = {
-    "secp256k1.swift": (
-        "https://github.com/GigaBitcoin/secp256k1.swift.git",
-        "0.15.0",
+    # PetrelCrypto's K-256 backend (Sources/PetrelCrypto/K256Backend.swift)
+    # wraps this package's P256K module, the renamed successor of
+    # GigaBitcoin/secp256k1.swift. It is pre-1.0 and changes API between
+    # minors, so the reviewed range stops at the next minor. Accepting a
+    # newer minor, another source, or the old package requires another
+    # explicit policy review.
+    "swift-secp256k1": (
+        "https://github.com/21-DOT-DEV/swift-secp256k1.git",
+        "0.24.0",
+        "0.25.0",
     ),
 }
+# No dependency is currently held to one exact release. The mechanism stays
+# for a dependency whose review covers a single version only.
+expected_exact = {}
 
 direct_dependencies = dump.get("dependencies", [])
 if not isinstance(direct_dependencies, list):

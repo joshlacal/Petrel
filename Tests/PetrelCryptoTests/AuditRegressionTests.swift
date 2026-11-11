@@ -1,12 +1,13 @@
 import Crypto
 import Foundation
 import PetrelCrypto
-import secp256k1
+import P256K
 import Testing
 
 /// One test per defect the 2026-11 conformance audit found in code that
-/// already existed. Each uses only API that predates the fix, so the file
-/// compiles against the earlier revision — where every test here fails.
+/// already existed. Each uses only Petrel API that predates the fix: built
+/// against the revision before the fixes, every test here fails. (That
+/// revision names the libsecp256k1 wrapper module `secp256k1`, not `P256K`.)
 @Suite("Audit regressions")
 struct AuditRegressionTests {
     /// floor(n / 2) for P-256. The implementation once had `d6` where this
@@ -46,7 +47,7 @@ struct AuditRegressionTests {
 
     @Test("Legacy uncompressed K-256 key with an off-curve Y is rejected")
     func legacyK256ChecksY() throws {
-        let uncompressed = try secp256k1.Signing.PrivateKey(format: .uncompressed).publicKey.dataRepresentation
+        let uncompressed = try P256K.Signing.PrivateKey(format: .uncompressed).publicKey.dataRepresentation
         #expect(uncompressed.count == 65)
         _ = try PLCDIDKeyCodec.decodeLegacyMultibase("z" + Base58BTC.encode(uncompressed), curve: .secp256k1)
 
@@ -59,9 +60,9 @@ struct AuditRegressionTests {
 
     @Test("A K-256 key given as an uncompressed point still encodes a decodable did:key")
     func uncompressedK256EncodesCanonically() throws {
-        let privateKey = try secp256k1.Signing.PrivateKey(format: .uncompressed)
+        let privateKey = try P256K.Signing.PrivateKey(format: .uncompressed)
         let uncompressed = privateKey.publicKey.dataRepresentation
-        let compressed = try secp256k1.Signing.PrivateKey(
+        let compressed = try P256K.Signing.PrivateKey(
             dataRepresentation: privateKey.dataRepresentation, format: .compressed
         ).publicKey.dataRepresentation
 
@@ -73,9 +74,9 @@ struct AuditRegressionTests {
 
     @Test("A K-256 verification key has one identity across encodings")
     func k256IdentityIsNormalized() throws {
-        let privateKey = try secp256k1.Signing.PrivateKey(format: .uncompressed)
+        let privateKey = try P256K.Signing.PrivateKey(format: .uncompressed)
         let uncompressed = privateKey.publicKey.dataRepresentation
-        let compressed = try secp256k1.Signing.PrivateKey(
+        let compressed = try P256K.Signing.PrivateKey(
             dataRepresentation: privateKey.dataRepresentation, format: .compressed
         ).publicKey.dataRepresentation
 

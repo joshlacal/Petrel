@@ -252,52 +252,86 @@ source_control(unbounded, "swiftcbor")["requirement"] = {
 }
 unbounded_path.write_text(json.dumps(unbounded), encoding="utf-8")
 
-# The reviewed exact dependency must not inherit the bounded-range policy,
-# accept another source/version, or bypass the generic pre-1.0 review gate.
-exact_requirements = {
-    "newer-version": {"exact": ["0.15.1"]},
-    "prerelease": {"exact": ["0.15.0-alpha.1"]},
-    "multiple-versions": {"exact": ["0.15.0", "0.15.1"]},
-    "empty-versions": {"exact": []},
-    "bounded-range": {
-        "range": [{"lowerBound": "0.15.0", "upperBound": "0.16.0"}]
-    },
+# The reviewed secp256k1 wrapper must stay inside its bounded range and its
+# reviewed source, and neither an exact pin nor the package it replaced may
+# bypass the generic pre-1.0 review gate.
+k256_range = {"lowerBound": "0.24.0", "upperBound": "0.25.0"}
+k256_not_one_range = {
+    "exact-pin": {"exact": ["0.24.0"]},
     "branch": {"branch": ["main"]},
-    "revision": {"revision": ["4c77c7384768acf1093d66ccaacf298d322b10b7"]},
-    "mixed-requirements": {"exact": ["0.15.0"], "branch": ["main"]},
+    "revision": {"revision": ["bcd6dd8e615ce243eab7097f213c8c4b39305a2e"]},
+    "mixed-requirements": {"range": [k256_range], "branch": ["main"]},
+    "two-ranges": {
+        "range": [k256_range, {"lowerBound": "0.25.0", "upperBound": "0.26.0"}]
+    },
+    "empty-ranges": {"range": []},
 }
-for label, requirement in exact_requirements.items():
-    document = copy.deepcopy(base)
-    source_control(document, "secp256k1.swift")["requirement"] = requirement
-    (exact_policy_dir / f"{label}.json").write_text(
-        json.dumps(document), encoding="utf-8"
-    )
+k256_wrong_range = {
+    "next-minor": {
+        "range": [{"lowerBound": "0.24.0", "upperBound": "0.26.0"}]
+    },
+    "older-lower-bound": {
+        "range": [{"lowerBound": "0.23.2", "upperBound": "0.25.0"}]
+    },
+    "up-to-next-major": {
+        "range": [{"lowerBound": "0.24.0", "upperBound": "1.0.0"}]
+    },
+    "prerelease-lower-bound": {
+        "range": [{"lowerBound": "0.24.0-alpha.1", "upperBound": "0.25.0"}]
+    },
+}
+for group, requirements in (
+    ("not-one-range", k256_not_one_range),
+    ("wrong-range", k256_wrong_range),
+):
+    for label, requirement in requirements.items():
+        document = copy.deepcopy(base)
+        source_control(document, "swift-secp256k1")["requirement"] = requirement
+        (exact_policy_dir / f"{group}-{label}.json").write_text(
+            json.dumps(document), encoding="utf-8"
+        )
 
-exact_wrong_url = copy.deepcopy(base)
-source_control(exact_wrong_url, "secp256k1.swift")["location"] = {
-    "remote": [{"urlString": "https://example.invalid/secp256k1.swift.git"}]
+k256_wrong_url = copy.deepcopy(base)
+source_control(k256_wrong_url, "swift-secp256k1")["location"] = {
+    "remote": [{"urlString": "https://example.invalid/swift-secp256k1.git"}]
 }
 (exact_policy_dir / "wrong-url.json").write_text(
-    json.dumps(exact_wrong_url), encoding="utf-8"
+    json.dumps(k256_wrong_url), encoding="utf-8"
 )
 
-exact_registry = copy.deepcopy(base)
-for wrapper in exact_registry["dependencies"]:
+k256_registry = copy.deepcopy(base)
+for wrapper in k256_registry["dependencies"]:
     entries = wrapper.get("sourceControl", [])
-    if len(entries) == 1 and entries[0].get("identity") == "secp256k1.swift":
+    if len(entries) == 1 and entries[0].get("identity") == "swift-secp256k1":
         entry = wrapper.pop("sourceControl")[0]
         entry.pop("location")
         wrapper["registry"] = [entry]
 (exact_policy_dir / "registry-substitution.json").write_text(
-    json.dumps(exact_registry), encoding="utf-8"
+    json.dumps(k256_registry), encoding="utf-8"
+)
+
+# The package this one replaced, at the release that used to be pinned.
+replaced_package = copy.deepcopy(base)
+old_k256 = copy.deepcopy(source_control(base, "swift-secp256k1"))
+old_k256["identity"] = "secp256k1.swift"
+old_k256["location"] = {
+    "remote": [
+        {"urlString": "https://github.com/GigaBitcoin/secp256k1.swift.git"}
+    ]
+}
+old_k256["requirement"] = {"exact": ["0.15.0"]}
+replaced_package["dependencies"].append({"sourceControl": [old_k256]})
+(exact_policy_dir / "replaced-package.json").write_text(
+    json.dumps(replaced_package), encoding="utf-8"
 )
 
 extra_exact = copy.deepcopy(base)
-unknown_exact = copy.deepcopy(source_control(base, "secp256k1.swift"))
+unknown_exact = copy.deepcopy(source_control(base, "swift-secp256k1"))
 unknown_exact["identity"] = "unreviewed-exact-zero"
 unknown_exact["location"] = {
     "remote": [{"urlString": "https://example.invalid/unreviewed-exact-zero.git"}]
 }
+unknown_exact["requirement"] = {"exact": ["0.24.0"]}
 extra_exact["dependencies"].append({"sourceControl": [unknown_exact]})
 (exact_policy_dir / "unreviewed-exact.json").write_text(
     json.dumps(extra_exact), encoding="utf-8"
@@ -351,21 +385,32 @@ expect_semantic_failure \
   "$UNBOUNDED_REVIEWED_DUMP" \
   "swiftcbor requirement must be 0.6.0..<0.7.0"
 
-for label in newer-version prerelease multiple-versions empty-versions \
-  bounded-range branch revision mixed-requirements; do
+for label in exact-pin branch revision mixed-requirements two-ranges \
+  empty-ranges; do
   expect_semantic_failure \
-    "exact-$label" \
-    "$EXACT_POLICY_DIR/$label.json" \
-    "secp256k1.swift requirement must be exact 0.15.0"
+    "k256-not-one-range-$label" \
+    "$EXACT_POLICY_DIR/not-one-range-$label.json" \
+    "swift-secp256k1 must use one semantic version range"
+done
+for label in next-minor older-lower-bound up-to-next-major \
+  prerelease-lower-bound; do
+  expect_semantic_failure \
+    "k256-wrong-range-$label" \
+    "$EXACT_POLICY_DIR/wrong-range-$label.json" \
+    "swift-secp256k1 requirement must be 0.24.0..<0.25.0"
 done
 expect_semantic_failure \
-  exact-wrong-url \
+  k256-wrong-url \
   "$EXACT_POLICY_DIR/wrong-url.json" \
-  "secp256k1.swift source URL must be https://github.com/GigaBitcoin/secp256k1.swift.git"
+  "swift-secp256k1 source URL must be https://github.com/21-DOT-DEV/swift-secp256k1.git"
 expect_semantic_failure \
-  exact-registry-substitution \
+  k256-registry-substitution \
   "$EXACT_POLICY_DIR/registry-substitution.json" \
-  "missing direct dependency: secp256k1.swift"
+  "missing direct dependency: swift-secp256k1"
+expect_semantic_failure \
+  k256-replaced-package \
+  "$EXACT_POLICY_DIR/replaced-package.json" \
+  "unreviewed direct pre-1.0 dependency: secp256k1.swift"
 expect_semantic_failure \
   unreviewed-exact \
   "$EXACT_POLICY_DIR/unreviewed-exact.json" \

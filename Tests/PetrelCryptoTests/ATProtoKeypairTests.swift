@@ -1,7 +1,7 @@
 import Crypto
 import Foundation
 import PetrelCrypto
-import secp256k1
+import P256K
 import Testing
 
 @Suite("Keypairs, signers and one-call verification")
@@ -83,12 +83,12 @@ struct ATProtoKeypairTests {
         let keypair = K256Keypair.generate()
         let signature = try keypair.sign(Self.message)
 
-        let libraryKey = try secp256k1.Signing.PrivateKey(dataRepresentation: keypair.exportRawRepresentation())
+        let libraryKey = try P256K.Signing.PrivateKey(dataRepresentation: keypair.exportRawRepresentation())
         #expect(libraryKey.publicKey.dataRepresentation == keypair.publicKey.compressedRepresentation)
-        let librarySignature = try secp256k1.Signing.ECDSASignature(compactRepresentation: signature)
+        let librarySignature = try P256K.Signing.ECDSASignature(compactRepresentation: signature)
         #expect(libraryKey.publicKey.isValidSignature(librarySignature, for: Self.message))
 
-        let fromLibrary = try libraryKey.signature(for: Self.message).compactRepresentation
+        let fromLibrary = libraryKey.signature(for: Self.message).compactRepresentation
         #expect(keypair.publicKey.isValidSignature(fromLibrary, for: Self.message))
         // RFC 6979: same key, same message, same signature.
         #expect(fromLibrary == signature)

@@ -1,7 +1,7 @@
 import Crypto
 import Foundation
 import PetrelCrypto
-import secp256k1
+import P256K
 import Testing
 
 /// Pins the low-S threshold `floor(n / 2)` for both curves **without**
@@ -52,9 +52,9 @@ struct LowSBoundaryTests {
                 _ = try P256.Signing.PrivateKey(rawRepresentation: order.data)
             }
         case .k256:
-            _ = try secp256k1.Signing.PrivateKey(dataRepresentation: orderMinusOne.data)
+            _ = try P256K.Signing.PrivateKey(dataRepresentation: orderMinusOne.data)
             #expect(throws: (any Error).self) {
-                _ = try secp256k1.Signing.PrivateKey(dataRepresentation: order.data)
+                _ = try P256K.Signing.PrivateKey(dataRepresentation: order.data)
             }
         }
     }
