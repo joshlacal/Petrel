@@ -29,44 +29,44 @@ struct IPAddress: Sendable {
             }
         #endif
     }
-    /// Normalizes IPv4-mapped IPv6 addresses (e.g. ::ffff:192.0.2.1 or ::ffff:7f00:1 -> 192.0.2.1 / 127.0.0.1)
-    static func normalizeIPv4MappedIPv6(_ ip: String) -> String {
-        let trimmed = ip.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        #if canImport(Network)
-            if let v6 = IPv6Address(trimmed) {
-                let bytes = v6.rawValue
-                // ::ffff:0:0/96 (IPv4-mapped IPv6)
-                if bytes.prefix(10) == Data(repeating: 0, count: 10) && bytes[10] == 0xFF && bytes[11] == 0xFF {
-                    let v4Bytes = bytes.suffix(4)
-                    let octets = Array(v4Bytes)
-                    return "\(octets[0]).\(octets[1]).\(octets[2]).\(octets[3])"
-                }
-                // 64:ff9b::/96 (Well-Known Prefix for IPv4/IPv6 translation)
-                if bytes.prefix(12) == Data([0x00, 0x64, 0xFF, 0x9B, 0, 0, 0, 0, 0, 0, 0, 0]) {
-                    let v4Bytes = bytes.suffix(4)
-                    let octets = Array(v4Bytes)
-                    return "\(octets[0]).\(octets[1]).\(octets[2]).\(octets[3])"
-                }
-                // 2002::/16 (6to4)
-                if bytes[0] == 0x20 && bytes[1] == 0x02 {
-                    return "\(bytes[2]).\(bytes[3]).\(bytes[4]).\(bytes[5])"
-                }
-            }
-        #endif
-        if trimmed.hasPrefix("::ffff:") {
-            let suffix = String(trimmed.dropFirst(7))
-            if Self.isValidIPv4(suffix) {
-                return suffix
-            }
-            // Hex form: ::ffff:7f00:1 == ::ffff:127.0.0.1
-            let groups = suffix.split(separator: ":")
-            if groups.count == 2,
-               let hi = UInt16(groups[0], radix: 16),
-               let lo = UInt16(groups[1], radix: 16) {
-                return "\(hi >> 8).\(hi & 0xFF).\(lo >> 8).\(lo & 0xFF)"
-            }
+    /// The 16 bytes of an IPv6 address in any textual form, or `nil` when the string is not an
+    /// IPv6 address. A zone suffix (`%en0`) is ignored. One parser serves every platform, so a
+    /// non-canonical spelling such as `0:0:0:0:0:ffff:7f00:1` is classified the same everywhere.
+    static func ipv6Bytes(_ string: String) -> [UInt8]? {
+        let trimmed = string.trimmingCharacters(in: .whitespacesAndNewlines)
+        let host = trimmed.split(separator: "%", maxSplits: 1, omittingEmptySubsequences: false).first.map(String.init) ?? trimmed
+        guard host.contains(":") else { return nil }
+        var address = in6_addr()
+        guard inet_pton(AF_INET6, host, &address) == 1 else { return nil }
+        return withUnsafeBytes(of: &address) { Array($0) }
+    }
+
+    /// The IPv4 address embedded in an IPv6 address that only exists to reach an IPv4 host:
+    /// IPv4-mapped (`::ffff:0:0/96`), the NAT64 well-known prefix (`64:ff9b::/96`) and 6to4
+    /// (`2002::/16`).
+    private static func embeddedIPv4(in bytes: [UInt8]) -> String? {
+        func dotted(_ slice: ArraySlice<UInt8>) -> String {
+            slice.map(String.init).joined(separator: ".")
         }
-        return ip
+        if bytes[0 ..< 10].allSatisfy({ $0 == 0 }), bytes[10] == 0xFF, bytes[11] == 0xFF {
+            return dotted(bytes[12 ..< 16])
+        }
+        if Array(bytes[0 ..< 12]) == [0x00, 0x64, 0xFF, 0x9B, 0, 0, 0, 0, 0, 0, 0, 0] {
+            return dotted(bytes[12 ..< 16])
+        }
+        if bytes[0] == 0x20, bytes[1] == 0x02 {
+            return dotted(bytes[2 ..< 6])
+        }
+        return nil
+    }
+
+    /// Replaces an IPv6 address that embeds an IPv4 address (IPv4-mapped, NAT64, 6to4) with that
+    /// IPv4 address, e.g. `::ffff:7f00:1` -> `127.0.0.1`. Other strings are returned unchanged.
+    static func normalizeIPv4MappedIPv6(_ ip: String) -> String {
+        guard let bytes = ipv6Bytes(ip), let embedded = embeddedIPv4(in: bytes) else {
+            return ip
+        }
+        return embedded
     }
 
     static func isPrivateOrReservedAddress(_ ip: String) -> Bool {
@@ -107,23 +107,6 @@ struct IPAddress: Sendable {
                 if a >= 240 { return true }
             }
 
-            if let v6 = IPv6Address(normalized) {
-                let bytes = v6.rawValue
-                // ::/128 unspecified
-                if bytes == Data(repeating: 0, count: 16) { return true }
-                // ::1/128 loopback
-                if bytes == Data(repeating: 0, count: 15) + Data([1]) { return true }
-                // fe80::/10 link-local
-                if (bytes[0] == 0xFE) && ((bytes[1] & 0xC0) == 0x80) { return true }
-                // fc00::/7 unique local
-                if (bytes[0] & 0xFE) == 0xFC { return true }
-                // ff00::/8 multicast
-                if bytes[0] == 0xFF { return true }
-                // 2001:db8::/32 documentation
-                if bytes[0] == 0x20 && bytes[1] == 0x01 && bytes[2] == 0x0D && bytes[3] == 0xB8 { return true }
-                // 100::/64 discard prefix
-                if bytes[0] == 0x01 && bytes[1] == 0x00 && bytes.subdata(in: 2..<8) == Data(repeating: 0, count: 6) { return true }
-            }
         #else
             let components = normalized.split(separator: ".").compactMap { Int($0) }
             if components.count == 4 {
@@ -147,16 +130,35 @@ struct IPAddress: Sendable {
                 if a >= 240 { return true }
             }
 
-            if normalized.contains(":") {
-                if normalized == "::1" || normalized == "0:0:0:0:0:0:0:1" || normalized == "::" { return true }
-                if normalized.lowercased().hasPrefix("fe80:") { return true }
-                if normalized.lowercased().hasPrefix("fc") || normalized.lowercased().hasPrefix("fd") { return true }
-                if normalized.lowercased().hasPrefix("ff") { return true }
-                if normalized.lowercased().hasPrefix("2001:db8:") || normalized.lowercased().hasPrefix("2001:0db8:") { return true }
-                if normalized.lowercased().hasPrefix("100::") { return true }
-            }
         #endif
 
+        if normalized.contains(":") {
+            // An IPv6 literal that does not parse cannot be shown to be public.
+            guard let bytes = ipv6Bytes(normalized) else { return true }
+            return isPrivateOrReservedIPv6(bytes)
+        }
+
+        return false
+    }
+
+    private static func isPrivateOrReservedIPv6(_ bytes: [UInt8]) -> Bool {
+        // ::/96: unspecified (::), loopback (::1) and the deprecated IPv4-compatible addresses.
+        if bytes[0 ..< 12].allSatisfy({ $0 == 0 }) { return true }
+        // An embedded IPv4 address is judged as that IPv4 address.
+        if let embedded = embeddedIPv4(in: bytes) { return isPrivateOrReservedAddress(embedded) }
+        // 64:ff9b:1::/48 local-use IPv4/IPv6 translation
+        if Array(bytes[0 ..< 6]) == [0x00, 0x64, 0xFF, 0x9B, 0x00, 0x01] { return true }
+        // fe80::/10 link-local and fec0::/10 site-local (deprecated)
+        if bytes[0] == 0xFE, (bytes[1] & 0xC0) == 0x80 || (bytes[1] & 0xC0) == 0xC0 { return true }
+        // fc00::/7 unique local
+        if (bytes[0] & 0xFE) == 0xFC { return true }
+        // ff00::/8 multicast
+        if bytes[0] == 0xFF { return true }
+        // 2001::/32 Teredo and 2001:db8::/32 documentation
+        if bytes[0] == 0x20, bytes[1] == 0x01, bytes[2] == 0x00, bytes[3] == 0x00 { return true }
+        if bytes[0] == 0x20, bytes[1] == 0x01, bytes[2] == 0x0D, bytes[3] == 0xB8 { return true }
+        // 100::/64 discard prefix
+        if bytes[0] == 0x01, bytes[1] == 0x00, bytes[2 ..< 8].allSatisfy({ $0 == 0 }) { return true }
         return false
     }
 
