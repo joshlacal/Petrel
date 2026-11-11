@@ -13,6 +13,24 @@ public enum LxmParam: Sendable, Hashable, Comparable {
         }
     }
 
+    /// Two methods are equal when they are the same bytes; Unicode
+    /// equivalence plays no part.
+    public static func == (lhs: LxmParam, rhs: LxmParam) -> Bool {
+        switch (lhs, rhs) {
+        case (.any, .any): true
+        case let (.nsid(a), .nsid(b)): a.isByteEqual(to: b)
+        default: false
+        }
+    }
+
+    /// Hashes the bytes, consistently with `==`.
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .any: hasher.combine(0 as UInt8)
+        case let .nsid(value): hasher.combine(1 as UInt8); hasher.combine(value.scopeBytes)
+        }
+    }
+
     /// Orders values by ``stringValue``.
     public static func < (lhs: LxmParam, rhs: LxmParam) -> Bool {
         lhs.stringValue < rhs.stringValue
@@ -34,6 +52,24 @@ public enum AudParam: Sendable, Hashable {
         switch self {
         case .any: "*"
         case let .service(value): value
+        }
+    }
+
+    /// Two services are equal when they are the same bytes; Unicode
+    /// equivalence plays no part.
+    public static func == (lhs: AudParam, rhs: AudParam) -> Bool {
+        switch (lhs, rhs) {
+        case (.any, .any): true
+        case let (.service(a), .service(b)): a.isByteEqual(to: b)
+        default: false
+        }
+    }
+
+    /// Hashes the bytes, consistently with `==`.
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .any: hasher.combine(0 as UInt8)
+        case let .service(value): hasher.combine(1 as UInt8); hasher.combine(value.scopeBytes)
         }
     }
 }
@@ -75,11 +111,11 @@ public struct RpcPermission: ScopePermission {
         guard !lxmRaw.isEmpty else {
             throw .emptyMultiValuedParameter(prefix: Self.schema.prefix, key: "lxm")
         }
-        let lxm = lxmRaw.map { $0 == "*" ? LxmParam.any : .nsid($0) }
+        let lxm = lxmRaw.map { $0.isByteEqual(to: "*") ? LxmParam.any : .nsid($0) }
         guard let audRaw = parameters.single("aud") else {
             throw .missingRequiredParameter(prefix: Self.schema.prefix, key: "aud")
         }
-        let aud: AudParam = audRaw == "*" ? .any : .service(audRaw)
+        let aud: AudParam = audRaw.isByteEqual(to: "*") ? .any : .service(audRaw)
         // scopes/rpc-permission.ts:78-79 — `rpc:*?aud=*` is forbidden: a
         // permission must be restricted by at least one of the two.
         if case .any = aud, lxm.contains(.any) {
@@ -104,13 +140,13 @@ public struct RpcPermission: ScopePermission {
             // scopes/rpc-permission.ts:54-57 — a list containing `*` is just
             // `*`; otherwise duplicates are dropped and the list is sorted.
             .init(key: "lxm", arity: .multiple, isRequired: true,
-                  normalize: { $0.contains("*") && $0.count > 1 ? ["*"] : Array(Set($0)).sorted() },
-                  validate: { $0 == "*" || AtprotoSyntax.isValidNSID($0) }),
+                  normalize: { $0.containsBytes(of: "*") && $0.count > 1 ? ["*"] : Array(Set($0)).sorted() },
+                  validate: { $0.isByteEqual(to: "*") || AtprotoSyntax.isValidNSID($0) }),
             // scopes/rpc-permission.ts:19-20 — `*` or an atproto DID with a
             // service fragment. A DID of another method, or one without a
             // fragment, is not an audience.
             .init(key: "aud", arity: .single, isRequired: true,
-                  validate: { $0 == "*" || AtprotoSyntax.isValidAtprotoDIDRefAbsolute($0) }),
+                  validate: { $0.isByteEqual(to: "*") || AtprotoSyntax.isValidAtprotoDIDRefAbsolute($0) }),
         ]
     )
 
@@ -133,7 +169,7 @@ public struct RpcPermission: ScopePermission {
     public func matches(_ target: Target) -> Bool {
         switch aud {
         case .any: break
-        case let .service(s): guard s == target.aud else { return false }
+        case let .service(s): guard s.isByteEqual(to: target.aud) else { return false }
         }
         if lxm.contains(.any) { return true }
         return lxm.contains(.nsid(target.lxm))

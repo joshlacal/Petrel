@@ -102,7 +102,8 @@ public struct LexPermissionSyntax: Sendable, ScopeSyntax {
         switch get(key) {
         case .none:
             return .absent
-        case .some(.list):
+        case .some(.list), .some(.unsupported):
+            // Not a single value: malformed, never "absent".
             return .repeated([])
         case let .some(value):
             return value.scalarText.map { .present($0) } ?? .absent

@@ -23,9 +23,15 @@ public enum LexiconValue: Sendable, Equatable {
     case bool(Bool)
     /// A JSON array.
     case list([LexiconValue])
+    /// JSON `null` or a JSON object: not a value any parameter can take. The
+    /// permission-set entry carrying it is ignored during expansion, as the
+    /// reference implementation ignores it (`lib/syntax-lexicon.ts:39-50`,
+    /// `lib/parser.ts:121-134`); the rest of the set is unaffected.
+    case unsupported
 
-    /// The text a parameter validator sees for a scalar. `nil` for an array,
-    /// which every caller treats as "invalid", never as "absent".
+    /// The text a parameter validator sees for a scalar. `nil` for an array or
+    /// an unsupported value, which every caller treats as "invalid", never as
+    /// "absent".
     ///
     /// A number is rendered without converting it to `Int` unless it is an
     /// integer `Double` can represent exactly: the value comes from an
@@ -44,22 +50,21 @@ public enum LexiconValue: Sendable, Equatable {
             return String(value)
         case let .bool(value):
             return value ? "true" : "false"
-        case .list:
+        case .list, .unsupported:
             return nil
         }
     }
 }
 
 extension LexiconValue: Decodable {
-    /// Decodes a string, number, boolean or array of those. JSON `null` is
-    /// none of them and fails the decode; see ``LexiconPermission``.
+    /// Decodes a string, number, boolean or array of those. JSON `null` and
+    /// JSON objects are none of them and decode as ``unsupported``; see
+    /// ``LexiconPermission``.
     public init(from decoder: any Decoder) throws {
         let container = try decoder.singleValueContainer()
         guard !container.decodeNil() else {
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "null is not a lexicon permission parameter value"
-            )
+            self = .unsupported
+            return
         }
         // Bool before Double: `inheritAud: true` is a boolean and must not
         // decode as the number 1 (`scopes/include-scope.ts:90` compares with
@@ -73,10 +78,7 @@ extension LexiconValue: Decodable {
         } else if let value = try? container.decode([LexiconValue].self) {
             self = .list(value)
         } else {
-            throw DecodingError.dataCorruptedError(
-                in: container,
-                debugDescription: "not a string, number, boolean, or array of those"
-            )
+            self = .unsupported
         }
     }
 }
@@ -90,10 +92,10 @@ extension LexiconValue: Decodable {
 /// `type` and `resource` are the two reserved keys. ``fields`` holds every
 /// other key, and so never contains either of them.
 ///
-/// Decoding is stricter than the reference implementation in one respect. A
-/// field that is `null`, an object, or otherwise not a ``LexiconValue`` makes
-/// the reference implementation ignore that entry; here it fails the decode of
-/// the whole document. The result grants strictly less, never more.
+/// A field that is `null` or a JSON object decodes as
+/// ``LexiconValue/unsupported``. Such an entry is ignored when the set is
+/// expanded, exactly as the reference implementation ignores it, and the
+/// other entries of the set are unaffected.
 public struct LexiconPermission: Sendable, Equatable {
     /// `"permission"` in a well-formed document (`lib/lexicon.ts:7`). Kept as
     /// decoded and not enforced: expansion dispatches on ``resource`` alone

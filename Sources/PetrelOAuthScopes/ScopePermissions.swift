@@ -72,7 +72,7 @@ public struct ATProtoScopeSet: Sendable, Equatable, Hashable {
     }
 
     /// The base AT Protocol session scope. Nothing is granted without it.
-    public var hasBaseATProtocolScope: Bool { rawScopes.contains("atproto") }
+    public var hasBaseATProtocolScope: Bool { rawScopes.containsBytes(of: "atproto") }
 
     // MARK: - Transition scopes
     //
@@ -80,13 +80,13 @@ public struct ATProtoScopeSet: Sendable, Equatable, Hashable {
     // exact strings.
 
     /// `transition:generic` — the broad pre-granular-permissions scope.
-    public var hasTransitionGeneric: Bool { rawScopes.contains("transition:generic") }
+    public var hasTransitionGeneric: Bool { rawScopes.containsBytes(of: "transition:generic") }
 
     /// `transition:email` — grants exactly `account:email?action=read`.
-    public var hasTransitionEmail: Bool { rawScopes.contains("transition:email") }
+    public var hasTransitionEmail: Bool { rawScopes.containsBytes(of: "transition:email") }
 
     /// `transition:chat.bsky` — grants exactly the `chat.bsky.*` RPC arm.
-    public var hasTransitionChatBsky: Bool { rawScopes.contains("transition:chat.bsky") }
+    public var hasTransitionChatBsky: Bool { rawScopes.containsBytes(of: "transition:chat.bsky") }
 }
 
 // MARK: - repo, rpc, blob, account, identity
@@ -127,9 +127,12 @@ public extension ATProtoScopeSet {
     /// restricted to an audience. A resource server that needs such a
     /// restriction applies it separately.
     func allowsRPC(_ target: RpcPermission.Target) -> Bool {
-        if hasTransitionGeneric, target.lxm == "*" { return true }
-        if hasTransitionGeneric, !target.lxm.hasPrefix("chat.bsky.") { return true }
-        if hasTransitionChatBsky, target.lxm.hasPrefix("chat.bsky.") { return true }
+        // Byte comparisons, as everywhere a request is matched: a text prefix
+        // test would not see `chat.bsky.` in a name whose next character is a
+        // combining mark, and transition:generic would then allow it.
+        if hasTransitionGeneric, target.lxm.isByteEqual(to: "*") { return true }
+        if hasTransitionGeneric, !target.lxm.hasBytePrefix("chat.bsky.") { return true }
+        if hasTransitionChatBsky, target.lxm.hasBytePrefix("chat.bsky.") { return true }
         return grants.contains { grant in
             guard case let .rpc(permission) = grant else { return false }
             return permission.matches(target)

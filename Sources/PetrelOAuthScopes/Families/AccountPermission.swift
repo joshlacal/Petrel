@@ -43,11 +43,11 @@ public struct AccountPermission: ScopePermission {
 
     /// Builds the permission from parameters ``schema`` has validated.
     public init(parameters: ScopeParameterValues) throws(ScopeParseError) {
-        guard let attrRaw = parameters.single("attr"), let attr = AccountAttribute(rawValue: attrRaw) else {
+        guard let attrRaw = parameters.single("attr"), let attr = AccountAttribute(bytewise: attrRaw) else {
             throw .missingRequiredParameter(prefix: Self.schema.prefix, key: "attr")
         }
         let actionRaw = parameters.multiple("action")
-        let action = actionRaw.compactMap(AccountAction.init(rawValue:))
+        let action = actionRaw.compactMap(AccountAction.init(bytewise:))
         guard action.count == actionRaw.count, !action.isEmpty else {
             throw .invalidParameterValue(prefix: Self.schema.prefix, key: "action", value: actionRaw.joined(separator: ","))
         }
@@ -66,7 +66,7 @@ public struct AccountPermission: ScopePermission {
         positionalKey: "attr",
         parameters: [
             .init(key: "attr", arity: .single, isRequired: true,
-                  validate: { AccountAttribute(rawValue: $0) != nil }),
+                  validate: { AccountAttribute(bytewise: $0) != nil }),
             // No `normalize`: the reference implementation declares none for
             // this parameter (`scopes/account-permission.ts:49-54`), so the
             // canonical form keeps the actions in the order they were written.
@@ -74,7 +74,7 @@ public struct AccountPermission: ScopePermission {
             // form; sorting the actions here would change those bytes.
             .init(key: "action", arity: .multiple,
                   defaultValue: [AccountAction.read.rawValue],
-                  validate: { AccountAction(rawValue: $0) != nil }),
+                  validate: { AccountAction(bytewise: $0) != nil }),
         ]
     )
 

@@ -205,7 +205,7 @@ public enum AtprotoSyntax {
     /// `did:plc:` followed by 24 base32 characters (`[a-z2-7]`, `:53-54`).
     private static func isValidDIDPlc(_ value: String) -> Bool {
         let bytes = Array(value.utf8)
-        guard bytes.count == 32, value.hasPrefix("did:plc:") else { return false }
+        guard bytes.count == 32, value.hasBytePrefix("did:plc:") else { return false }
         return bytes[8...].allSatisfy { (0x61 ... 0x7A).contains($0) || (0x32 ... 0x37).contains($0) }
     }
 
@@ -221,7 +221,7 @@ public enum AtprotoSyntax {
     /// leading `:`, a DID Core method-specific id, and an identifier that
     /// rebuilds into a URL the WHATWG URL parser accepts.
     private static func isValidDIDWeb(_ value: String) -> Bool {
-        guard value.hasPrefix("did:web:") else { return false }
+        guard value.hasBytePrefix("did:web:") else { return false }
         let msid = Array(value.utf8)[8...]
         guard msid.first != 0x3A, isDIDCoreMSID(msid) else { return false }
         return didWebURLCanParse(msid)
@@ -237,9 +237,9 @@ public enum AtprotoSyntax {
     /// allowed on `localhost` only, so a development server at
     /// `did:web:localhost%3A8080` stays valid.
     private static func didWebHasHTTPSPort(_ did: String) -> Bool {
-        if did == "did:web:localhost"
-            || did.hasPrefix("did:web:localhost:")
-            || did.hasPrefix("did:web:localhost%3A") { return false }
+        if did.isByteEqual(to: "did:web:localhost")
+            || did.hasBytePrefix("did:web:localhost:")
+            || did.hasBytePrefix("did:web:localhost%3A") { return false }
         // Reached only for a DID without a path component, where an encoded
         // colon anywhere after the prefix is a port.
         return did.dropFirst(8).contains("%3A")

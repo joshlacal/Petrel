@@ -462,16 +462,19 @@ struct OAuthScopesIncludeExpansionTests {
     }
 
     @Test
-    func aNullFieldFailsTheDocumentRatherThanSilentlyWideningIt() throws {
-        // Stricter than the reference implementation, as documented on
-        // `LexiconPermission`: it ignores the entry, and here the document
-        // fails to decode. Either way the entry never becomes a grant.
-        #expect(throws: (any Error).self) {
-            try permissionSet("""
-            {"type":"permission-set","permissions":[
-              {"type":"permission","resource":"repo","collection":null}]}
-            """)
-        }
+    func aNullFieldIgnoresThatEntryAndNeverWidensIt() throws {
+        // As the reference implementation does (`lib/syntax-lexicon.ts:39-50`,
+        // `lib/parser.ts:121-134`): `null` is not a parameter value, so the
+        // entry carrying it is ignored and the other entries stand. In
+        // particular a `null` where a list is required is never read as
+        // "absent", which for an optional parameter would mean its default.
+        #expect(try compile(auth, """
+        {"type":"permission-set","permissions":[
+          {"type":"permission","resource":"repo","collection":null},
+          {"type":"permission","resource":"repo","collection":["com.example.calendar.post"],"action":null},
+          {"type":"permission","resource":"repo","collection":["com.example.calendar.like"],"extra":{"nested":true}},
+          {"type":"permission","resource":"repo","collection":["com.example.calendar.kept"]}]}
+        """) == ["repo:com.example.calendar.kept"])
     }
 
     @Test

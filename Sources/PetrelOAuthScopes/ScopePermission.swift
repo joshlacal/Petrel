@@ -52,8 +52,14 @@ extension ScopeFamily {
 /// the normalised values of its parameters. Equal for two scopes exactly when
 /// they are the same grant.
 struct ScopeMeaning: Hashable {
-    let resource: String
-    let parameters: [String: Set<String>]
+    let resource: ScopeBytes
+    /// Parameter name → the set of its normalised values, as bytes.
+    let parameters: [String: Set<ScopeBytes>]
+
+    init(resource: String, parameters: [String: Set<ScopeBytes>]) {
+        self.resource = resource.scopeBytes
+        self.parameters = parameters
+    }
 }
 
 /// A scope that grants access to a resource (`repo:`, `rpc:`, `blob:`,
@@ -104,13 +110,12 @@ public enum ATProtoScope: Sendable, Hashable {
     /// - Throws: ``ScopeParseError/unknownPrefix(_:)`` when the value names no
     ///   known resource, or the error of the resource's own parser.
     public static func parse(_ scope: String) throws(ScopeParseError) -> ATProtoScope {
-        switch scope {
-        case "atproto": return .atproto
-        case "transition:email": return .transitionEmail
-        case "transition:generic": return .transitionGeneric
-        case "transition:chat.bsky": return .transitionChatBsky
-        default: break
-        }
+        // Byte comparisons: a string literal pattern would match by Unicode
+        // canonical equivalence.
+        if scope.isByteEqual(to: "atproto") { return .atproto }
+        if scope.isByteEqual(to: "transition:email") { return .transitionEmail }
+        if scope.isByteEqual(to: "transition:generic") { return .transitionGeneric }
+        if scope.isByteEqual(to: "transition:chat.bsky") { return .transitionChatBsky }
         if ScopeStringSyntax.isScopeString(scope, for: AccountPermission.prefix) {
             return .account(try AccountPermission.parse(scope))
         }

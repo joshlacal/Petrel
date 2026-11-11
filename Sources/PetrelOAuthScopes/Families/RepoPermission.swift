@@ -30,6 +30,24 @@ public enum CollectionParam: Sendable, Hashable, Comparable {
         }
     }
 
+    /// Two collections are equal when they are the same bytes; Unicode
+    /// equivalence plays no part.
+    public static func == (lhs: CollectionParam, rhs: CollectionParam) -> Bool {
+        switch (lhs, rhs) {
+        case (.any, .any): true
+        case let (.nsid(a), .nsid(b)): a.isByteEqual(to: b)
+        default: false
+        }
+    }
+
+    /// Hashes the bytes, consistently with `==`.
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .any: hasher.combine(0 as UInt8)
+        case let .nsid(value): hasher.combine(1 as UInt8); hasher.combine(value.scopeBytes)
+        }
+    }
+
     /// Orders values by ``stringValue``.
     public static func < (lhs: CollectionParam, rhs: CollectionParam) -> Bool {
         lhs.stringValue < rhs.stringValue
@@ -66,9 +84,9 @@ public struct RepoPermission: ScopePermission {
         guard !collectionRaw.isEmpty else {
             throw .emptyMultiValuedParameter(prefix: Self.schema.prefix, key: "collection")
         }
-        self.collection = collectionRaw.map { $0 == "*" ? .any : .nsid($0) }
+        self.collection = collectionRaw.map { $0.isByteEqual(to: "*") ? .any : .nsid($0) }
         let actionRaw = parameters.multiple("action")
-        let action = actionRaw.compactMap(RepoAction.init(rawValue:))
+        let action = actionRaw.compactMap(RepoAction.init(bytewise:))
         guard action.count == actionRaw.count else {
             throw .invalidParameterValue(prefix: Self.schema.prefix, key: "action", value: actionRaw.joined(separator: ","))
         }
@@ -91,15 +109,15 @@ public struct RepoPermission: ScopePermission {
                   // scopes/repo-permission.ts:59-65 — a list containing `*` is
                   // just `*`; otherwise duplicates are dropped and the list is
                   // sorted.
-                  normalize: { $0.contains("*") && $0.count > 1 ? ["*"] : Array(Set($0)).sorted() },
-                  validate: { $0 == "*" || AtprotoSyntax.isValidNSID($0) }),
+                  normalize: { $0.containsBytes(of: "*") && $0.count > 1 ? ["*"] : Array(Set($0)).sorted() },
+                  validate: { $0.isByteEqual(to: "*") || AtprotoSyntax.isValidNSID($0) }),
             .init(key: "action", arity: .multiple,
                   defaultValue: REPO_ACTIONS.map(\.rawValue),
                   // scopes/repo-permission.ts:72-76 — the actions in canonical
                   // order, so `action=delete&action=create` is written
                   // `action=create&action=delete`.
                   normalize: { given in RepoAction.allCases.map(\.rawValue).filter(given.contains) },
-                  validate: { RepoAction(rawValue: $0) != nil }),
+                  validate: { RepoAction(bytewise: $0) != nil }),
         ]
     )
 

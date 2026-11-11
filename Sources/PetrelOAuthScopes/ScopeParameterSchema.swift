@@ -130,7 +130,7 @@ public struct ScopeParameterSchema: Sendable {
     /// single value, non-array list, empty list, invalid value, missing
     /// required parameter — through this one body.
     public func parse(_ syntax: some ScopeSyntax) throws(ScopeParseError) -> ScopeParameterValues {
-        guard syntax.prefix == prefix else {
+        guard syntax.prefix.isByteEqual(to: prefix) else {
             throw .prefixMismatch(expected: prefix, actual: syntax.prefix)
         }
 
@@ -235,11 +235,12 @@ public struct ScopeParameterSchema: Sendable {
     /// not always a fixed point (`blob?accept=a/b&accept=a/b` canonicalises to
     /// `blob?accept=a/b`, which itself canonicalises to `blob:a/b`), and for a
     /// value containing `%` it reads back as a different value.
-    func meaning(of values: ScopeParameterValues) -> [String: Set<String>] {
-        var meaning: [String: Set<String>] = [:]
+    func meaning(of values: ScopeParameterValues) -> [String: Set<ScopeBytes>] {
+        var meaning: [String: Set<ScopeBytes>] = [:]
         for parameter in parameters where values.has(parameter.key) {
-            let normalized = Set(parameter.normalize(values.multiple(parameter.key)))
-            if !parameter.isRequired, let defaultValue = parameter.defaultValue, Set(defaultValue) == normalized {
+            let normalized = Set(parameter.normalize(values.multiple(parameter.key)).map(\.scopeBytes))
+            if !parameter.isRequired, let defaultValue = parameter.defaultValue,
+               Set(defaultValue.map(\.scopeBytes)) == normalized {
                 continue
             }
             meaning[parameter.key] = normalized
@@ -275,8 +276,8 @@ public struct ScopeParameterSchema: Sendable {
                 if parameter.key == positionalKey, normalized.count == 1 {
                     positional = normalized[0] // lib/parser.ts:79-80
                 } else {
-                    var seen = Set<String>() // lib/parser.ts:82-84: drop duplicates,
-                    for value in normalized where seen.insert(value).inserted {
+                    var seen = Set<ScopeBytes>() // lib/parser.ts:82-84: drop duplicates,
+                    for value in normalized where seen.insert(value.scopeBytes).inserted {
                         bag.append(key: parameter.key, value: value) // keep order
                     }
                 }

@@ -1,0 +1,52 @@
+// Authorization compares bytes, not text.
+//
+// Swift's `String ==`, `hasPrefix` and string hashing work on Unicode
+// canonical equivalence: U+212A KELVIN SIGN equals "K", and "e" followed by
+// U+0301 equals "é". The reference implementation compares UTF-16 code units,
+// which for these purposes is the same as comparing UTF-8 bytes. Everything in
+// this module that decides whether a request is allowed, or whether two
+// scopes are the same grant, goes through the helpers below.
+
+extension String {
+    /// Whether `self` and `other` are the same sequence of bytes.
+    func isByteEqual(to other: String) -> Bool {
+        utf8.elementsEqual(other.utf8)
+    }
+
+    /// Whether the bytes of `self` begin with the bytes of `prefix`.
+    func hasBytePrefix(_ prefix: String) -> Bool {
+        utf8.starts(with: prefix.utf8)
+    }
+
+    /// `self` with the ASCII letters `A`–`Z` lower-cased and every other byte
+    /// left alone. Unicode case mapping must not be used where the result is
+    /// compared for authorization: it maps U+212A KELVIN SIGN to `k`.
+    var asciiLowercased: String {
+        guard utf8.contains(where: { $0 >= 0x41 && $0 <= 0x5A }) else { return self }
+        return String(decoding: utf8.map { $0 >= 0x41 && $0 <= 0x5A ? $0 | 0x20 : $0 }, as: UTF8.self)
+    }
+}
+
+extension Sequence where Element == String {
+    /// Whether the sequence contains `value`, compared byte-wise.
+    func containsBytes(of value: String) -> Bool {
+        contains { $0.isByteEqual(to: value) }
+    }
+}
+
+extension CaseIterable where Self: RawRepresentable, RawValue == String {
+    /// The case whose raw value is byte-for-byte `raw`.
+    init?(bytewise raw: String) {
+        guard let match = Self.allCases.first(where: { $0.rawValue.isByteEqual(to: raw) }) else { return nil }
+        self = match
+    }
+}
+
+/// A string as its bytes, for use as a set element or dictionary key where
+/// `String`'s own equality would merge canonically equivalent strings.
+typealias ScopeBytes = [UInt8]
+
+extension String {
+    /// The UTF-8 bytes of `self`.
+    var scopeBytes: ScopeBytes { Array(utf8) }
+}

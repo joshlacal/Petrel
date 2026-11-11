@@ -29,7 +29,7 @@ public struct IdentityPermission: ScopePermission {
 
     /// Builds the permission from parameters ``schema`` has validated.
     public init(parameters: ScopeParameterValues) throws(ScopeParseError) {
-        guard let attrRaw = parameters.single("attr"), let attr = IdentityAttribute(rawValue: attrRaw) else {
+        guard let attrRaw = parameters.single("attr"), let attr = IdentityAttribute(bytewise: attrRaw) else {
             throw .missingRequiredParameter(prefix: Self.schema.prefix, key: "attr")
         }
         self.attr = attr
@@ -46,7 +46,7 @@ public struct IdentityPermission: ScopePermission {
         positionalKey: "attr",
         parameters: [
             .init(key: "attr", arity: .single, isRequired: true,
-                  validate: { IdentityAttribute(rawValue: $0) != nil }),
+                  validate: { IdentityAttribute(bytewise: $0) != nil }),
         ]
     )
 

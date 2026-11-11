@@ -113,13 +113,14 @@ extension IncludeScope {
     /// the permission specification calls invalid: `inheritAud` together with
     /// `aud`, and `inheritAud` on an include that has no `aud`.
     func lexSyntax(for entry: LexiconPermission) -> LexPermissionSyntax? {
-        switch entry.resource {
-        case RepoPermission.prefix:
+        if entry.resource.isByteEqual(to: RepoPermission.prefix) {
             return LexPermissionSyntax(permission: entry)
-
-        case RpcPermission.prefix:
+        }
+        if entry.resource.isByteEqual(to: RpcPermission.prefix) {
             let declaredAud = entry.fields["aud"]
-            if let declaredAud, declaredAud != .string("*") { return nil }
+            if let declaredAud {
+                guard case let .string(value) = declaredAud, value.isByteEqual(to: "*") else { return nil }
+            }
 
             // `inheritAud === true` compares with the boolean; `1` and
             // `"true"` do not qualify.
@@ -137,10 +138,8 @@ extension IncludeScope {
             }
 
             return LexPermissionSyntax(permission: entry)
-
-        default:
-            return nil
         }
+        return nil
     }
 
     /// Whether every NSID `permission` names is under this include's
@@ -175,7 +174,7 @@ extension IncludeScope {
     /// ``nsid`` is ASCII, so `other` shares the prefix only if it is ASCII up
     /// to that point, and what follows needs only to be non-empty.
     public func isParentAuthorityOf(_ other: String) -> Bool {
-        guard other != "*" else { return false }
+        guard !other.isByteEqual(to: "*") else { return false }
 
         let nsidBytes = Array(nsid.utf8)
         guard let groupPrefixEnd = nsidBytes.lastIndex(of: 0x2E) else {

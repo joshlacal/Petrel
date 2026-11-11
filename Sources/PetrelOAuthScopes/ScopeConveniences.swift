@@ -270,8 +270,8 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
                     return allowsRPC(.init(lxm: method, aud: audience))
                 case let (.nsid(method), .any):
                     // Transition scopes allow a method on every service.
-                    if hasTransitionGeneric, !method.hasPrefix("chat.bsky.") { return true }
-                    if hasTransitionChatBsky, method.hasPrefix("chat.bsky.") { return true }
+                    if hasTransitionGeneric, !method.hasBytePrefix("chat.bsky.") { return true }
+                    if hasTransitionChatBsky, method.hasBytePrefix("chat.bsky.") { return true }
                     return grants.contains {
                         guard case let .rpc(grant) = $0 else { return false }
                         return grant.aud == .any && (grant.lxm.contains(.any) || grant.lxm.contains(lxm))
@@ -305,9 +305,17 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
         }
     }
 
-    /// Whether every recognised scope of `needed` is covered by this set.
+    /// Whether everything in `needed` is covered by this set.
+    ///
+    /// Every recognised scope of `needed` must be covered, as the
+    /// single-scope `covers(_:)` decides. A scope string of `needed` that
+    /// did not parse — one this version of Petrel does not understand —
+    /// cannot be reasoned about, so it counts as covered only when this set
+    /// holds the identical string. Anything else would let a client conclude
+    /// that it need not ask for something it cannot evaluate.
     public func covers(_ needed: ATProtoScopeSet) -> Bool {
         needed.grants.allSatisfy(covers)
+            && needed.rejected.keys.allSatisfy { rawScopes.containsBytes(of: $0) }
     }
 }
 

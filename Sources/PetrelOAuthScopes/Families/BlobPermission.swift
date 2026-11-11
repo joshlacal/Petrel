@@ -27,27 +27,52 @@ public enum AcceptPattern: Sendable, Equatable, Hashable, Comparable {
     /// non-empty part on each side, no SPACE, and `*` only as the whole of a
     /// part, where a `*` type requires a `*` subtype.
     ///
-    /// The pattern is held in lower case. Media type names are
-    /// case-insensitive (RFC 6838 §4.2) and the canonical scope string
-    /// lower-cases them (`scopes/blob-permission.ts:46`), so `blob:IMAGE/PNG`
-    /// and `blob:image/png` are the same permission: they canonicalise alike
-    /// and they match alike. See ``BlobPermission/matches(_:)``.
+    /// The pattern is held with its ASCII letters in lower case. Media type
+    /// names are case-insensitive (RFC 6838 §4.2) and the canonical scope
+    /// string lower-cases them (`scopes/blob-permission.ts:46`), so
+    /// `blob:IMAGE/PNG` and `blob:image/png` are the same permission: they
+    /// canonicalise alike and they match alike. See
+    /// ``BlobPermission/matches(_:)``.
+    ///
+    /// Only `A`–`Z` are folded. Unicode case mapping would turn U+212A KELVIN
+    /// SIGN into `k` and so make a different byte sequence match.
     public init?(_ raw: String) {
-        let raw = raw.lowercased()
-        guard !raw.isEmpty, !raw.contains(" ") else { return nil }
-        let parts = raw.split(separator: "/", omittingEmptySubsequences: false)
-        guard parts.count == 2 else { return nil }
-        let type = String(parts[0]), subtype = String(parts[1])
-        guard !type.isEmpty, !subtype.isEmpty else { return nil }
-        if type == "*" {
-            guard subtype == "*" else { return nil } // "*/subtype" is never valid
+        let bytes = Array(raw.asciiLowercased.utf8)
+        guard !bytes.isEmpty, !bytes.contains(0x20) else { return nil }
+        let parts = bytes.split(separator: 0x2F, omittingEmptySubsequences: false)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
+        let type = String(decoding: parts[0], as: UTF8.self), subtype = String(decoding: parts[1], as: UTF8.self)
+        let star: [UInt8] = [0x2A]
+        if parts[0].elementsEqual(star) {
+            guard parts[1].elementsEqual(star) else { return nil } // "*/subtype" is never valid
             self = .any
-        } else if subtype == "*" {
-            guard !type.contains("*") else { return nil }
+        } else if parts[1].elementsEqual(star) {
+            guard !parts[0].contains(0x2A) else { return nil }
             self = .type(type)
         } else {
-            guard !type.contains("*"), !subtype.contains("*") else { return nil }
+            guard !parts[0].contains(0x2A), !parts[1].contains(0x2A) else { return nil }
             self = .exact(type, subtype)
+        }
+    }
+
+    /// Two patterns are equal when they are the same bytes; Unicode
+    /// equivalence plays no part.
+    public static func == (lhs: AcceptPattern, rhs: AcceptPattern) -> Bool {
+        switch (lhs, rhs) {
+        case (.any, .any): true
+        case let (.type(a), .type(b)): a.isByteEqual(to: b)
+        case let (.exact(a, c), .exact(b, d)): a.isByteEqual(to: b) && c.isByteEqual(to: d)
+        default: false
+        }
+    }
+
+    /// Hashes the bytes, consistently with `==`.
+    public func hash(into hasher: inout Hasher) {
+        switch self {
+        case .any: hasher.combine(0 as UInt8)
+        case let .type(type): hasher.combine(1 as UInt8); hasher.combine(type.scopeBytes)
+        case let .exact(type, subtype):
+            hasher.combine(2 as UInt8); hasher.combine(type.scopeBytes); hasher.combine(subtype.scopeBytes)
         }
     }
 
@@ -68,13 +93,12 @@ public struct ConcreteMime: Sendable, Hashable {
     /// Parses `raw`, or returns `nil` when it is not exactly one `/` between
     /// two non-empty parts, or contains SPACE or `*`.
     public init?(_ raw: String) {
-        guard !raw.isEmpty, !raw.contains(" "), !raw.contains("*") else { return nil }
-        let parts = raw.split(separator: "/", omittingEmptySubsequences: false)
-        guard parts.count == 2 else { return nil }
-        let type = String(parts[0]), subtype = String(parts[1])
-        guard !type.isEmpty, !subtype.isEmpty else { return nil }
-        self.type = type
-        self.subtype = subtype
+        let bytes = Array(raw.utf8)
+        guard !bytes.isEmpty, !bytes.contains(0x20), !bytes.contains(0x2A) else { return nil }
+        let parts = bytes.split(separator: 0x2F, omittingEmptySubsequences: false)
+        guard parts.count == 2, !parts[0].isEmpty, !parts[1].isEmpty else { return nil }
+        self.type = String(decoding: parts[0], as: UTF8.self)
+        self.subtype = String(decoding: parts[1], as: UTF8.self)
     }
 }
 
@@ -140,13 +164,14 @@ public struct BlobPermission: ScopePermission {
     /// concrete `type/subtype`, nothing matches it, not even `*/*`
     /// (`lib/mime.test.ts:67-74`).
     ///
-    /// The comparison ignores case, on both sides. The reference
-    /// implementation compares the strings exactly as written, while its
-    /// canonical form lower-cases the pattern, so there a permission can stop
-    /// matching, or start matching, when it is canonicalised. Here a
-    /// permission means the same before and after: see <doc:ReferenceParity>.
+    /// The comparison ignores the case of ASCII letters, on both sides, and is
+    /// otherwise byte-for-byte. The reference implementation compares the
+    /// strings exactly as written, while its canonical form lower-cases the
+    /// pattern, so there a permission can stop matching, or start matching,
+    /// when it is canonicalised. Here a permission means the same before and
+    /// after: see <doc:ReferenceParity>.
     public func matches(_ target: Target) -> Bool {
-        guard let concrete = ConcreteMime(target.mime.lowercased()) else { return false }
+        guard let concrete = ConcreteMime(target.mime.asciiLowercased) else { return false }
         return accept.contains { Self.covers($0, concrete) }
     }
 
@@ -156,8 +181,8 @@ public struct BlobPermission: ScopePermission {
     private static func covers(_ pattern: AcceptPattern, _ mime: ConcreteMime) -> Bool {
         switch pattern {
         case .any: true
-        case let .type(t): mime.type == t
-        case let .exact(t, s): mime.type == t && mime.subtype == s
+        case let .type(t): mime.type.isByteEqual(to: t)
+        case let .exact(t, s): mime.type.isByteEqual(to: t) && mime.subtype.isByteEqual(to: s)
         }
     }
 

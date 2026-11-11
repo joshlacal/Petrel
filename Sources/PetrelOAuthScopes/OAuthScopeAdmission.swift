@@ -182,7 +182,7 @@ public enum OAuthScopeAdmissionPolicy {
             }
         }
         guard isCanonicalSubset(admitted, of: declared) else { throw .notRegistered }
-        guard admitted.contains("atproto") else { throw .missingBaseScope }
+        guard admitted.containsBytes(of: "atproto") else { throw .missingBaseScope }
         return admitted
     }
 

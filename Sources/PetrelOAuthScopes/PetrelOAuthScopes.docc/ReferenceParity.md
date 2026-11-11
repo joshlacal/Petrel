@@ -39,11 +39,36 @@ Because a canonical string may not parse back, it is not always the right thing 
 
 ``ATProtoScopeSet/init(_:)`` keeps the typed scopes it is given and stores their `scopeString`, so a set built from typed scopes grants exactly what the values say and serialises to something a server reads the same way. Whether one scope covers another (`covers(_:)`) is decided from what the scopes grant, never from their spelling.
 
+### Comparisons are byte-wise
+
+Everything that decides whether a request is allowed — a collection, a method, a service, a media type, an attribute, the `chat.bsky.` prefix that separates the two transition scopes, the namespace authority of a permission set — compares bytes. The reference implementation compares UTF-16 code units, which amounts to the same thing. Swift's own `String ==` and `hasPrefix` compare by Unicode canonical equivalence, under which U+212A KELVIN SIGN equals `K` and `e` followed by U+0301 equals `é`, so they are not used: `repo:com.example.Key` does not allow a write to a collection spelled with a Kelvin sign, and a method name cannot hide its `chat.bsky.` prefix behind a combining mark. The parameter values (``CollectionParam``, ``LxmParam``, ``AudParam``, ``AcceptPattern``) are `Equatable` and `Hashable` on the same terms.
+
 ### Media type case
 
 The reference implementation compares media types exactly as written when matching (`lib/mime.ts`), but lower-cases them when it writes the canonical scope string (`scopes/blob-permission.ts`). There, `blob:IMAGE/PNG` does not allow an `image/png` upload, while its own canonical form `blob:image/png` does: canonicalising changes what the permission grants.
 
-Petrel resolves this one way. Media type names are case-insensitive (RFC 6838 §4.2), so patterns and requested types are compared without regard to case, in ``BlobPermission/matches(_:)``, in ``ATProtoScopeSet/allowsBlob(_:)`` and in `covers` alike, and the canonical form stays the reference's lower-case string. For media types written in lower case — which is what the reference emits and what clients send — the two implementations answer identically; they differ only for a pattern or an upload type containing upper-case letters, where Petrel's answer is the one the canonical form implies.
+Petrel resolves this one way, and it is the one place where a match here can differ from the reference: media type names are case-insensitive (RFC 6838 §4.2), so patterns and requested types are compared without regard to the case of ASCII letters, in ``BlobPermission/matches(_:)``, in ``ATProtoScopeSet/allowsBlob(_:)`` and in `covers` alike, and the canonical form stays the reference's lower-case string. For media types written in lower case — which is what the reference emits and what clients send — the two implementations answer identically. They differ only for a pattern or an upload type containing upper-case letters: Petrel allows `image/png` under `blob:IMAGE/PNG` and `IMAGE/PNG` under `blob:image/png`, where the reference allows neither. Only `A`–`Z` are folded; beyond that the comparison is byte-wise, as above.
+
+### Permission sets
+
+An entry of a permission set that carries a field which is JSON `null` or a JSON object is ignored, and the rest of the set stands, as in the reference implementation. Such a value decodes as ``LexiconValue/unsupported``; it is never read as "absent", which for an optional parameter would have meant its default.
+
+`inheritAud` is understood only when it is the boolean `true` and the `include:` scope has an audience to inherit. Any other `inheritAud`, `false` included, is a parameter `rpc` does not define, so the entry is ignored — the reference's behaviour, where the specification's wording (an optional boolean) would make `false` the same as leaving it out. The `type` of a set and of its entries is decoded but not checked; a malformed `title:lang` or `detail:lang` map is ignored rather than failing the set.
+
+### Notes for client code
+
+Behaviour that follows the reference implementation and is worth knowing when building or comparing scopes:
+
+- **Decoding the parameter part never fails.** It is read as `URLSearchParams` reads it: a malformed percent-escape stays as written and invalid UTF-8 becomes U+FFFD. The scope is still rejected, by the parameter's own validation.
+- **A parsed permission keeps its values as written** — order, duplicates and letter case. Only ``ATProtoScope/canonicalScopeString()`` sorts, removes duplicates and lower-cases.
+- **`==` on ``ATProtoScope`` is structural.** It compares the values as written, including whether a parameter was stated or left to its default, so two scopes granting the same access can be unequal. To ask whether one grant includes another use `covers(_:)` on an ``ATProtoScopeSet``.
+- **An empty `actions` list means every action**, exactly as leaving `action` out of the scope string does.
+- **Only the builders and `parse` validate.** The permission types' own initializers (`RepoPermission(collection:action:)` and the others) take what they are given. A value assembled that way which no scope string can describe has no ``ATProtoScope/scopeString`` and grants nothing in a set.
+- **`did:web:localhost%3A`** — a port separator with no port — is accepted as an audience, as the URL parser behind the reference accepts `http://localhost:`.
+- **A scope value is split on SPACE only** (RFC 6749 §3.3). Tabs and newlines are part of a token, which then is not a valid scope. Leading, trailing and repeated spaces are tolerated, by ``ATProtoScopeSet/init(strict:)`` as well.
+- **A set parsed from a string holds the strings as given.** ``ATProtoScopeSet/scopes`` and ``ATProtoScopeSet/scopeString`` are in sorted order of those strings, not the order given, and two spellings of one permission are two members; ``ATProtoScopeSet/normalizedScopeString`` folds them, and keeps strings it does not recognise as they are.
+- **`transition:generic` does not reach `chat.bsky.` methods**, and `transition:chat.bsky` reaches only those. A need for every method on a service is therefore covered by the two together, not by either alone.
+- **A scope that does not parse is covered only by the identical string.** `covers` cannot reason about a scope this version does not understand, so it does not report it as covered unless the granted set holds exactly that string.
 
 ### Where Petrel is stricter than the reference
 
