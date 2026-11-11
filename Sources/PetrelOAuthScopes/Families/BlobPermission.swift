@@ -76,6 +76,16 @@ public enum AcceptPattern: Sendable, Equatable, Hashable, Comparable {
         }
     }
 
+    /// The pattern with the ASCII letters of its parts lower-cased; nothing
+    /// else is changed.
+    var asciiFolded: AcceptPattern {
+        switch self {
+        case .any: .any
+        case let .type(t): .type(t.asciiLowercased)
+        case let .exact(t, s): .exact(t.asciiLowercased, s.asciiLowercased)
+        }
+    }
+
     /// Orders patterns by ``stringValue``.
     public static func < (lhs: AcceptPattern, rhs: AcceptPattern) -> Bool {
         lhs.stringValue < rhs.stringValue
@@ -116,7 +126,13 @@ public struct BlobPermission: ScopePermission {
     private let parameters: ScopeParameterValues
 
     /// Creates a permission accepting `accept`.
+    ///
+    /// The ASCII letters of each pattern are lower-cased, as
+    /// ``AcceptPattern/init(_:)`` does for a parsed pattern, so a pattern
+    /// built from the enum cases (`.exact("IMAGE", "PNG")`) is the same
+    /// permission as its parsed spelling and matches the same uploads.
     public init(accept: [AcceptPattern]) {
+        let accept = accept.map(\.asciiFolded)
         self.accept = accept
         var values = ScopeParameterValues()
         values.set("accept", accept.map(\.stringValue))

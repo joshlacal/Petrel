@@ -311,4 +311,25 @@ struct ClientScopeModelBlobTests {
         #expect(positional.accept == [.exact("image", "svg+xml")])
         #expect(try positional.canonicalScopeString() == "blob:image/svg+xml")
     }
+
+    // MARK: Directly constructed patterns
+
+    /// A pattern built from the enum cases skips the folding of
+    /// `AcceptPattern.init(_:)`; the permission folds it, so a typed
+    /// permission and the one read back from its scope string agree.
+    @Test("a directly constructed upper-case pattern matches as its parsed spelling does")
+    func directlyConstructedPatternIsFolded() throws {
+        let typed = BlobPermission(accept: [.exact("IMAGE", "PNG"), .type("VIDEO")])
+        #expect(typed.accept == [.exact("image", "png"), .type("video")])
+        #expect(typed.matches(.init(mime: "image/png")))
+        #expect(typed.matches(.init(mime: "video/mp4")))
+        let reparsed = try BlobPermission.parse(typed.canonicalScopeString())
+        #expect(reparsed.accept == typed.accept)
+        let set = ATProtoScopeSet([.atproto, .blob(typed)])
+        #expect(set.allowsBlob(.init(mime: "image/png")))
+        #expect(set == ATProtoScopeSet(scope: set.scopeString))
+        // Only ASCII is folded: U+212A KELVIN SIGN stays what it is.
+        let kelvin = BlobPermission(accept: [.exact("image", "\u{212A}tx")])
+        #expect(!kelvin.matches(.init(mime: "image/ktx")))
+    }
 }
