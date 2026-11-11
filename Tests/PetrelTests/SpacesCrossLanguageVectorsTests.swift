@@ -424,9 +424,11 @@ struct SpacesCrossLanguageVectorsTests {
             defer { session.invalidateAndCancel() }
 
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
-            let oldKey = P256.Signing.PrivateKey()
-            let activeKey = P256.Signing.PrivateKey()
-            let wrongKey = P256.Signing.PrivateKey()
+            // swift-crypto's `P256.Signing.PrivateKey` is not `Sendable` on Linux, so the
+            // `@Sendable` mock handlers capture the raw scalars and rebuild the keys.
+            let oldKeyRaw = P256.Signing.PrivateKey().rawRepresentation
+            let activeKeyRaw = P256.Signing.PrivateKey().rawRepresentation
+            let wrongKeyRaw = P256.Signing.PrivateKey().rawRepresentation
 
             for authorityDID in ["did:plc:ewvi7nxzyoun6zhxrhs64oiz", "did:web:ds.catbird.blue"] {
                 let space = try SpaceRef(uriString: "at://\(authorityDID)/space/blue.catbird.mlsChat/3l2aaaaaaaaaa")
@@ -461,6 +463,8 @@ struct SpacesCrossLanguageVectorsTests {
                 enum NegativeCase { case expired, wrongSpace, badSignature, wrongCnfKid }
                 for neg in [NegativeCase.expired, .wrongSpace, .badSignature, .wrongCnfKid] {
                     Gate7MockURLProtocol.setHandler { request in
+                        let activeKey = try P256.Signing.PrivateKey(rawRepresentation: activeKeyRaw)
+                        let wrongKey = try P256.Signing.PrivateKey(rawRepresentation: wrongKeyRaw)
                         let url = request.url!
                         if url.host == "plc.directory" || url.path.hasSuffix("/did.json") {
                             let resp = HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
@@ -535,6 +539,8 @@ struct SpacesCrossLanguageVectorsTests {
                 // Positive case + rotated key single forceRefresh retry
                 let didFetchCount = Mutex<Int>(0)
                 Gate7MockURLProtocol.setHandler { request in
+                    let oldKey = try P256.Signing.PrivateKey(rawRepresentation: oldKeyRaw)
+                    let activeKey = try P256.Signing.PrivateKey(rawRepresentation: activeKeyRaw)
                     let url = request.url!
                     if url.host == "plc.directory" || url.path.hasSuffix("/did.json") {
                         let attempt = didFetchCount.withLock { c -> Int in
