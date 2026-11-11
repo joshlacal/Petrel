@@ -731,4 +731,89 @@ struct CARStrictnessTests {
         let archive2 = builder2.archive(root: commitCID2)
         #expect(throws: CARReaderError.self) { try parse(archive2) }
     }
+
+    // MARK: - Header
+
+    /// `header` followed by the three blocks of a well-formed repository.
+    private func archive(withHeader header: Data) -> Data {
+        let wellFormed = archive()
+        // Skip the well-formed archive's own header (one-byte varint, then
+        // the header) and splice the replacement in.
+        let headerLength = Int(wellFormed[0])
+        return TestCARBuilder.varint(header.count) + header + wellFormed.dropFirst(1 + headerLength)
+    }
+
+    @Test("A CAR header must carry version 1 and at least one CID-link root")
+    func headerRequiresVersionAndRoots() throws {
+        let root = CID.fromDAGCBOR(Data([0xa0]))
+        let malformed: [(String, Data)] = [
+            ("no version", TestCBOR.map([("roots", TestCBOR.array([TestCBOR.link(root)]))])),
+            ("no roots", TestCBOR.map([("version", TestCBOR.uint(1))])),
+            ("empty roots", TestCBOR.map([
+                ("roots", TestCBOR.array([])), ("version", TestCBOR.uint(1)),
+            ])),
+            ("version 2", TestCBOR.map([
+                ("roots", TestCBOR.array([TestCBOR.link(root)])), ("version", TestCBOR.uint(2)),
+            ])),
+            ("version is text", TestCBOR.map([
+                ("roots", TestCBOR.array([TestCBOR.link(root)])), ("version", TestCBOR.text("1")),
+            ])),
+            ("roots is not an array", TestCBOR.map([
+                ("roots", TestCBOR.link(root)), ("version", TestCBOR.uint(1)),
+            ])),
+            ("a root that is a string", TestCBOR.map([
+                ("roots", TestCBOR.array([TestCBOR.text(root.string)])), ("version", TestCBOR.uint(1)),
+            ])),
+            ("a root that is bare bytes, not a link", TestCBOR.map([
+                ("roots", TestCBOR.array([TestCBOR.bytes(root.bytes)])), ("version", TestCBOR.uint(1)),
+            ])),
+            ("a link root after a non-link root", TestCBOR.map([
+                ("roots", TestCBOR.array([TestCBOR.uint(1), TestCBOR.link(root)])),
+                ("version", TestCBOR.uint(1)),
+            ])),
+        ]
+        for (name, header) in malformed {
+            #expect(throws: CARReaderError.self, "\(name)") {
+                try CARReader(data: archive(withHeader: header))
+            }
+            // The high-level parser never reports such an archive as an
+            // empty, successful parse.
+            #expect(throws: CARReaderError.self, "\(name)") { try parse(archive(withHeader: header)) }
+        }
+
+        // Two link roots are well formed; the first is the commit.
+        let wellFormed = archive()
+        let commit = try CARReader(data: wellFormed).roots[0]
+        let twoRoots = TestCBOR.map([
+            ("roots", TestCBOR.array([TestCBOR.link(commit), TestCBOR.link(root)])),
+            ("version", TestCBOR.uint(1)),
+        ])
+        let reader = try CARReader(data: archive(withHeader: twoRoots))
+        #expect(reader.roots == [commit, root])
+        #expect(try parse(archive(withHeader: twoRoots)).0.recordCount == 1)
+    }
+
+    @Test("Block decode limits are configurable and default to a repository-sized budget")
+    func blockDecodeLimits() throws {
+        // A record holding 20,000 integers: legal, and more values than the
+        // generic 10,000-node default admits.
+        var builder = TestCARBuilder()
+        let recordCID = builder.add(TestCBOR.map([
+            ("$type", TestCBOR.text("app.bsky.feed.post")),
+            ("values", TestCBOR.array(Array(repeating: TestCBOR.uint(1), count: 20_000))),
+        ]))
+        let reader = try CARReader(data: builder.archive(root: recordCID))
+        #expect(reader.blockDecodeLimits == .repositoryBlock)
+        let decoded = try #require(try reader.decodeBlock(for: recordCID) as? [String: Any])
+        #expect((decoded["values"] as? [Any])?.count == 20_000)
+        #expect(throws: CARReaderError.self) {
+            try reader.decodeBlock(for: recordCID.bytes, limits: .standard)
+        }
+
+        let raw = try reader.rawBlockData(for: recordCID.bytes)
+        _ = try CARRepository.decodeRecordCBOR(raw)
+        #expect(throws: CARReaderError.self) {
+            try CARRepository.decodeRecordCBOR(raw, limits: .standard)
+        }
+    }
 }

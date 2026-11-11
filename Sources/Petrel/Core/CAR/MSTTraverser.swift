@@ -8,6 +8,13 @@ import Foundation
 
 // MARK: - MSTTraverser
 
+/// Walks the Merkle Search Tree of a repository held by a ``CARReader`` and
+/// reports each record path with its CID.
+///
+/// This is the tree walk behind ``CARRepository``. It enforces node shape,
+/// prefix compression and key order, and bounds depth and cycles. It does not
+/// check key depth per layer or the commit signature; for a verifying walk
+/// use `Repository` or `RepositoryMSTWalker` from the `PetrelRepo` product.
 public class MSTTraverser {
     /// Maximum allowable depth when traversing an MST.
     ///

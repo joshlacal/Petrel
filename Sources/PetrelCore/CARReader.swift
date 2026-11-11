@@ -59,6 +59,11 @@ public class CARReader {
     /// CID roots from the CAR header
     public private(set) var roots: [CID] = []
 
+    /// Decode limits applied by `decodeBlock(for:)`. The default is
+    /// `DAGCBOR.PreflightLimits.repositoryBlock`, sized so that any block
+    /// the protocol allows (records are capped near 1 MB) decodes.
+    public var blockDecodeLimits: DAGCBOR.PreflightLimits = .repositoryBlock
+
     // MARK: - Init
 
     public init(data: Data) throws {
@@ -140,37 +145,40 @@ public class CARReader {
             throw CARReaderError.invalidHeader("Header is not a CBOR map")
         }
 
-        // Check version
-        if let versionCBOR = map[.utf8String("version")] {
-            switch versionCBOR {
-            case let .unsignedInt(v):
-                guard v == 1 else {
-                    throw CARReaderError.invalidHeader("Unsupported CAR version: \(v)")
-                }
-            default:
-                throw CARReaderError.invalidHeader("Invalid version field type")
+        // CARv1 requires both header fields: `version` (1) and a non-empty
+        // `roots` array of CID links. A header missing either, or carrying a
+        // root that is not a tag-42 link, is malformed; it is never read as an
+        // archive with no roots.
+        guard let versionCBOR = map[.utf8String("version")] else {
+            throw CARReaderError.invalidHeader("Missing version field")
+        }
+        switch versionCBOR {
+        case let .unsignedInt(v):
+            guard v == 1 else {
+                throw CARReaderError.invalidHeader("Unsupported CAR version: \(v)")
             }
+        default:
+            throw CARReaderError.invalidHeader("Invalid version field type")
         }
 
-        // Parse roots
-        if let rootsCBOR = map[.utf8String("roots")] {
-            guard case let .array(rootArray) = rootsCBOR else {
-                throw CARReaderError.invalidHeader("Roots is not an array")
+        guard let rootsCBOR = map[.utf8String("roots")] else {
+            throw CARReaderError.invalidHeader("Missing roots field")
+        }
+        guard case let .array(rootArray) = rootsCBOR else {
+            throw CARReaderError.invalidHeader("Roots is not an array")
+        }
+        guard !rootArray.isEmpty else {
+            throw CARReaderError.invalidHeader("Roots array is empty")
+        }
+        for rootItem in rootArray {
+            guard case let .tagged(tag, value) = rootItem, tag.rawValue == 42,
+                  case let .byteString(bytes) = value, bytes.count > 1, bytes[0] == 0x00 else {
+                throw CARReaderError.invalidHeader("Root is not a CID link")
             }
-
-            for rootItem in rootArray {
-                if case let .tagged(tag, value) = rootItem, tag.rawValue == 42 {
-                    // Tag 42 CID link
-                    if case let .byteString(bytes) = value, bytes.count > 1, bytes[0] == 0x00 {
-                        let cidBytes = Data(bytes.dropFirst())
-                        let cid = try CID(bytes: cidBytes)
-                        roots.append(cid)
-                    }
-                } else if case let .byteString(bytes) = rootItem {
-                    // Raw CID bytes
-                    let cid = try CID(bytes: Data(bytes))
-                    roots.append(cid)
-                }
+            do {
+                roots.append(try CID(bytes: Data(bytes.dropFirst())))
+            } catch {
+                throw CARReaderError.invalidHeader("Root is not a parseable CID")
             }
         }
     }
@@ -282,6 +290,15 @@ public class CARReader {
 
     /// Retrieves and decodes the CBOR block for a given CID bytes key.
     public func decodeBlock(for cidBytes: Data) throws -> Any? {
+        try decodeBlock(for: cidBytes, limits: blockDecodeLimits)
+    }
+
+    /// Retrieves and decodes a block under explicit decode limits.
+    ///
+    /// - Parameters:
+    ///   - cidBytes: The binary CID of the block.
+    ///   - limits: Depth, node-count and container bounds for this block.
+    public func decodeBlock(for cidBytes: Data, limits: DAGCBOR.PreflightLimits) throws -> Any? {
         guard let location = rawBlockIndex[cidBytes] else {
             throw CARReaderError.blockNotFound(cidBytes.hexEncodedString())
         }
@@ -289,7 +306,7 @@ public class CARReader {
         let blockData = data[location.dataOffset ..< (location.dataOffset + location.dataLength)]
 
         do {
-            try DAGCBOR.decodeCBORPreflight(Data(blockData))
+            try DAGCBOR.decodeCBORPreflight(Data(blockData), limits: limits)
         } catch {
             throw CARReaderError.decodingFailed("CBOR preflight failed for block \(cidBytes.hexEncodedString()): \(error.localizedDescription)")
         }
