@@ -1,28 +1,83 @@
 import Crypto
 import Foundation
-import secp256k1
 
 /// The PLC wire format uses `did:key` multicodec values for both the local
 /// P-256 identity and the pinned TypeScript PDS's secp256k1 identity. Keep the
 /// decoding rule in one place so state/audit verification cannot accidentally
 /// accept a key-shaped string without proving its curve and point encoding.
+///
+/// Despite the name this is not PLC-specific: it is a public key on either
+/// AT Protocol curve. New code should prefer ``ATProtoPublicKey``, which is
+/// validated at construction; convert with `init(_:)` and ``publicKey()``.
 public enum PLCDIDVerificationKey: @unchecked Sendable, Equatable {
     case p256(P256.Signing.PublicKey)
+    /// A secp256k1 SEC1 point. Build this with
+    /// ``init(secp256k1PublicKey:)`` or ``PLCDIDKeyCodec``, which validate
+    /// the point and store it compressed.
     case secp256k1(Data)
 
+    /// Creates a secp256k1 key from a 33-byte compressed or 65-byte
+    /// uncompressed SEC1 point. The point is checked against the curve and
+    /// stored compressed.
+    ///
+    /// - Throws: ``PetrelCryptoError/malformed(_:)``.
+    public init(secp256k1PublicKey: Data) throws {
+        self = try .secp256k1(K256Backend.compressedPublicKey(fromSEC1: secp256k1PublicKey))
+    }
+
+    /// Wraps a validated ``ATProtoPublicKey``.
+    ///
+    /// - Throws: Never for a value built by ``ATProtoPublicKey``'s own
+    ///   initializers; the error path exists because the P-256 point is
+    ///   re-parsed into a Swift Crypto key.
+    public init(_ key: ATProtoPublicKey) throws {
+        switch key.curve {
+        case .p256: self = try .p256(key.p256Key())
+        case .k256: self = .secp256k1(key.compressedRepresentation)
+        }
+    }
+
+    /// The same key as a validated, curve-tagged ``ATProtoPublicKey``.
+    ///
+    /// - Throws: ``PetrelCryptoError/malformed(_:)`` if a hand-built
+    ///   `.secp256k1` case holds bytes that are not a curve point.
+    public func publicKey() throws -> ATProtoPublicKey {
+        switch self {
+        case let .p256(key):
+            return ATProtoPublicKey(key)
+        case let .secp256k1(bytes):
+            return try ATProtoPublicKey(curve: .k256, sec1Representation: bytes)
+        }
+    }
+
+    /// Multicodec prefix followed by the compressed point.
+    ///
+    /// A `.secp256k1` case built by hand from an uncompressed point is
+    /// compressed here, so the result is always the canonical 35 bytes for
+    /// a real key. Bytes that are not a curve point are passed through
+    /// unchanged and will not decode.
     public var didKeyBytes: Data {
         switch self {
         case let .p256(key):
             return Data([0x80, 0x24]) + key.compressedRepresentation
         case let .secp256k1(bytes):
-            return Data([0xe7, 0x01]) + bytes
+            let canonical = (try? K256Backend.compressedPublicKey(fromSEC1: bytes)) ?? bytes
+            return Data([0xe7, 0x01]) + canonical
         }
     }
 
-    public var didKey: String {
-        "did:key:z" + Base58BTC.encode(didKeyBytes)
+    /// The multikey string (`z…`), as used for a `Multikey` verification
+    /// method's `publicKeyMultibase`.
+    public var multikey: String {
+        "z" + Base58BTC.encode(didKeyBytes)
     }
 
+    public var didKey: String {
+        "did:key:" + multikey
+    }
+
+    /// Strict verification of a compact low-S signature. See
+    /// ``ATProtoJWTVerificationKey/verify(signature:signingInput:algorithm:)``.
     public func verify(
         signature: Data,
         signingInput: Data,
@@ -40,15 +95,33 @@ public enum PLCDIDVerificationKey: @unchecked Sendable, Equatable {
     }
 }
 
+/// `did:key` and multikey decoding for both AT Protocol curves.
+///
+/// Despite the name this is not PLC-specific. ``ATProtoPublicKey`` offers
+/// the same parsing with a curve-neutral result type.
 public enum PLCDIDKeyCodec {
+    /// Decodes a `did:key` for P-256 or K-256. The value must be canonical:
+    /// compressed point, minimal base58btc.
     public static func decode(_ value: String) throws -> PLCDIDVerificationKey {
         guard value.hasPrefix("did:key:z"), value.utf8.count <= 256 else {
             throw PetrelCryptoError.invalidIdentifier("did:key")
         }
-        let encoded = String(value.dropFirst("did:key:z".count))
+        return try decodeMultikeyBody(String(value.dropFirst("did:key:z".count)), context: "did:key")
+    }
+
+    /// Decodes a bare multikey (`z…`, no `did:key:` prefix) — the
+    /// `publicKeyMultibase` of a `Multikey` verification method.
+    public static func decodeMultikey(_ value: String) throws -> PLCDIDVerificationKey {
+        guard value.hasPrefix("z"), value.utf8.count <= 256 else {
+            throw PetrelCryptoError.invalidIdentifier("multikey")
+        }
+        return try decodeMultikeyBody(String(value.dropFirst()), context: "multikey")
+    }
+
+    private static func decodeMultikeyBody(_ encoded: String, context: String) throws -> PLCDIDVerificationKey {
         let decoded = try Base58BTC.decode(encoded)
         guard Base58BTC.encode(decoded) == encoded else {
-            throw PetrelCryptoError.invalidIdentifier("did:key")
+            throw PetrelCryptoError.invalidIdentifier(context)
         }
 
         if decoded.count == 35, decoded.prefix(2) == Data([0x80, 0x24]) {
@@ -57,25 +130,20 @@ public enum PLCDIDKeyCodec {
                     compressedRepresentation: decoded.dropFirst(2)
                 )
                 guard key.compressedRepresentation == decoded.dropFirst(2) else {
-                    throw PetrelCryptoError.invalidIdentifier("P-256 did:key")
+                    throw PetrelCryptoError.invalidIdentifier("P-256 \(context)")
                 }
                 return .p256(key)
             } catch {
-                throw PetrelCryptoError.invalidIdentifier("P-256 did:key")
+                throw PetrelCryptoError.invalidIdentifier("P-256 \(context)")
             }
         }
 
         guard decoded.count == 35, decoded.prefix(2) == Data([0xe7, 0x01]) else {
-            throw PetrelCryptoError.invalidIdentifier("secp256k1 did:key")
+            throw PetrelCryptoError.invalidIdentifier("secp256k1 \(context)")
         }
         let point = Data(decoded.dropFirst(2))
-        do {
-            _ = try secp256k1.Signing.PublicKey(
-                dataRepresentation: point,
-                format: .compressed
-            )
-        } catch {
-            throw PetrelCryptoError.invalidIdentifier("secp256k1 did:key")
+        guard let compressed = try? K256Backend.compressedPublicKey(fromSEC1: point), compressed == point else {
+            throw PetrelCryptoError.invalidIdentifier("secp256k1 \(context)")
         }
         return .secp256k1(point)
     }
@@ -118,26 +186,11 @@ public enum PLCDIDKeyCodec {
                 throw PetrelCryptoError.invalidIdentifier("P-256 legacy verification method")
             }
         case .secp256k1:
-            let compressed: Data
-            switch decoded.count {
-            case 33:
-                compressed = decoded
-            case 65:
-                // 0x04 ‖ X ‖ Y → (0x02 | lsb(Y)) ‖ X.
-                guard decoded[decoded.startIndex] == 0x04 else {
-                    throw PetrelCryptoError.invalidIdentifier("secp256k1 legacy verification method")
-                }
-                let x = Data(decoded.dropFirst().prefix(32))
-                let yIsOdd = (decoded[decoded.index(decoded.startIndex, offsetBy: 64)] & 1) == 1
-                compressed = Data([yIsOdd ? 0x03 : 0x02]) + x
-            default:
-                throw PetrelCryptoError.invalidIdentifier("secp256k1 legacy verification method")
-            }
-            do {
-                _ = try secp256k1.Signing.PublicKey(
-                    dataRepresentation: compressed, format: .compressed
-                )
-            } catch {
+            // Parse with libsecp256k1 in either encoding: for the 65-byte
+            // form that checks (X, Y) against the curve equation, so a
+            // corrupted Y is rejected rather than silently discarded.
+            guard decoded.count == 33 || decoded.count == 65,
+                  let compressed = try? K256Backend.compressedPublicKey(fromSEC1: decoded) else {
                 throw PetrelCryptoError.invalidIdentifier("secp256k1 legacy verification method")
             }
             return .secp256k1(compressed)

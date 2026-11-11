@@ -1,13 +1,20 @@
 import Foundation
 
+/// Base58 with the Bitcoin alphabet, the `z` multibase used by multikeys
+/// and `did:key`.
 public enum Base58BTC {
     private static let alphabet = Array("123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".utf8)
     private static let lookup: [UInt8: Int] = Dictionary(uniqueKeysWithValues: alphabet.enumerated().map { ($0.element, $0.offset) })
 
+    /// Encodes bytes as base58btc (no multibase prefix). Each leading zero
+    /// byte becomes one leading `1`.
     public static func encode(_ data: Data) -> String {
         guard !data.isEmpty else { return "" }
         var digits = [UInt8](repeating: 0, count: data.count * 138 / 100 + 1)
-        var digitLength = 1
+        // Number of base-58 digits of the numeric value so far. Zero while
+        // the value is zero, so an all-zero input yields only its
+        // leading-zero markers ("1" per byte) and no spurious extra digit.
+        var digitLength = 0
         for byte in data {
             var carry = Int(byte)
             for index in 0 ..< digitLength {
@@ -27,13 +34,21 @@ public enum Base58BTC {
         return String(decoding: output, as: UTF8.self)
     }
 
+    /// Decodes base58btc (no multibase prefix). Each leading `1` becomes one
+    /// leading zero byte.
+    ///
+    /// - Throws: ``PetrelCryptoError/invalidIdentifier(_:)`` for an empty
+    ///   string, more than 256 characters, or a character outside the
+    ///   alphabet.
     public static func decode(_ value: String) throws -> Data {
         let bytes = Array(value.utf8)
         guard !bytes.isEmpty, bytes.count <= 256 else {
             throw PetrelCryptoError.invalidIdentifier("base58btc value")
         }
         var output = [UInt8](repeating: 0, count: bytes.count * 733 / 1_000 + 1)
-        var outputLength = 1
+        // As in `encode`: zero bytes of numeric value until a non-zero digit
+        // is seen, so "1" decodes to exactly one zero byte.
+        var outputLength = 0
         for byte in bytes {
             guard let digit = lookup[byte] else {
                 throw PetrelCryptoError.invalidIdentifier("base58btc value")
