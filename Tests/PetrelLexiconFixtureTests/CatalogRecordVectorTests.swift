@@ -67,15 +67,6 @@ struct CatalogRecordVectorTests {
         "blob wrong type",
     ]
 
-    /// Invalid vectors that hinge on a string format whose Swift type (`URI`,
-    /// `LanguageCodeContainer`) may or may not validate, depending on the version of the
-    /// syntax types this is built against. Neither outcome is a generator fault, so both
-    /// are accepted here; the runtime validator rejects them unconditionally.
-    private static let syntaxTypeDependentVectors: Set<String> = [
-        "invalid string format language",
-        "invalid string format uri",
-    ]
-
     @Test("Every valid record vector decodes strictly and re-encodes to the same data")
     func validRecordsRoundTrip() throws {
         let vectors = try Self.vectors("record-data-valid")
@@ -109,9 +100,7 @@ struct CatalogRecordVectorTests {
             } catch {}
         }
 
-        let unexpectedlyAccepted = Set(accepted)
-            .subtracting(Self.constraintOnlyVectors)
-            .subtracting(Self.syntaxTypeDependentVectors)
+        let unexpectedlyAccepted = Set(accepted).subtracting(Self.constraintOnlyVectors)
         #expect(unexpectedlyAccepted.isEmpty, "structurally invalid but accepted: \(unexpectedlyAccepted.sorted())")
         let unexpectedlyRejected = Self.constraintOnlyVectors.subtracting(accepted)
         #expect(unexpectedlyRejected.isEmpty, "only a constraint is violated but rejected: \(unexpectedlyRejected.sorted())")
