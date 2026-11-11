@@ -80,7 +80,7 @@ public struct JetstreamClientConfiguration: Sendable {
     apiKey: String? = nil,
     cursorStorage: (any FirehoseCursorStorage)? = nil,
     transport: any JetstreamHTTPTransport = URLSessionJetstreamHTTPTransport(),
-    sessionFactory: any FirehoseWebSocketSessionFactory = URLSessionFirehoseWebSocketFactory(),
+    sessionFactory: any FirehoseWebSocketSessionFactory = URLSessionFirehoseWebSocketFactory(options: .jetstream),
     backoff: FirehoseBackoffConfiguration = .init()
   ) {
     self.host = host
@@ -109,16 +109,24 @@ public final class JetstreamClient: Sendable {
   }
 
   /// Returns an async throwing stream yielding batches of Jetstream events.
+  ///
+  /// At most a few batches are buffered ahead of the consumer; backfill downloads and the
+  /// live socket pause while the consumer is busy. With `cursorStorage` set, the cursor of a
+  /// batch is saved when the consumer asks for the next one.
   public func events() -> AsyncThrowingStream<JetstreamBatch, Error> {
-    AsyncThrowingStream { continuation in
-      let runner = JetstreamClientRunner(configuration: configuration)
-      let task = Task {
-        await runner.run(continuation: continuation)
-      }
-      continuation.onTermination = { _ in
-        task.cancel()
-      }
+    let channel = JetstreamBatchChannel(capacity: 4, cursorStorage: configuration.cursorStorage)
+    let runner = JetstreamClientRunner(configuration: configuration)
+    let task = Task {
+      await runner.run(continuation: channel)
     }
+    let lifetime = JetstreamProducerLifetime(task: task, channel: channel)
+    return AsyncThrowingStream(unfolding: {
+      try await withTaskCancellationHandler {
+        try await lifetime.next()
+      } onCancel: {
+        lifetime.cancel()
+      }
+    })
   }
 }
 
@@ -161,7 +169,7 @@ private actor JetstreamClientRunner {
     )
   }
 
-  func run(continuation: AsyncThrowingStream<JetstreamBatch, Error>.Continuation) async {
+  func run(continuation: JetstreamBatchChannel) async {
     do {
       switch configuration.mode {
       case let .live(cursor):
@@ -174,7 +182,7 @@ private actor JetstreamClientRunner {
           isSnapshotOnly: true,
           continuation: continuation
         )
-        continuation.finish()
+        await continuation.finish()
 
       case let .snapshotThenLive(afterSeq):
         var currentAfterSeq = afterSeq
@@ -218,13 +226,13 @@ private actor JetstreamClientRunner {
             continue
           }
         }
-        continuation.finish()
+        await continuation.finish()
       }
     } catch {
       if !Task.isCancelled {
-        continuation.finish(throwing: error)
+        await continuation.finish(throwing: error)
       } else {
-        continuation.finish()
+        await continuation.finish()
       }
     }
   }
@@ -233,14 +241,20 @@ private actor JetstreamClientRunner {
 
   private func runLiveOnly(
     initialCursor: Int64?,
-    continuation: AsyncThrowingStream<JetstreamBatch, Error>.Continuation
+    continuation: JetstreamBatchChannel
   ) async throws {
+    // The channel saves the cursor once the consumer has processed a batch, so the inner
+    // subscription gets no storage of its own; the stored cursor is only read here.
+    var initialCursor = initialCursor
+    if initialCursor == nil, let storage = configuration.cursorStorage {
+      initialCursor = try? await storage.loadCursor()
+    }
     let subConfig = JetstreamSubscriptionConfiguration(
       url: configuration.host,
       filter: configuration.filter,
       cursor: initialCursor,
       compression: configuration.compression,
-      cursorStorage: configuration.cursorStorage,
+      cursorStorage: nil,
       backoff: configuration.backoff,
       sessionFactory: configuration.sessionFactory,
       httpTransport: configuration.transport
@@ -257,13 +271,13 @@ private actor JetstreamClientRunner {
           lastCursor = seq
         }
         // ponytail: per-event live batches; coalesce if throughput demands
-        continuation.yield(JetstreamBatch(events: [jetstreamEvent], lastCursor: lastCursor))
+        await continuation.yield(JetstreamBatch(events: [jetstreamEvent], lastCursor: lastCursor))
       case .streamError:
-        // Subscription reconnects automatically; ignore terminal streamError notification
+        // The subscription ends by throwing the matching EventStreamError right after.
         break
       }
     }
-    continuation.finish()
+    await continuation.finish()
   }
 
   // MARK: - Live Tail Cutover
@@ -277,14 +291,14 @@ private actor JetstreamClientRunner {
 
   private func runLiveTail(
     cursor: Int64,
-    continuation: AsyncThrowingStream<JetstreamBatch, Error>.Continuation
+    continuation: JetstreamBatchChannel
   ) async throws {
     let subConfig = JetstreamSubscriptionConfiguration(
       url: configuration.host,
       filter: configuration.filter,
       cursor: cursor,
       compression: configuration.compression,
-      cursorStorage: configuration.cursorStorage,
+      cursorStorage: nil,
       backoff: configuration.backoff,
       sessionFactory: configuration.sessionFactory,
       httpTransport: configuration.transport
@@ -305,10 +319,9 @@ private actor JetstreamClientRunner {
             }
             lastCursor = seq
             // ponytail: per-event live batches; coalesce if throughput demands
-            continuation.yield(JetstreamBatch(events: [jetstreamEvent], lastCursor: lastCursor))
-            try? await configuration.cursorStorage?.saveCursor(seq)
+            await continuation.yield(JetstreamBatch(events: [jetstreamEvent], lastCursor: lastCursor))
           } else {
-            continuation.yield(JetstreamBatch(events: [jetstreamEvent], lastCursor: lastCursor))
+            await continuation.yield(JetstreamBatch(events: [jetstreamEvent], lastCursor: lastCursor))
           }
         case .streamError:
           break
@@ -326,7 +339,7 @@ private actor JetstreamClientRunner {
     initialAfterSeq: Int64,
     targetBeforeSeq: Int64?,
     isSnapshotOnly: Bool,
-    continuation: AsyncThrowingStream<JetstreamBatch, Error>.Continuation
+    continuation: JetstreamBatchChannel
   ) async throws -> (sealedTip: Int64, lastProcessed: Int64) {
     var currentAfterSeq = initialAfterSeq
     var pinnedS: Int64?
@@ -411,11 +424,10 @@ private actor JetstreamClientRunner {
 
   private func flushBatch(
     _ state: BackfillState,
-    continuation: AsyncThrowingStream<JetstreamBatch, Error>.Continuation
+    continuation: JetstreamBatchChannel
   ) async {
     guard !state.currentBatch.isEmpty else { return }
-    continuation.yield(JetstreamBatch(events: state.currentBatch, lastCursor: state.lastProcessed))
-    try? await configuration.cursorStorage?.saveCursor(state.lastProcessed)
+    await continuation.yield(JetstreamBatch(events: state.currentBatch, lastCursor: state.lastProcessed))
     state.currentBatch.removeAll(keepingCapacity: true)
   }
 
@@ -426,7 +438,7 @@ private actor JetstreamClientRunner {
     initialAfterSeq: Int64,
     effectiveLimit: Int64,
     state: BackfillState,
-    continuation: AsyncThrowingStream<JetstreamBatch, Error>.Continuation
+    continuation: JetstreamBatchChannel
   ) async throws {
     guard !units.isEmpty else { return }
 
@@ -485,7 +497,7 @@ private actor JetstreamClientRunner {
     initialAfterSeq: Int64,
     effectiveLimit: Int64,
     state: BackfillState,
-    continuation: AsyncThrowingStream<JetstreamBatch, Error>.Continuation
+    continuation: JetstreamBatchChannel
   ) async throws {
     switch unit {
     case let .segmentFile(fileURL):
@@ -525,7 +537,7 @@ private actor JetstreamClientRunner {
     initialAfterSeq: Int64,
     effectiveLimit: Int64,
     state: BackfillState,
-    continuation: AsyncThrowingStream<JetstreamBatch, Error>.Continuation
+    continuation: JetstreamBatchChannel
   ) async throws {
     for event in events {
       let seq = event.seq

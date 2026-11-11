@@ -4,7 +4,8 @@ import PetrelFirehose
 
 /// One record mutation from the Jetstream v2 stream or archive.
 public struct JetstreamCommitEvent: Sendable {
-  /// Jetstream's monotonic per-event sequence number; the stream cursor.
+  /// Jetstream's monotonic per-event sequence number; the stream cursor. On the legacy
+  /// `/subscribe` API, which has no sequence numbers, this is the event's `time_us`.
   public let seq: Int64
   public let did: String
   /// Display timestamp, unix microseconds.

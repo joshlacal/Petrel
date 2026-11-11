@@ -11,8 +11,44 @@ import PetrelFirehose
 import XCTest
 
 final class JetstreamLiveSmokeTests: XCTestCase {
-  /// Live integration test against an active Jetstream host.
-  /// Skipped by default unless JETSTREAM_SMOKE_URL environment variable is provided.
+  private static let postFilter = JetstreamFilter(kinds: [.commit], dids: [], collections: ["app.bsky.feed.post"])
+  private static let backoff = FirehoseBackoffConfiguration(initialDelay: 0.5, maxDelay: 5.0, multiplier: 2.0)
+
+  private static func isPostCreate(_ event: JetstreamEvent) -> JetstreamCommitEvent? {
+    if case let .commit(commit) = event, commit.operation != .delete, commit.recordJSON != nil {
+      return commit
+    }
+    return nil
+  }
+
+  /// Runs `search` until it returns a create/update commit, or 30 seconds have passed.
+  /// Any thrown error (a rejected connection included) fails the test: a smoke test that
+  /// tolerates rejection passes vacuously.
+  private func firstPostCommit(
+    file: StaticString = #filePath, line: UInt = #line,
+    _ search: @escaping @Sendable () async throws -> JetstreamCommitEvent?
+  ) async throws -> JetstreamCommitEvent? {
+    let consumer = Task { try await search() }
+    let timeout = Task {
+      try await Task.sleep(nanoseconds: 30_000_000_000)
+      consumer.cancel()
+    }
+    defer { timeout.cancel() }
+    let commit = try await consumer.value
+    XCTAssertNotNil(commit, "No create/update commit within 30 s", file: file, line: line)
+    if let commit {
+      XCTAssertEqual(commit.collection, "app.bsky.feed.post", file: file, line: line)
+      XCTAssertNotNil(commit.decodedRecord(), "Expected the record to decode", file: file, line: line)
+      XCTAssertGreaterThan(commit.seq, 0, file: file, line: line)
+    }
+    return commit
+  }
+
+  /// Live integration test against an active Jetstream host, through `JetstreamClient` with
+  /// its default transport and no compression (production then sends WebSocket TEXT frames).
+  ///
+  /// `JETSTREAM_SMOKE_URL` is either a base host (v2 API) or a full legacy endpoint ending in
+  /// `/subscribe`, e.g. `wss://jetstream2.us-east.bsky.network/subscribe`.
   func testLiveStreamReceivesCommitWithDecodableRecord() async throws {
     guard let smokeURLString = ProcessInfo.processInfo.environment["JETSTREAM_SMOKE_URL"],
       let smokeURL = URL(string: smokeURLString)
@@ -20,80 +56,49 @@ final class JetstreamLiveSmokeTests: XCTestCase {
       throw XCTSkip("JETSTREAM_SMOKE_URL environment variable not set; skipping live smoke test")
     }
 
-    let filter = JetstreamFilter(
-      kinds: [.commit],
-      dids: [],
-      collections: ["app.bsky.feed.post"]
-    )
-
-    let config = JetstreamClientConfiguration(
+    let client = JetstreamClient(configuration: JetstreamClientConfiguration(
       host: smokeURL,
       mode: .live(),
-      filter: filter,
+      filter: Self.postFilter,
       batchSize: 10,
       compression: false,
-      backoff: FirehoseBackoffConfiguration(initialDelay: 0.5, maxDelay: 5.0, multiplier: 2.0)
-    )
-
-    let client = JetstreamClient(configuration: config)
-
-    // Run stream with a 30-second timeout
-    let streamTask = Task { () -> [JetstreamBatch] in
-      var collectedBatches: [JetstreamBatch] = []
+      backoff: Self.backoff
+    ))
+    _ = try await firstPostCommit {
       for try await batch in client.events() {
-        collectedBatches.append(batch)
-        // Stop after collecting at least 1 batch with a commit event
-        if collectedBatches.contains(where: { b in
-          b.events.contains(where: { e in
-            if case .commit = e { return true }
-            return false
-          })
-        }) {
-          break
+        if let commit = batch.events.lazy.compactMap(Self.isPostCreate).first {
+          return commit
         }
       }
-      return collectedBatches
+      return nil
+    }
+  }
+
+  /// The v2 API on `JETSTREAM_SMOKE_V2_URL` (a base host such as
+  /// `https://jetstream2.us-east.bsky.network`), once uncompressed (TEXT frames) and once with
+  /// the server's zstd dictionary (BINARY frames).
+  func testLiveV2StreamUncompressedAndCompressed() async throws {
+    guard let smokeURLString = ProcessInfo.processInfo.environment["JETSTREAM_SMOKE_V2_URL"],
+      let smokeURL = URL(string: smokeURLString)
+    else {
+      throw XCTSkip("JETSTREAM_SMOKE_V2_URL environment variable not set; skipping live smoke test")
     }
 
-    let timeoutTask = Task {
-      try await Task.sleep(nanoseconds: 30_000_000_000)
-      streamTask.cancel()
-    }
-
-    do {
-      let batches = try await streamTask.value
-      timeoutTask.cancel()
-
-      XCTAssertFalse(batches.isEmpty, "Expected at least 1 batch from live stream")
-
-      var foundDecodableCommit = false
-      for batch in batches {
-        for event in batch.events {
-          if case let .commit(commit) = event {
-            XCTAssertEqual(commit.collection, "app.bsky.feed.post")
-            if commit.operation != .delete {
-              if commit.recordJSON != nil {
-                foundDecodableCommit = true
-                let decoded = commit.decodedRecord()
-                XCTAssertNotNil(decoded, "Expected successful record decode")
-              }
-            }
+    for compression in [false, true] {
+      let subscription = JetstreamSubscription(configuration: .init(
+        url: smokeURL, filter: Self.postFilter, compression: compression, backoff: Self.backoff
+      ))
+      XCTAssertEqual(subscription.configuration.resolvedAPIVersion, .v2)
+      let commit = try await firstPostCommit {
+        for try await element in subscription.events() {
+          if case let .event(event) = element, let commit = Self.isPostCreate(event) {
+            return commit
           }
         }
+        return nil
       }
-
-      XCTAssertTrue(foundDecodableCommit, "Expected at least one create/update commit with record payload")
-    } catch let error as JetstreamSubscriptionError {
-      // If host rejects due to unsupported endpoint (e.g. 404 or 400), report as environment finding
-      timeoutTask.cancel()
-      if case let .connectionRejected(status, _, _) = error {
-        print("[SmokeTest] Host returned connectionRejected status \(status): \(error)")
-      } else {
-        throw error
-      }
-    } catch is CancellationError {
-      timeoutTask.cancel()
-      XCTFail("Timed out waiting for live stream events from \(smokeURL)")
+      // v2 cursors are sequence numbers, far below unix-microsecond timestamps.
+      XCTAssertLessThan(commit?.seq ?? 0, 1_000_000_000_000_000, "compression: \(compression)")
     }
   }
 
