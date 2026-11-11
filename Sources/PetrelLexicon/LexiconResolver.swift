@@ -426,18 +426,24 @@ public enum LexiconHTTPError: Error, Sendable, Hashable, CustomStringConvertible
 /// record against a signed repository commit; plug a ``LexiconRecordFetching``
 /// that uses `com.atproto.sync.getRecord` and MST proof verification
 /// (`PetrelRepo`) into ``DefaultLexiconResolver`` where that matters.
+///
+/// The PDS is named by records anyone can publish, so the default transport
+/// treats it as an untrusted host: see ``hardenedTransport()``.
 public struct LexiconHTTPRecordFetcher: LexiconRecordFetching {
     private let transport: LexiconHTTPTransport
 
     /// Creates a fetcher.
     ///
     /// - Parameter transport: Performs the request. Defaults to
-    ///   `URLSession.shared`.
-    public init(transport: @escaping LexiconHTTPTransport = LexiconHTTPRecordFetcher.urlSessionTransport) {
+    ///   ``hardenedTransport()``: no credentials, no redirects, bounded time
+    ///   and size, private and reserved addresses refused.
+    public init(transport: @escaping LexiconHTTPTransport = LexiconHTTPRecordFetcher.hardenedTransport()) {
         self.transport = transport
     }
 
-    /// A transport backed by `URLSession.shared`.
+    /// A transport backed by `URLSession.shared`, with none of the protections
+    /// of ``hardenedTransport()``. For closed networks and local development,
+    /// where the PDS is at a private or loopback address.
     public static let urlSessionTransport: LexiconHTTPTransport = { request in
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let http = response as? HTTPURLResponse else {

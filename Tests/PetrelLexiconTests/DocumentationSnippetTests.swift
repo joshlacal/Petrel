@@ -286,7 +286,18 @@ struct DocumentationSnippetTests {
         #expect(did == "did:plc:ewvi7nxzyoun6zhxrhs64oiz")
     }
 
-    /// LexiconResolution.md, "Resolve a Lexicon"
+    /// LexiconResolution.md, "Resolve a Lexicon". Compiled, not run: it would query live DNS.
+    func documentationResolveWithIdentity() async throws {
+        let resolver = DefaultLexiconResolver(
+            identity: IdentityResolver(),
+            cache: LexiconResolutionCache(timeToLive: 300)
+        )
+
+        let resolved = try await resolver.resolve("com.example.note")
+        _ = resolved
+    }
+
+    /// LexiconResolution.md, "Replace a step"
     struct ExampleDNS: LexiconDNSTXTResolving {
         func resolveTXT(_ name: String) async throws -> [String] {
             // Query your DNS resolver for the TXT records of `name`.

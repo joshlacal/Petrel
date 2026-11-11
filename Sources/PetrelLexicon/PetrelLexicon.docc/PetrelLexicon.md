@@ -113,6 +113,8 @@ its `catalog`), and `syntax`.
 - ``LexiconResolutionError``
 - ``LexiconDNSTXTResolving``
 - ``LexiconDIDDocumentResolving``
+- ``IdentityLexiconDNSResolver``
+- ``IdentityLexiconDIDResolver``
 - ``LexiconRecordFetching``
 - ``LexiconFetchedRecord``
 - ``LexiconHTTPRecordFetcher``

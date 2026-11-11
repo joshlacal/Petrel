@@ -32,6 +32,27 @@ fine, and two different values are a conflict that fails the resolution.
 
 ## Resolve a Lexicon
 
+With Petrel's identity layer, one initializer wires up all three steps: the
+system DNS resolver for the TXT lookup, an `IdentityResolver` for the DID, and
+a credential-free HTTP transport for the record.
+
+<!-- Mirrors DocumentationSnippetTests.documentationResolveWithIdentity -->
+
+```swift
+let resolver = DefaultLexiconResolver(
+    identity: IdentityResolver(),
+    cache: LexiconResolutionCache(timeToLive: 300)
+)
+
+let resolved = try await resolver.resolve("com.example.note")
+```
+
+``IdentityLexiconDNSResolver`` and ``IdentityLexiconDIDResolver`` are the two
+adapters behind that initializer; use them directly to combine the identity
+layer with a record source of your own.
+
+## Replace a step
+
 ``DefaultLexiconResolver`` runs the procedure over three small protocols, so
 each step can use whatever the application already has:
 
@@ -83,9 +104,17 @@ returned the resolver checks that:
 
 Each failure is a distinct ``LexiconResolutionError`` case.
 
-## What the default fetcher does not prove
+## What the default fetcher does and does not do
 
-``LexiconHTTPRecordFetcher`` trusts the PDS it talks to and the TLS connection
+The PDS a schema is fetched from is named by a DNS record and a DID document
+that anyone can publish, so ``LexiconHTTPRecordFetcher`` treats it as an
+untrusted host. Its default transport sends no credentials or cookies, follows
+no redirects, bounds the time and the size of the response, and refuses hosts
+that resolve to private, loopback or reserved addresses. On a closed network,
+where the PDS is at such an address, pass
+``LexiconHTTPRecordFetcher/urlSessionTransport`` or a transport of your own.
+
+The fetcher trusts the PDS it talks to and the TLS connection
 to it. It does not verify the record against a signed repository commit. Where
 that matters, supply a ``LexiconRecordFetching`` implementation that uses
 `com.atproto.sync.getRecord` and verifies the Merkle proof (`PetrelRepo`
