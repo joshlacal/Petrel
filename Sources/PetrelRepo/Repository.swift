@@ -170,10 +170,21 @@ public struct RepositoryRecordProof: Sendable, Equatable {
     /// The commit, the MST nodes on the search path, and the record if it
     /// exists, in that order.
     public let blocks: [PublicRepositoryBlock]
+    /// The limits of the repository that built the proof; ``car(limits:)``
+    /// encodes under them unless told otherwise.
+    let repositoryLimits: PublicRepositoryLimits
 
     /// The proof as a CAR archive whose root is the commit.
-    public func car() async throws -> Data {
-        try await PublicRepositoryCAR.encode(rootCID: commitCID, blocks: blocks)
+    ///
+    /// - Parameter limits: Bounds on the archive. `nil` (the default) uses the
+    ///   limits of the repository the proof came from, so any record that
+    ///   repository holds can be proven.
+    public func car(limits: PublicRepositoryLimits? = nil) async throws -> Data {
+        try await PublicRepositoryCAR.encode(
+            rootCID: commitCID,
+            blocks: blocks,
+            limits: limits ?? repositoryLimits
+        )
     }
 }
 
@@ -647,7 +658,8 @@ public struct Repository: Sendable {
             commitCID: commit.cid,
             path: path,
             recordCID: found.recordCID,
-            blocks: blocks
+            blocks: blocks,
+            repositoryLimits: options.limits
         )
     }
 

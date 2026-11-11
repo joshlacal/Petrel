@@ -237,6 +237,28 @@ struct RepositoryFacadeTests {
         #expect(try await second.verify().recordCount == 9)
     }
 
+    @Test("a record proof serializes under the repository's own limits")
+    func recordProofCarriesRepositoryLimits() async throws {
+        // 1.5 MB: allowed by networkScale (2 MB blocks), refused by standard (1 MB).
+        let signer = K256Keypair.generate()
+        var repository = try await Repository.create(did: did, signer: signer)
+        let large: PublicRecord = ["$type": .string(posts), "text": .string(String(repeating: "x", count: 1_500_000))]
+        repository = try await repository.commit(
+            [.create(path: try path(posts, "large"), record: large)], signer: signer
+        ).repository
+
+        let proof = try await repository.recordProof(collection: posts, recordKey: "large")
+        let proven = try await Repository.verifyRecordProof(
+            car: try await proof.car(), did: did, collection: posts, recordKey: "large",
+            verification: .signingKey(signer.publicKey)
+        )
+        #expect(try proven.record?.record() == large)
+        // An explicit, tighter policy still applies when asked for.
+        await #expect(throws: PublicRepositoryCARError.self) {
+            try await proof.car(limits: .standard)
+        }
+    }
+
     @Test("record proofs: inclusion and exclusion, built and verified")
     func recordProofs() async throws {
         let signer = K256Keypair.generate()
