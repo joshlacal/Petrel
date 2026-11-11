@@ -62,6 +62,11 @@ let package = Package(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
         ),
+        // `swift package petrel-lexgen`: generate Swift types from your own lexicons.
+        .plugin(
+            name: "PetrelLexgen",
+            targets: ["PetrelLexgen"]
+        ),
     ],
     dependencies: [
         .package(url: "https://github.com/valpackett/SwiftCBOR.git", .upToNextMinor(from: "0.6.0")),
@@ -249,6 +254,24 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ]
+        ),
+        .plugin(
+            name: "PetrelLexgen",
+            capability: .command(
+                intent: .custom(
+                    verb: "petrel-lexgen",
+                    description: "Generate Swift types and XRPC calls from Lexicon JSON files"
+                ),
+                permissions: [
+                    .writeToPackageDirectory(
+                        reason: "Writes the generated Swift sources into the output directory the manifest names"
+                    ),
+                    .allowNetworkConnections(
+                        scope: .all(ports: [443]),
+                        reason: "Installs the generator's Python dependencies from PyPI on first use"
+                    ),
+                ]
+            )
         ),
         .testTarget(
             name: "PetrelTests",

@@ -123,6 +123,12 @@ def resolve_owned_namespace_roots(graph_path):
                 core_manifest_path = os.path.normpath(
                     os.path.join(os.getcwd(), pkg['manifest'])
                 )
+                if not os.path.exists(core_manifest_path):
+                    # Run from another package (a third party generating its own
+                    # lexicons): the graph still describes this Petrel checkout.
+                    core_manifest_path = os.path.normpath(
+                        os.path.join(os.path.dirname(GENERATOR_DIR), pkg['manifest'])
+                    )
                 core = load_manifest(core_manifest_path)
                 return normalize_core_namespace_roots(
                     core.get('package', {}).get('core_namespace_roots', ()),
