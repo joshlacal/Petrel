@@ -41,24 +41,107 @@ extension ScopeFamily {
     func parseableScopeString() throws(ScopeParseError) -> String {
         try Self.schema.formatParseable(scopeParameters)
     }
-
-    /// What this scope grants, independent of how it was written.
-    var meaning: ScopeMeaning {
-        ScopeMeaning(resource: Self.schema.prefix, parameters: Self.schema.meaning(of: scopeParameters))
-    }
 }
 
-/// What a scope grants, independent of how it was written: the resource and
-/// the normalised values of its parameters. Equal for two scopes exactly when
-/// they are the same grant.
+/// What a scope grants, as the matchers see it, independent of how it was
+/// written. Equal for two scopes exactly when every request one allows the
+/// other allows too.
+///
+/// It is built from the same typed values the matchers read, never from a
+/// scope string: a canonical string is not a faithful key. It is not a fixed
+/// point (`blob?accept=a/b&accept=a/b` canonicalises to `blob?accept=a/b`,
+/// which canonicalises to `blob:a/b`), and it can coincide for different
+/// grants — an `rpc` audience ending `#svc&admin` and one ending
+/// `#svc%26admin` both canonicalise to `…%23svc%26admin`. Redundant spellings
+/// are folded the way the matchers fold them: a wildcard absorbs the specific
+/// values beside it, `type/*` absorbs `type/subtype`, and `manage` absorbs
+/// `read`.
 struct ScopeMeaning: Hashable {
-    let resource: ScopeBytes
-    /// Parameter name → the set of its normalised values, as bytes.
-    let parameters: [String: Set<ScopeBytes>]
+    private let resource: ScopeBytes
+    /// Parameter name → the set of values it stands for, each tagged so that a
+    /// wildcard can never equal a literal value spelled `*`.
+    private let parameters: [String: Set<ScopeBytes>]
 
-    init(resource: String, parameters: [String: Set<ScopeBytes>]) {
+    private static let wildcard: ScopeBytes = [0]
+    private static func value(_ string: String) -> ScopeBytes { [1] + string.utf8 }
+
+    init(resource: String, parameters: [String: Set<ScopeBytes>] = [:]) {
         self.resource = resource.scopeBytes
         self.parameters = parameters
+    }
+
+    init(_ permission: RepoPermission) {
+        let collections: Set<ScopeBytes> = permission.collection.contains(.any)
+            ? [Self.wildcard]
+            : Set(permission.collection.map { Self.value($0.stringValue) })
+        self.init(resource: RepoPermission.prefix, parameters: [
+            "collection": collections,
+            "action": Set(permission.action.map { Self.value($0.rawValue) }),
+        ])
+    }
+
+    init(_ permission: RpcPermission) {
+        let methods: Set<ScopeBytes> = permission.lxm.contains(.any)
+            ? [Self.wildcard]
+            : Set(permission.lxm.map { Self.value($0.stringValue) })
+        self.init(resource: RpcPermission.prefix, parameters: [
+            "lxm": methods,
+            "aud": [Self.audience(permission.aud)],
+        ])
+    }
+
+    init(_ permission: BlobPermission) {
+        let accept: Set<ScopeBytes>
+        if permission.accept.contains(.any) {
+            accept = [Self.wildcard]
+        } else {
+            let types = Set(permission.accept.compactMap { pattern -> ScopeBytes? in
+                if case let .type(type) = pattern { return type.scopeBytes }
+                return nil
+            })
+            accept = Set(permission.accept.compactMap { pattern -> ScopeBytes? in
+                switch pattern {
+                case .any: nil
+                case let .type(type): [2] + type.utf8
+                case let .exact(type, subtype):
+                    // Already granted by `type/*` beside it.
+                    types.contains(type.scopeBytes) ? nil : Self.value("\(type)/\(subtype)")
+                }
+            })
+        }
+        self.init(resource: BlobPermission.prefix, parameters: ["accept": accept])
+    }
+
+    init(_ permission: AccountPermission) {
+        // `manage` includes `read`.
+        let actions: Set<ScopeBytes> = permission.action.contains(.manage)
+            ? [Self.value(AccountAction.manage.rawValue)]
+            : Set(permission.action.map { Self.value($0.rawValue) })
+        self.init(resource: AccountPermission.prefix, parameters: [
+            "attr": [Self.value(permission.attr.rawValue)],
+            "action": actions,
+        ])
+    }
+
+    init(_ permission: IdentityPermission) {
+        self.init(resource: IdentityPermission.prefix, parameters: [
+            "attr": [permission.attr == .any ? Self.wildcard : Self.value(permission.attr.rawValue)],
+        ])
+    }
+
+    init(_ include: IncludeScope) {
+        var parameters: [String: Set<ScopeBytes>] = ["nsid": [Self.value(include.nsid)]]
+        if let aud = include.aud {
+            parameters["aud"] = [Self.audience(aud)]
+        }
+        self.init(resource: IncludeScope.prefix, parameters: parameters)
+    }
+
+    private static func audience(_ aud: AudParam) -> ScopeBytes {
+        switch aud {
+        case .any: wildcard
+        case let .service(service): value(service)
+        }
     }
 }
 
@@ -156,19 +239,20 @@ public enum ATProtoScope: Sendable, Hashable {
 }
 
 extension ATProtoScope {
-    /// What this scope grants, independent of how it was written.
+    /// What this scope grants, as the matchers see it. Two scopes with equal
+    /// meanings allow exactly the same requests.
     var meaning: ScopeMeaning {
         switch self {
-        case .atproto: ScopeMeaning(resource: "atproto", parameters: [:])
-        case .transitionEmail: ScopeMeaning(resource: "transition:email", parameters: [:])
-        case .transitionGeneric: ScopeMeaning(resource: "transition:generic", parameters: [:])
-        case .transitionChatBsky: ScopeMeaning(resource: "transition:chat.bsky", parameters: [:])
-        case let .account(p): p.meaning
-        case let .blob(p): p.meaning
-        case let .identity(p): p.meaning
-        case let .include(s): s.meaning
-        case let .repo(p): p.meaning
-        case let .rpc(p): p.meaning
+        case .atproto: ScopeMeaning(resource: "atproto")
+        case .transitionEmail: ScopeMeaning(resource: "transition:email")
+        case .transitionGeneric: ScopeMeaning(resource: "transition:generic")
+        case .transitionChatBsky: ScopeMeaning(resource: "transition:chat.bsky")
+        case let .account(p): ScopeMeaning(p)
+        case let .blob(p): ScopeMeaning(p)
+        case let .identity(p): ScopeMeaning(p)
+        case let .include(s): ScopeMeaning(s)
+        case let .repo(p): ScopeMeaning(p)
+        case let .rpc(p): ScopeMeaning(p)
         }
     }
 

@@ -138,6 +138,11 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
         var rejected: [String: ScopeParseError] = [:]
         for scope in scopes {
             if let string = scope.scopeString {
+                // De-duplicating on the string is de-duplicating on the grant:
+                // a `scopeString` parses back to the meaning of the scope it
+                // came from, so two scopes with one string have one meaning.
+                // The string is ASCII (the formatter escapes every other
+                // byte), so `String` equality here is byte equality.
                 if rawScopes.insert(string).inserted {
                     grants.append((string, scope))
                 }
@@ -173,11 +178,11 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
     /// is not a recognised scope, where ``init(scope:)`` records it in
     /// ``rejected`` and carries on.
     public init(strict scope: String) throws(ScopeParseError) {
-        let tokens = scope.split(separator: " ").map(String.init)
+        let tokens = scope.scopeTokens
         for token in tokens {
             _ = try ATProtoScope.parse(token)
         }
-        self.init(rawScopes: Set(tokens))
+        self.init(rawScopes: Set(scopeTokens: tokens))
     }
 
     /// The scope strings that did not parse, sorted. They grant nothing.
@@ -200,6 +205,11 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
     /// written as its ``ATProtoScope/scopeString`` — the canonical form, except
     /// where that would not parse back to the same scope — duplicates removed
     /// and sorted. Unrecognised strings are kept as they are.
+    ///
+    /// For display and for sending. It is not a key for the grant: two sets
+    /// that grant the same can normalise differently (`repo:*` beside
+    /// `repo:a.b.c` is not folded into `repo:*`). To compare what two sets
+    /// grant use `covers(_:)` in both directions.
     public var normalizedScopeString: String {
         Set(rawScopes.map { raw in (try? ATProtoScope.parse(raw))?.scopeString ?? raw })
             .sorted().joined(separator: " ")
@@ -247,7 +257,7 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
         case let .include(include):
             return grants.contains {
                 guard case let .include(grant) = $0 else { return false }
-                return grant.meaning == include.meaning
+                return ScopeMeaning(grant) == ScopeMeaning(include)
             }
         case let .repo(permission):
             return permission.action.allSatisfy { action in

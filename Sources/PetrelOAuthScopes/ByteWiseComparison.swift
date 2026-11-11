@@ -27,6 +27,38 @@ extension String {
     }
 }
 
+extension String {
+    /// The tokens of an OAuth `scope` value: the runs of bytes between SPACE
+    /// (0x20) bytes.
+    ///
+    /// Split on the byte, not on the `Character` `" "`: a space followed by a
+    /// combining mark is one `Character` that is not a space, and splitting
+    /// on characters would glue the tokens either side of it together.
+    var scopeTokens: [String] {
+        // 0x20 is never part of a multi-byte sequence, so every piece is
+        // itself valid UTF-8 and decodes without loss.
+        utf8.split(separator: 0x20).map { String(decoding: $0, as: UTF8.self) }
+    }
+}
+
+extension Set where Element == String {
+    /// The distinct tokens of `tokens`, chosen deterministically.
+    ///
+    /// A `Set<String>` cannot hold two strings that are canonically
+    /// equivalent, so where two tokens differ in bytes and are equal as
+    /// `String`s only one can be kept. The one kept is the first in byte
+    /// order, whatever order they arrived in. That is the all-ASCII one when
+    /// there is one — the only one of the two that can be a scope — because
+    /// a string equivalent to an ASCII string first differs from it at a
+    /// non-ASCII byte.
+    init(scopeTokens tokens: [String]) {
+        self.init()
+        for token in tokens.sorted(by: { $0.utf8.lexicographicallyPrecedes($1.utf8) }) {
+            insert(token) // keeps the member already present
+        }
+    }
+}
+
 extension Sequence where Element == String {
     /// Whether the sequence contains `value`, compared byte-wise.
     func containsBytes(of value: String) -> Bool {

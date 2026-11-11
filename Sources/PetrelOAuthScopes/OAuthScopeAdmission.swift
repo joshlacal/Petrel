@@ -126,19 +126,27 @@ public enum OAuthScopeTokenizer {
         guard raw.utf8.count <= budget.bytesPerSet else {
             throw .rawRequestTooLong(bytes: raw.utf8.count, limit: budget.bytesPerSet)
         }
-        let values = raw.split(separator: " ", omittingEmptySubsequences: true).map(String.init)
+        let values = raw.scopeTokens
         guard !values.isEmpty else { throw .emptyScopeRequest }
         guard values.count <= budget.scopeCount else {
             throw .tooManyScopes(count: values.count, limit: budget.scopeCount)
         }
-        guard values.count == Set(values).count else { throw .duplicateScope }
+        // A duplicate is the same token twice: identical bytes. Two spellings of
+        // one permission are not duplicates here; whether they are the same
+        // grant is a question for admission, which compares meanings. Bytes
+        // rather than `String` equality, which would call two canonically
+        // equivalent strings one.
+        guard values.count == Set(values.map(\.scopeBytes)).count else { throw .duplicateScope }
         for value in values {
             guard ScopeToken.isScopeToken(value) else { throw .notAScopeToken }
             guard value.utf8.count <= budget.bytesPerScope else {
                 throw .rawScopeTooLong(bytes: value.utf8.count, limit: budget.bytesPerScope)
             }
-            guard value != "openid" else { throw .forbiddenScope }
+            guard !value.isByteEqual(to: "openid") else { throw .forbiddenScope }
         }
+        // Every value is now known to be an ASCII scope-token, and no two
+        // distinct ASCII strings are equal as `String`s, so the set holds
+        // exactly the tokens that were sent.
         return Set(values)
     }
 }
@@ -162,8 +170,8 @@ public enum OAuthScopeAdmissionPolicy {
     /// Admits a tokenized request.
     ///
     /// 1. Every requested scope must parse (or is dropped, per `unknownScopes`).
-    /// 2. Every admitted scope must be declared in the client metadata,
-    ///    comparing canonical forms on both sides.
+    /// 2. Every admitted scope must be declared in the client metadata: some
+    ///    declared scope must grant exactly what it grants (``isDeclared(_:by:)``).
     /// 3. The admitted set must contain `atproto`.
     ///
     /// - Returns: the admitted scope strings, exactly as the client wrote them.
@@ -181,26 +189,45 @@ public enum OAuthScopeAdmissionPolicy {
                 if unknownScopes == .reject { throw .unparseableScope(error) }
             }
         }
-        guard isCanonicalSubset(admitted, of: declared) else { throw .notRegistered }
+        guard isDeclared(admitted, by: declared) else { throw .notRegistered }
         guard admitted.containsBytes(of: "atproto") else { throw .missingBaseScope }
         return admitted
     }
 
-    /// requested ⊆ declared, with both sides canonicalised.
+    /// Whether every scope of `requested` is declared: for each, some scope of
+    /// `declared` grants exactly the same thing.
     ///
-    /// A client can legitimately spell the same grant differently in its
-    /// metadata and its request (`repo:a.b.c?action=create` versus
-    /// `repo?collection=a.b.c&action=create`). A declared value that does not
-    /// parse is kept and compared as its raw bytes, never dropped: dropping it
-    /// could lock a client out over a scope it is not currently asking for.
-    public static func isCanonicalSubset(_ requested: Set<String>, of declared: Set<String>) -> Bool {
-        let canonicalDeclared = Set(declared.map(canonicalisedOrRaw))
+    /// A client can legitimately spell one grant differently in its metadata
+    /// and in its request (`repo:a.b.c?action=create` versus
+    /// `repo?collection=a.b.c&action=create`), so the comparison is not on the
+    /// strings as written. Nor is it on canonical strings, which are not a
+    /// faithful key for a grant: `rpc:m?aud=did:web:example.com%23svc%26admin`
+    /// (audience `…#svc&admin`) and `…%23svc%2526admin` (audience
+    /// `…#svc%26admin`) are different services with one canonical string, and
+    /// comparing those would admit a scope the client never declared. Both
+    /// sides are parsed and compared by what they grant, as the matchers see
+    /// it: `isDeclared` holding implies that everything a requested scope
+    /// allows, the declared scopes allow.
+    ///
+    /// A scope that does not parse grants nothing that can be compared. A
+    /// requested one is declared only if `declared` holds the identical bytes;
+    /// a declared one never vouches for anything but those bytes. It is kept,
+    /// not dropped, so a client is not locked out over a declared scope it is
+    /// not currently asking for.
+    public static func isDeclared(_ requested: Set<String>, by declared: Set<String>) -> Bool {
+        let declaredMeanings = Set(declared.compactMap { (try? ATProtoScope.parse($0))?.meaning })
         return requested.allSatisfy { scope in
-            declared.contains(scope) || canonicalDeclared.contains(canonicalisedOrRaw(scope))
+            if let parsed = try? ATProtoScope.parse(scope) {
+                return declaredMeanings.contains(parsed.meaning)
+            }
+            return declared.containsBytes(of: scope)
         }
     }
 
     /// Enforces the expanded-grant budget on a grant about to be persisted.
+    ///
+    /// This measures storage — how many strings and how many bytes — so it
+    /// counts the strings as they are, not the distinct grants among them.
     public static func enforceExpandedGrantBudget(
         _ scopes: Set<String>,
         budget: OAuthScopeBudget = .expandedGrant
@@ -219,14 +246,5 @@ public enum OAuthScopeAdmissionPolicy {
         guard total <= budget.bytesPerSet else {
             throw .expandedGrantTooLong(bytes: total, limit: budget.bytesPerSet)
         }
-    }
-
-    private static func canonicalisedOrRaw(_ scope: String) -> String {
-        guard let parsed = try? ATProtoScope.parse(scope),
-              let canonical = try? parsed.canonicalScopeString()
-        else {
-            return scope
-        }
-        return canonical
     }
 }

@@ -29,6 +29,11 @@ public struct ATProtoScopeSet: Sendable, Equatable, Hashable {
 
     /// Parses `rawScopes` once.
     ///
+    /// A `Set<String>` treats canonically equivalent strings as one element,
+    /// so a caller that builds the set from a `scope` value has already let
+    /// `String` equality decide which of two such tokens survives. Prefer
+    /// ``init(scope:)``, which splits and de-duplicates on bytes.
+    ///
     /// - Parameter rawScopes: the token's effective scope strings, verbatim.
     public init(rawScopes: Set<String>) {
         self.rawScopes = rawScopes
@@ -56,19 +61,35 @@ public struct ATProtoScopeSet: Sendable, Equatable, Hashable {
 
     /// Parses an OAuth `scope` value — scope tokens separated by SPACE — as
     /// it appears in a token response or an access-token claim.
+    ///
+    /// The value is split on the SPACE byte. Of two tokens that differ in
+    /// bytes and are equal as `String`s (one spelled with U+212A KELVIN SIGN
+    /// for `K`, say), ``rawScopes`` can hold one: it holds the ASCII one, the
+    /// only one that can be a scope, whichever came first.
     public init(scope: String) {
-        self.init(rawScopes: Set(scope.split(separator: " ").map(String.init)))
+        self.init(rawScopes: Set(scopeTokens: scope.scopeTokens))
     }
 
-    /// Two values are equal when they hold the same scope strings; what they
-    /// grant is a pure function of those.
+    /// Two values are equal when they hold the same scope strings, byte for
+    /// byte; what they grant is a pure function of those.
+    ///
+    /// This is identity of the token's contents, not of the grant: two sets
+    /// that spell one permission differently are unequal and grant the same.
+    /// To ask whether one set grants what another does, use `covers(_:)` in
+    /// both directions. The strings are compared as bytes because `String`
+    /// equality would call `repo:com.example.Key` and the same text spelled
+    /// with U+212A KELVIN SIGN equal, and only the first is a grant.
     public static func == (lhs: Self, rhs: Self) -> Bool {
-        lhs.rawScopes == rhs.rawScopes
+        lhs.rawScopeBytes == rhs.rawScopeBytes
     }
 
-    /// Hashes the scope strings.
+    /// Hashes the scope strings' bytes, consistently with `==`.
     public func hash(into hasher: inout Hasher) {
-        hasher.combine(rawScopes)
+        hasher.combine(rawScopeBytes)
+    }
+
+    private var rawScopeBytes: Set<ScopeBytes> {
+        Set(rawScopes.map(\.scopeBytes))
     }
 
     /// The base AT Protocol session scope. Nothing is granted without it.

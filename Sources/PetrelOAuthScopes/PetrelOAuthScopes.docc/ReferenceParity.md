@@ -25,7 +25,7 @@ Each is pinned individually by `ReferenceParityTests`.
 | `rpc:app.bsky.feed.getFeed?aud=did:web:example.com%23a%2541` | canonical form ends `%23a%41` | the canonical form would keep `%2541` |
 | `blob?accept=image/png&accept=image/png` | canonical form `blob?accept=image/png` | a single value could use the positional form `blob:image/png` |
 
-Two consequences are worth knowing. A canonical string is the reference's serialisation, not a normal form that is guaranteed to parse back to the same value: the last four `rpc` and `blob` rows show canonical strings whose own percent-escapes or `+` would be decoded again. Compare scopes by canonical string from the same input, and do not canonicalise twice.
+Two consequences are worth knowing. A canonical string is the reference's serialisation, not a normal form that is guaranteed to parse back to the same value: the last four `rpc` and `blob` rows show canonical strings whose own percent-escapes or `+` would be decoded again. And a canonical string does not identify a grant: two scopes that grant different things can share one (below). So do not canonicalise twice, and do not decide anything by comparing canonical strings — this module never does.
 
 ### Sending a scope: `scopeString`
 
@@ -38,6 +38,25 @@ Because a canonical string may not parse back, it is not always the right thing 
 | everything else | the canonical string | the same |
 
 ``ATProtoScopeSet/init(_:)`` keeps the typed scopes it is given and stores their `scopeString`, so a set built from typed scopes grants exactly what the values say and serialises to something a server reads the same way. Whether one scope covers another (`covers(_:)`) is decided from what the scopes grant, never from their spelling.
+
+### Scopes are compared by what they grant
+
+Nothing in this module decides whether two scopes are "the same" by comparing strings — not the strings as written, since one grant has many spellings, and not canonical strings, since different grants can share one:
+
+| Scope | Audience it names | `canonicalScopeString()` |
+|---|---|---|
+| `rpc:com.example.method?aud=did:web:example.com%23svc%26admin` | `did:web:example.com#svc&admin` | `rpc:com.example.method?aud=did:web:example.com%23svc%26admin` |
+| `rpc:com.example.method?aud=did:web:example.com%23svc%2526admin` | `did:web:example.com#svc%26admin` | the same string |
+
+The questions are answered from the parsed values the matchers themselves read:
+
+- **Is a requested scope declared by the client?** ``OAuthScopeAdmissionPolicy/isDeclared(_:by:)``, used by ``OAuthScopeAdmissionPolicy/admit(requested:declaredBy:unknownScopes:)``: some declared scope must grant exactly what the requested one grants. The second scope above is not declared by a client that declared the first. A wildcard beside a specific value, a `type/*` beside `type/subtype`, `manage` beside `read`, a repeated value and the positional or named form of a parameter do not change what a scope grants, so those spellings are interchangeable; a narrower or a wider scope is a different one. The reference authorization server requires the requested string to appear verbatim among the declared ones (`oauth-provider/src/client/client.ts:297-312`), so everything it admits Petrel admits, and Petrel additionally admits another spelling of a declared grant — never another grant. Whenever a scope is admitted, every request it allows is allowed by the declared scopes; `ScopeAdmissionMeaningTests` checks that for every pair of scopes in the reference corpus.
+- **Does a set cover a scope?** `covers(_:)`, likewise from the parsed values.
+- **Are two sets equal?** ``ATProtoScopeSet`` `==` is identity of the strings the token carries, byte for byte, and says so; it is not a statement about grants. Use `covers(_:)` in both directions for that.
+
+Three places do work on strings, because a string is what they are about. ``OAuthScopeTokenizer`` rejects a token that appears twice, byte for byte, as a malformed request; two spellings of one grant are not duplicates. ``OAuthScopeBudget`` counts strings and bytes, since it bounds storage. And a scope that does not parse has no meaning to compare, so it is declared, or covered, only by the identical bytes.
+
+A scope that has to be written down — sent in a request, or stored in a grant after an `include:` scope is expanded — is written as a string that parses back to the same grant: ``ATProtoScope/scopeString`` above, and ``IncludedPermission/scopeString()`` for the permissions ``IncludeScope/expandToScopeStrings(_:)`` returns. For an `rpc` permission that inherits the second audience in the table, that is the string with `%2526`; the canonical string would be read back by a resource server as the first audience.
 
 ### Comparisons are byte-wise
 
@@ -65,7 +84,8 @@ Behaviour that follows the reference implementation and is worth knowing when bu
 - **An empty `actions` list means every action**, exactly as leaving `action` out of the scope string does.
 - **Only the builders and `parse` validate.** The permission types' own initializers (`RepoPermission(collection:action:)` and the others) take what they are given. A value assembled that way which no scope string can describe has no ``ATProtoScope/scopeString`` and grants nothing in a set.
 - **`did:web:localhost%3A`** — a port separator with no port — is accepted as an audience, as the URL parser behind the reference accepts `http://localhost:`.
-- **A scope value is split on SPACE only** (RFC 6749 §3.3). Tabs and newlines are part of a token, which then is not a valid scope. Leading, trailing and repeated spaces are tolerated, by ``ATProtoScopeSet/init(strict:)`` as well.
+- **A scope value is split on SPACE only** (RFC 6749 §3.3), and on the byte: a space followed by a combining mark still separates two tokens. Tabs and newlines are part of a token, which then is not a valid scope. Leading, trailing and repeated spaces are tolerated, by ``ATProtoScopeSet/init(strict:)`` as well.
+- **``ATProtoScopeSet/rawScopes`` is a `Set<String>`**, which cannot hold two strings that differ in bytes and are canonically equivalent. Given both in one scope value, ``ATProtoScopeSet/init(scope:)`` keeps the ASCII one — the only one that can be a scope — in either order.
 - **A set parsed from a string holds the strings as given.** ``ATProtoScopeSet/scopes`` and ``ATProtoScopeSet/scopeString`` are in sorted order of those strings, not the order given, and two spellings of one permission are two members; ``ATProtoScopeSet/normalizedScopeString`` folds them, and keeps strings it does not recognise as they are.
 - **`transition:generic` does not reach `chat.bsky.` methods**, and `transition:chat.bsky` reaches only those. A need for every method on a service is therefore covered by the two together, not by either alone.
 - **A scope that does not parse is covered only by the identical string.** `covers` cannot reason about a scope this version does not understand, so it does not report it as covered unless the granted set holds exactly that string.

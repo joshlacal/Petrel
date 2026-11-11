@@ -227,27 +227,6 @@ public struct ScopeParameterSchema: Sendable {
         try syntax(for: values).parseableString()
     }
 
-    /// What `values` mean, independent of how they were written: for each
-    /// parameter that is not at its default, the set of its normalised values.
-    ///
-    /// Two scopes of one resource grant the same thing exactly when these are
-    /// equal. The canonical string cannot be used for that comparison: it is
-    /// not always a fixed point (`blob?accept=a/b&accept=a/b` canonicalises to
-    /// `blob?accept=a/b`, which itself canonicalises to `blob:a/b`), and for a
-    /// value containing `%` it reads back as a different value.
-    func meaning(of values: ScopeParameterValues) -> [String: Set<ScopeBytes>] {
-        var meaning: [String: Set<ScopeBytes>] = [:]
-        for parameter in parameters where values.has(parameter.key) {
-            let normalized = Set(parameter.normalize(values.multiple(parameter.key)).map(\.scopeBytes))
-            if !parameter.isRequired, let defaultValue = parameter.defaultValue,
-               Set(defaultValue.map(\.scopeBytes)) == normalized {
-                continue
-            }
-            meaning[parameter.key] = normalized
-        }
-        return meaning
-    }
-
     /// The normalised positional and named parameters of `values`, in
     /// canonical order (`lib/parser.ts:50-96`).
     private func syntax(for values: ScopeParameterValues) -> ScopeStringSyntax {

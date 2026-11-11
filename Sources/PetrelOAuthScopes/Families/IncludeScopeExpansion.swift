@@ -25,15 +25,14 @@ extension IncludedPermission {
     /// entry ignored, not the set invalid (`scopes/include-scope.ts:59-60`).
     init?(_ syntax: LexPermissionSyntax) {
         do {
-            switch syntax.prefix {
-            case RepoPermission.prefix:
+            if syntax.prefix.isByteEqual(to: RepoPermission.prefix) {
                 self = .repo(try RepoPermission(parameters: RepoPermission.schema.parse(syntax)))
-            case RpcPermission.prefix:
+            } else if syntax.prefix.isByteEqual(to: RpcPermission.prefix) {
                 self = .rpc(try RpcPermission(parameters: RpcPermission.schema.parse(syntax)))
-            default:
+            } else {
                 // `lexSyntax(for:)` produces only these two resources. The
                 // value still derives from an untrusted document, so this is
-                // a total switch rather than a trap.
+                // total rather than a trap.
                 return nil
             }
         } catch {
@@ -41,12 +40,43 @@ extension IncludedPermission {
         }
     }
 
-    /// The canonical scope string of this permission.
+    /// The canonical scope string of this permission, byte-identical with the
+    /// reference implementation's. Not necessarily a string that parses back
+    /// to this permission; to store or send the permission use
+    /// ``scopeString()``.
     public func canonicalScopeString() throws(ScopeParseError) -> String {
         switch self {
         case let .repo(permission): try permission.canonicalScopeString()
         case let .rpc(permission): try permission.canonicalScopeString()
         }
+    }
+
+    /// This permission as an ``ATProtoScope``.
+    public var scope: ATProtoScope {
+        switch self {
+        case let .repo(permission): .repo(permission)
+        case let .rpc(permission): .rpc(permission)
+        }
+    }
+
+    /// The scope string to store in a grant: one that parses back to exactly
+    /// this permission.
+    ///
+    /// It is ``canonicalScopeString()`` unless that would read back as a
+    /// different permission. That happens for an `rpc` permission that
+    /// inherited an audience containing `%`: the canonical form of the
+    /// audience `did:web:example.com#svc%26admin` ends `%23svc%26admin`, which
+    /// a resource server parses as `…#svc&admin` — another service. There the
+    /// `%` is left escaped. See ``ATProtoScope/scopeString``.
+    ///
+    /// - Throws: ``ScopeParseError/notAScopeToken(_:)`` if no scope string
+    ///   describes the permission, which cannot happen for a permission
+    ///   produced by ``IncludeScope/expand(_:)``.
+    public func scopeString() throws(ScopeParseError) -> String {
+        guard let string = scope.scopeString else {
+            throw .notAScopeToken((try? canonicalScopeString()) ?? "")
+        }
+        return string
     }
 }
 
@@ -83,15 +113,22 @@ extension IncludeScope {
         }
     }
 
-    /// ``expand(_:)`` as canonical scope strings
-    /// (`toScopes`, `scopes/include-scope.ts:42-46`).
+    /// ``expand(_:)`` as scope strings to grant: each parses back to the
+    /// permission it stands for (`toScopes`, `scopes/include-scope.ts:42-46`).
+    ///
+    /// The strings are what an authorization server stores in the grant and a
+    /// resource server later parses, so they must read back as the same
+    /// permission. They are the reference implementation's canonical strings
+    /// except for a permission whose inherited audience contains `%`: there
+    /// the canonical form would be read back as a different service (see
+    /// ``IncludedPermission/scopeString()``), so the `%` stays escaped.
     public func expandToScopeStrings(
         _ set: LexiconPermissionSet
     ) throws(ScopeParseError) -> [String] {
         var strings: [String] = []
         strings.reserveCapacity(set.permissions.count)
         for permission in expand(set) {
-            strings.append(try permission.canonicalScopeString())
+            strings.append(try permission.scopeString())
         }
         return strings
     }
