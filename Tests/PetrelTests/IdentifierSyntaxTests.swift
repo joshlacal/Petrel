@@ -508,6 +508,9 @@ struct ATURISyntaxTests {
     }
 
     @Test("a trailing slash or empty segment is rejected and never read as 'absent'", arguments: [
+        "at://",
+        "at:///",
+        "at:///com.example.foo",
         "at://did:plc:abc/",
         "at://did:plc:abc//",
         "at://did:plc:abc/com.example.foo/",
