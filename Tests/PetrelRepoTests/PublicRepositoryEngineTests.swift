@@ -303,7 +303,13 @@ final class PublicRepositoryEngineTests: XCTestCase {
         )
 
         XCTAssertEqual(result.state.dataCID, PublicRepositoryGenesisCodec.canonicalEmptyMSTCIDValue)
-        XCTAssertEqual(result.newBlocks.cids, [result.state.commitCID])
+        // The empty root is a node of the new tree that was not in the
+        // previous tree, so it belongs to the commit even though the store
+        // still holds it from the repository's first commit.
+        XCTAssertEqual(
+            result.newBlocks.cids,
+            [result.state.commitCID, PublicRepositoryGenesisCodec.canonicalEmptyMSTCIDValue]
+        )
         XCTAssertEqual(result.recordResults[0].previousRecordCID, first.recordResults[0].recordCID)
         XCTAssertNil(result.recordResults[0].recordCID)
         XCTAssertFalse(result.newBlocks.cids.contains(first.state.dataCID))
@@ -381,15 +387,17 @@ final class PublicRepositoryEngineTests: XCTestCase {
                 batch: batch,
                 signer: unsupported
             )
-            XCTFail("expected unsupported signer")
+            XCTFail("expected a refused signature")
         } catch {
+            // secp256k1 is supported, so the signer is called; its all-zero
+            // output is refused because r and s must be non-zero.
             XCTAssertEqual(
                 error as? PublicRepositoryEngineError,
-                .commit(.unsupportedSigningAlgorithm)
+                .commit(.invalidSignature)
             )
         }
         let unsupportedCount = await unsupported.count()
-        XCTAssertEqual(unsupportedCount, 0)
+        XCTAssertEqual(unsupportedCount, 1)
 
         let throwing = ThrowingEngineSigner()
         do {

@@ -62,7 +62,35 @@ public struct PreparedPublicRepositoryMutation: Sendable, Equatable {
     /// Typed metadata claims carried by the changed public records. Storage
     /// rechecks these against the same public blob rows at commit time.
     public let publicTypedBlobReferences: [PublicTypedBlobReference]
+    /// Blocks to persist: the signed commit, every MST node that is in the
+    /// new tree and was not in the previous one, and every created or updated
+    /// record. Membership is decided by comparing the two trees, never by
+    /// what the block source happened to contain.
     public let newBlocks: PublicRepositoryBlockMap
+    /// Blocks for the commit's diff (the `blocks` CAR of a `#commit` firehose
+    /// event): everything in ``newBlocks`` plus the unchanged MST nodes a
+    /// consumer needs to verify the operations by inversion, as the sync
+    /// specification requires. Feed these to `PublicFirehoseDiffCAR.build`.
+    public let relevantBlocks: PublicRepositoryBlockMap
+    /// MST root of the repository before this commit: the event's `prevData`.
+    public let previousDataCID: CID
+    /// The record operations in wire form, with the previous record CID for
+    /// updates and deletes.
+    public var operations: [RepositoryCommitOperation] {
+        recordResults.compactMap { result in
+            switch result.action {
+            case .create:
+                return result.recordCID.map { .create(path: result.path, cid: $0) }
+            case .update:
+                guard let cid = result.recordCID, let previous = result.previousRecordCID else {
+                    return nil
+                }
+                return .update(path: result.path, cid: cid, previous: previous)
+            case .delete:
+                return result.previousRecordCID.map { .delete(path: result.path, previous: $0) }
+            }
+        }
+    }
 
     fileprivate init(
         state: PublicRepositoryState,
@@ -73,7 +101,9 @@ public struct PreparedPublicRepositoryMutation: Sendable, Equatable {
         recordResults: [PublicRepositoryMutationRecordResult],
         publicBlobCIDs: [CID],
         publicTypedBlobReferences: [PublicTypedBlobReference],
-        newBlocks: PublicRepositoryBlockMap
+        newBlocks: PublicRepositoryBlockMap,
+        relevantBlocks: PublicRepositoryBlockMap,
+        previousDataCID: CID
     ) {
         self.state = state
         self.baseCommitCID = baseCommitCID
@@ -84,10 +114,34 @@ public struct PreparedPublicRepositoryMutation: Sendable, Equatable {
         self.publicBlobCIDs = publicBlobCIDs
         self.publicTypedBlobReferences = publicTypedBlobReferences
         self.newBlocks = newBlocks
+        self.relevantBlocks = relevantBlocks
+        self.previousDataCID = previousDataCID
     }
 }
 
+/// Applies record writes to a repository and produces the next signed commit.
 public enum PublicRepositoryEngine {
+    /// Applies `batch` on top of `currentState` and signs the result.
+    ///
+    /// Nothing is written: the returned value carries the new state and the
+    /// blocks to persist. An empty batch (``PublicRepositoryWriteBatch/empty(expectedCommitCID:)``)
+    /// produces a commit over the unchanged tree, which is what an account
+    /// publishes after rotating its signing key.
+    ///
+    /// - Parameters:
+    ///   - repositoryDID: The account DID; must match `currentState`.
+    ///   - currentState: The repository head the writes apply to.
+    ///   - blocks: Source of the current tree's blocks.
+    ///   - revision: The new `rev`; must be greater than the current one.
+    ///   - batch: The writes.
+    ///   - limits: Write-count, block-size and commit-diff bounds.
+    ///   - signer: Signs the commit, on either curve.
+    ///   - signingGeneration: Caller-defined key generation tag, carried
+    ///     through to the result unchanged.
+    ///   - mstOptions: How the existing tree is read. Pass
+    ///     ``RepositoryMSTOptions/dataModel`` to write on top of a repository
+    ///     whose leaves use non-blessed record links; new records always get
+    ///     blessed CIDs.
     public static func apply(
         repositoryDID: String,
         currentState: PublicRepositoryState,
@@ -96,7 +150,8 @@ public enum PublicRepositoryEngine {
         batch: PublicRepositoryWriteBatch,
         limits: PublicRepositoryLimits = .standard,
         signer: any PublicRepositoryCommitSigner,
-        signingGeneration: UInt64 = 1
+        signingGeneration: UInt64 = 1,
+        mstOptions: RepositoryMSTOptions = .strict
     ) async throws -> PreparedPublicRepositoryMutation {
         guard repositoryDID == currentState.did else {
             throw PublicRepositoryEngineError.repositoryDIDMismatch
@@ -119,16 +174,13 @@ public enum PublicRepositoryEngine {
            expectedCommitCID != currentState.commitCID {
             throw PublicRepositoryEngineError.commitCIDMismatch
         }
-        guard signer.signingAlgorithm == .p256 else {
-            throw PublicRepositoryEngineError.commit(.unsupportedSigningAlgorithm)
-        }
-
         var tree: RepositoryMST
         do {
             tree = try RepositoryMST.load(
                 rootCID: currentState.dataCID,
                 blocks: blocks,
-                limits: limits
+                limits: limits,
+                options: mstOptions
             )
         } catch let error as RepositoryMSTMutationError {
             throw PublicRepositoryEngineError.mst(error)
@@ -255,16 +307,10 @@ public enum PublicRepositoryEngine {
             throw PublicRepositoryEngineError.mst(.invalidNode)
         }
 
-        var transactionBlocks: [PublicRepositoryBlock] = []
-        for recordBlock in preparedRecordBlocks {
-            if let existing = try await block(recordBlock.cid, from: blocks) {
-                guard existing == recordBlock.bytes else {
-                    throw PublicRepositoryEngineError.record(.blockCIDMismatch)
-                }
-            } else {
-                transactionBlocks.append(recordBlock)
-            }
-        }
+        // Every created or updated record belongs to the commit, whether or
+        // not the store already holds identical bytes from earlier history.
+        // The sync specification requires a diff to carry all of them.
+        var transactionBlocks: [PublicRepositoryBlock] = preparedRecordBlocks
         for cid in materialized.newBlocks.cids {
             guard let bytes = try await materialized.newBlocks.block(for: cid) else {
                 throw PublicRepositoryEngineError.mst(.missingBlock)
@@ -307,12 +353,34 @@ public enum PublicRepositoryEngine {
             throw PublicRepositoryEngineError.signingFailed
         }
 
-        let newBlocks = try makeBlockMap(
-            transactionBlocks + [
-                .init(cid: signedCommit.commitCID, bytes: signedCommit.signedCommitBytes),
-            ],
-            limits: limits
+        let commitBlock = PublicRepositoryBlock(
+            cid: signedCommit.commitCID,
+            bytes: signedCommit.signedCommitBytes
         )
+        let newBlocks = try makeBlockMap(transactionBlocks + [commitBlock], limits: limits)
+
+        // The covering proof: for each written path, the nodes of the *new*
+        // tree on the path to the key and to its neighbour on each side.
+        let coveringBlocks: [PublicRepositoryBlock]
+        do {
+            coveringBlocks = try await tree.coveringProof(for: batch.writes.map(\.path))
+        } catch let error as RepositoryMSTMutationError {
+            throw PublicRepositoryEngineError.mst(error)
+        } catch {
+            throw PublicRepositoryEngineError.mst(.invalidNode)
+        }
+        let relevantBlocks: PublicRepositoryBlockMap
+        do {
+            // Bounded by the archive ceiling rather than the commit-diff
+            // budget: the budget above already bounds what this commit adds,
+            // and the firehose frame encoder enforces the event size.
+            relevantBlocks = try PublicRepositoryBlockMap(
+                blocks: transactionBlocks + [commitBlock] + coveringBlocks,
+                maximumRelevantBytes: PublicRepositoryLimits.maximumPermittedCARBytes
+            )
+        } catch let error as PublicRepositoryDomainError {
+            throw PublicRepositoryEngineError.record(error)
+        }
         let newState: PublicRepositoryState
         do {
             newState = try PublicRepositoryState(
@@ -335,7 +403,9 @@ public enum PublicRepositoryEngine {
                 publicBlobCIDsByString[$0]
             },
             publicTypedBlobReferences: publicTypedBlobReferences,
-            newBlocks: newBlocks
+            newBlocks: newBlocks,
+            relevantBlocks: relevantBlocks,
+            previousDataCID: currentState.dataCID
         )
     }
 
@@ -350,19 +420,6 @@ public enum PublicRepositoryEngine {
             throw PublicRepositoryEngineError.record(error)
         } catch {
             throw PublicRepositoryEngineError.record(.invalidRecordType)
-        }
-    }
-
-    private static func block(
-        _ cid: CID,
-        from source: any PublicRepositoryBlockSource
-    ) async throws -> Data? {
-        do {
-            return try await source.block(for: cid)
-        } catch let error as PublicRepositoryEngineError {
-            throw error
-        } catch {
-            throw PublicRepositoryEngineError.mst(.missingBlock)
         }
     }
 

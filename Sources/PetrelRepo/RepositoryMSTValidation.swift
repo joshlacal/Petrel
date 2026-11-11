@@ -2,7 +2,7 @@
 // bluesky-social/atproto@3f6c96d5d2d25438bd40fa89d6ecc37865f8e354
 // packages/repo/src/mst/{mst,util}.ts, used under the repository's
 // MIT OR Apache-2.0 notice policy recorded in THIRD_PARTY_NOTICES.md.
-// The hostile-input checks are Swan-specific hardening.
+// The hostile-input checks are additions.
 
 import Foundation
 import Petrel
@@ -36,6 +36,11 @@ public enum RepositoryMSTValidationError: Error, Sendable, Equatable {
     case cborDepthLimitExceeded
     case invalidReachableRepositoryByteBudget
     case reachableRepositoryByteLimitExceeded
+    /// A record contains a `cid-link` that is structurally a CID but in a
+    /// format this library cannot represent as a value. The record's bytes
+    /// are intact and can still be exported; only decoding it to a value
+    /// fails.
+    case unsupportedRecordLink
 }
 
 public struct ValidatedPublicRepositoryMST: Sendable, Equatable {
@@ -93,15 +98,17 @@ public enum RepositoryMSTValidation {
     public static func validateRecordBlock(
         _ bytes: Data,
         for path: PublicRepositoryPath,
-        limits: PublicRepositoryLimits = .standard
+        limits: PublicRepositoryLimits = .standard,
+        policy: RepositoryReadPolicy = .strict
     ) throws {
         guard bytes.count <= limits.maximumRecordBlockBytes else {
             throw RepositoryMSTValidationError.recordBlockTooLarge
         }
-        _ = try RepositoryRecordBlockValidator.decode(
+        try RepositoryRecordBlockValidator.validate(
             bytes,
             expectedType: path.collection,
-            maximumDepth: limits.maximumCBORNestingDepth
+            maximumDepth: limits.maximumCBORNestingDepth,
+            policy: policy
         )
     }
 
@@ -112,7 +119,8 @@ public enum RepositoryMSTValidation {
     public static func decodeRecordBlock(
         _ bytes: Data,
         for path: PublicRepositoryPath,
-        limits: PublicRepositoryLimits = .standard
+        limits: PublicRepositoryLimits = .standard,
+        policy: RepositoryReadPolicy = .strict
     ) throws -> ATProtocolValueContainer {
         guard bytes.count <= limits.maximumRecordBlockBytes else {
             throw RepositoryMSTValidationError.recordBlockTooLarge
@@ -120,17 +128,26 @@ public enum RepositoryMSTValidation {
         return try RepositoryRecordBlockValidator.decode(
             bytes,
             expectedType: path.collection,
-            maximumDepth: limits.maximumCBORNestingDepth
+            maximumDepth: limits.maximumCBORNestingDepth,
+            policy: policy
         )
     }
+
+    /// Walks the whole tree from `rootCID`, checking every node and record,
+    /// and returns the leaves and reachable blocks in memory.
+    ///
+    /// This holds every leaf and every MST node at once. For repositories
+    /// with millions of records use ``Repository``, which verifies with
+    /// memory proportional to the tree's depth.
     public static func validate(
         rootCID: CID, blocks: any PublicRepositoryBlockSource,
         limits: PublicRepositoryLimits = .standard,
-        maximumReachableRepositoryBytes: Int? = nil
+        maximumReachableRepositoryBytes: Int? = nil,
+        policy: RepositoryReadPolicy = .strict
     ) async throws -> ValidatedPublicRepositoryMST {
         let collector = ValidationCollector()
         let projection = try await validateProjection(rootCID: rootCID, blocks: blocks, projection: collector,
-            limits: limits, maximumReachableRepositoryBytes: maximumReachableRepositoryBytes)
+            limits: limits, maximumReachableRepositoryBytes: maximumReachableRepositoryBytes, policy: policy)
         let snapshot = await collector.snapshot()
         return .init(rootCID: projection.rootCID, rootLayer: projection.rootLayer,
             leaves: snapshot.leaves, reachableMSTBlocks: snapshot.mstBlocks,
@@ -143,10 +160,12 @@ public enum RepositoryMSTValidation {
         rootCID: CID, blocks: any PublicRepositoryBlockSource, limits: PublicRepositoryLimits,
         maximumReachableRepositoryBytes: Int? = nil,
         maximumMSTNodesOverride: Int? = nil,
-        maximumMSTEntriesPerNodeOverride: Int? = nil
+        maximumMSTEntriesPerNodeOverride: Int? = nil,
+        policy: RepositoryReadPolicy = .strict
     ) async throws -> ValidatedPublicRepositoryMST {
         let collector = ValidationCollector()
         let projection = try await run(rootCID: rootCID, blocks: blocks, projection: collector, limits: limits,
+            policy: policy,
             maximumReachableRepositoryBytes: maximumReachableRepositoryBytes,
             maximumMSTNodes: maximumMSTNodesOverride ?? limits.maximumMSTNodes,
             maximumMSTEntries: maximumMSTEntriesPerNodeOverride ?? limits.maximumMSTEntriesPerNode)
@@ -162,9 +181,11 @@ public enum RepositoryMSTValidation {
         rootCID: CID, blocks: any PublicRepositoryBlockSource,
         projection: any PublicRepositoryReachableProjectionSink,
         limits: PublicRepositoryLimits = .standard,
-        maximumReachableRepositoryBytes: Int? = nil
+        maximumReachableRepositoryBytes: Int? = nil,
+        policy: RepositoryReadPolicy = .strict
     ) async throws -> ValidatedPublicRepositoryProjection {
         try await run(rootCID: rootCID, blocks: blocks, projection: projection, limits: limits,
+            policy: policy,
             maximumReachableRepositoryBytes: maximumReachableRepositoryBytes,
             maximumMSTNodes: limits.maximumMSTNodes,
             maximumMSTEntries: limits.maximumMSTEntriesPerNode)
@@ -173,9 +194,11 @@ public enum RepositoryMSTValidation {
     private static func run(
         rootCID: CID, blocks: any PublicRepositoryBlockSource,
         projection: any PublicRepositoryReachableProjectionSink,
-        limits: PublicRepositoryLimits, maximumReachableRepositoryBytes: Int?,
+        limits: PublicRepositoryLimits, policy: RepositoryReadPolicy,
+        maximumReachableRepositoryBytes: Int?,
         maximumMSTNodes: Int, maximumMSTEntries: Int
     ) async throws -> ValidatedPublicRepositoryProjection {
+        let mstOptions = policy.mstOptions
         do { try PublicRepositoryCID.validate(rootCID) }
         catch { throw RepositoryMSTValidationError.unsupportedCID }
         guard limits.maximumCBORNestingDepth >= 3 else { throw RepositoryMSTValidationError.cborDepthLimitExceeded }
@@ -203,9 +226,9 @@ public enum RepositoryMSTValidation {
             catch PublicRepositoryDomainError.unsupportedCID { throw RepositoryMSTValidationError.unsupportedCID }
             catch { throw RepositoryMSTValidationError.blockCIDMismatch }
             bytesTotal = try adding(bytes.count, to: bytesTotal, maximum: maximumBytes)
-            let node = try RepositoryMSTCodec.decode(bytes)
+            let node = try RepositoryMSTCodec.decode(bytes, options: mstOptions)
             guard node.entries.count <= maximumMSTEntries else { throw RepositoryMSTValidationError.entryLimitExceeded }
-            let nodeLeaves = try RepositoryMSTCodec.reconstructedLeaves(from: node)
+            let nodeLeaves = try RepositoryMSTCodec.reconstructedLeaves(from: node, options: mstOptions)
             let layer: Int
             if let first = nodeLeaves.first {
                 layer = first.path.keyDepth
@@ -237,6 +260,11 @@ public enum RepositoryMSTValidation {
                 guard isInside(key, lower: item.lower, upper: item.upper) else { throw RepositoryMSTValidationError.subtreeOutOfRange }
                 guard leaves.count < limits.maximumRepositoryRecords else { throw RepositoryMSTValidationError.recordLimitExceeded }
                 keys.append(key); leaves.append(leaf)
+                // A leaf that links its record through a non-blessed CID is
+                // retained as a link (the policy allowed it to be read), but
+                // its block cannot be checked: SHA-256 DAG-CBOR is the only
+                // record form this library can hash and decode.
+                guard leaf.recordCID.blessedKind == .dagCBOR else { continue }
                 if records.insert(leaf.recordCID).inserted { recordOrder.append(leaf.recordCID) }
             }
             guard layer > 0 || (node.leftTreeCID == nil && nodeLeaves.allSatisfy { $0.rightTreeCID == nil }) else {
@@ -255,7 +283,9 @@ public enum RepositoryMSTValidation {
             }
         }
         var expected: [CID: Set<String>] = [:]
-        for leaf in leaves { expected[leaf.recordCID, default: []].insert(leaf.path.collection) }
+        for leaf in leaves where leaf.recordCID.blessedKind == .dagCBOR {
+            expected[leaf.recordCID, default: []].insert(leaf.path.collection)
+        }
         for cid in recordOrder {
             try Task.checkCancellation()
             guard let data = try await blocks.block(for: cid) else { throw RepositoryMSTValidationError.missingRecordBlock }
@@ -266,7 +296,7 @@ public enum RepositoryMSTValidation {
             bytesTotal = try adding(data.count, to: bytesTotal, maximum: maximumBytes)
             guard let collections = expected[cid] else { throw RepositoryMSTValidationError.missingRecordBlock }
             for collection in collections {
-                do { try RepositoryRecordBlockValidator.validate(data, expectedType: collection, maximumDepth: limits.maximumCBORNestingDepth) }
+                do { try RepositoryRecordBlockValidator.validate(data, expectedType: collection, maximumDepth: limits.maximumCBORNestingDepth, policy: policy) }
                 catch { throw RepositoryMSTValidationError.invalidRecordBlock }
             }
             try await projection.recordReachableBlock(cid: cid, kind: .record, bytes: data)
@@ -356,46 +386,132 @@ private actor ValidationCollector: PublicRepositoryReachableProjectionSink {
     func snapshot() -> Snapshot { state }
 }
 
-/// Strict, allocation-bounded validation of the AT data-model subset used by
-/// record blocks. MST validation cannot stop at CID integrity: the leaf path's
-/// collection and the record's top-level `$type` are one repository invariant.
-private struct RepositoryRecordBlockValidator {
-    /// Keeps a single untrusted DAG-CBOR container from reserving an
-    /// disproportionate amount of memory even when its declared count is
-    /// consistent with the enclosing record's byte budget.
-    private static let maximumContainerElementCount = 65_536
+/// Strict, allocation-bounded validation of the AT data model as it appears
+/// in a record block. Canonical DAG-CBOR (shortest integers and lengths,
+/// definite lengths, sorted unique map keys, no floats, no tag but 42) is
+/// always enforced; ``RepositoryReadPolicy`` decides the rest.
+struct RepositoryRecordBlockValidator {
+    /// Under the strict policy, keeps a single untrusted DAG-CBOR container
+    /// from reserving a disproportionate amount of memory even when its
+    /// declared count is consistent with the enclosing record's byte budget.
+    /// The data-model policy has no such rule to apply (the data model does
+    /// not limit container sizes), so there the count is bounded only by the
+    /// bytes that remain in the block, which the block-size limit bounds.
+    private static let strictMaximumContainerElementCount = 65_536
+
+    private var maximumContainerElementCount: Int {
+        policy.requiresSafeIntegers ? Self.strictMaximumContainerElementCount : Int.max
+    }
 
     private let bytes: [UInt8]
+    private let policy: RepositoryReadPolicy
+    /// `false` while only checking validity: a link in a format `CID` cannot
+    /// hold is then skipped instead of refused.
+    private let materializes: Bool
     private var offset = 0
     private var topLevelType: String?
+
+    private init(bytes: [UInt8], policy: RepositoryReadPolicy, materializes: Bool) {
+        self.bytes = bytes
+        self.policy = policy
+        self.materializes = materializes
+    }
 
     static func validate(
         _ data: Data,
         expectedType: String,
-        maximumDepth: Int
+        maximumDepth: Int,
+        policy: RepositoryReadPolicy
     ) throws {
-        _ = try decode(
-            data,
-            expectedType: expectedType,
-            maximumDepth: maximumDepth
+        _ = try run(
+            data, expectedType: expectedType, maximumDepth: maximumDepth,
+            policy: policy, materializes: false
         )
     }
 
     static func decode(
         _ data: Data,
         expectedType: String,
-        maximumDepth: Int
+        maximumDepth: Int,
+        policy: RepositoryReadPolicy
     ) throws -> ATProtocolValueContainer {
-        var parser = Self(bytes: Array(data))
+        try run(
+            data, expectedType: expectedType, maximumDepth: maximumDepth,
+            policy: policy, materializes: true
+        )
+    }
+
+    /// Decodes a DAG-CBOR map that is not a record: no `$type` is required.
+    static func decodeObject(
+        _ data: Data,
+        maximumDepth: Int,
+        policy: RepositoryReadPolicy
+    ) throws -> ATProtocolValueContainer {
+        var parser = Self(bytes: Array(data), policy: policy, materializes: true)
+        let value = try parser.readMap(depth: 1, maximumDepth: maximumDepth, captureType: false)
+        guard parser.offset == parser.bytes.count else {
+            throw RepositoryMSTValidationError.invalidRecordBlock
+        }
+        return .object(value)
+    }
+
+    private static func run(
+        _ data: Data,
+        expectedType: String,
+        maximumDepth: Int,
+        policy: RepositoryReadPolicy,
+        materializes: Bool
+    ) throws -> ATProtocolValueContainer {
+        var parser = Self(bytes: Array(data), policy: policy, materializes: materializes)
         let value = try parser.readMap(
             depth: 1,
             maximumDepth: maximumDepth,
             captureType: true
         )
-        guard parser.offset == parser.bytes.count, parser.topLevelType == expectedType else {
+        guard parser.offset == parser.bytes.count, let type = parser.topLevelType, !type.isEmpty else {
+            throw RepositoryMSTValidationError.invalidRecordBlock
+        }
+        if policy.requiresRecordTypeToMatchCollection, type != expectedType {
             throw RepositoryMSTValidationError.invalidRecordBlock
         }
         return .object(value)
+    }
+
+    /// Whether `bytes` are exactly one binary CID, whatever its codec or
+    /// hash.
+    static func isStructurallyCID(_ bytes: Data) -> Bool {
+        cidPrefixLength(in: bytes) == bytes.count
+    }
+
+    /// The length of the binary CID `bytes` begin with, or `nil` if they do
+    /// not begin with one. Recognizes CIDv1 (`0x01`, codec varint, multihash)
+    /// and CIDv0 (a bare SHA-256 multihash) without needing to know the
+    /// codec or the hash function.
+    static func cidPrefixLength(in bytes: Data) -> Int? {
+        let raw = Array(bytes.prefix(1_100))
+        func varint(_ offset: inout Int) -> UInt64? {
+            var value: UInt64 = 0
+            var shift: UInt64 = 0
+            while offset < raw.count, shift < 63 {
+                let byte = raw[offset]
+                offset += 1
+                value |= UInt64(byte & 0x7f) << shift
+                if byte & 0x80 == 0 { return value }
+                shift += 7
+            }
+            return nil
+        }
+        if raw.count >= 34, raw[0] == 0x12, raw[1] == 0x20 { return 34 }
+        var offset = 0
+        guard varint(&offset) == 1,
+              varint(&offset) != nil,
+              varint(&offset) != nil,
+              let length = varint(&offset),
+              length > 0, length <= 1_024,
+              bytes.count - offset >= Int(length) else {
+            return nil
+        }
+        return offset + Int(length)
     }
 
     private mutating func readValue(
@@ -405,14 +521,23 @@ private struct RepositoryRecordBlockValidator {
         guard offset < bytes.count else { throw RepositoryMSTValidationError.invalidRecordBlock }
         switch bytes[offset] >> 5 {
         case 0:
+            // The data model's integer is a signed 64-bit value. The 53-bit
+            // "safe" range is a recommendation to writers and is enforced
+            // only when the policy asks for it.
             let value = try readArgument(major: 0)
-            guard value <= UInt64(PublicRepositoryRecordCodec.maximumSafeInteger) else {
+            let maximum = policy.requiresSafeIntegers
+                ? UInt64(PublicRepositoryRecordCodec.maximumSafeInteger)
+                : UInt64(Int64.max)
+            guard value <= maximum else {
                 throw RepositoryMSTValidationError.invalidRecordBlock
             }
             return .number(Int(value))
         case 1:
             let value = try readArgument(major: 1)
-            guard value < UInt64(-PublicRepositoryRecordCodec.minimumSafeInteger) else {
+            let maximum = policy.requiresSafeIntegers
+                ? UInt64(-PublicRepositoryRecordCodec.minimumSafeInteger) - 1
+                : UInt64(Int64.max)
+            guard value <= maximum else {
                 throw RepositoryMSTValidationError.invalidRecordBlock
             }
             return .number(-1 - Int(value))
@@ -427,7 +552,7 @@ private struct RepositoryRecordBlockValidator {
             // Reject oversized or impossible hostile counts before
             // reserveCapacity can turn an authenticated-but-untrusted block
             // into a huge allocation.
-            guard count <= Self.maximumContainerElementCount,
+            guard count <= maximumContainerElementCount,
                   count <= bytes.count - offset else {
                 throw RepositoryMSTValidationError.invalidRecordBlock
             }
@@ -451,22 +576,32 @@ private struct RepositoryRecordBlockValidator {
             guard try readArgument(major: 6) == 42 else {
                 throw RepositoryMSTValidationError.invalidRecordBlock
             }
+            guard offset < bytes.count, bytes[offset] >> 5 == 2 else {
+                throw RepositoryMSTValidationError.invalidRecordBlock
+            }
             let payload = try readData(major: 2)
-            guard payload.count == 37, payload.first == 0 else {
+            guard payload.count > 1, payload.first == 0 else {
                 throw RepositoryMSTValidationError.invalidRecordBlock
             }
-            let cid = try CID(bytes: Data(payload.dropFirst()))
-            let cidBytes = cid.bytes
-            guard cidBytes.count == 36,
-                  cidBytes[cidBytes.startIndex] == 0x01,
-                  cidBytes[cidBytes.startIndex + 1] == cid.codec.rawValue,
-                  cid.codec == .raw || cid.codec == .dagCBOR,
-                  cid.multihash.algorithm == Multihash.sha256Code,
-                  cid.multihash.length == Multihash.sha256Length,
-                  cid.multihash.digest.count == 32 else {
+            let cidBytes = Data(payload.dropFirst())
+            if let cid = try? CID(bytes: cidBytes) {
+                guard cid.isBlessed || !policy.requiresBlessedLinksInRecords else {
+                    throw RepositoryMSTValidationError.invalidRecordBlock
+                }
+                return .link(ATProtoLink(cid: cid))
+            }
+            // A CID in a format `CID` cannot hold (another CID version, a
+            // multi-byte codec or hash code). Tolerated on import, where only
+            // validity is being checked and the bytes are kept as they are.
+            guard !policy.requiresBlessedLinksInRecords,
+                  Self.isStructurallyCID(cidBytes) else {
                 throw RepositoryMSTValidationError.invalidRecordBlock
             }
-            return .link(ATProtoLink(cid: cid))
+            guard !materializes else {
+                throw RepositoryMSTValidationError.unsupportedRecordLink
+            }
+            // Validation discards the value tree, so nothing observes this.
+            return .null
         case 7:
             let byte = bytes[offset]
             guard byte == 0xf4 || byte == 0xf5 || byte == 0xf6 else {
@@ -492,7 +627,7 @@ private struct RepositoryRecordBlockValidator {
         // A map pair consumes at least one byte for its key and one for its
         // value. This is a necessary lower bound, checked before allocating;
         // the ordinary parser remains responsible for all stronger validity.
-        guard count <= Self.maximumContainerElementCount,
+        guard count <= maximumContainerElementCount,
               count <= (bytes.count - offset) / 2 else {
             throw RepositoryMSTValidationError.invalidRecordBlock
         }

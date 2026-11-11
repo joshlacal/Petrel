@@ -277,8 +277,10 @@ final class RepositoryMSTMutationTests: XCTestCase {
         let materializationReads = await baseSource.readCIDs
 
         XCTAssertLessThan(changed.newBlocks.count, base.newBlocks.count)
-        XCTAssertEqual(materializationReads.count, changed.newBlocks.count)
-        XCTAssertEqual(Set(materializationReads), changed.newBlocks.cids)
+        XCTAssertEqual(changed.newBlocks.count, 4)
+        // Which nodes are new is decided by comparing trees. The block
+        // source is not asked whether it already holds them.
+        XCTAssertEqual(materializationReads, [])
         var combined = base.newBlocks.blocks
         combined.merge(changed.newBlocks.blocks) { _, new in new }
         combined.merge(recordBlocks) { old, _ in old }

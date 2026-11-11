@@ -21,7 +21,8 @@ public enum PublicRepositoryDomainError: Error, Sendable, Equatable {
     case duplicateWritePath
 }
 
-/// A frozen repository-v3 `<collection>/<record-key>` path.
+/// A repository path: `<collection>/<record-key>`, the key of one record in
+/// the MST.
 public struct PublicRepositoryPath: Hashable, Sendable, CustomStringConvertible {
     public static let maximumCollectionCharacters = 317
     public static let maximumRecordKeyCharacters = 512
@@ -50,6 +51,62 @@ public struct PublicRepositoryPath: Hashable, Sendable, CustomStringConvertible 
         self.mstKey = key
         self.mstKeyBytes = bytes
         self.keyDepth = RepositoryMSTCodec.keyDepth(forASCIIBytes: bytes)
+    }
+
+    /// Parses an MST key (`<collection>/<record-key>`).
+    ///
+    /// - Parameters:
+    ///   - mstKey: The whole key.
+    ///   - syntax: `.repositoryPath` (the default) requires a valid NSID and
+    ///     record key. `.mstKey` applies only the reference implementation's
+    ///     tree-level rule, for trees that are not repositories (such as the
+    ///     official MST test vectors).
+    public init(mstKey: String, syntax: RepositoryMSTKeySyntax = .repositoryPath) throws {
+        let bytes = Data(mstKey.utf8)
+        guard let slash = bytes.firstIndex(of: 0x2f),
+              !bytes[bytes.index(after: slash)...].contains(0x2f),
+              let collection = String(data: bytes[..<slash], encoding: .ascii),
+              let recordKey = String(data: bytes[bytes.index(after: slash)...], encoding: .ascii) else {
+            throw PublicRepositoryDomainError.invalidCollection
+        }
+        switch syntax {
+        case .repositoryPath:
+            try self.init(collection: collection, recordKey: recordKey)
+        case .mstKey:
+            guard !collection.isEmpty, !recordKey.isEmpty,
+                  bytes.allSatisfy(Self.isMSTKeyByte) else {
+                throw PublicRepositoryDomainError.invalidRecordKey
+            }
+            guard bytes.count <= Self.maximumMSTKeyBytes else {
+                throw PublicRepositoryDomainError.pathTooLong
+            }
+            self = Self(
+                uncheckedCollection: collection,
+                recordKey: recordKey,
+                mstKey: mstKey,
+                mstKeyBytes: bytes
+            )
+        }
+    }
+
+    private init(
+        uncheckedCollection collection: String,
+        recordKey: String,
+        mstKey: String,
+        mstKeyBytes: Data
+    ) {
+        self.collection = collection
+        self.recordKey = recordKey
+        self.mstKey = mstKey
+        self.mstKeyBytes = mstKeyBytes
+        keyDepth = RepositoryMSTCodec.keyDepth(forASCIIBytes: mstKeyBytes)
+    }
+
+    private static func isMSTKeyByte(_ byte: UInt8) -> Bool {
+        (65...90).contains(byte) || (97...122).contains(byte)
+            || (48...57).contains(byte)
+            || byte == 95 || byte == 126 || byte == 46
+            || byte == 58 || byte == 45 || byte == 47
     }
 
     public var description: String { mstKey }
@@ -101,20 +158,32 @@ public struct PublicRepositoryPath: Hashable, Sendable, CustomStringConvertible 
     }
 }
 
-/// Repository block CIDs are deliberately narrower than Petrel's general CID.
+/// The CID rule for repository structure: commits, MST nodes, and records
+/// written by this library must use the blessed DAG-CBOR CID (CIDv1,
+/// `dag-cbor`, SHA-256).
+///
+/// The rule itself is `CID.blessedKind` in `PetrelCore`; this type only
+/// applies it and reports in the repository error vocabulary. `CID` is the
+/// one CID type in Petrel: ``PetrelCID`` is a deprecated alias for it.
 public enum PublicRepositoryCID {
+    /// Requires `cid` to be a blessed DAG-CBOR CID.
     public static func validate(_ cid: CID) throws {
-        let bytes = cid.bytes
-        guard bytes.count == 36,
-              bytes[bytes.startIndex] == 0x01,
-              bytes[bytes.startIndex + 1] == CIDCodec.dagCBOR.rawValue,
-              cid.multihash.algorithm == Multihash.sha256Code,
-              cid.multihash.length == Multihash.sha256Length,
-              cid.multihash.digest.count == 32 else {
+        guard cid.blessedKind == .dagCBOR else {
             throw PublicRepositoryDomainError.unsupportedCID
         }
     }
 
+    /// Strictly parses the canonical string form of a blessed DAG-CBOR CID.
+    public static func parse(_ string: String) throws -> CID {
+        do {
+            return try CID.parseBlessed(string, kind: .dagCBOR)
+        } catch {
+            throw PublicRepositoryDomainError.unsupportedCID
+        }
+    }
+
+    /// Requires `cid` to be a blessed DAG-CBOR CID and `blockBytes` to hash
+    /// to it.
     public static func validate(_ cid: CID, blockBytes: Data) throws {
         try validate(cid)
         guard CID.fromDAGCBOR(blockBytes) == cid else {
@@ -191,5 +260,20 @@ public struct PublicRepositoryWriteBatch: Sendable, Equatable {
         }
         self.writes = writes
         self.expectedCommitCID = expectedCommitCID
+    }
+
+    private init(emptyWithExpectedCommitCID expectedCommitCID: CID?) {
+        writes = []
+        self.expectedCommitCID = expectedCommitCID
+    }
+
+    /// A batch with no writes. Applying it produces a new signed commit over
+    /// the unchanged tree: what an account publishes after rotating its
+    /// signing key.
+    public static func empty(expectedCommitCID: CID? = nil) throws -> Self {
+        if let expectedCommitCID {
+            try PublicRepositoryCID.validate(expectedCommitCID)
+        }
+        return Self(emptyWithExpectedCommitCID: expectedCommitCID)
     }
 }

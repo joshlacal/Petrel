@@ -129,8 +129,6 @@ final class PublicRepositoryCommitTests: XCTestCase {
         let signature = valid.signature
         var cases: [Data] = [
             try signedCommit(did: did, revision: revision, dataCID: root, signature: signature, prev: .missing),
-            try signedCommit(did: did, revision: revision, dataCID: root, signature: signature, prev: .link),
-            try signedCommit(did: did, revision: revision, dataCID: root, signature: signature, version: 2),
             try signedCommit(did: "not-a-did", revision: revision, dataCID: root, signature: signature),
             try signedCommit(did: did, revision: "bad", dataCID: root, signature: signature),
             try signedCommit(did: did, revision: revision, dataCID: root, signature: signature, extra: true),
@@ -174,6 +172,21 @@ final class PublicRepositoryCommitTests: XCTestCase {
                 ]
             )
         }
+
+        // A non-null `prev` is valid schema ("CID link, nullable"). This
+        // commit is refused only because its signature was made over the
+        // commit with a null `prev`: the link is part of what is signed.
+        await assertRejected(
+            try signedCommit(did: did, revision: revision, dataCID: root, signature: signature, prev: .link),
+            key: key,
+            expected: [.invalidSignature]
+        )
+        // Version 2 is not a version-3 commit; it has its own reader.
+        await assertRejected(
+            try signedCommit(did: did, revision: revision, dataCID: root, signature: signature, version: 2),
+            key: key,
+            expected: [.unsupportedVersion]
+        )
     }
 
     func testSignatureAndCIDNegativeMatrixRejects() async throws {
@@ -234,19 +247,20 @@ final class PublicRepositoryCommitTests: XCTestCase {
         XCTAssertEqual(structurallyValidated.signature, opaqueWireSignature)
     }
 
-    func testUnsupportedAlgorithmsFailBeforeSignerOrVerifierSideEffects() async throws {
+    func testSecp256k1SignerAndVerifierProtocolsAreInvokedExactlyOnce() async throws {
         let root = CID.fromDAGCBOR(PublicRepositoryGenesisCodec.canonicalEmptyMST)
-        let unsupportedSigner = RecordingUnsupportedSigner()
-        await assertCommitError(.unsupportedSigningAlgorithm) {
-            _ = try await PublicRepositoryCommitCodec.prepare(
-                did: self.did,
-                revision: self.revision,
-                dataCID: root,
-                signer: unsupportedSigner
-            )
-        }
-        let signerCalls = await unsupportedSigner.callCount()
-        XCTAssertEqual(signerCalls, 0)
+        // Both curves are supported, so a secp256k1 signer is called. Its
+        // output is checked structurally (64 bytes, in range, low-S).
+        let recordingSigner = RecordingUnsupportedSigner()
+        let recorded = try await PublicRepositoryCommitCodec.prepare(
+            did: did,
+            revision: revision,
+            dataCID: root,
+            signer: recordingSigner
+        )
+        XCTAssertEqual(recorded.signingAlgorithm, .secp256k1)
+        let signerCalls = await recordingSigner.callCount()
+        XCTAssertEqual(signerCalls, 1)
 
         let key = try fixedKey()
         let prepared = try await PublicRepositoryCommitCodec.prepare(
@@ -255,9 +269,8 @@ final class PublicRepositoryCommitTests: XCTestCase {
             dataCID: root,
             signer: P256PublicRepositoryCommitSigner(privateKey: key)
         )
-        // Verification accepts the pinned TypeScript secp256k1 algorithm;
-        // the concrete verifier still owns the public-key check. The writer
-        // path above remains P-256-only until Swan has a secp256k1 signer.
+        // The concrete verifier owns the public-key check; the codec owns
+        // the structural one.
         let referenceVerifier = RecordingUnsupportedVerifier()
         _ = try await PublicRepositoryCommitCodec.verify(
             signedCommitBytes: prepared.signedCommitBytes,

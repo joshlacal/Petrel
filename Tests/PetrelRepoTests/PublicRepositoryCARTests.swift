@@ -42,7 +42,7 @@ final class PublicRepositoryCARTests: XCTestCase {
         for value in transitions {
             let encoded = PublicRepositoryCAR.canonicalUnsignedVarint(value)
             let expected: PublicRepositoryCARError =
-                value == 0 ? .invalidRootCount
+                value == 0 ? .malformedHeader
                 : value <= 1_024 ? .malformedFrame
                 : .malformedHeader
             await assertImportError(expected, encoded)
