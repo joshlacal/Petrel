@@ -142,6 +142,7 @@ final class FixtureXRPCCallTests: XCTestCase {
         )
     }
 
+    /// The body is not an image, so the default metadata stripping leaves it alone.
     func testWildcardBodyIsSentUntouchedWithQueryParameters() async throws {
         let blob = """
         {"blob":{"$type":"blob","ref":{"$link":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"},\
@@ -212,6 +213,24 @@ final class FixtureXRPCCallTests: XCTestCase {
         )
 
         XCTAssertNil(message)
+    }
+
+    /// An error frame (`op: -1`) ends the stream with a typed error.
+    func testSubscriptionErrorFrameThrowsATypedError() async throws {
+        let data = try frame(header: ["op": -1], payload: ["error": "FutureCursor", "message": "cursor 99 is ahead"])
+
+        do {
+            _ = try await service().decodeSubscriptionFrame(
+                data,
+                as: ComExampleWidgetSubscribeThings.Message.self,
+                endpoint: "com.example.widget.subscribeThings"
+            )
+            XCTFail("an error frame must throw")
+        } catch let error as EventStreamError {
+            XCTAssertEqual(error, .futureCursor(message: "cursor 99 is ahead"))
+            // The name is the one the Lexicon declares.
+            XCTAssertEqual(ComExampleWidgetSubscribeThings.Error(rawValue: error.name), .futureCursor)
+        }
     }
 
     func testSubscriptionStillRejectsAMalformedDeclaredMessage() async throws {

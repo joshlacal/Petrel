@@ -15,7 +15,6 @@ import Foundation
 #if canImport(Compression)
     import Compression
 #endif
-import SwiftCBOR
 
 public enum RequestSecurityPolicy: Sendable, Equatable {
     case unauthenticated
@@ -2642,6 +2641,11 @@ public actor NetworkService: NetworkServiceProtocol {
         if let urlSessionTask = webSocketTask as? URLSessionTask {
             sessionDelegate.contextManager.setApprovedAddresses(websocketAddresses, for: urlSessionTask)
         }
+        if let urlSessionWebSocketTask = webSocketTask as? URLSessionWebSocketTask {
+            // URLSession refuses messages above 1 MiB by default; event-stream frames may
+            // be up to 5 MB.
+            urlSessionWebSocketTask.maximumMessageSize = ATProtoWebSocketFrameDecoder.maximumFrameBytes
+        }
         webSocketTask.resume()
 
         // Create bounded async throwing stream with buffer size 1000
@@ -2731,19 +2735,25 @@ public actor NetworkService: NetworkServiceProtocol {
     }
     /// Decode a subscription WebSocket frame containing two DAG-CBOR objects.
     ///
-    /// Returns `nil` for a frame the consumer must skip: a header `op` other than
-    /// `1` (message) or `-1` (error), or a message type the `Message` union does not
-    /// declare. Error frames and malformed frames throw.
+    /// Returns `nil` for a frame the consumer must skip, as the event-stream
+    /// specification asks: a header `op` other than `1` (message) or `-1` (error), or a
+    /// message type the `Message` union does not declare. An error frame throws its
+    /// ``EventStreamError``; a malformed frame throws.
     func decodeSubscriptionFrame<Message: Codable & Sendable>(
         _ data: Data,
         as messageType: Message.Type,
         endpoint: String
     ) throws -> Message? {
-        if Self.subscriptionFrameHasUnknownOperation(data) {
-            LogManager.logDebug("Skipping event-stream frame with an unknown operation on \(endpoint)")
+        let decoded: ATProtoWebSocketFrameDecoder.DecodedFrame
+        switch try ATProtoWebSocketFrameDecoder.decode(data, defaultLexicon: endpoint) {
+        case let .message(frame):
+            decoded = frame
+        case let .error(error):
+            throw error
+        case let .unknownOperation(operation):
+            LogManager.logDebug("Skipping event-stream frame with unknown operation \(operation) on \(endpoint)")
             return nil
         }
-        let decoded = try ATProtoWebSocketFrameDecoder.decodeFrame(data, defaultLexicon: endpoint)
         if let declared = (Message.self as? any XRPCSubscriptionMessage.Type)?.knownMessageTypes,
            !declared.contains(decoded.messageType)
         {
@@ -2755,28 +2765,6 @@ public actor NetworkService: NetworkServiceProtocol {
         } catch {
             LogManager.logError("Failed to decode JSON payload (\(decoded.jsonData.count) bytes) for message type: \(decoded.messageType)")
             throw error
-        }
-    }
-
-    /// Whether the frame header carries an `op` that is neither `1` nor `-1`.
-    ///
-    /// Only a well-formed header with an integer `op` can answer yes; anything else
-    /// is left to the frame decoder, which reports it as an error.
-    nonisolated static func subscriptionFrameHasUnknownOperation(_ data: Data) -> Bool {
-        guard let header = try? CBOR.decode([UInt8](data)), case let .map(fields) = header else {
-            return false
-        }
-        switch fields[CBOR.utf8String("op")] {
-        case .unsignedInt(UInt64.max)?:
-            // Not a plausible future operation: this is -1 written as an unsigned
-            // integer. The frame decoder decides what to make of it.
-            return false
-        case let .unsignedInt(value)?:
-            return value != 1
-        case let .negativeInt(value)?:
-            return value != 0
-        default:
-            return false
         }
     }
 
