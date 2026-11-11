@@ -144,6 +144,12 @@ actor JetstreamLiveOptions {
   private(set) var filter: JetstreamFilter
   private(set) var maxMessageSizeBytes: Int?
   private var sessions: [ObjectIdentifier: any FirehoseWebSocketSession] = [:]
+  /// Incremented by every ``apply(_:)``; a broadcast that is no longer the latest stops.
+  private var version = 0
+  /// Set while a broadcast or catch-up send is in flight. Sends happen one at a time, so
+  /// every connection receives updates in the order they were applied.
+  private var sending = false
+  private var sendWaiters: [CheckedContinuation<Void, Never>] = []
 
   init(filter: JetstreamFilter, maxMessageSizeBytes: Int?) {
     self.filter = filter
@@ -158,24 +164,31 @@ actor JetstreamLiveOptions {
 
   /// Adds an open connection to the set that ``apply(_:)`` updates.
   ///
+  /// When the options changed while the connection was being opened (or it carries none),
+  /// sends it the current ones, in order with any broadcast. Updates applied after this call
+  /// reach the connection through ``apply(_:)``.
+  ///
   /// - Parameter sent: The options the connection already carries (its URL query), or `nil`
   ///   when it carries none (`requireHello`).
-  /// - Returns: The `options_update` the connection still needs because the options changed
-  ///   while it was being opened, or `nil` when it is up to date. Updates applied after this
-  ///   call reach the connection through ``apply(_:)``.
   func register(
     _ session: any FirehoseWebSocketSession,
     id: ObjectIdentifier,
     connectedWith sent: JetstreamOptionsUpdate?
-  ) -> JetstreamOptionsUpdate? {
+  ) async throws {
     sessions[id] = session
-    let current = currentUpdate
-    return current == sent ? nil : current
+    guard currentUpdate != sent else { return }
+    await acquireSending()
+    defer { releaseSending() }
+    // Read after acquiring: a broadcast that ran meanwhile may have changed the options.
+    try await session.sendText(try currentUpdate.encoded())
   }
 
   func unregister(id: ObjectIdentifier) {
     sessions[id] = nil
   }
+
+  /// Number of registered connections.
+  var sessionCount: Int { sessions.count }
 
   var currentUpdate: JetstreamOptionsUpdate {
     .init(
@@ -185,13 +198,39 @@ actor JetstreamLiveOptions {
     )
   }
 
+  /// Replaces the options and sends them to every registered connection.
+  ///
+  /// Broadcasts never interleave: a broadcast waits for the one in flight, and a broadcast
+  /// superseded by a newer ``apply(_:)`` while waiting or sending stops, because the newer
+  /// one sends the latest options to every connection.
   func apply(_ update: JetstreamOptionsUpdate) async throws {
+    let text = try update.encoded()
     filter.collections = update.wantedCollections
     filter.dids = update.wantedDids
     maxMessageSizeBytes = update.maxMessageSizeBytes
-    let text = try update.encoded()
+    version += 1
+    let myVersion = version
+    await acquireSending()
+    defer { releaseSending() }
     for session in sessions.values {
+      guard version == myVersion else { return }
       try await session.sendText(text)
+    }
+  }
+
+  private func acquireSending() async {
+    while sending {
+      await withCheckedContinuation { sendWaiters.append($0) }
+    }
+    sending = true
+  }
+
+  private func releaseSending() {
+    sending = false
+    let waiters = sendWaiters
+    sendWaiters.removeAll()
+    for waiter in waiters {
+      waiter.resume()
     }
   }
 }
@@ -203,7 +242,7 @@ actor JetstreamLiveOptions {
 /// element. Cancelling the consuming task, or dropping the stream, closes the socket.
 public final class JetstreamSubscription: Sendable {
   public let configuration: JetstreamSubscriptionConfiguration
-  private let liveOptions: JetstreamLiveOptions
+  let liveOptions: JetstreamLiveOptions
 
   public init(configuration: JetstreamSubscriptionConfiguration) {
     self.configuration = configuration
@@ -215,8 +254,7 @@ public final class JetstreamSubscription: Sendable {
 
   /// Start streaming events from the Jetstream service.
   public func events() -> AsyncThrowingStream<JetstreamSubscriptionEvent, Error> {
-    let runner = JetstreamSubscriptionRunner(configuration: configuration, liveOptions: liveOptions)
-    return AsyncThrowingStream(unfolding: { try await runner.next() })
+    JetstreamSubscriptionRunner(configuration: configuration, liveOptions: liveOptions).makeStream()
   }
 
   /// Legacy `/subscribe` API: replaces the collection and DID filters of every open stream of
@@ -228,6 +266,26 @@ public final class JetstreamSubscription: Sendable {
       throw JetstreamSubscriptionError.optionsUpdateUnsupported
     }
     try await liveOptions.apply(update)
+  }
+}
+
+/// The only reference a stream holds to its runner. `AsyncThrowingStream(unfolding:)` releases
+/// its closure, and with it this handle, when the consuming task is cancelled (also between
+/// reads) or the stream is dropped.
+final class JetstreamRunnerHandle: Sendable {
+  private let runner: JetstreamSubscriptionRunner
+
+  init(_ runner: JetstreamSubscriptionRunner) {
+    self.runner = runner
+  }
+
+  func next() async throws -> JetstreamSubscriptionEvent? {
+    try await runner.next()
+  }
+
+  deinit {
+    let runner = runner
+    Task { await runner.terminate() }
   }
 }
 
@@ -296,6 +354,19 @@ actor JetstreamSubscriptionRunner {
 
   private func saveCursor(_ seq: Int64) async {
     try? await configuration.cursorStorage?.saveCursor(seq)
+  }
+
+  /// The pull-based stream over this runner. The stream owns a handle whose release, when the
+  /// consumer is cancelled or drops the stream, closes the socket even if something else still
+  /// holds the runner.
+  nonisolated func makeStream() -> AsyncThrowingStream<JetstreamSubscriptionEvent, any Error> {
+    let handle = JetstreamRunnerHandle(self)
+    return AsyncThrowingStream(unfolding: { try await handle.next() })
+  }
+
+  /// Ends the stream and closes the socket.
+  func terminate() async {
+    await finish()
   }
 
   func next() async throws -> JetstreamSubscriptionEvent? {
@@ -525,14 +596,12 @@ actor JetstreamSubscriptionRunner {
       // `options_update` sent while the connection was being opened found no session to
       // reach, and the URL (or, with `requireHello`, nothing) carries the options from
       // before it: send whatever the connection is still missing.
-      let missing = await liveOptions.register(
+      try await liveOptions.register(
         session,
         id: sessionID,
-        connectedWith: configuration.requireHello ? nil : options.update
+        // v2 has no options_update; its options never change, so nothing is ever sent.
+        connectedWith: apiVersion == .v1 && configuration.requireHello ? nil : options.update
       )
-      if apiVersion == .v1, let missing {
-        try await session.sendText(try missing.encoded())
-      }
       return session
     } catch {
       await connectionFailed(error)

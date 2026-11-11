@@ -90,6 +90,27 @@ struct JetstreamStreamSemanticsTests {
     #expect(await factory.connectedURLs.count == 1)
   }
 
+  @Test("an info event before the first sequence number does not store a timestamp cursor", .timeLimit(.minutes(1)))
+  func timestampCursorStaysOutOfPersistence() async throws {
+    let timestamp: Int64 = 1_725_911_162_329_308
+    let info = Data(#"{"$type":"message","payload":{"$type":"network.bsky.jetstream.subscribeEvents#info","name":"OutdatedCursor"}}"#.utf8)
+    let factory = ScriptedWebSocketFactory(sessions: [
+      ScriptedWebSocketSession(messages: [info, Self.commit(seq: 10), Self.commit(seq: 11)]),
+    ])
+    let storage = InMemoryFirehoseCursorStorage()
+    let client = JetstreamClient(configuration: .init(
+      host: Self.host, mode: .live(cursor: timestamp), cursorStorage: storage,
+      transport: StatusTransport(status: 426), sessionFactory: factory, backoff: Self.fastBackoff
+    ))
+    var batches = 0
+    for try await _ in client.events() {
+      batches += 1
+      // Asking for the third batch is what persists the second one (seq 10).
+      if batches == 3 { break }
+    }
+    #expect(await storage.loadCursor() == 10)
+  }
+
   @Test("the v2 connection offers the xrpc.v1.json subprotocol")
   func offersJSONSubprotocol() async throws {
     let factory = ScriptedWebSocketFactory(sessions: [ScriptedWebSocketSession(messages: [Self.commit(seq: 1)])])

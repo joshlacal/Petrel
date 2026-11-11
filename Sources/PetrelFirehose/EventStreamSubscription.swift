@@ -60,7 +60,7 @@ public final class EventStreamSubscription<Message: Decodable & Sendable>: Senda
       decode: { try Self.step(for: $0, nsid: nsid) },
       makeGap: { .sequenceGap(expected: $0, received: $1) }
     )
-    return AsyncThrowingStream(unfolding: { try await pump.next() })
+    return pump.makeStream()
   }
 
   static func step(for data: Data, nsid: String) throws -> EventStreamStep<EventStreamEvent<Message>> {

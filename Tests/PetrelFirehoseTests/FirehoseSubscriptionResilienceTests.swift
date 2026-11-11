@@ -385,6 +385,45 @@ struct FirehoseSubscriptionResilienceTests {
     withExtendedLifetime(stream) {}
   }
 
+  @Test("the stream closes the socket on cancellation even while something else holds the pump", .timeLimit(.minutes(1)))
+  func cancellationClosesSocketIndependentOfPumpLifetime() async throws {
+    let session = ScriptedWebSocketSession(messages: [Self.identity(1), Self.identity(2)])
+    let configuration = FirehoseSubscriptionConfiguration(
+      url: Self.url,
+      cursorStorage: InMemoryFirehoseCursorStorage(),
+      backoff: Self.fastBackoff,
+      sessionFactory: ScriptedWebSocketFactory(sessions: [session])
+    )
+    // The pump outlives the stream here, so its deinit cannot be what closes the socket.
+    let pump = EventStreamPump<FirehoseSubscriptionEvent>(
+      configuration: configuration.pumpConfiguration,
+      coordinator: EventStreamCursorCoordinator(storage: configuration.cursorStorage),
+      decode: FirehoseSubscription.step(for:),
+      makeGap: { .sequenceGap(expected: $0, received: $1) }
+    )
+    let stream = pump.makeStream()
+    let entered = AsyncStream<Void>.makeStream()
+    let consumer = Task {
+      var count = 0
+      for try await _ in stream {
+        count += 1
+        entered.continuation.yield()
+        while !Task.isCancelled {
+          await Task.yield()
+        }
+      }
+      return count
+    }
+    for await _ in entered.stream {
+      break
+    }
+    consumer.cancel()
+    #expect(try await consumer.value == 1)
+    await session.waitForClose()
+    #expect(await session.isClosed)
+    withExtendedLifetime((stream, pump)) {}
+  }
+
   @Test("dropping the stream without cancelling closes the socket")
   func droppingTheStreamClosesTheSocket() async throws {
     let session = ScriptedWebSocketSession(messages: [Self.identity(1), Self.identity(2)])

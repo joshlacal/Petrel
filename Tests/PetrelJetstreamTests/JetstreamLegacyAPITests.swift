@@ -370,6 +370,75 @@ struct JetstreamLegacyAPITests {
     #expect(await session.sentTexts.isEmpty)
   }
 
+  @Test("concurrent updateOptions leave every connection on the newest options", .timeLimit(.minutes(1)))
+  func concurrentUpdatesAreSerialized() async throws {
+    let gate = FirstSendGate()
+    let first = GatedSendSession(gate: gate)
+    let second = GatedSendSession(gate: gate)
+    let factory = ScriptedWebSocketFactory([])
+    let subscription = JetstreamSubscription(
+      configuration: Self.configuration(factory) {
+        $0.sessionFactory = TwoSessionFactory(first, second)
+      }
+    )
+    // Two open streams of one subscription, both registered for options_update.
+    let consumers = [Task { for try await _ in subscription.events() {} }, Task { for try await _ in subscription.events() {} }]
+    while await subscription.liveOptions.sessionCount < 2 {
+      await Task.yield()
+    }
+
+    let older = JetstreamOptionsUpdate(wantedCollections: ["app.bsky.feed.like"])
+    let newer = JetstreamOptionsUpdate(wantedCollections: ["app.bsky.feed.post"])
+    // The older broadcast suspends inside its first send.
+    let olderTask = Task { try await subscription.updateOptions(older) }
+    await gate.waitUntilBlocked()
+    let newerTask = Task { try await subscription.updateOptions(newer) }
+    while await subscription.liveOptions.filter.collections != newer.wantedCollections {
+      await Task.yield()
+    }
+    await gate.release()
+    try await olderTask.value
+    try await newerTask.value
+
+    let newest = try newer.encoded()
+    #expect(await first.sentTexts.last == newest)
+    #expect(await second.sentTexts.last == newest)
+    for consumer in consumers {
+      consumer.cancel()
+    }
+  }
+
+  @Test("the runner's stream closes the socket on cancellation even while the runner is held", .timeLimit(.minutes(1)))
+  func cancellationClosesSocketIndependentOfRunnerLifetime() async throws {
+    let session = ScriptedWebSocketSession(messages: [Self.commit(timeUS: 1), Self.commit(timeUS: 2)])
+    let configuration = Self.configuration(ScriptedWebSocketFactory(sessions: [session]))
+    let runner = JetstreamSubscriptionRunner(
+      configuration: configuration,
+      liveOptions: JetstreamLiveOptions(filter: configuration.filter, maxMessageSizeBytes: nil)
+    )
+    let stream = runner.makeStream()
+    let entered = AsyncStream<Void>.makeStream()
+    let consumer = Task {
+      var count = 0
+      for try await _ in stream {
+        count += 1
+        entered.continuation.yield()
+        while !Task.isCancelled {
+          await Task.yield()
+        }
+      }
+      return count
+    }
+    for await _ in entered.stream {
+      break
+    }
+    consumer.cancel()
+    #expect(try await consumer.value == 1)
+    await session.waitForClose()
+    #expect(await session.isClosed)
+    withExtendedLifetime((stream, runner)) {}
+  }
+
   @Test("cancelling between reads closes the socket of a retained stream", .timeLimit(.minutes(1)))
   func cancellationBetweenReadsClosesRetainedStream() async throws {
     let session = ScriptedWebSocketSession(messages: [Self.commit(timeUS: 1), Self.commit(timeUS: 2)])
@@ -473,5 +542,82 @@ struct UnreachableHTTPTransport: JetstreamHTTPTransport {
 
   func download(for request: URLRequest) async throws -> (URL, HTTPURLResponse) {
     throw Unreachable()
+  }
+}
+
+/// Blocks the first `sendText` made through any session sharing it until released.
+actor FirstSendGate {
+  private var used = false
+  private var blocked = false
+  private var released = false
+  private var blockedWaiters: [CheckedContinuation<Void, Never>] = []
+  private var releaseWaiters: [CheckedContinuation<Void, Never>] = []
+
+  func pass() async {
+    if used { return }
+    used = true
+    blocked = true
+    blockedWaiters.forEach { $0.resume() }
+    blockedWaiters.removeAll()
+    if released { return }
+    await withCheckedContinuation { releaseWaiters.append($0) }
+  }
+
+  func waitUntilBlocked() async {
+    if blocked { return }
+    await withCheckedContinuation { blockedWaiters.append($0) }
+  }
+
+  func release() {
+    released = true
+    releaseWaiters.forEach { $0.resume() }
+    releaseWaiters.removeAll()
+  }
+}
+
+/// An idle session that records text messages once their send completes.
+actor GatedSendSession: FirehoseWebSocketSession {
+  private let gate: FirstSendGate
+  private(set) var sentTexts: [String] = []
+  private var closed = false
+  private var closeWaiters: [CheckedContinuation<Void, Never>] = []
+
+  init(gate: FirstSendGate) {
+    self.gate = gate
+  }
+
+  func receiveMessage() async throws -> Data {
+    if !closed {
+      await withCheckedContinuation { closeWaiters.append($0) }
+    }
+    throw FirehoseSubscriptionError.connectionClosed
+  }
+
+  func sendText(_ text: String) async throws {
+    await gate.pass()
+    sentTexts.append(text)
+  }
+
+  func close() {
+    closed = true
+    closeWaiters.forEach { $0.resume() }
+    closeWaiters.removeAll()
+  }
+}
+
+/// Hands out two fixed sessions, then idle ones.
+actor TwoSessionFactory: FirehoseWebSocketSessionFactory {
+  private var sessions: [any FirehoseWebSocketSession]
+
+  init(_ first: GatedSendSession, _ second: GatedSendSession) {
+    self.sessions = [first, second]
+  }
+
+  func makeSession(url: URL) async throws -> any FirehoseWebSocketSession {
+    try await makeSession(url: url, subprotocols: [])
+  }
+
+  func makeSession(url _: URL, subprotocols _: [String]) async throws -> any FirehoseWebSocketSession {
+    sessions.isEmpty ? ScriptedWebSocketSession([]) : sessions.removeFirst()
   }
 }

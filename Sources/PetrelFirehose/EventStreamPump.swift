@@ -76,6 +76,26 @@ actor EventStreamCursorCoordinator {
   }
 }
 
+/// The only reference a stream holds to its pump. `AsyncThrowingStream(unfolding:)` releases
+/// its closure, and with it this handle, when the consuming task is cancelled (also between
+/// reads) or the stream is dropped.
+final class EventStreamPumpHandle<Output: Sendable>: Sendable {
+  private let pump: EventStreamPump<Output>
+
+  init(_ pump: EventStreamPump<Output>) {
+    self.pump = pump
+  }
+
+  func next() async throws -> Output? {
+    try await pump.next()
+  }
+
+  deinit {
+    let pump = pump
+    Task { await pump.terminate() }
+  }
+}
+
 /// Pull-based event-stream consumer shared by every subscription type in this module.
 ///
 /// Each call to ``next()`` reads at most as many frames from the socket as it takes to produce
@@ -118,6 +138,19 @@ actor EventStreamPump<Output: Sendable> {
     if let session {
       Task { await session.close() }
     }
+  }
+
+  /// The pull-based stream over this pump. The stream owns a handle whose release, when the
+  /// consumer is cancelled or drops the stream, closes the socket even if something else still
+  /// holds the pump.
+  nonisolated func makeStream() -> AsyncThrowingStream<Output, any Error> {
+    let handle = EventStreamPumpHandle(self)
+    return AsyncThrowingStream(unfolding: { try await handle.next() })
+  }
+
+  /// Ends the stream and closes the socket.
+  func terminate() async {
+    await finish()
   }
 
   func next() async throws -> Output? {

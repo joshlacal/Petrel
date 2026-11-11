@@ -54,7 +54,11 @@ actor JetstreamBatchChannel {
   func next() async throws -> JetstreamBatch? {
     if let cursor = deliveredCursor {
       deliveredCursor = nil
-      if cursor > savedCursor {
+      // Only sequence numbers move the watermark. A batch delivered before the first
+      // sequenced event carries the starting cursor, which on the v2 API may still be a
+      // unix-microsecond timestamp; persisting it would put the watermark above every
+      // sequence number that follows, and nothing would be saved again.
+      if cursor > savedCursor, cursor < JetstreamSubscriptionRunner.timestampCursorFloor {
         savedCursor = cursor
         try? await cursorStorage?.saveCursor(cursor)
       }

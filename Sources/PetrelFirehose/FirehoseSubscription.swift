@@ -211,7 +211,7 @@ public final class FirehoseSubscription: Sendable {
       decode: Self.step(for:),
       makeGap: { .sequenceGap(expected: $0, received: $1) }
     )
-    return AsyncThrowingStream(unfolding: { try await pump.next() })
+    return pump.makeStream()
   }
 
   static func step(for data: Data) throws -> EventStreamStep<FirehoseSubscriptionEvent> {
