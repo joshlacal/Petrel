@@ -457,8 +457,22 @@ indirect enum RelayCBORValue {
 struct RelayCBORMap {
   private let storage: [String: RelayCBORValue]
 
-  init(_ entries: [(String, RelayCBORValue)]) {
-    storage = Dictionary(uniqueKeysWithValues: entries)
+  /// Builds the map from wire entries.
+  ///
+  /// - Throws: ``RelayCBORReaderError/invalid`` when two keys collide as Swift `String`s.
+  ///   The reader has already checked that the key bytes are distinct and in canonical order,
+  ///   but canonically equivalent Unicode spellings (NFC `é` and NFD `e` + U+0301) are
+  ///   distinct bytes and the same `String`. A lookup could not tell them apart, so such a map
+  ///   is rejected rather than trapping or silently keeping one of the values.
+  init(_ entries: [(String, RelayCBORValue)]) throws {
+    var storage: [String: RelayCBORValue] = [:]
+    storage.reserveCapacity(entries.count)
+    for (key, value) in entries {
+      guard storage.updateValue(value, forKey: key) == nil else {
+        throw RelayCBORReaderError.invalid
+      }
+    }
+    self.storage = storage
   }
 
   var keys: Set<String> { Set(storage.keys) }
@@ -587,7 +601,7 @@ struct CanonicalRelayCBORReader {
         previous = keyBytes
         entries.append((key, try read(depth: depth + 1)))
       }
-      return .map(.init(entries))
+      return .map(try .init(entries))
     case 6:
       guard argument == 42 else { throw RelayCBORReaderError.invalid }
       guard case let .bytes(linkBytes) = try read(depth: depth + 1),

@@ -254,6 +254,30 @@ struct RelayFrameLenientDecodingTests {
     #expect(decodedDecorated == expectedDecorated)
   }
 
+  @Test("canonically equivalent map keys are invalid CBOR, not a crash")
+  func canonicallyEquivalentMapKeys() {
+    // "é" precomposed (NFC, C3 A9) and decomposed (NFD, 65 CC 81) are distinct byte strings,
+    // so the pair passes the byte-wise key order check, but Swift `String` equality treats
+    // them as the same key. A relay must not be able to trap the process with such a frame.
+    let nfc = "\u{E9}"
+    let nfd = "e\u{301}"
+    #expect(Array(nfc.utf8) != Array(nfd.utf8))
+    #expect(nfc == nfd)
+    let inPayload = TestDAGCBOR.frame(
+      header: .map([("op", .unsigned(1)), ("t", .text("#identity"))]),
+      payload: .rawOrder([(nfc, .unsigned(1)), (nfd, .unsigned(2))])
+    )
+    #expect(throws: RelayVerifierError.invalidCBOR) { try RelayFrameDecoder.decodeFrame(inPayload) }
+    let inHeader = TestDAGCBOR.frame(
+      // Canonical order: shorter keys first, then bytewise.
+      header: .rawOrder([("t", .text("#identity")), ("op", .unsigned(1)), (nfc, .unsigned(1)), (nfd, .unsigned(2))]),
+      payload: .map([])
+    )
+    #expect(throws: RelayVerifierError.invalidCBOR) { try RelayFrameDecoder.decodeFrame(inHeader) }
+    // The subscription treats it as a hard framing error as well.
+    #expect(throws: RelayVerifierError.invalidCBOR) { try FirehoseSubscription.step(for: inPayload) }
+  }
+
   @Test("invalid framing stays a hard error in lenient mode")
   func framingErrorsAreHard() {
     let valid = Self.identity()
