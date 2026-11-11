@@ -97,6 +97,41 @@ struct LexiconVectorTests {
         #expect(problems.first?.path == "/defs/main/input/schema/properties/preferences/ref")
     }
 
+    @Test("lexicon/catalog: a directory of Lexicons loads in one call")
+    func catalogLoadsFromDirectory() throws {
+        var catalog = LexiconCatalog()
+        let added = try catalog.add(contentsOfDirectory: Vectors.root.appendingPathComponent("lexicon/catalog"))
+        #expect(added.map(\.id) == [
+            "example.lexicon.permissionset",
+            "example.lexicon.procedure",
+            "example.lexicon.query",
+            "example.lexicon.record",
+            "example.lexicon.subscription",
+        ])
+        #expect(catalog.nsids == added.map(\.id).sorted())
+
+        // Subdirectories are searched; loading the parent finds the same five
+        // documents and then stops at the first file that is not a Lexicon
+        // (the vector files themselves, which are JSON arrays).
+        var fromParent = LexiconCatalog()
+        #expect(throws: LexiconSchemaError.self) {
+            try fromParent.add(contentsOfDirectory: Vectors.root.appendingPathComponent("lexicon"))
+        }
+        #expect(fromParent.nsids.count == 5)
+
+        // Loading the same directory twice is a duplicate unless replacing.
+        #expect(throws: LexiconSchemaError.self) {
+            try catalog.add(contentsOfDirectory: Vectors.root.appendingPathComponent("lexicon/catalog"))
+        }
+        #expect(throws: Never.self) {
+            try catalog.add(contentsOfDirectory: Vectors.root.appendingPathComponent("lexicon/catalog"), replaceExisting: true)
+        }
+        var missing = LexiconCatalog()
+        #expect(throws: (any Error).self) {
+            try missing.add(contentsOfDirectory: Vectors.root.appendingPathComponent("no-such-directory"))
+        }
+    }
+
     @Test("lexicon/catalog: every document survives a model round trip")
     func catalogDocumentsRoundTrip() throws {
         for file in try Vectors.jsonFiles(in: "lexicon/catalog") {

@@ -81,6 +81,17 @@ struct ProductionCorpusTests {
         #expect(problems.isEmpty, "unresolved or invalid references: \(problems.prefix(10))")
     }
 
+    @Test("the production corpus loads as a directory")
+    func corpusLoadsAsDirectory() throws {
+        guard !Self.corpusFiles().isEmpty else { return }
+        var catalog = LexiconCatalog()
+        let added = try catalog.add(
+            contentsOfDirectory: Self.corpusRoot,
+            options: LexiconSchemaOptions(allowUnknownStringFormats: true)
+        )
+        #expect(added.count == Self.corpusFiles().count)
+    }
+
     @Test("every production Lexicon survives a model round trip")
     func corpusRoundTrips() throws {
         let options = LexiconSchemaOptions(allowUnknownStringFormats: true)
