@@ -54,9 +54,10 @@ else
   exit 1
 fi
 
-# The core package, the tools.ozone overlay product, and the third-party fixture module
-# that proves overlay output compiles. All three are committed post-format and must be
-# fixed points of this script.
+# The core package (which also writes the Lexicon documents bundled into PetrelLexicon),
+# the tools.ozone overlay product, and the third-party fixture module that proves overlay
+# output compiles. Every tree is committed post-format and must be a fixed point of this
+# script.
 "$PETREL_PYTHON" run.py \
   --manifest generator/manifests/petrel-core.json \
   --language swift
@@ -67,4 +68,4 @@ fi
   --manifest Tests/LexiconFixture/lexgen.json \
   --language swift
 "$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \
-  Sources/Petrel/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated
+  Sources/Petrel/Generated Sources/PetrelLexicon/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated

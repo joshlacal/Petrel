@@ -84,7 +84,7 @@ struct DataModelVectorTests {
             // And back: the fixture bytes decode to the same value.
             let decoded = try LexValue(dagCBOR: expectedCBOR)
             #expect(decoded == value, "fixture \(index): decoding the fixture bytes gives a different value")
-            #expect(try CID.fromDAGCBOR(expectedCBOR).string == expectedCID, "fixture \(index): fixture bytes do not hash to the fixture CID")
+            #expect(CID.fromDAGCBOR(expectedCBOR).string == expectedCID, "fixture \(index): fixture bytes do not hash to the fixture CID")
         }
     }
 

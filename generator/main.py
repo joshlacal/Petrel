@@ -244,8 +244,15 @@ async def generate_swift_from_lexicons_recursive(
     emit_server_contracts=False,
     emit_xrpc_error_parsing=False,
     property_type_overrides=None,
+    lexicon_documents=None,
 ):
     """
+    lexicon_documents: `{"output": <dir>, "type": <Swift enum name>, "access": "internal"|"public"}`
+    from the manifest (`swift.lexicon_documents`). Writes one Swift file holding
+    every emitted Lexicon document as JSON, so a runtime validator can check data
+    against exactly the schemas the generated types were built from (lengths,
+    ranges, enums and the other constraints the types themselves do not carry).
+
     property_type_overrides: `{nsid: {"<StructName>.<property>": "<SwiftType>"}}`
     from the manifest (`swift.property_type_overrides`). Replaces the generated
     Swift type of individual properties, for a package that ships a hand-written
@@ -410,6 +417,67 @@ async def generate_swift_from_lexicons_recursive(
         add_expected_file(compatibility_file_path, render_petrel_020_compatibility())
 
     await write_swift_projection(output_folder, expected_files)
+
+    if lexicon_documents:
+        type_name = lexicon_documents.get('type', 'BundledLexiconDocuments')
+        await write_swift_projection(
+            lexicon_documents['output'],
+            {
+                f'{type_name}.swift': render_lexicon_documents(
+                    [lexicon for _, lexicon in lexicons],
+                    type_name=type_name,
+                    access=lexicon_documents.get('access', 'internal'),
+                )
+            },
+        )
+
+
+LEXICON_DOCUMENT_CHUNK = 20
+
+
+def render_lexicon_documents(lexicons, type_name='BundledLexiconDocuments', access='internal'):
+    """Swift source holding Lexicon documents as minified JSON string literals.
+
+    Documents are ordered by NSID and appended in chunks, each in its own
+    function: one array literal with hundreds of long strings is slow to type-check.
+    """
+    if access not in ('internal', 'public'):
+        raise ValueError(f"lexicon_documents.access must be 'internal' or 'public', not {access!r}")
+    if not re.fullmatch(r'[A-Z][A-Za-z0-9_]*', type_name):
+        raise ValueError(f"lexicon_documents.type must be a Swift type name, not {type_name!r}")
+    from templates import escape_swift_string_literal
+    modifier = 'public ' if access == 'public' else ''
+    ordered = sorted(lexicons, key=lambda lexicon: lexicon.get('id', ''))
+    literals = [
+        escape_swift_string_literal(orjson.dumps(lexicon).decode('utf-8'))
+        for lexicon in ordered
+    ]
+    chunks = [literals[i:i + LEXICON_DOCUMENT_CHUNK] for i in range(0, len(literals), LEXICON_DOCUMENT_CHUNK)]
+    lines = [
+        'import Foundation',
+        '',
+        '/// The Lexicon documents the generated types of this package were built from, as JSON.',
+        '///',
+        '/// A runtime validator loads them to check data against the same schemas: the',
+        '/// generated types enforce shape, the schemas also carry lengths, ranges and enums.',
+        f'{modifier}enum {type_name} {{',
+        '    /// The number of documents.',
+        f'    {modifier}static let count = {len(literals)}',
+        '',
+        '    /// Every document as minified JSON, ordered by NSID.',
+        f'    {modifier}static var all: [String] {{',
+        '        var documents: [String] = []',
+        '        documents.reserveCapacity(count)',
+    ]
+    lines += [f'        appendChunk{index}(to: &documents)' for index in range(len(chunks))]
+    lines += ['        return documents', '    }']
+    for index, chunk in enumerate(chunks):
+        lines += ['', f'    private static func appendChunk{index}(to documents: inout [String]) {{']
+        lines += [f'        documents.append("{literal}")' for literal in chunk]
+        lines += ['    }']
+    lines += ['}', '']
+    return '\n'.join(lines)
+
 
 def render_atproto_client(generated_classes):
     from templates import TemplateManager
@@ -820,6 +888,7 @@ async def run_manifest(manifest_path, language='both', graph_path=None):
             emit_server_contracts=swift_cfg.get('emit_server_contracts', False),
             emit_xrpc_error_parsing=swift_cfg.get('emit_xrpc_error_parsing', False),
             property_type_overrides=swift_cfg.get('property_type_overrides'),
+            lexicon_documents=swift_cfg.get('lexicon_documents'),
         ))
     kotlin_cfg = manifest.get('kotlin')
     if kotlin_cfg and language in ('kotlin', 'both'):

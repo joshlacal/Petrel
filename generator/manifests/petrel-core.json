@@ -22,7 +22,9 @@
       "com.atproto.server.createSession": {"Output.didDoc": "DIDDocument"},
       "com.atproto.server.getSession": {"Output.didDoc": "DIDDocument"},
       "com.atproto.server.refreshSession": {"Output.didDoc": "DIDDocument"}
-    }
+    },
+    "$comment_lexicon_documents": "The emitted Lexicon documents as JSON, for the PetrelLexicon runtime validator (LexiconCatalog.bundled()).",
+    "lexicon_documents": {"output": "Sources/PetrelLexicon/Generated", "type": "BundledLexiconDocuments"}
   },
   "kotlin": {
     "output": "kotlin/src/main/kotlin/blue/catbird/petrel/generated"

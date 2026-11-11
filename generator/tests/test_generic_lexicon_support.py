@@ -24,6 +24,7 @@ sys.path.insert(0, str(GENERATOR_DIR))
 from base_code_generator import validate_lexicon_schema
 from cycle_detector import CycleDetector
 from main import (
+    LEXICON_DOCUMENT_CHUNK,
     CORE_LEXICON_DIR,
     CORE_REFERENCE_TOKEN,
     build_namespace_hierarchy,
@@ -32,6 +33,7 @@ from main import (
     generate_swift_overlay_namespaces,
     lower_camel,
     namespace_segments,
+    render_lexicon_documents,
     resolve_reference_dirs,
 )
 from swift_code_generator import SwiftCodeGenerator
@@ -573,6 +575,62 @@ class OverlayManifestTests(unittest.TestCase):
                 ))
             registration = (output / "Client" / "PinsLexicons.swift").read_text()
             self.assertEqual(re.findall(r'forType: "([^"]+)"', registration), ["com.example.pins.defs#pin"])
+
+
+class LexiconDocumentBundleTests(unittest.TestCase):
+    """The Lexicon documents emitted for the runtime validator (LexiconCatalog.bundled())."""
+
+    @staticmethod
+    def decode_literals(source):
+        literals = re.findall(r'documents\.append\("((?:[^"\\]|\\.)*)"\)', source)
+        return [json.loads(json.loads(f'"{literal}"')) for literal in literals]
+
+    def test_documents_survive_the_round_trip_through_swift_string_literals(self):
+        documents = [
+            lexicon("com.example.b", {"main": object_def({"q": {"type": "string", "description": 'say "hi" \\ bye\n\ttab é 👋'}})}),
+            lexicon("com.example.a", {"main": {"type": "token"}}),
+        ]
+        source = render_lexicon_documents(documents)
+        self.assertIn("enum BundledLexiconDocuments {", source)
+        self.assertIn("static let count = 2", source)
+        decoded = self.decode_literals(source)
+        # Ordered by NSID, whatever the load order, and unchanged.
+        self.assertEqual(decoded, [documents[1], documents[0]])
+
+    def test_documents_are_split_into_chunks(self):
+        documents = [lexicon(f"com.example.d{index:03}", {"main": {"type": "token"}}) for index in range(LEXICON_DOCUMENT_CHUNK * 2 + 1)]
+        source = render_lexicon_documents(documents, type_name="PinsLexiconDocuments", access="public")
+        self.assertIn("public enum PinsLexiconDocuments {", source)
+        self.assertIn("public static var all: [String] {", source)
+        self.assertEqual(source.count("private static func appendChunk"), 3)
+        self.assertEqual(len(self.decode_literals(source)), len(documents))
+
+    def test_invalid_options_are_rejected(self):
+        with self.assertRaisesRegex(ValueError, "access"):
+            render_lexicon_documents([], access="open")
+        with self.assertRaisesRegex(ValueError, "type name"):
+            render_lexicon_documents([], type_name="not a type")
+
+    def test_core_manifest_bundles_its_documents_into_petrel_lexicon(self):
+        manifest = json.loads((GENERATOR_DIR / "manifests" / "petrel-core.json").read_text())
+        self.assertEqual(
+            manifest["swift"]["lexicon_documents"],
+            {"output": "Sources/PetrelLexicon/Generated", "type": "BundledLexiconDocuments"},
+        )
+        bundled = REPOSITORY_ROOT / "Sources" / "PetrelLexicon" / "Generated" / "BundledLexiconDocuments.swift"
+        decoded = self.decode_literals(bundled.read_text())
+        ids = [document["id"] for document in decoded]
+        self.assertEqual(ids, sorted(ids))
+        self.assertIn("app.bsky.feed.post", ids)
+        excluded = manifest["lexicons"]["exclude_namespaces"]
+        self.assertFalse([nsid for nsid in ids if any(nsid.startswith(ns + ".") for ns in excluded)])
+        # Byte-for-byte the schemas the generator read.
+        on_disk = {}
+        for path in (GENERATOR_DIR / "lexicons").rglob("*.json"):
+            document = json.loads(path.read_text())
+            on_disk[document["id"]] = document
+        for document in decoded:
+            self.assertEqual(document, on_disk[document["id"]])
 
 
 class FixtureManifestTests(unittest.TestCase):

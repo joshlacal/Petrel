@@ -1660,7 +1660,7 @@ fi
                         "release-python|run.py|--manifest|generator/manifests/petrel-ozone.json|--language|swift",
                         "release-python|run.py|--manifest|Tests/LexiconFixture/lexgen.json|--language|swift",
                         "release-mint|run|--executable|swiftformat|nicklockwood/SwiftFormat@0.61.1|"
-                        "Sources/Petrel/Generated|Sources/PetrelOzone/Generated|Tests/LexiconFixture/Generated",
+                        "Sources/Petrel/Generated|Sources/PetrelLexicon/Generated|Sources/PetrelOzone/Generated|Tests/LexiconFixture/Generated",
                     ],
                 )
                 self.assertEqual(
@@ -1993,9 +1993,9 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
         text = self.text["generator.yml"]
         tests_command = '"$PETREL_PYTHON" -m unittest discover -s generator/tests -v'
         regenerate_command = "Scripts/regenerate-generated.sh"
-        # Every generated tree: the core package, the tools.ozone overlay product and
-        # the third-party fixture module.
-        trees = "Sources/Petrel/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated"
+        # Every generated tree: the core package, the Lexicon documents bundled for the
+        # runtime validator, the tools.ozone overlay product and the third-party fixture.
+        trees = "Sources/Petrel/Generated Sources/PetrelLexicon/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated"
         diff_command = f"git diff --exit-code -- {trees}"
         untracked_command = (
             'test -z "$(git status --porcelain --untracked-files=all -- '
@@ -2085,7 +2085,7 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
             )
         self.assertIn(
             '"$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \\\n'
-            '            Sources/Petrel/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated',
+            '            Sources/Petrel/Generated Sources/PetrelLexicon/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated',
             text,
         )
         self.assertLess(
@@ -2105,6 +2105,7 @@ class WorkflowDeterminismContractTests(unittest.TestCase):
                 "generator/lexicons/**",
                 "generator/provenance/standard-lexicons.json",
                 "Sources/Petrel/Generated/**",
+                "Sources/PetrelLexicon/Generated/**",
                 "Sources/PetrelOzone/Generated/**",
                 "Tests/LexiconFixture/Generated/**",
                 "kotlin/src/main/kotlin/blue/catbird/petrel/generated/**",

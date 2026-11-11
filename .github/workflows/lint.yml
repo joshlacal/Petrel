@@ -69,7 +69,7 @@ jobs:
         run: |
           set -euo pipefail
           "$RELEASE_MINT" run --executable swiftformat nicklockwood/SwiftFormat@0.61.1 \
-            --lint Sources/Petrel/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated
+            --lint Sources/Petrel/Generated Sources/PetrelLexicon/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated
 
   hygiene:
     name: No print() in library code
