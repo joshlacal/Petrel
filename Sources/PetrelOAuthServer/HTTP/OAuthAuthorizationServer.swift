@@ -225,10 +225,9 @@ public struct OAuthAuthorizationServer: Sendable {
     /// Revokes every session of an account, for example when its password
     /// changes or the account is disabled.
     public func revokeAllSessions(subject: String) async throws {
-        let now = clock.now()
-        for session in try await store.sessions(subject: subject, now: now) {
-            try await store.revokeSession(id: session.sessionID, now: now)
-        }
+        // Not the "connected apps" listing: that omits sessions whose code
+        // has been issued but not redeemed, and those codes must die too.
+        try await store.revokeSessions(subject: subject, now: clock.now())
     }
 
     // MARK: - Metadata

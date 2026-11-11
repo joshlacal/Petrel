@@ -31,6 +31,19 @@ struct OAuthTokenEndpointTests {
         #expect(body.tokenType == "DPoP")
     }
 
+    @Test("revoking all of an account's sessions also kills a code issued but not yet exchanged")
+    func revokeAllCoversPendingCode() async throws {
+        // A password change between consent and code exchange must not leave
+        // the old code redeemable for a fresh token family.
+        let harness = try TestServer()
+        let client = try TestClient(harness)
+        let pending = try await code(harness, client)
+        try await harness.server.revokeAllSessions(subject: TestAccounts.alice.did)
+        let response = try await client.exchange(code: pending)
+        #expect(response.status == 400)
+        #expect(try response.decode(ErrorPayload.self).error == "invalid_grant")
+    }
+
     @Test("a wrong binding is refused and does not burn the code", arguments: [
         "code_verifier", "redirect_uri",
     ])

@@ -99,7 +99,13 @@ public protocol OAuthSessionStore: Sendable {
     /// Revokes a session and all of its tokens. Idempotent.
     func revokeSession(id: UUID, now: Date) async throws
 
-    /// The account's active sessions, for a "connected apps" page.
+    /// Atomically revokes every session of the account, including a session
+    /// whose authorization code has been issued but not yet redeemed (so that
+    /// code can no longer be exchanged). Idempotent.
+    func revokeSessions(subject: String, now: Date) async throws
+
+    /// The account's active sessions, for a "connected apps" page. A session
+    /// whose code has not yet been redeemed is not listed.
     func sessions(subject: String, now: Date) async throws -> [OAuthSession]
 
     /// True when the client currently holds at least one active session.

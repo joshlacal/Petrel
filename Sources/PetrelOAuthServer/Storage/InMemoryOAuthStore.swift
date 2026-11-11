@@ -142,6 +142,12 @@ public actor InMemoryOAuthStore: OAuthAuthorizationRequestStore, OAuthSessionSto
         revoke(id, now: now)
     }
 
+    public func revokeSessions(subject: String, now: Date) {
+        for session in sessions.values where session.subject == subject {
+            revoke(session.sessionID, now: now)
+        }
+    }
+
     public func sessions(subject: String, now: Date) -> [OAuthSession] {
         sessions.values
             .filter { $0.subject == subject && $0.isActive(at: now) && $0.tokens != nil }
