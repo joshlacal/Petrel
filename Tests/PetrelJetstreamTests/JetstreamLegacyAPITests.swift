@@ -17,10 +17,15 @@ struct JetstreamLegacyAPITests {
   static let fastBackoff = FirehoseBackoffConfiguration(initialDelay: 0.001, maxDelay: 0.002, multiplier: 1)
 
   /// Event shapes from the Jetstream README.
-  static func commit(timeUS: Int64, collection: String = "app.bsky.feed.like", did: String = "did:plc:eygmaihciaxprqvxpfvl6flk") -> Data {
+  static func commit(
+    timeUS: Int64,
+    collection: String = "app.bsky.feed.like",
+    did: String = "did:plc:eygmaihciaxprqvxpfvl6flk",
+    rkey: String = "3l3qo2vuowo2b"
+  ) -> Data {
     Data("""
     {"did":"\(did)","time_us":\(timeUS),"kind":"commit","commit":{"rev":"3l3qo2vutsw2b",\
-    "operation":"create","collection":"\(collection)","rkey":"3l3qo2vuowo2b",\
+    "operation":"create","collection":"\(collection)","rkey":"\(rkey)",\
     "record":{"$type":"\(collection)","createdAt":"2024-09-09T19:46:02.102Z","subject":\
     {"cid":"bafyreidc6sydkkbchcyg62v77wbhzvb2mvytlmsychqgwf2xojjtirmzj4",\
     "uri":"at://did:plc:wa7b35aakoll7hugkrjtf3xf/app.bsky.feed.post/3l3pte3p2e325"}},\
@@ -265,6 +270,196 @@ struct JetstreamLegacyAPITests {
     }
     #expect(seen == [42])
     #expect(await factory.connectedURLs.first?.query == "compress=true")
+  }
+
+  @Test("distinct events sharing a time_us are all delivered", .timeLimit(.minutes(1)))
+  func distinctEventsSharingATimestamp() async throws {
+    // time_us is a timestamp, not an event identifier: several events can carry the same one.
+    let session = ScriptedWebSocketSession(messages: [
+      Self.commit(timeUS: 100, rkey: "a"),
+      Self.commit(timeUS: 100, rkey: "b"),
+      Self.commit(timeUS: 100, collection: "app.bsky.feed.post", rkey: "a"),
+      Self.commit(timeUS: 101, rkey: "a"),
+    ])
+    let factory = ScriptedWebSocketFactory(sessions: [session])
+    var seen: [String] = []
+    for try await event in JetstreamSubscription(configuration: Self.configuration(factory)).events() {
+      if case let .event(.commit(commit)) = event {
+        seen.append("\(commit.timeUS) \(commit.collection) \(commit.rkey)")
+      }
+      if seen.count == 4 { break }
+    }
+    #expect(seen == [
+      "100 app.bsky.feed.like a",
+      "100 app.bsky.feed.like b",
+      "100 app.bsky.feed.post a",
+      "101 app.bsky.feed.like a",
+    ])
+  }
+
+  @Test("the inclusive replay at the resume time_us drops only events already delivered", .timeLimit(.minutes(1)))
+  func replayAtResumeTimestamp() async throws {
+    // The connection drops after the first of two events at time_us 200. The server replays
+    // from 200 inclusive: the event already delivered must be dropped, its sibling must not.
+    let first = ScriptedWebSocketSession(
+      messages: [Self.commit(timeUS: 100, rkey: "a"), Self.commit(timeUS: 200, rkey: "a")],
+      then: URLError(.networkConnectionLost)
+    )
+    let second = ScriptedWebSocketSession(messages: [
+      Self.commit(timeUS: 100, rkey: "a"),
+      Self.commit(timeUS: 200, rkey: "a"),
+      Self.commit(timeUS: 200, rkey: "b"),
+      Self.commit(timeUS: 300, rkey: "a"),
+    ])
+    let factory = ScriptedWebSocketFactory(sessions: [first, second])
+    var seen: [String] = []
+    for try await event in JetstreamSubscription(configuration: Self.configuration(factory)).events() {
+      if case let .event(.commit(commit)) = event {
+        seen.append("\(commit.timeUS) \(commit.rkey)")
+      }
+      if seen.count == 4 { break }
+    }
+    #expect(seen == ["100 a", "200 a", "200 b", "300 a"])
+    #expect(await factory.cursors == [nil, "200"])
+  }
+
+  @Test("updateOptions during a connect attempt reaches the new connection", .timeLimit(.minutes(1)))
+  func updateOptionsDuringConnect() async throws {
+    let session = ScriptedWebSocketSession(messages: [
+      Self.commit(timeUS: 1, collection: "app.bsky.feed.post"),
+    ])
+    let factory = GatedWebSocketFactory(session: session)
+    let subscription = JetstreamSubscription(
+      configuration: Self.configuration(ScriptedWebSocketFactory(sessions: [])) {
+        $0.filter = .init(collections: ["app.bsky.feed.like"])
+        $0.sessionFactory = factory
+      }
+    )
+    let consumer = Task {
+      var collections: [String] = []
+      for try await event in subscription.events() {
+        if case let .event(.commit(commit)) = event {
+          collections.append(commit.collection)
+        }
+        break
+      }
+      return collections
+    }
+    // The URL was built with the old filter; change it before the socket is registered.
+    await factory.waitForConnectAttempt()
+    try await subscription.updateOptions(.init(wantedCollections: ["app.bsky.feed.post"]))
+    await factory.release()
+
+    #expect(try await consumer.value == ["app.bsky.feed.post"])
+    let url = try #require(await factory.connectedURL)
+    #expect(url.query == "wantedCollections=app.bsky.feed.like")
+    #expect(await session.sentTexts == [
+      #"{"payload":{"maxMessageSizeBytes":0,"wantedCollections":["app.bsky.feed.post"],"wantedDids":[]},"type":"options_update"}"#,
+    ])
+  }
+
+  @Test("a connection whose URL already carries the current filters sends no options_update")
+  func noRedundantOptionsUpdate() async throws {
+    let session = ScriptedWebSocketSession(messages: [Self.commit(timeUS: 1)])
+    let configuration = Self.configuration(
+      ScriptedWebSocketFactory(sessions: [session]), filter: .init(collections: ["app.bsky.feed.like"])
+    )
+    for try await _ in JetstreamSubscription(configuration: configuration).events() {
+      break
+    }
+    #expect(await session.sentTexts.isEmpty)
+  }
+
+  @Test("cancelling between reads closes the socket of a retained stream", .timeLimit(.minutes(1)))
+  func cancellationBetweenReadsClosesRetainedStream() async throws {
+    let session = ScriptedWebSocketSession(messages: [Self.commit(timeUS: 1), Self.commit(timeUS: 2)])
+    let subscription = JetstreamSubscription(
+      configuration: Self.configuration(ScriptedWebSocketFactory(sessions: [session]))
+    )
+    let stream = subscription.events()
+    let gate = BetweenReadsGate()
+    let consumer = Task {
+      var count = 0
+      for try await _ in stream {
+        count += 1
+        // Cancelled while handling the element, not while suspended in a read.
+        await gate.handlingElement()
+      }
+      return count
+    }
+    await gate.waitUntilHandling()
+    consumer.cancel()
+    await gate.resume()
+    #expect(try await consumer.value == 1)
+    await session.waitForClose()
+    #expect(await session.isClosed)
+    withExtendedLifetime(stream) {}
+  }
+}
+
+/// Holds a consumer inside its loop body until the test has cancelled it.
+actor BetweenReadsGate {
+  private var handling = false
+  private var handlingWaiters: [CheckedContinuation<Void, Never>] = []
+  private var resumeWaiter: CheckedContinuation<Void, Never>?
+  private var resumed = false
+
+  func handlingElement() async {
+    handling = true
+    handlingWaiters.forEach { $0.resume() }
+    handlingWaiters.removeAll()
+    if resumed { return }
+    await withCheckedContinuation { resumeWaiter = $0 }
+  }
+
+  func waitUntilHandling() async {
+    if handling { return }
+    await withCheckedContinuation { handlingWaiters.append($0) }
+  }
+
+  func resume() {
+    resumed = true
+    resumeWaiter?.resume()
+    resumeWaiter = nil
+  }
+}
+
+/// A session factory whose single connect attempt waits for the test to release it.
+actor GatedWebSocketFactory: FirehoseWebSocketSessionFactory {
+  private let session: ScriptedWebSocketSession
+  private(set) var connectedURL: URL?
+  private var arrivalWaiters: [CheckedContinuation<Void, Never>] = []
+  private var releaseWaiter: CheckedContinuation<Void, Never>?
+  private var released = false
+
+  init(session: ScriptedWebSocketSession) {
+    self.session = session
+  }
+
+  func makeSession(url: URL) async throws -> any FirehoseWebSocketSession {
+    try await makeSession(url: url, subprotocols: [])
+  }
+
+  func makeSession(url: URL, subprotocols _: [String]) async throws -> any FirehoseWebSocketSession {
+    if connectedURL != nil { return ScriptedWebSocketSession([]) }
+    connectedURL = url
+    arrivalWaiters.forEach { $0.resume() }
+    arrivalWaiters.removeAll()
+    if !released {
+      await withCheckedContinuation { releaseWaiter = $0 }
+    }
+    return session
+  }
+
+  func waitForConnectAttempt() async {
+    if connectedURL != nil { return }
+    await withCheckedContinuation { arrivalWaiters.append($0) }
+  }
+
+  func release() {
+    released = true
+    releaseWaiter?.resume()
+    releaseWaiter = nil
   }
 }
 

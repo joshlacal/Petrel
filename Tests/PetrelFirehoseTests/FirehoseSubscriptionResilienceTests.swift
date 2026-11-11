@@ -355,6 +355,36 @@ struct FirehoseSubscriptionResilienceTests {
     #expect(await session.isClosed)
   }
 
+  @Test("cancelling between reads closes the socket of a retained stream", .timeLimit(.minutes(1)))
+  func cancellationBetweenReadsClosesRetainedStream() async throws {
+    let session = ScriptedWebSocketSession(messages: [Self.identity(1), Self.identity(2)])
+    let subscription = Self.subscription(ScriptedWebSocketFactory(sessions: [session]))
+    let stream = subscription.events()
+    let entered = AsyncStream<Void>.makeStream()
+    let proceed = AsyncStream<Void>.makeStream()
+    let consumer = Task {
+      var count = 0
+      for try await _ in stream {
+        count += 1
+        // Cancelled while handling the element, not while suspended in a read.
+        entered.continuation.yield()
+        for await _ in proceed.stream {
+          break
+        }
+      }
+      return count
+    }
+    for await _ in entered.stream {
+      break
+    }
+    consumer.cancel()
+    proceed.continuation.yield()
+    #expect(try await consumer.value == 1)
+    await session.waitForClose()
+    #expect(await session.isClosed)
+    withExtendedLifetime(stream) {}
+  }
+
   @Test("dropping the stream without cancelling closes the socket")
   func droppingTheStreamClosesTheSocket() async throws {
     let session = ScriptedWebSocketSession(messages: [Self.identity(1), Self.identity(2)])

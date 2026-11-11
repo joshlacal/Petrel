@@ -150,8 +150,27 @@ actor JetstreamLiveOptions {
     self.maxMessageSizeBytes = maxMessageSizeBytes
   }
 
-  func register(_ session: any FirehoseWebSocketSession, id: ObjectIdentifier) {
+  /// The filters and the `options_update` equivalent of them, read in one step so a
+  /// connection URL never mixes old and new values.
+  var snapshot: (filter: JetstreamFilter, maxMessageSizeBytes: Int?, update: JetstreamOptionsUpdate) {
+    (filter, maxMessageSizeBytes, currentUpdate)
+  }
+
+  /// Adds an open connection to the set that ``apply(_:)`` updates.
+  ///
+  /// - Parameter sent: The options the connection already carries (its URL query), or `nil`
+  ///   when it carries none (`requireHello`).
+  /// - Returns: The `options_update` the connection still needs because the options changed
+  ///   while it was being opened, or `nil` when it is up to date. Updates applied after this
+  ///   call reach the connection through ``apply(_:)``.
+  func register(
+    _ session: any FirehoseWebSocketSession,
+    id: ObjectIdentifier,
+    connectedWith sent: JetstreamOptionsUpdate?
+  ) -> JetstreamOptionsUpdate? {
     sessions[id] = session
+    let current = currentUpdate
+    return current == sent ? nil : current
   }
 
   func unregister(id: ObjectIdentifier) {
@@ -224,6 +243,10 @@ actor JetstreamSubscriptionRunner {
   private var currentDelay: TimeInterval?
   private var pendingDelay: TimeInterval?
   private var lastSeq: Int64?
+  /// Legacy API: identities of the events seen at `lastSeq`. `time_us` is a timestamp, not an
+  /// event identifier, and the server replays from the cursor inclusively, so an event at the
+  /// resume timestamp is a duplicate only when it was already seen.
+  private var legacyEventsAtLastSeq: Set<String> = []
   private var hasProcessedEvents = false
   private var hasRetriedUnknownDictionary = false
   private var initialCursor: Int64?
@@ -399,9 +422,22 @@ actor JetstreamSubscriptionRunner {
 
     case let .message(event):
       if let seq = event.seq {
-        if let last = lastSeq, seq <= last {
-          // Drop duplicate / already-seen position
-          return
+        switch apiVersion {
+        case .v2:
+          // Sequence numbers are unique: anything at or below the last one was already seen.
+          if let last = lastSeq, seq <= last { return }
+        case .v1:
+          let key = Self.legacyEventKey(event)
+          if let last = lastSeq {
+            if seq < last { return }
+            if seq == last {
+              guard legacyEventsAtLastSeq.insert(key).inserted else { return }
+            } else {
+              legacyEventsAtLastSeq = [key]
+            }
+          } else {
+            legacyEventsAtLastSeq = [key]
+          }
         }
         lastSeq = seq
         hasProcessedEvents = true
@@ -443,7 +479,8 @@ actor JetstreamSubscriptionRunner {
       connectCursor = initialCursor
     }
 
-    let filter = await liveOptions.filter
+    let options = await liveOptions.snapshot
+    let filter = options.filter
     let url: URL?
     switch apiVersion {
     case .v2:
@@ -459,7 +496,7 @@ actor JetstreamSubscriptionRunner {
         filter: configuration.requireHello ? JetstreamFilter() : filter,
         cursor: connectCursor,
         compress: configuration.compression,
-        maxMessageSizeBytes: await liveOptions.maxMessageSizeBytes,
+        maxMessageSizeBytes: options.maxMessageSizeBytes,
         requireHello: configuration.requireHello
       )
     }
@@ -485,9 +522,16 @@ actor JetstreamSubscriptionRunner {
         return nil
       }
       activeSession = session
-      await liveOptions.register(session, id: sessionID)
-      if apiVersion == .v1, configuration.requireHello {
-        try await session.sendText(try await liveOptions.currentUpdate.encoded())
+      // `options_update` sent while the connection was being opened found no session to
+      // reach, and the URL (or, with `requireHello`, nothing) carries the options from
+      // before it: send whatever the connection is still missing.
+      let missing = await liveOptions.register(
+        session,
+        id: sessionID,
+        connectedWith: configuration.requireHello ? nil : options.update
+      )
+      if apiVersion == .v1, let missing {
+        try await session.sendText(try missing.encoded())
       }
       return session
     } catch {
@@ -597,6 +641,22 @@ actor JetstreamSubscriptionRunner {
     }
     let dictID = JetstreamZstd.dictionaryID(of: data) ?? id
     return (data, dictID)
+  }
+
+  /// What makes a legacy event distinct from another one with the same `time_us`.
+  static func legacyEventKey(_ event: JetstreamEvent) -> String {
+    switch event {
+    case let .commit(commit):
+      return "commit \(commit.did) \(commit.rev) \(commit.operation.rawValue) \(commit.collection) \(commit.rkey)"
+    case let .identity(identity):
+      return "identity \(identity.did) \(identity.identity.map { String($0.seq) } ?? "-")"
+    case let .account(account):
+      return "account \(account.did) \(account.account.map { String($0.seq) } ?? "-")"
+    case let .sync(sync):
+      return "sync \(sync.did) \(sync.sync.map { String($0.seq) } ?? "-")"
+    case let .info(info):
+      return "info \(info.name)"
+    }
   }
 
   /// Sequence numbers are far below this; unix-microsecond timestamps have been above it
