@@ -226,20 +226,77 @@ final class GeneratedXRPCCallTests: XCTestCase {
 
     // MARK: - Blob upload (lex-5, bsky-6)
 
-    /// A `*/*` body is opaque: every byte and the caller's Content-Type go out untouched,
-    /// for images, video and arbitrary data alike.
-    func testUploadBlobSendsTheBodyUntouched() async throws {
-        // A PNG header followed by bytes no image decoder would accept: if anything tried
-        // to decode or re-encode the "image", the body would change or the call would throw.
-        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data((0 ..< 64).map { UInt8($0) })
+    private let blobResponse = """
+    {"blob":{"$type":"blob","ref":{"$link":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"},\
+    "mimeType":"application/octet-stream","size":256}}
+    """
+
+    /// A 1x1 PNG carrying a `tEXt` chunk, the kind of metadata an upload must not leak.
+    private func pngWithTextChunk(_ text: String) throws -> Data {
+        let png = try XCTUnwrap(Data(base64Encoded:
+            "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="))
+        func crc32(_ bytes: [UInt8]) -> UInt32 {
+            var crc: UInt32 = 0xFFFF_FFFF
+            for byte in bytes {
+                crc ^= UInt32(byte)
+                for _ in 0 ..< 8 {
+                    crc = (crc & 1) == 1 ? (crc >> 1) ^ 0xEDB8_8320 : crc >> 1
+                }
+            }
+            return ~crc
+        }
+        func bigEndian(_ value: UInt32) -> [UInt8] {
+            [UInt8(value >> 24), UInt8((value >> 16) & 0xFF), UInt8((value >> 8) & 0xFF), UInt8(value & 0xFF)]
+        }
+        let typeAndData = Array("tEXt".utf8) + Array("Comment".utf8) + [0] + Array(text.utf8)
+        let chunk = bigEndian(UInt32(typeAndData.count - 4)) + typeAndData + bigEndian(crc32(typeAndData))
+        // Signature (8 bytes) + IHDR chunk (25 bytes), then the new chunk, then the rest.
+        return png.prefix(33) + Data(chunk) + png.dropFirst(33)
+    }
+
+    /// The default removes image metadata, in the image's own format and under the
+    /// caller's Content-Type. No pixel is re-encoded.
+    func testUploadBlobStripsImageMetadataByDefault() async throws {
+        let secret = "GPS 37.7749,-122.4194"
+        let png = try pngWithTextChunk(secret)
+        XCTAssertNotNil(png.range(of: Data(secret.utf8)))
+        XRPCStubURLProtocol.install(status: 200, body: blobResponse)
+
+        _ = try await atproto().repo.uploadBlob(data: png, mimeType: "image/png")
+
+        let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "image/png")
+        let body = try XCTUnwrap(XRPCStubURLProtocol.lastBody)
+        XCTAssertNil(body.range(of: Data(secret.utf8)), "the metadata was uploaded")
+        XCTAssertNil(body.range(of: Data("tEXt".utf8)))
+        XCTAssertEqual(body.prefix(8), png.prefix(8), "still a PNG")
+        // Everything but the metadata chunk is byte-identical: nothing was re-encoded.
+        XCTAssertEqual(body, try pngWithoutTextChunk(png))
+    }
+
+    private func pngWithoutTextChunk(_ png: Data) throws -> Data {
+        let start = try XCTUnwrap(png.range(of: Data("tEXt".utf8))).lowerBound - 4
+        let length = png[start ..< start + 4].reduce(0) { ($0 << 8) | Int($1) }
+        return png.prefix(upTo: start) + png.suffix(from: start + 12 + length)
+    }
+
+    /// `stripMetadata: false` sends the caller's bytes, metadata included.
+    func testUploadBlobSendsTheBodyUntouchedWhenNotStripping() async throws {
+        let png = try pngWithTextChunk("keep me")
+        XRPCStubURLProtocol.install(status: 200, body: blobResponse)
+
+        _ = try await atproto().repo.uploadBlob(data: png, mimeType: "image/png", stripMetadata: false)
+
+        XCTAssertEqual(XRPCStubURLProtocol.lastBody, png)
+    }
+
+    /// A body that is not an image is opaque: with the default it goes out byte for byte,
+    /// under the caller's Content-Type.
+    func testUploadBlobSendsNonImageBodiesUntouched() async throws {
         let mp4 = Data([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]) + Data(repeating: 0xAB, count: 256)
         let octets = Data((0 ... 255).map { UInt8($0) })
-        let blobResponse = """
-        {"blob":{"$type":"blob","ref":{"$link":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"},\
-        "mimeType":"application/octet-stream","size":256}}
-        """
 
-        for (data, mimeType) in [(png, "image/png"), (mp4, "video/mp4"), (octets, "application/octet-stream")] {
+        for (data, mimeType) in [(mp4, "video/mp4"), (octets, "application/octet-stream"), (octets, "text/vtt")] {
             XRPCStubURLProtocol.install(status: 200, body: blobResponse)
 
             let (status, output) = try await atproto().repo.uploadBlob(data: data, mimeType: mimeType)
@@ -251,6 +308,23 @@ final class GeneratedXRPCCallTests: XCTestCase {
             XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), mimeType)
             XCTAssertEqual(XRPCStubURLProtocol.lastBody, data, "\(mimeType) body was modified")
         }
+    }
+
+    /// Fail closed: an image whose metadata cannot be removed is not uploaded.
+    func testUploadBlobRefusesAnImageItCannotStrip() async throws {
+        // A PNG signature followed by bytes that are not chunks.
+        let broken = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data((0 ..< 64).map { UInt8($0) })
+        XRPCStubURLProtocol.install(status: 200, body: blobResponse)
+
+        do {
+            _ = try await atproto().repo.uploadBlob(data: broken, mimeType: "image/png")
+            XCTFail("an image that cannot be stripped must not be uploaded")
+        } catch NetworkError.metadataStrippingFailed {}
+        XCTAssertNil(XRPCStubURLProtocol.lastRequest)
+
+        // The caller can still choose to send exactly these bytes.
+        _ = try await atproto().repo.uploadBlob(data: broken, mimeType: "image/png", stripMetadata: false)
+        XCTAssertEqual(XRPCStubURLProtocol.lastBody, broken)
     }
 
     // MARK: - Untyped calls (lex-7)
