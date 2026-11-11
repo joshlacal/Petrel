@@ -80,7 +80,7 @@ struct PetrelLexgen: CommandPlugin {
             in: workDirectory,
             quiet: true
         )
-        FileManager.default.createFile(atPath: stamp.path, contents: Data())
+        try Data().write(to: stamp)
         return interpreter
     }
 
