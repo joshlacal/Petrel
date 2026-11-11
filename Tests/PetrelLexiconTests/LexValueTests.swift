@@ -35,8 +35,33 @@ struct LexValueTests {
         #expect(try LexValue(jsonString: "-2.50e1") == .integer(-25))
         #expect(code("123.456") == .floatNotAllowed)
         #expect(code("1e-1") == .floatNotAllowed)
-        #expect(code("1e400") == .floatNotAllowed)
+        #expect(code("1e400") == .integerOutOfRange)
         #expect(code("1e30") == .integerOutOfRange)
+    }
+
+    @Test("numbers: integrality is decided on the decimal digits, never through a lossy Double")
+    func integerLikeNumbersAreExact() throws {
+        // Each of these rounds to a whole Double, but none is a whole number.
+        for literal in [
+            "1.0000000000000001", "1.00000000000000001", "9007199254740990.5", "1e-9999", "-1e-9999",
+            "12345678901234567.25e1", "1e-99999999999999999999",
+        ] {
+            #expect(code(literal) == .floatNotAllowed, "\(literal)")
+        }
+        // Exact whole numbers in any spelling keep every digit, across the full
+        // signed 64-bit range that plain integer syntax accepts.
+        let exact: [(String, Int64)] = [
+            ("9007199254740993.0", 9_007_199_254_740_993), ("9007199254740993e0", 9_007_199_254_740_993),
+            ("0e-9999", 0), ("-0.0", 0), ("0.000e99999999999999999999", 0), ("1.50e1", 15), ("12300e-2", 123),
+            ("9.223372036854775807e18", .max), ("-9.223372036854775808e18", .min),
+        ]
+        for (literal, value) in exact {
+            #expect(try LexValue(jsonString: literal) == .integer(value), "\(literal)")
+        }
+        // Whole, but outside the signed 64-bit range.
+        for literal in ["9.223372036854775808e18", "-9.223372036854775809e18", "1e19", "1e99999999999999999999"] {
+            #expect(code(literal) == .integerOutOfRange, "\(literal)")
+        }
     }
 
     @Test("numbers: malformed literals are rejected", arguments: ["01", "-", "1.", ".5", "+1", "1e", "0x10", "NaN", "Infinity"])

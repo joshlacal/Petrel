@@ -297,12 +297,14 @@ struct LexJSONParser {
 
     private mutating func parseNumber(path: String) throws -> LexValue {
         let start = index
-        if bytes[index] == UInt8(ascii: "-") {
+        let isNegative = bytes[index] == UInt8(ascii: "-")
+        if isNegative {
             index += 1
         }
         guard index < bytes.count, isDigit(bytes[index]) else {
             throw malformed("invalid number at offset \(start)", path: path)
         }
+        let integerStart = index
         if bytes[index] == UInt8(ascii: "0") {
             index += 1
         } else {
@@ -310,32 +312,38 @@ struct LexJSONParser {
                 index += 1
             }
         }
-        var isIntegerLiteral = true
+        let integerDigits = integerStart ..< index
+        var fractionDigits = index ..< index
         if index < bytes.count, bytes[index] == UInt8(ascii: ".") {
-            isIntegerLiteral = false
             index += 1
             guard index < bytes.count, isDigit(bytes[index]) else {
                 throw malformed("invalid number at offset \(start)", path: path)
             }
+            let fractionStart = index
             while index < bytes.count, isDigit(bytes[index]) {
                 index += 1
             }
+            fractionDigits = fractionStart ..< index
         }
+        var exponent: (isNegative: Bool, digits: Range<Int>)?
         if index < bytes.count, bytes[index] == UInt8(ascii: "e") || bytes[index] == UInt8(ascii: "E") {
-            isIntegerLiteral = false
             index += 1
+            var exponentIsNegative = false
             if index < bytes.count, bytes[index] == UInt8(ascii: "+") || bytes[index] == UInt8(ascii: "-") {
+                exponentIsNegative = bytes[index] == UInt8(ascii: "-")
                 index += 1
             }
             guard index < bytes.count, isDigit(bytes[index]) else {
                 throw malformed("invalid number at offset \(start)", path: path)
             }
+            let exponentStart = index
             while index < bytes.count, isDigit(bytes[index]) {
                 index += 1
             }
+            exponent = (exponentIsNegative, exponentStart ..< index)
         }
         let literal = String(decoding: bytes[start ..< index], as: UTF8.self)
-        if isIntegerLiteral {
+        if fractionDigits.isEmpty, exponent == nil {
             guard let value = Int64(literal) else {
                 throw LexValueError(.integerOutOfRange, path: path, "\(literal) does not fit in a signed 64-bit integer")
             }
@@ -343,12 +351,68 @@ struct LexJSONParser {
         }
         // A fraction or exponent is still an integer when it reduces to one
         // ("123.0", "1e3"): the official data-model-valid.json vector
-        // "float, but integer-like" requires this.
-        guard let double = Double(literal), double.isFinite, double.rounded(.towardZero) == double else {
+        // "float, but integer-like" requires this. Decided on the decimal
+        // digits themselves: a Double intermediate rounds "1.0000000000000001"
+        // to 1 and "9007199254740993.0" to ...992.
+        switch Self.exactInteger(
+            isNegative: isNegative,
+            digits: Array(bytes[integerDigits]) + Array(bytes[fractionDigits]),
+            fractionDigitCount: fractionDigits.count,
+            exponent: exponent.map { (isNegative: $0.isNegative, digits: Array(bytes[$0.digits])) }
+        ) {
+        case let .integer(value):
+            return .integer(value)
+        case .fractional:
             throw LexValueError(.floatNotAllowed, path: path, "\(literal) is not an integer; floats are not part of the data model")
-        }
-        guard let value = Int64(exactly: double) else {
+        case .outOfRange:
             throw LexValueError(.integerOutOfRange, path: path, "\(literal) does not fit in a signed 64-bit integer")
+        }
+    }
+
+    private enum ExactInteger {
+        case integer(Int64)
+        case fractional
+        case outOfRange
+    }
+
+    /// Classifies `±digits × 10^(exponent − fractionDigitCount)` without rounding.
+    private static func exactInteger(
+        isNegative: Bool,
+        digits: [UInt8],
+        fractionDigitCount: Int,
+        exponent: (isNegative: Bool, digits: [UInt8])?
+    ) -> ExactInteger {
+        // Significant digits: no leading zeros, trailing zeros folded into the scale.
+        var significand = Array(digits.drop { $0 == UInt8(ascii: "0") })
+        if significand.isEmpty {
+            return .integer(0) // zero in any spelling
+        }
+        var scale = -fractionDigitCount
+        while significand.last == UInt8(ascii: "0") {
+            significand.removeLast()
+            scale += 1
+        }
+        if let exponent {
+            let magnitude = exponent.digits.drop { $0 == UInt8(ascii: "0") }
+            // A nonzero value scaled by 10^±(10 digits or more) is either fractional or
+            // far beyond 19 digits; the exponent's exact value does not matter.
+            guard magnitude.count <= 9 else {
+                return exponent.isNegative ? .fractional : .outOfRange
+            }
+            let value = Int(String(decoding: magnitude, as: UTF8.self)) ?? 0
+            scale += exponent.isNegative ? -value : value
+        }
+        guard scale >= 0 else {
+            return .fractional
+        }
+        guard significand.count + scale <= 19 else {
+            return .outOfRange
+        }
+        let text = (isNegative ? "-" : "")
+            + String(decoding: significand, as: UTF8.self)
+            + String(repeating: "0", count: scale)
+        guard let value = Int64(text) else {
+            return .outOfRange
         }
         return .integer(value)
     }
