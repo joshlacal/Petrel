@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.graph.unmuteThread
 
+/// Unmutes the specified thread. Requires auth.
 public enum AppBskyGraphUnmuteThread {
     public static let typeIdentifier = "app.bsky.graph.unmuteThread"
+
     public struct Input: ATProtocolCodable {
         public let root: ATProtocolURI
 
-        /// Standard public initializer
-        public init(root: ATProtocolURI) {
+        public init(
+            root: ATProtocolURI
+        ) {
             self.root = root
         }
 
@@ -39,13 +42,12 @@ public enum AppBskyGraphUnmuteThread {
 public extension ATProtoClient.App.Bsky.Graph {
     // MARK: - unmuteThread
 
-    // Unmutes the specified thread. Requires auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Unmutes the specified thread. Requires auth.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func unmuteThread(
         input: AppBskyGraphUnmuteThread.Input
 
@@ -71,7 +73,13 @@ public extension ATProtoClient.App.Bsky.Graph {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.graph.unmuteThread")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

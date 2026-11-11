@@ -3,22 +3,27 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.notification.putPreferences
 
+/// Set the requesting account's chat notification preferences. Only the provided preferences are updated; omitted preferences are left unchanged.
 public enum ChatBskyNotificationPutPreferences {
     public static let typeIdentifier = "chat.bsky.notification.putPreferences"
+
     public struct Input: ATProtocolCodable {
         public let chat: ChatBskyNotificationDefs.ChatPreference?
         public let chatRequest: ChatBskyNotificationDefs.ChatPreference?
 
-        /// Standard public initializer
-        public init(chat: ChatBskyNotificationDefs.ChatPreference? = nil, chatRequest: ChatBskyNotificationDefs.ChatPreference? = nil) {
+        public init(
+            chat: ChatBskyNotificationDefs.ChatPreference? = nil,
+            chatRequest: ChatBskyNotificationDefs.ChatPreference? = nil
+        ) {
             self.chat = chat
             self.chatRequest = chatRequest
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            chat = try container.decodeIfPresent(ChatBskyNotificationDefs.ChatPreference.self, forKey: .chat)
-            chatRequest = try container.decodeIfPresent(ChatBskyNotificationDefs.ChatPreference.self, forKey: .chatRequest)
+            let strict = decoder.isATProtoStrictDecoding
+            chat = try container.decodeIfPresent(ChatBskyNotificationDefs.ChatPreference.self, forKey: .chat, rejectingNull: strict)
+            chatRequest = try container.decodeIfPresent(ChatBskyNotificationDefs.ChatPreference.self, forKey: .chatRequest, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -49,32 +54,26 @@ public enum ChatBskyNotificationPutPreferences {
     public struct Output: ATProtocolCodable {
         public let preferences: ChatBskyNotificationDefs.Preferences
 
-        /// Standard public initializer
         public init(
             preferences: ChatBskyNotificationDefs.Preferences
-
         ) {
             self.preferences = preferences
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             preferences = try container.decode(ChatBskyNotificationDefs.Preferences.self, forKey: .preferences)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(preferences, forKey: .preferences)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let preferencesValue = try preferences.toCBORValue()
             map = map.adding(key: "preferences", value: preferencesValue)
-
             return map
         }
 
@@ -87,13 +86,12 @@ public enum ChatBskyNotificationPutPreferences {
 public extension ATProtoClient.Chat.Bsky.Notification {
     // MARK: - putPreferences
 
-    // Set the requesting account's chat notification preferences. Only the provided preferences are updated; omitted preferences are left unchanged.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Set the requesting account's chat notification preferences. Only the provided preferences are updated; omitted preferences are left unchanged.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func putPreferences(
         input: ChatBskyNotificationPutPreferences.Input
 
@@ -121,34 +119,26 @@ public extension ATProtoClient.Chat.Bsky.Notification {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.notification.putPreferences")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyNotificationPutPreferences.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.notification.putPreferences: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyNotificationPutPreferences.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

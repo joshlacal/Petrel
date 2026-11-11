@@ -3,47 +3,47 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.createInviteCodes
 
+/// Create invite codes.
 public enum ComAtprotoServerCreateInviteCodes {
     public static let typeIdentifier = "com.atproto.server.createInviteCodes"
 
     public struct AccountCodes: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.server.createInviteCodes#accountCodes"
+
         public let account: String
         public let codes: [String]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            account: String, codes: [String]
+            account: String,
+            codes: [String],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.account = account
             self.codes = codes
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                account = try container.decode(String.self, forKey: .account)
-            } catch {
-                LogManager.logError("Decoding error for required property 'account': \(error)")
-                throw error
-            }
-            do {
-                codes = try container.decode([String].self, forKey: .codes)
-            } catch {
-                LogManager.logError("Decoding error for required property 'codes': \(error)")
-                throw error
-            }
+            account = try container.decode(String.self, forKey: .account)
+            codes = try container.decode([String].self, forKey: .codes)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(account, forKey: .account)
             try container.encode(codes, forKey: .codes)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(account)
             hasher.combine(codes)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +54,7 @@ public enum ComAtprotoServerCreateInviteCodes {
             if codes != other.codes {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +63,16 @@ public enum ComAtprotoServerCreateInviteCodes {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let accountValue = try account.toCBORValue()
             map = map.adding(key: "account", value: accountValue)
             let codesValue = try codes.toCBORValue()
             map = map.adding(key: "codes", value: codesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "account", "codes"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case account
             case codes
         }
@@ -83,8 +83,11 @@ public enum ComAtprotoServerCreateInviteCodes {
         public let useCount: Int
         public let forAccounts: [DID]?
 
-        /// Standard public initializer
-        public init(codeCount: Int, useCount: Int, forAccounts: [DID]? = nil) {
+        public init(
+            codeCount: Int,
+            useCount: Int,
+            forAccounts: [DID]? = nil
+        ) {
             self.codeCount = codeCount
             self.useCount = useCount
             self.forAccounts = forAccounts
@@ -92,9 +95,10 @@ public enum ComAtprotoServerCreateInviteCodes {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             codeCount = try container.decode(Int.self, forKey: .codeCount)
             useCount = try container.decode(Int.self, forKey: .useCount)
-            forAccounts = try container.decodeIfPresent([DID].self, forKey: .forAccounts)
+            forAccounts = try container.decodeIfPresent([DID].self, forKey: .forAccounts, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -127,32 +131,26 @@ public enum ComAtprotoServerCreateInviteCodes {
     public struct Output: ATProtocolCodable {
         public let codes: [AccountCodes]
 
-        /// Standard public initializer
         public init(
             codes: [AccountCodes]
-
         ) {
             self.codes = codes
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             codes = try container.decode([AccountCodes].self, forKey: .codes)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(codes, forKey: .codes)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let codesValue = try codes.toCBORValue()
             map = map.adding(key: "codes", value: codesValue)
-
             return map
         }
 
@@ -165,13 +163,12 @@ public enum ComAtprotoServerCreateInviteCodes {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - createInviteCodes
 
-    // Create invite codes.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Create invite codes.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func createInviteCodes(
         input: ComAtprotoServerCreateInviteCodes.Input
 
@@ -199,34 +196,26 @@ public extension ATProtoClient.Com.Atproto.Server {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.createInviteCodes")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoServerCreateInviteCodes.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.createInviteCodes: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoServerCreateInviteCodes.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

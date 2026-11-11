@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.group.requestJoin
 
+/// Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
 public enum ChatBskyGroupRequestJoin {
     public static let typeIdentifier = "chat.bsky.group.requestJoin"
+
     public struct Input: ATProtocolCodable {
         public let code: String
 
-        /// Standard public initializer
-        public init(code: String) {
+        public init(
+            code: String
+        ) {
             self.code = code
         }
 
@@ -37,30 +40,28 @@ public enum ChatBskyGroupRequestJoin {
 
     public struct Output: ATProtocolCodable {
         public let status: String
-
+        /// The group convo joined. This is only present in the case of status=joined
         public let convo: ChatBskyConvoDefs.ConvoView?
 
-        /// Standard public initializer
         public init(
             status: String,
-
             convo: ChatBskyConvoDefs.ConvoView? = nil
-
         ) {
             self.status = status
-
             self.convo = convo
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             status = try container.decode(String.self, forKey: .status)
-
             do {
-                convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+                convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'convo' — degrading to nil: \(error)")
                 convo = nil
             }
@@ -68,25 +69,18 @@ public enum ChatBskyGroupRequestJoin {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(status, forKey: .status)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(convo, forKey: .convo)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let statusValue = try status.toCBORValue()
             map = map.adding(key: "status", value: statusValue)
-
             if let value = convo {
-                // Encode optional property even if it's an empty array for CBOR
                 let convoValue = try value.toCBORValue()
                 map = map.adding(key: "convo", value: convoValue)
             }
-
             return map
         }
 
@@ -116,13 +110,12 @@ public enum ChatBskyGroupRequestJoin {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - requestJoin
 
-    // Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Sends a request to join a group (via join link) to the group owner. Action taken by the prospective group member.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ChatBskyGroupRequestJoin.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func requestJoin(
         input: ChatBskyGroupRequestJoin.Input
 
@@ -153,40 +146,23 @@ public extension ATProtoClient.Chat.Bsky.Group {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ChatBskyGroupRequestJoin.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyGroupRequestJoin.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.requestJoin: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ChatBskyGroupRequestJoin.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyGroupRequestJoin.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

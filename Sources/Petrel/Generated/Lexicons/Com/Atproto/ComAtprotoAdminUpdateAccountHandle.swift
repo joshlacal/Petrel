@@ -3,14 +3,18 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.admin.updateAccountHandle
 
+/// Administrative action to update an account's handle.
 public enum ComAtprotoAdminUpdateAccountHandle {
     public static let typeIdentifier = "com.atproto.admin.updateAccountHandle"
+
     public struct Input: ATProtocolCodable {
         public let did: DID
         public let handle: Handle
 
-        /// Standard public initializer
-        public init(did: DID, handle: Handle) {
+        public init(
+            did: DID,
+            handle: Handle
+        ) {
             self.did = did
             self.handle = handle
         }
@@ -46,13 +50,12 @@ public enum ComAtprotoAdminUpdateAccountHandle {
 public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - updateAccountHandle
 
-    // Administrative action to update an account's handle.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Administrative action to update an account's handle.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func updateAccountHandle(
         input: ComAtprotoAdminUpdateAccountHandle.Input
 
@@ -78,7 +81,13 @@ public extension ATProtoClient.Com.Atproto.Admin {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.admin.updateAccountHandle")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

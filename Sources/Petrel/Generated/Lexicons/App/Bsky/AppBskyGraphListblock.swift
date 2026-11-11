@@ -3,20 +3,35 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.graph.listblock
 
+/// Record representing a block relationship against an entire an entire list of accounts (actors).
 public struct AppBskyGraphListblock: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.graph.listblock"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    /// Reference (AT-URI) to the mod list record.
     public let subject: ATProtocolURI
     public let createdAt: ATProtocolDate
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(subject: ATProtocolURI, createdAt: ATProtocolDate) {
+    public init(
+        subject: ATProtocolURI,
+        createdAt: ATProtocolDate,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.subject = subject
         self.createdAt = createdAt
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         subject = try container.decode(ATProtocolURI.self, forKey: .subject)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -24,10 +39,13 @@ public struct AppBskyGraphListblock: ATProtocolCodable, ATProtocolValue {
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(subject, forKey: .subject)
         try container.encode(createdAt, forKey: .createdAt)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(subject)
+        hasher.combine(createdAt)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -38,12 +56,11 @@ public struct AppBskyGraphListblock: ATProtocolCodable, ATProtocolValue {
         if createdAt != other.createdAt {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(subject)
-        hasher.combine(createdAt)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -53,8 +70,10 @@ public struct AppBskyGraphListblock: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "subject", value: subjectValue)
         let createdAtValue = try createdAt.toCBORValue()
         map = map.adding(key: "createdAt", value: createdAtValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "createdAt"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

@@ -3,16 +3,26 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.memberspace.putMember
 
+/// Add a member to the member list of a space governed by the memberspace policy, or replace their read and write access. Requires auth as the space owner.
 public enum ComAtprotoMemberspacePutMember {
     public static let typeIdentifier = "com.atproto.memberspace.putMember"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// The DID of the member.
         public let did: DID
+        /// Whether the member may read when the policy's publicRead is not set.
         public let read: Bool
+        /// Whether the member's writes are tracked when the policy's publicWrite is not set.
         public let write: Bool
 
-        /// Standard public initializer
-        public init(space: SpaceRef, did: DID, read: Bool, write: Bool) {
+        public init(
+            space: SpaceRef,
+            did: DID,
+            read: Bool,
+            write: Bool
+        ) {
             self.space = space
             self.did = did
             self.read = read
@@ -95,13 +105,12 @@ public enum ComAtprotoMemberspacePutMember {
 public extension ATProtoClient.Com.Atproto.Memberspace {
     // MARK: - putMember
 
-    // Add a member to the member list of a space governed by the memberspace policy, or replace their read and write access. Requires auth as the space owner.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Add a member to the member list of a space governed by the memberspace policy, or replace their read and write access. Requires auth as the space owner.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoMemberspacePutMember.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func putMember(
         input: ComAtprotoMemberspacePutMember.Input
 
@@ -130,18 +139,8 @@ public extension ATProtoClient.Com.Atproto.Memberspace {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoMemberspacePutMember.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoMemberspacePutMember.Error.self)
         }
 
         return responseCode

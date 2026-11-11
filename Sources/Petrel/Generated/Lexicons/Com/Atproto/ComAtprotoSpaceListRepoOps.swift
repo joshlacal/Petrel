@@ -3,20 +3,33 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.listRepoOps
 
+/// List the operation log for an account's permissioned repo within a space, returning operations after a given revision. Primary incremental sync mechanism. By default each created or updated operation inlines the record's current value; set excludeValues for metadata-only entries. Note the oplog is a transport optimization with no history guarantee: a host may compact it or drop it, and it does not survive account migration, so omitting `since` returns the retained window rather than the repo's full history. Use getRepo for an initial sync or when a `since` revision is no longer available. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). When called with a space credential, the caller must send an Atproto-Space-Want-Mac header, and a response that includes the commit carries its MAC in the Atproto-Space-Mac response header.
 public enum ComAtprotoSpaceListRepoOps {
     public static let typeIdentifier = "com.atproto.space.listRepoOps"
 
+    /// A single operation in a permissioned repo's oplog. cid is null for deletes; prev is null for creates. Operations sharing the same rev belong to the same batch. value carries the record's current value for creates and updates, unless excludeValues was set or the value is stale (superseded by a later operation).
     public struct OpEntry: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.listRepoOps#opEntry"
+
         public let rev: TID
         public let collection: NSID
         public let rkey: RecordKey
         public let cid: CID?
         public let prev: CID?
+        /// The record's current value, inlined for create and update operations. Omitted when excludeValues is set, for deletes, or when the value has been superseded by a later operation.
         public let value: ATProtocolValueContainer?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: TID, collection: NSID, rkey: RecordKey, cid: CID?, prev: CID?, value: ATProtocolValueContainer? = nil
+            rev: TID,
+            collection: NSID,
+            rkey: RecordKey,
+            cid: CID?,
+            prev: CID?,
+            value: ATProtocolValueContainer? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.collection = collection
@@ -24,77 +37,57 @@ public enum ComAtprotoSpaceListRepoOps {
             self.cid = cid
             self.prev = prev
             self.value = value
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(TID.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                collection = try container.decode(NSID.self, forKey: .collection)
-            } catch {
-                LogManager.logError("Decoding error for required property 'collection': \(error)")
-                throw error
-            }
-            do {
-                rkey = try container.decode(RecordKey.self, forKey: .rkey)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rkey': \(error)")
-                throw error
-            }
-            do {
-                guard container.contains(.cid) else {
-                    throw DecodingError.keyNotFound(
-                        CodingKeys.cid,
-                        DecodingError.Context(
-                            codingPath: container.codingPath,
-                            debugDescription: "Missing required property 'cid'"
-                        )
+            let strict = decoder.isATProtoStrictDecoding
+            rev = try container.decode(TID.self, forKey: .rev)
+            collection = try container.decode(NSID.self, forKey: .collection)
+            rkey = try container.decode(RecordKey.self, forKey: .rkey)
+            guard container.contains(.cid) else {
+                throw DecodingError.keyNotFound(
+                    CodingKeys.cid,
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Missing required property 'cid'"
                     )
-                }
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
-                throw error
+                )
             }
-            do {
-                guard container.contains(.prev) else {
-                    throw DecodingError.keyNotFound(
-                        CodingKeys.prev,
-                        DecodingError.Context(
-                            codingPath: container.codingPath,
-                            debugDescription: "Missing required property 'prev'"
-                        )
+            cid = try container.decodeIfPresent(CID.self, forKey: .cid)
+            guard container.contains(.prev) else {
+                throw DecodingError.keyNotFound(
+                    CodingKeys.prev,
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Missing required property 'prev'"
                     )
-                }
-                prev = try container.decodeIfPresent(CID.self, forKey: .prev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'prev': \(error)")
-                throw error
+                )
             }
+            prev = try container.decodeIfPresent(CID.self, forKey: .prev)
             do {
-                value = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .value)
+                value = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .value, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'value' — degrading to nil: \(error)")
                 value = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(collection, forKey: .collection)
             try container.encode(rkey, forKey: .rkey)
             try container.encode(cid, forKey: .cid)
             try container.encode(prev, forKey: .prev)
             try container.encodeIfPresent(value, forKey: .value)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -116,6 +109,7 @@ public enum ComAtprotoSpaceListRepoOps {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -138,7 +132,7 @@ public enum ComAtprotoSpaceListRepoOps {
             if value != other.value {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -147,7 +141,6 @@ public enum ComAtprotoSpaceListRepoOps {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let collectionValue = try collection.toCBORValue()
@@ -170,11 +163,12 @@ public enum ComAtprotoSpaceListRepoOps {
                 let valueValue = try value.toCBORValue()
                 map = map.adding(key: "value", value: valueValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "collection", "rkey", "cid", "prev", "value"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case collection
             case rkey
@@ -211,44 +205,42 @@ public enum ComAtprotoSpaceListRepoOps {
 
     public struct Output: ATProtocolCodable {
         public let ops: [OpEntry]
-
+        /// The account's current commit. Included when the response reaches the head of the oplog; omitted on backfill responses.
         public let commit: ComAtprotoSpaceDefs.Commit?
-
+        /// Pass as `cursor` to fetch the next page. Absent once the response reaches the head of the oplog.
         public let cursor: String?
 
-        /// Standard public initializer
         public init(
             ops: [OpEntry],
-
             commit: ComAtprotoSpaceDefs.Commit? = nil,
-
             cursor: String? = nil
-
         ) {
             self.ops = ops
-
             self.commit = commit
-
             self.cursor = cursor
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             ops = try container.decode([OpEntry].self, forKey: .ops)
-
             do {
-                commit = try container.decodeIfPresent(ComAtprotoSpaceDefs.Commit.self, forKey: .commit)
+                commit = try container.decodeIfPresent(ComAtprotoSpaceDefs.Commit.self, forKey: .commit, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
                 commit = nil
             }
-
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
@@ -256,34 +248,23 @@ public enum ComAtprotoSpaceListRepoOps {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(ops, forKey: .ops)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(commit, forKey: .commit)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let opsValue = try ops.toCBORValue()
             map = map.adding(key: "ops", value: opsValue)
-
             if let value = commit {
-                // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
                 map = map.adding(key: "commit", value: commitValue)
             }
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
             return map
         }
 
@@ -339,9 +320,8 @@ public extension ATProtoClient.Com.Atproto.Space {
     /// List the operation log for an account's permissioned repo within a space, returning operations after a given revision. Primary incremental sync mechanism. By default each created or updated operation inlines the record's current value; set excludeValues for metadata-only entries. Note the oplog is a transport optimization with no history guarantee: a host may compact it or drop it, and it does not survive account migration, so omitting `since` returns the retained window rather than the repo's full history. Use getRepo for an initial sync or when a `since` revision is no longer available. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). When called with a space credential, the caller must send an Atproto-Space-Want-Mac header, and a response that includes the commit carries its MAC in the Atproto-Space-Mac response header.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoSpaceListRepoOps.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func listRepoOps(input: ComAtprotoSpaceListRepoOps.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSpaceListRepoOps.Output?) {
         let endpoint = "com.atproto.space.listRepoOps"
 
@@ -361,45 +341,23 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceListRepoOps.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSpaceListRepoOps.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.listRepoOps: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceListRepoOps.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSpaceListRepoOps.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

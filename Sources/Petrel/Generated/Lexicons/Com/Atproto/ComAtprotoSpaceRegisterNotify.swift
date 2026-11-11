@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.registerNotify
 
+/// Register a service to be notified of writes to any repo in a space. Called on the space host. The registering service is named by its service identifier rather than a bare URL, because notifyWrite is delivered with service auth addressed to that identifier; the delivery endpoint is resolved from the service's DID document. Authenticated with a space credential. Re-registering an existing service replaces its registration and extends the expiry.
 public enum ComAtprotoSpaceRegisterNotify {
     public static let typeIdentifier = "com.atproto.space.registerNotify"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// Service identifier of the subscriber: a DID with an optional service fragment naming the entry in its DID document to deliver to (e.g. 'did:web:syncer.example.com#atproto_space_syncer'). notifyWrite calls are addressed to this identifier.
         public let service: String
 
-        /// Standard public initializer
-        public init(space: SpaceRef, service: String) {
+        public init(
+            space: SpaceRef,
+            service: String
+        ) {
             self.space = space
             self.service = service
         }
@@ -43,34 +49,29 @@ public enum ComAtprotoSpaceRegisterNotify {
     }
 
     public struct Output: ATProtocolCodable {
+        /// When the registration expires. May be later than the expiry of the space credential the request was authenticated with; renew before this time to stay subscribed.
         public let expiresAt: ATProtocolDate
 
-        /// Standard public initializer
         public init(
             expiresAt: ATProtocolDate
-
         ) {
             self.expiresAt = expiresAt
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             expiresAt = try container.decode(ATProtocolDate.self, forKey: .expiresAt)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(expiresAt, forKey: .expiresAt)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let expiresAtValue = try expiresAt.toCBORValue()
             map = map.adding(key: "expiresAt", value: expiresAtValue)
-
             return map
         }
 
@@ -117,13 +118,12 @@ public enum ComAtprotoSpaceRegisterNotify {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - registerNotify
 
-    // Register a service to be notified of writes to any repo in a space. Called on the space host. The registering service is named by its service identifier rather than a bare URL, because notifyWrite is delivered with service auth addressed to that identifier; the delivery endpoint is resolved from the service's DID document. Authenticated with a space credential. Re-registering an existing service replaces its registration and extends the expiry.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Register a service to be notified of writes to any repo in a space. Called on the space host. The registering service is named by its service identifier rather than a bare URL, because notifyWrite is delivered with service auth addressed to that identifier; the delivery endpoint is resolved from the service's DID document. Authenticated with a space credential. Re-registering an existing service replaces its registration and extends the expiry.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoSpaceRegisterNotify.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func registerNotify(
         input: ComAtprotoSpaceRegisterNotify.Input
 
@@ -154,44 +154,23 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceRegisterNotify.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSpaceRegisterNotify.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.registerNotify: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceRegisterNotify.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSpaceRegisterNotify.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,62 +3,62 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.listRecords
 
+/// List the records in an account's repo within a permissioned space, optionally filtered by collection. By default each record's value is inlined; set excludeValues for a metadata-only listing (collection, rkey, cid). Used for full-state recovery. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). Throws RepoNotFound when the account holds no repo in the space; this does not distinguish a member that has never written from a non-member.
 public enum ComAtprotoSpaceListRecords {
     public static let typeIdentifier = "com.atproto.space.listRecords"
 
     public struct Record: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.listRecords#record"
+
         public let collection: NSID
         public let rkey: RecordKey
         public let cid: CID
+        /// The record's value. Inlined by default; omitted when excludeValues is set.
         public let value: ATProtocolValueContainer?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            collection: NSID, rkey: RecordKey, cid: CID, value: ATProtocolValueContainer? = nil
+            collection: NSID,
+            rkey: RecordKey,
+            cid: CID,
+            value: ATProtocolValueContainer? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.collection = collection
             self.rkey = rkey
             self.cid = cid
             self.value = value
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            collection = try container.decode(NSID.self, forKey: .collection)
+            rkey = try container.decode(RecordKey.self, forKey: .rkey)
+            cid = try container.decode(CID.self, forKey: .cid)
             do {
-                collection = try container.decode(NSID.self, forKey: .collection)
+                value = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .value, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'collection': \(error)")
-                throw error
-            }
-            do {
-                rkey = try container.decode(RecordKey.self, forKey: .rkey)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rkey': \(error)")
-                throw error
-            }
-            do {
-                cid = try container.decode(CID.self, forKey: .cid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
-                throw error
-            }
-            do {
-                value = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .value)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'value' — degrading to nil: \(error)")
                 value = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(collection, forKey: .collection)
             try container.encode(rkey, forKey: .rkey)
             try container.encode(cid, forKey: .cid)
             try container.encodeIfPresent(value, forKey: .value)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -70,6 +70,7 @@ public enum ComAtprotoSpaceListRecords {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -86,7 +87,7 @@ public enum ComAtprotoSpaceListRecords {
             if value != other.value {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -95,7 +96,6 @@ public enum ComAtprotoSpaceListRecords {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let collectionValue = try collection.toCBORValue()
             map = map.adding(key: "collection", value: collectionValue)
             let rkeyValue = try rkey.toCBORValue()
@@ -106,11 +106,12 @@ public enum ComAtprotoSpaceListRecords {
                 let valueValue = try value.toCBORValue()
                 map = map.adding(key: "value", value: valueValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "collection", "rkey", "cid", "value"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case collection
             case rkey
             case cid
@@ -148,56 +149,46 @@ public enum ComAtprotoSpaceListRecords {
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-
         public let records: [Record]
 
-        /// Standard public initializer
         public init(
             cursor: String? = nil,
-
             records: [Record]
-
         ) {
             self.cursor = cursor
-
             self.records = records
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
             records = try container.decode([Record].self, forKey: .records)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
             try container.encode(records, forKey: .records)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
             let recordsValue = try records.toCBORValue()
             map = map.adding(key: "records", value: recordsValue)
-
             return map
         }
 
@@ -250,9 +241,8 @@ public extension ATProtoClient.Com.Atproto.Space {
     /// List the records in an account's repo within a permissioned space, optionally filtered by collection. By default each record's value is inlined; set excludeValues for a metadata-only listing (collection, rkey, cid). Used for full-state recovery. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). Throws RepoNotFound when the account holds no repo in the space; this does not distinguish a member that has never written from a non-member.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoSpaceListRecords.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func listRecords(input: ComAtprotoSpaceListRecords.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSpaceListRecords.Output?) {
         let endpoint = "com.atproto.space.listRecords"
 
@@ -272,45 +262,23 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceListRecords.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSpaceListRecords.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.listRecords: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceListRecords.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSpaceListRecords.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

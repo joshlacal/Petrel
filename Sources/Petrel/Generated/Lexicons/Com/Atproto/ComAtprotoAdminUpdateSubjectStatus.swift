@@ -3,15 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.admin.updateSubjectStatus
 
+/// Update the service-specific admin status of a subject (account, record, or blob).
 public enum ComAtprotoAdminUpdateSubjectStatus {
     public static let typeIdentifier = "com.atproto.admin.updateSubjectStatus"
+
     public struct Input: ATProtocolCodable {
         public let subject: InputSubjectUnion
         public let takedown: ComAtprotoAdminDefs.StatusAttr?
         public let deactivated: ComAtprotoAdminDefs.StatusAttr?
 
-        /// Standard public initializer
-        public init(subject: InputSubjectUnion, takedown: ComAtprotoAdminDefs.StatusAttr? = nil, deactivated: ComAtprotoAdminDefs.StatusAttr? = nil) {
+        public init(
+            subject: InputSubjectUnion,
+            takedown: ComAtprotoAdminDefs.StatusAttr? = nil,
+            deactivated: ComAtprotoAdminDefs.StatusAttr? = nil
+        ) {
             self.subject = subject
             self.takedown = takedown
             self.deactivated = deactivated
@@ -19,9 +24,10 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             subject = try container.decode(InputSubjectUnion.self, forKey: .subject)
-            takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
-            deactivated = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .deactivated)
+            takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown, rejectingNull: strict)
+            deactivated = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .deactivated, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -55,30 +61,27 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
 
     public struct Output: ATProtocolCodable {
         public let subject: OutputSubjectUnion
-
         public let takedown: ComAtprotoAdminDefs.StatusAttr?
 
-        /// Standard public initializer
         public init(
             subject: OutputSubjectUnion,
-
             takedown: ComAtprotoAdminDefs.StatusAttr? = nil
-
         ) {
             self.subject = subject
-
             self.takedown = takedown
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             subject = try container.decode(OutputSubjectUnion.self, forKey: .subject)
-
             do {
-                takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown)
+                takedown = try container.decodeIfPresent(ComAtprotoAdminDefs.StatusAttr.self, forKey: .takedown, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'takedown' — degrading to nil: \(error)")
                 takedown = nil
             }
@@ -86,25 +89,18 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(subject, forKey: .subject)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(takedown, forKey: .takedown)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-
             if let value = takedown {
-                // Encode optional property even if it's an empty array for CBOR
                 let takedownValue = try value.toCBORValue()
                 map = map.adding(key: "takedown", value: takedownValue)
             }
-
             return map
         }
 
@@ -118,6 +114,8 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoAdminDefs.RepoRef) {
             self = .comAtprotoAdminDefsRepoRef(value)
@@ -286,6 +284,8 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
         case comAtprotoAdminDefsRepoBlobRef(ComAtprotoAdminDefs.RepoBlobRef)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoAdminDefs.RepoRef) {
             self = .comAtprotoAdminDefsRepoRef(value)
@@ -454,13 +454,12 @@ public enum ComAtprotoAdminUpdateSubjectStatus {
 public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - updateSubjectStatus
 
-    // Update the service-specific admin status of a subject (account, record, or blob).
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Update the service-specific admin status of a subject (account, record, or blob).
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func updateSubjectStatus(
         input: ComAtprotoAdminUpdateSubjectStatus.Input
 
@@ -488,34 +487,26 @@ public extension ATProtoClient.Com.Atproto.Admin {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.admin.updateSubjectStatus")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoAdminUpdateSubjectStatus.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.admin.updateSubjectStatus: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoAdminUpdateSubjectStatus.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,27 +3,40 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.temp.checkHandleAvailability
 
+/// Checks whether the provided handle is available. If the handle is not available, available suggestions will be returned. Optional inputs will be used to generate suggestions.
 public enum ComAtprotoTempCheckHandleAvailability {
     public static let typeIdentifier = "com.atproto.temp.checkHandleAvailability"
 
+    /// Indicates the provided handle is available.
     public struct ResultAvailable: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.temp.checkHandleAvailability#resultAvailable"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -31,44 +44,48 @@ public enum ComAtprotoTempCheckHandleAvailability {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// Indicates the provided handle is unavailable and gives suggestions of available handles.
     public struct ResultUnavailable: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.temp.checkHandleAvailability#resultUnavailable"
+
+        /// List of suggested handles based on the provided inputs.
         public let suggestions: [Suggestion]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            suggestions: [Suggestion]
+            suggestions: [Suggestion],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.suggestions = suggestions
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                suggestions = try container.decode([Suggestion].self, forKey: .suggestions)
-            } catch {
-                LogManager.logError("Decoding error for required property 'suggestions': \(error)")
-                throw error
-            }
+            suggestions = try container.decode([Suggestion].self, forKey: .suggestions)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(suggestions, forKey: .suggestions)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(suggestions)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -76,7 +93,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
             if suggestions != other.suggestions {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -85,56 +102,56 @@ public enum ComAtprotoTempCheckHandleAvailability {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let suggestionsValue = try suggestions.toCBORValue()
             map = map.adding(key: "suggestions", value: suggestionsValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "suggestions"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case suggestions
         }
     }
 
     public struct Suggestion: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.temp.checkHandleAvailability#suggestion"
+
         public let handle: Handle
+        /// Method used to build this suggestion. Should be considered opaque to clients. Can be used for metrics.
         public let method: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            handle: Handle, method: String
+            handle: Handle,
+            method: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.handle = handle
             self.method = method
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                handle = try container.decode(Handle.self, forKey: .handle)
-            } catch {
-                LogManager.logError("Decoding error for required property 'handle': \(error)")
-                throw error
-            }
-            do {
-                method = try container.decode(String.self, forKey: .method)
-            } catch {
-                LogManager.logError("Decoding error for required property 'method': \(error)")
-                throw error
-            }
+            handle = try container.decode(Handle.self, forKey: .handle)
+            method = try container.decode(String.self, forKey: .method)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(handle, forKey: .handle)
             try container.encode(method, forKey: .method)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(handle)
             hasher.combine(method)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -145,7 +162,7 @@ public enum ComAtprotoTempCheckHandleAvailability {
             if method != other.method {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -154,16 +171,16 @@ public enum ComAtprotoTempCheckHandleAvailability {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
             let methodValue = try method.toCBORValue()
             map = map.adding(key: "method", value: methodValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "handle", "method"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case handle
             case method
         }
@@ -186,47 +203,36 @@ public enum ComAtprotoTempCheckHandleAvailability {
     }
 
     public struct Output: ATProtocolCodable {
+        /// Echo of the input handle.
         public let handle: Handle
-
         public let result: OutputResultUnion
 
-        /// Standard public initializer
         public init(
             handle: Handle,
-
             result: OutputResultUnion
-
         ) {
             self.handle = handle
-
             self.result = result
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             handle = try container.decode(Handle.self, forKey: .handle)
-
             result = try container.decode(OutputResultUnion.self, forKey: .result)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(handle, forKey: .handle)
-
             try container.encode(result, forKey: .result)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
-
             let resultValue = try result.toCBORValue()
             map = map.adding(key: "result", value: resultValue)
-
             return map
         }
 
@@ -251,6 +257,8 @@ public enum ComAtprotoTempCheckHandleAvailability {
     public enum OutputResultUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case comAtprotoTempCheckHandleAvailabilityResultAvailable(ComAtprotoTempCheckHandleAvailability.ResultAvailable)
         case comAtprotoTempCheckHandleAvailabilityResultUnavailable(ComAtprotoTempCheckHandleAvailability.ResultUnavailable)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoTempCheckHandleAvailability.ResultAvailable) {
             self = .comAtprotoTempCheckHandleAvailabilityResultAvailable(value)
@@ -387,9 +395,8 @@ public extension ATProtoClient.Com.Atproto.Temp {
     /// Checks whether the provided handle is available. If the handle is not available, available suggestions will be returned. Optional inputs will be used to generate suggestions.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoTempCheckHandleAvailability.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func checkHandleAvailability(input: ComAtprotoTempCheckHandleAvailability.Parameters) async throws -> (responseCode: Int, data: ComAtprotoTempCheckHandleAvailability.Output?) {
         let endpoint = "com.atproto.temp.checkHandleAvailability"
 
@@ -409,41 +416,23 @@ public extension ATProtoClient.Com.Atproto.Temp {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoTempCheckHandleAvailability.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoTempCheckHandleAvailability.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.temp.checkHandleAvailability: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoTempCheckHandleAvailability.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoTempCheckHandleAvailability.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

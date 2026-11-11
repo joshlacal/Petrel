@@ -3,73 +3,77 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.sync.listRepos
 
+/// Enumerates all the DID, rev, and commit CID for all repos hosted by this service. Does not require auth; implemented by PDS and Relay.
 public enum ComAtprotoSyncListRepos {
     public static let typeIdentifier = "com.atproto.sync.listRepos"
 
     public struct Repo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.sync.listRepos#repo"
+
         public let did: DID
+        /// Current repo commit CID
         public let head: CID
         public let rev: TID
         public let active: Bool?
+        /// If active=false, this optional field indicates a possible reason for why the account is not active. If active=false and no status is supplied, then the host makes no claim for why the repository is no longer being hosted.
         public let status: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID, head: CID, rev: TID, active: Bool? = nil, status: String? = nil
+            did: DID,
+            head: CID,
+            rev: TID,
+            active: Bool? = nil,
+            status: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
             self.head = head
             self.rev = rev
             self.active = active
             self.status = status
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            did = try container.decode(DID.self, forKey: .did)
+            head = try container.decode(CID.self, forKey: .head)
+            rev = try container.decode(TID.self, forKey: .rev)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                active = try container.decodeIfPresent(Bool.self, forKey: .active, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                head = try container.decode(CID.self, forKey: .head)
-            } catch {
-                LogManager.logError("Decoding error for required property 'head': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(TID.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                active = try container.decodeIfPresent(Bool.self, forKey: .active)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'active' — degrading to nil: \(error)")
                 active = nil
             }
             do {
-                status = try container.decodeIfPresent(String.self, forKey: .status)
+                status = try container.decodeIfPresent(String.self, forKey: .status, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
                 status = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
             try container.encode(head, forKey: .head)
             try container.encode(rev, forKey: .rev)
             try container.encodeIfPresent(active, forKey: .active)
             try container.encodeIfPresent(status, forKey: .status)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -86,6 +90,7 @@ public enum ComAtprotoSyncListRepos {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -105,7 +110,7 @@ public enum ComAtprotoSyncListRepos {
             if status != other.status {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -114,7 +119,6 @@ public enum ComAtprotoSyncListRepos {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
             let headValue = try head.toCBORValue()
@@ -129,11 +133,12 @@ public enum ComAtprotoSyncListRepos {
                 let statusValue = try value.toCBORValue()
                 map = map.adding(key: "status", value: statusValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "head", "rev", "active", "status"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
             case head
             case rev
@@ -157,56 +162,46 @@ public enum ComAtprotoSyncListRepos {
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-
         public let repos: [Repo]
 
-        /// Standard public initializer
         public init(
             cursor: String? = nil,
-
             repos: [Repo]
-
         ) {
             self.cursor = cursor
-
             self.repos = repos
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
             repos = try container.decode([Repo].self, forKey: .repos)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
             try container.encode(repos, forKey: .repos)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
             let reposValue = try repos.toCBORValue()
             map = map.adding(key: "repos", value: reposValue)
-
             return map
         }
 
@@ -223,9 +218,8 @@ public extension ATProtoClient.Com.Atproto.Sync {
     /// Enumerates all the DID, rev, and commit CID for all repos hosted by this service. Does not require auth; implemented by PDS and Relay.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func listRepos(input: ComAtprotoSyncListRepos.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSyncListRepos.Output?) {
         let endpoint = "com.atproto.sync.listRepos"
 
@@ -242,35 +236,26 @@ public extension ATProtoClient.Com.Atproto.Sync {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.sync.listRepos")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSyncListRepos.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.listRepos: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSyncListRepos.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

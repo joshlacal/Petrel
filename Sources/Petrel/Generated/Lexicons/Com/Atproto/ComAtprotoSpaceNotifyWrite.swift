@@ -3,18 +3,32 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.notifyWrite
 
+/// Notify that a repo in a space has advanced. Repo hosts reliably deliver their latest state to the space host, which sequences updates and forwards them to registered syncers with reasonable-effort delivery. Authenticated with service auth.
 public enum ComAtprotoSpaceNotifyWrite {
     public static let typeIdentifier = "com.atproto.space.notifyWrite"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// The DID of the account whose repo advanced.
         public let repo: DID
+        /// The repo revision after the write.
         public let repoRev: TID
+        /// The repo's current commit data (sha256 of the LtHash state) after the write. Lets the space host maintain each repo's commit data for listRepos.
         public let data: Bytes
+        /// The space revision assigned by the space host. Present only on notifications forwarded to syncers.
         public let spaceRev: TID?
+        /// The previous space revision. Omitted on the first update in a space. A gap indicates missed notifications; recover using listRepos with cursor.
         public let prevSpaceRev: TID?
 
-        /// Standard public initializer
-        public init(space: SpaceRef, repo: DID, repoRev: TID, data: Bytes, spaceRev: TID? = nil, prevSpaceRev: TID? = nil) {
+        public init(
+            space: SpaceRef,
+            repo: DID,
+            repoRev: TID,
+            data: Bytes,
+            spaceRev: TID? = nil,
+            prevSpaceRev: TID? = nil
+        ) {
             self.space = space
             self.repo = repo
             self.repoRev = repoRev
@@ -138,13 +152,12 @@ public enum ComAtprotoSpaceNotifyWrite {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - notifyWrite
 
-    // Notify that a repo in a space has advanced. Repo hosts reliably deliver their latest state to the space host, which sequences updates and forwards them to registered syncers with reasonable-effort delivery. Authenticated with service auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Notify that a repo in a space has advanced. Repo hosts reliably deliver their latest state to the space host, which sequences updates and forwards them to registered syncers with reasonable-effort delivery. Authenticated with service auth.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoSpaceNotifyWrite.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func notifyWrite(
         input: ComAtprotoSpaceNotifyWrite.Input
 
@@ -173,18 +186,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceNotifyWrite.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceNotifyWrite.Error.self)
         }
 
         return responseCode

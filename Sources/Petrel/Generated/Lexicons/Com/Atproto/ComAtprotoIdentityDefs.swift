@@ -8,52 +8,49 @@ public enum ComAtprotoIdentityDefs {
 
     public struct IdentityInfo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.identity.defs#identityInfo"
+
         public let did: DID
+        /// The validated handle of the account; or 'handle.invalid' if the handle did not bi-directionally match the DID document.
         public let handle: Handle
+        /// The complete DID document for the identity.
         public let didDoc: DIDDocument
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID, handle: Handle, didDoc: DIDDocument
+            did: DID,
+            handle: Handle,
+            didDoc: DIDDocument,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
             self.handle = handle
             self.didDoc = didDoc
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                handle = try container.decode(Handle.self, forKey: .handle)
-            } catch {
-                LogManager.logError("Decoding error for required property 'handle': \(error)")
-                throw error
-            }
-            do {
-                didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
-            } catch {
-                LogManager.logError("Decoding error for required property 'didDoc': \(error)")
-                throw error
-            }
+            did = try container.decode(DID.self, forKey: .did)
+            handle = try container.decode(Handle.self, forKey: .handle)
+            didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
             try container.encode(handle, forKey: .handle)
             try container.encode(didDoc, forKey: .didDoc)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
             hasher.combine(handle)
             hasher.combine(didDoc)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -67,7 +64,7 @@ public enum ComAtprotoIdentityDefs {
             if didDoc != other.didDoc {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -76,18 +73,18 @@ public enum ComAtprotoIdentityDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
             let didDocValue = try didDoc.toCBORValue()
             map = map.adding(key: "didDoc", value: didDocValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "handle", "didDoc"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
             case handle
             case didDoc

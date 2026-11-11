@@ -3,47 +3,47 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.label.subscribeLabels
 
+/// Subscribe to stream of labels (and negations). Public endpoint implemented by mod services. Uses same sequencing scheme as repo event stream.
 public enum ComAtprotoLabelSubscribeLabels {
     public static let typeIdentifier = "com.atproto.label.subscribeLabels"
 
     public struct Labels: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.label.subscribeLabels#labels"
+
         public let seq: Int
         public let labels: [ComAtprotoLabelDefs.Label]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            seq: Int, labels: [ComAtprotoLabelDefs.Label]
+            seq: Int,
+            labels: [ComAtprotoLabelDefs.Label],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.seq = seq
             self.labels = labels
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                seq = try container.decode(Int.self, forKey: .seq)
-            } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
-                throw error
-            }
-            do {
-                labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-            } catch {
-                LogManager.logError("Decoding error for required property 'labels': \(error)")
-                throw error
-            }
+            seq = try container.decode(Int.self, forKey: .seq)
+            labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(seq, forKey: .seq)
             try container.encode(labels, forKey: .labels)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(seq)
             hasher.combine(labels)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +54,7 @@ public enum ComAtprotoLabelSubscribeLabels {
             if labels != other.labels {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +63,16 @@ public enum ComAtprotoLabelSubscribeLabels {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
             map = map.adding(key: "seq", value: seqValue)
             let labelsValue = try labels.toCBORValue()
             map = map.adding(key: "labels", value: labelsValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "labels"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case seq
             case labels
         }
@@ -80,39 +80,45 @@ public enum ComAtprotoLabelSubscribeLabels {
 
     public struct Info: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.label.subscribeLabels#info"
+
         public let name: String
         public let message: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            name: String, message: String? = nil
+            name: String,
+            message: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.name = name
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            name = try container.decode(String.self, forKey: .name)
             do {
-                name = try container.decode(String.self, forKey: .name)
+                message = try container.decodeIfPresent(String.self, forKey: .message, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
                 message = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -122,6 +128,7 @@ public enum ComAtprotoLabelSubscribeLabels {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -132,7 +139,7 @@ public enum ComAtprotoLabelSubscribeLabels {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -141,18 +148,18 @@ public enum ComAtprotoLabelSubscribeLabels {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let nameValue = try name.toCBORValue()
             map = map.adding(key: "name", value: nameValue)
             if let value = message {
                 let messageValue = try value.toCBORValue()
                 map = map.adding(key: "message", value: messageValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case name
             case message
         }
@@ -168,10 +175,18 @@ public enum ComAtprotoLabelSubscribeLabels {
         }
     }
 
-    public enum Message: Codable, Sendable {
+    public enum Message: Codable, Sendable, XRPCSubscriptionMessage {
         case labels(Labels)
 
         case info(Info)
+
+        /// The message types this subscription's Lexicon declares. Frames of any other
+        /// type are skipped by the transport, as the event-stream specification asks.
+        public static let knownMessageTypes: Swift.Set<String> = [
+            "com.atproto.label.subscribeLabels#labels",
+
+            "com.atproto.label.subscribeLabels#info",
+        ]
 
         enum CodingKeys: String, CodingKey {
             case type = "$type"

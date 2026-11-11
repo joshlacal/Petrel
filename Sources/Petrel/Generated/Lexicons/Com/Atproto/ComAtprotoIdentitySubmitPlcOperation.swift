@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.identity.submitPlcOperation
 
+/// Validates a PLC operation to ensure that it doesn't violate a service's constraints or get the identity into a bad state, then submits it to the PLC registry
 public enum ComAtprotoIdentitySubmitPlcOperation {
     public static let typeIdentifier = "com.atproto.identity.submitPlcOperation"
+
     public struct Input: ATProtocolCodable {
         public let operation: ATProtocolValueContainer
 
-        /// Standard public initializer
-        public init(operation: ATProtocolValueContainer) {
+        public init(
+            operation: ATProtocolValueContainer
+        ) {
             self.operation = operation
         }
 
@@ -39,13 +42,12 @@ public enum ComAtprotoIdentitySubmitPlcOperation {
 public extension ATProtoClient.Com.Atproto.Identity {
     // MARK: - submitPlcOperation
 
-    // Validates a PLC operation to ensure that it doesn't violate a service's constraints or get the identity into a bad state, then submits it to the PLC registry
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Validates a PLC operation to ensure that it doesn't violate a service's constraints or get the identity into a bad state, then submits it to the PLC registry
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func submitPlcOperation(
         input: ComAtprotoIdentitySubmitPlcOperation.Input
 
@@ -71,7 +73,13 @@ public extension ATProtoClient.Com.Atproto.Identity {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.identity.submitPlcOperation")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

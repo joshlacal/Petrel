@@ -6,44 +6,46 @@ import Foundation
 public enum AppBskyContactDefs {
     public static let typeIdentifier = "app.bsky.contact.defs"
 
+    /// Associates a profile with the positional index of the contact import input in the call to `app.bsky.contact.importContacts`, so clients can know which phone caused a particular match.
     public struct MatchAndContactIndex: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.contact.defs#matchAndContactIndex"
+
+        /// Profile of the matched user.
         public let match: AppBskyActorDefs.ProfileView
+        /// The index of this match in the import contact input.
         public let contactIndex: Int
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            match: AppBskyActorDefs.ProfileView, contactIndex: Int
+            match: AppBskyActorDefs.ProfileView,
+            contactIndex: Int,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.match = match
             self.contactIndex = contactIndex
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                match = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .match)
-            } catch {
-                LogManager.logError("Decoding error for required property 'match': \(error)")
-                throw error
-            }
-            do {
-                contactIndex = try container.decode(Int.self, forKey: .contactIndex)
-            } catch {
-                LogManager.logError("Decoding error for required property 'contactIndex': \(error)")
-                throw error
-            }
+            match = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .match)
+            contactIndex = try container.decode(Int.self, forKey: .contactIndex)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(match, forKey: .match)
             try container.encode(contactIndex, forKey: .contactIndex)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(match)
             hasher.combine(contactIndex)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +56,7 @@ public enum AppBskyContactDefs {
             if contactIndex != other.contactIndex {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +65,16 @@ public enum AppBskyContactDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let matchValue = try match.toCBORValue()
             map = map.adding(key: "match", value: matchValue)
             let contactIndexValue = try contactIndex.toCBORValue()
             map = map.adding(key: "contactIndex", value: contactIndexValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "match", "contactIndex"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case match
             case contactIndex
         }
@@ -80,42 +82,43 @@ public enum AppBskyContactDefs {
 
     public struct SyncStatus: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.contact.defs#syncStatus"
+
+        /// Last date when contacts where imported.
         public let syncedAt: ATProtocolDate
+        /// Number of existing contact matches resulting of the user imports and of their imported contacts having imported the user. Matches stop being counted when the user either follows the matched contact or dismisses the match.
         public let matchesCount: Int
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            syncedAt: ATProtocolDate, matchesCount: Int
+            syncedAt: ATProtocolDate,
+            matchesCount: Int,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.syncedAt = syncedAt
             self.matchesCount = matchesCount
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                syncedAt = try container.decode(ATProtocolDate.self, forKey: .syncedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'syncedAt': \(error)")
-                throw error
-            }
-            do {
-                matchesCount = try container.decode(Int.self, forKey: .matchesCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'matchesCount': \(error)")
-                throw error
-            }
+            syncedAt = try container.decode(ATProtocolDate.self, forKey: .syncedAt)
+            matchesCount = try container.decode(Int.self, forKey: .matchesCount)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(syncedAt, forKey: .syncedAt)
             try container.encode(matchesCount, forKey: .matchesCount)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(syncedAt)
             hasher.combine(matchesCount)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -126,7 +129,7 @@ public enum AppBskyContactDefs {
             if matchesCount != other.matchesCount {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -135,59 +138,61 @@ public enum AppBskyContactDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let syncedAtValue = try syncedAt.toCBORValue()
             map = map.adding(key: "syncedAt", value: syncedAtValue)
             let matchesCountValue = try matchesCount.toCBORValue()
             map = map.adding(key: "matchesCount", value: matchesCountValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "syncedAt", "matchesCount"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case syncedAt
             case matchesCount
         }
     }
 
+    /// A stash object to be sent via bsync representing a notification to be created.
     public struct Notification: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.contact.defs#notification"
+
+        /// The DID of who this notification comes from.
         public let from: DID
+        /// The DID of who this notification should go to.
         public let to: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            from: DID, to: DID
+            from: DID,
+            to: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.from = from
             self.to = to
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                from = try container.decode(DID.self, forKey: .from)
-            } catch {
-                LogManager.logError("Decoding error for required property 'from': \(error)")
-                throw error
-            }
-            do {
-                to = try container.decode(DID.self, forKey: .to)
-            } catch {
-                LogManager.logError("Decoding error for required property 'to': \(error)")
-                throw error
-            }
+            from = try container.decode(DID.self, forKey: .from)
+            to = try container.decode(DID.self, forKey: .to)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(from, forKey: .from)
             try container.encode(to, forKey: .to)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(from)
             hasher.combine(to)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -198,7 +203,7 @@ public enum AppBskyContactDefs {
             if to != other.to {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -207,16 +212,16 @@ public enum AppBskyContactDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let fromValue = try from.toCBORValue()
             map = map.adding(key: "from", value: fromValue)
             let toValue = try to.toCBORValue()
             map = map.adding(key: "to", value: toValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "from", "to"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case from
             case to
         }

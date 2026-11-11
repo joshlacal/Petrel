@@ -3,129 +3,111 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.refreshSession
 
+/// Refresh an authentication session. Requires auth using the 'refreshJwt' (not the 'accessJwt').
 public enum ComAtprotoServerRefreshSession {
     public static let typeIdentifier = "com.atproto.server.refreshSession"
 
     public struct Output: ATProtocolCodable {
         public let accessJwt: String
-
         public let refreshJwt: String
-
         public let handle: Handle
-
         public let did: DID
-
         public let didDoc: DIDDocument?
-
         public let email: String?
-
         public let emailConfirmed: Bool?
-
         public let emailAuthFactor: Bool?
-
         public let active: Bool?
-
+        /// Hosting status of the account. If not specified, then assume 'active'.
         public let status: String?
 
-        /// Standard public initializer
         public init(
             accessJwt: String,
-
             refreshJwt: String,
-
             handle: Handle,
-
             did: DID,
-
             didDoc: DIDDocument? = nil,
-
             email: String? = nil,
-
             emailConfirmed: Bool? = nil,
-
             emailAuthFactor: Bool? = nil,
-
             active: Bool? = nil,
-
             status: String? = nil
-
         ) {
             self.accessJwt = accessJwt
-
             self.refreshJwt = refreshJwt
-
             self.handle = handle
-
             self.did = did
-
             self.didDoc = didDoc
-
             self.email = email
-
             self.emailConfirmed = emailConfirmed
-
             self.emailAuthFactor = emailAuthFactor
-
             self.active = active
-
             self.status = status
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             accessJwt = try container.decode(String.self, forKey: .accessJwt)
-
             refreshJwt = try container.decode(String.self, forKey: .refreshJwt)
-
             handle = try container.decode(Handle.self, forKey: .handle)
-
             did = try container.decode(DID.self, forKey: .did)
-
             do {
-                didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
+                didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'didDoc' — degrading to nil: \(error)")
                 didDoc = nil
             }
-
             do {
-                email = try container.decodeIfPresent(String.self, forKey: .email)
+                email = try container.decodeIfPresent(String.self, forKey: .email, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
                 email = nil
             }
-
             do {
-                emailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .emailConfirmed)
+                emailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .emailConfirmed, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'emailConfirmed' — degrading to nil: \(error)")
                 emailConfirmed = nil
             }
-
             do {
-                emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
+                emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'emailAuthFactor' — degrading to nil: \(error)")
                 emailAuthFactor = nil
             }
-
             do {
-                active = try container.decodeIfPresent(Bool.self, forKey: .active)
+                active = try container.decodeIfPresent(Bool.self, forKey: .active, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'active' — degrading to nil: \(error)")
                 active = nil
             }
-
             do {
-                status = try container.decodeIfPresent(String.self, forKey: .status)
+                status = try container.decodeIfPresent(String.self, forKey: .status, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
                 status = nil
             }
@@ -133,85 +115,52 @@ public enum ComAtprotoServerRefreshSession {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(accessJwt, forKey: .accessJwt)
-
             try container.encode(refreshJwt, forKey: .refreshJwt)
-
             try container.encode(handle, forKey: .handle)
-
             try container.encode(did, forKey: .did)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(didDoc, forKey: .didDoc)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(email, forKey: .email)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(emailConfirmed, forKey: .emailConfirmed)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(emailAuthFactor, forKey: .emailAuthFactor)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(active, forKey: .active)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(status, forKey: .status)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let accessJwtValue = try accessJwt.toCBORValue()
             map = map.adding(key: "accessJwt", value: accessJwtValue)
-
             let refreshJwtValue = try refreshJwt.toCBORValue()
             map = map.adding(key: "refreshJwt", value: refreshJwtValue)
-
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
-
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
             if let value = didDoc {
-                // Encode optional property even if it's an empty array for CBOR
                 let didDocValue = try value.toCBORValue()
                 map = map.adding(key: "didDoc", value: didDocValue)
             }
-
             if let value = email {
-                // Encode optional property even if it's an empty array for CBOR
                 let emailValue = try value.toCBORValue()
                 map = map.adding(key: "email", value: emailValue)
             }
-
             if let value = emailConfirmed {
-                // Encode optional property even if it's an empty array for CBOR
                 let emailConfirmedValue = try value.toCBORValue()
                 map = map.adding(key: "emailConfirmed", value: emailConfirmedValue)
             }
-
             if let value = emailAuthFactor {
-                // Encode optional property even if it's an empty array for CBOR
                 let emailAuthFactorValue = try value.toCBORValue()
                 map = map.adding(key: "emailAuthFactor", value: emailAuthFactorValue)
             }
-
             if let value = active {
-                // Encode optional property even if it's an empty array for CBOR
                 let activeValue = try value.toCBORValue()
                 map = map.adding(key: "active", value: activeValue)
             }
-
             if let value = status {
-                // Encode optional property even if it's an empty array for CBOR
                 let statusValue = try value.toCBORValue()
                 map = map.adding(key: "status", value: statusValue)
             }
-
             return map
         }
 
@@ -248,8 +197,8 @@ public extension ATProtoClient.Com.Atproto.Server {
 
     /// Refresh an authentication session. Requires auth using the 'refreshJwt' (not the 'accessJwt').
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoServerRefreshSession.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func refreshSession(
     ) async throws -> (responseCode: Int, data: ComAtprotoServerRefreshSession.Output?) {
         let endpoint = "com.atproto.server.refreshSession"
@@ -276,40 +225,23 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoServerRefreshSession.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoServerRefreshSession.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.refreshSession: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoServerRefreshSession.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoServerRefreshSession.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

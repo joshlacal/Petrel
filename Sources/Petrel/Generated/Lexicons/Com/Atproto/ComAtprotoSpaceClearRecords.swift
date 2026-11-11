@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.clearRecords
 
+/// Delete every record in the authenticated account's space repo. The repo advances to a new revision with the empty repo's digest, and its oplog is cleared. In the space authority's own repo, the records the host publishes from the space's configuration (com.atproto.space.policy and com.atproto.memberspace.member) are kept, and the digest is that of the records that remain. Succeeds whether or not the repo held any records to delete. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceClearRecords {
     public static let typeIdentifier = "com.atproto.space.clearRecords"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// The DID of the repo to clear (the authenticated member).
         public let repo: DID
 
-        /// Standard public initializer
-        public init(space: SpaceRef, repo: DID) {
+        public init(
+            space: SpaceRef,
+            repo: DID
+        ) {
             self.space = space
             self.repo = repo
         }
@@ -43,25 +49,21 @@ public enum ComAtprotoSpaceClearRecords {
     }
 
     public struct Output: ATProtocolCodable {
-        // Empty output - no properties (response is {})
-
-        /// Standard public initializer
         public init() {}
 
         public init(from decoder: Decoder) throws {
-            // Empty output - just validate it's an object by trying to get any container
-            _ = try decoder.singleValueContainer()
+            _ = try decoder.container(keyedBy: CodingKeys.self)
         }
 
         public func encode(to encoder: Encoder) throws {
-            // Empty output - encode empty object
-            _ = encoder.singleValueContainer()
+            _ = encoder.container(keyedBy: CodingKeys.self)
         }
 
         public func toCBORValue() throws -> Any {
-            // Empty output - return empty CBOR map
             return OrderedCBORMap()
         }
+
+        private enum CodingKeys: CodingKey {}
     }
 
     public struct XRPCMethodDescriptor: Sendable, Equatable {
@@ -89,13 +91,12 @@ public enum ComAtprotoSpaceClearRecords {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - clearRecords
 
-    // Delete every record in the authenticated account's space repo. The repo advances to a new revision with the empty repo's digest, and its oplog is cleared. In the space authority's own repo, the records the host publishes from the space's configuration (com.atproto.space.policy and com.atproto.memberspace.member) are kept, and the digest is that of the records that remain. Succeeds whether or not the repo held any records to delete. Requires auth, implemented by PDS.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Delete every record in the authenticated account's space repo. The repo advances to a new revision with the empty repo's digest, and its oplog is cleared. In the space authority's own repo, the records the host publishes from the space's configuration (com.atproto.space.policy and com.atproto.memberspace.member) are kept, and the digest is that of the records that remain. Succeeds whether or not the repo held any records to delete. Requires auth, implemented by PDS.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func clearRecords(
         input: ComAtprotoSpaceClearRecords.Input
 
@@ -126,35 +127,23 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSpaceClearRecords.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.clearRecords: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSpaceClearRecords.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

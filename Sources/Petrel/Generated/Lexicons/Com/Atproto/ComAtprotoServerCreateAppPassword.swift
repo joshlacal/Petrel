@@ -3,62 +3,61 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.createAppPassword
 
+/// Create an App Password.
 public enum ComAtprotoServerCreateAppPassword {
     public static let typeIdentifier = "com.atproto.server.createAppPassword"
 
     public struct AppPassword: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.server.createAppPassword#appPassword"
+
         public let name: String
         public let password: String
         public let createdAt: ATProtocolDate
         public let privileged: Bool?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            name: String, password: String, createdAt: ATProtocolDate, privileged: Bool? = nil
+            name: String,
+            password: String,
+            createdAt: ATProtocolDate,
+            privileged: Bool? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.name = name
             self.password = password
             self.createdAt = createdAt
             self.privileged = privileged
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            name = try container.decode(String.self, forKey: .name)
+            password = try container.decode(String.self, forKey: .password)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             do {
-                name = try container.decode(String.self, forKey: .name)
+                privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
-                throw error
-            }
-            do {
-                password = try container.decode(String.self, forKey: .password)
-            } catch {
-                LogManager.logError("Decoding error for required property 'password': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'privileged' — degrading to nil: \(error)")
                 privileged = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(name, forKey: .name)
             try container.encode(password, forKey: .password)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encodeIfPresent(privileged, forKey: .privileged)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -70,6 +69,7 @@ public enum ComAtprotoServerCreateAppPassword {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -86,7 +86,7 @@ public enum ComAtprotoServerCreateAppPassword {
             if privileged != other.privileged {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -95,7 +95,6 @@ public enum ComAtprotoServerCreateAppPassword {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let nameValue = try name.toCBORValue()
             map = map.adding(key: "name", value: nameValue)
             let passwordValue = try password.toCBORValue()
@@ -106,11 +105,12 @@ public enum ComAtprotoServerCreateAppPassword {
                 let privilegedValue = try value.toCBORValue()
                 map = map.adding(key: "privileged", value: privilegedValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "password", "createdAt", "privileged"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case name
             case password
             case createdAt
@@ -119,19 +119,24 @@ public enum ComAtprotoServerCreateAppPassword {
     }
 
     public struct Input: ATProtocolCodable {
+        /// A short name for the App Password, to help distinguish them.
         public let name: String
+        /// If an app password has 'privileged' access to possibly sensitive account state. Meant for use with trusted clients.
         public let privileged: Bool?
 
-        /// Standard public initializer
-        public init(name: String, privileged: Bool? = nil) {
+        public init(
+            name: String,
+            privileged: Bool? = nil
+        ) {
             self.name = name
             self.privileged = privileged
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             name = try container.decode(String.self, forKey: .name)
-            privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged)
+            privileged = try container.decodeIfPresent(Bool.self, forKey: .privileged, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -174,13 +179,12 @@ public enum ComAtprotoServerCreateAppPassword {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - createAppPassword
 
-    // Create an App Password.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Create an App Password.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoServerCreateAppPassword.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func createAppPassword(
         input: ComAtprotoServerCreateAppPassword.Input
 
@@ -211,40 +215,23 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoServerCreateAppPassword.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoServerCreateAppPassword.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.createAppPassword: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoServerCreateAppPassword.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoServerCreateAppPassword.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

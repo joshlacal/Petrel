@@ -28,7 +28,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
 
         init() {
             var decoders: [String: DecoderFunction] = [:]
-            decoders.reserveCapacity(345)
+            decoders.reserveCapacity(343)
 
             Self.registerChunk0(into: &decoders)
 
@@ -182,16 +182,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["app.bsky.actor.defs#preferences"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyActorDefs.Preferences(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding AppBskyActorDefs.Preferences: \(error)")
-                    return .decodeError("Error decoding AppBskyActorDefs.Preferences: \(error)")
-                }
-            }
-
             decoders["app.bsky.actor.defs#adultContentPref"] = { decoder in
                 do {
                     let decodedObject = try AppBskyActorDefs.AdultContentPref(from: decoder)
@@ -311,9 +301,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyActorDefs.MutedWordsPref: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk1(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.actor.defs#hiddenPostsPref"] = { decoder in
                 do {
                     let decodedObject = try AppBskyActorDefs.HiddenPostsPref(from: decoder)
@@ -323,7 +311,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyActorDefs.HiddenPostsPref: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk1(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.actor.defs#labelersPref"] = { decoder in
                 do {
                     let decodedObject = try AppBskyActorDefs.LabelersPref(from: decoder)
@@ -563,9 +553,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyBookmarkDefs.Bookmark: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk2(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.bookmark.defs#bookmarkView"] = { decoder in
                 do {
                     let decodedObject = try AppBskyBookmarkDefs.BookmarkView(from: decoder)
@@ -575,7 +563,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyBookmarkDefs.BookmarkView: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk2(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.contact.defs#matchAndContactIndex"] = { decoder in
                 do {
                     let decodedObject = try AppBskyContactDefs.MatchAndContactIndex(from: decoder)
@@ -673,16 +663,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding AppBskyDraftDefs.DraftEmbedGallery: \(error)")
                     return .decodeError("Error decoding AppBskyDraftDefs.DraftEmbedGallery: \(error)")
-                }
-            }
-
-            decoders["app.bsky.draft.defs#draftEmbedGalleryItems"] = { decoder in
-                do {
-                    let decodedObject = try AppBskyDraftDefs.DraftEmbedGalleryItems(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding AppBskyDraftDefs.DraftEmbedGalleryItems: \(error)")
-                    return .decodeError("Error decoding AppBskyDraftDefs.DraftEmbedGalleryItems: \(error)")
                 }
             }
 
@@ -815,9 +795,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyEmbedGallery: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk3(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.embed.gallery#image"] = { decoder in
                 do {
                     let decodedObject = try AppBskyEmbedGallery.Image(from: decoder)
@@ -837,7 +815,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyEmbedGallery.View: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk3(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.embed.gallery#viewImage"] = { decoder in
                 do {
                     let decodedObject = try AppBskyEmbedGallery.ViewImage(from: decoder)
@@ -1067,9 +1047,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyFeedDefs.ReasonRepost: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk4(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.feed.defs#reasonPin"] = { decoder in
                 do {
                     let decodedObject = try AppBskyFeedDefs.ReasonPin(from: decoder)
@@ -1089,7 +1067,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyFeedDefs.ThreadViewPost: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk4(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.feed.defs#notFoundPost"] = { decoder in
                 do {
                     let decodedObject = try AppBskyFeedDefs.NotFoundPost(from: decoder)
@@ -1319,9 +1299,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyFeedThreadgate: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk5(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.feed.threadgate#mentionRule"] = { decoder in
                 do {
                     let decodedObject = try AppBskyFeedThreadgate.MentionRule(from: decoder)
@@ -1341,7 +1319,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyFeedThreadgate.FollowerRule: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk5(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.feed.threadgate#followingRule"] = { decoder in
                 do {
                     let decodedObject = try AppBskyFeedThreadgate.FollowingRule(from: decoder)
@@ -1571,9 +1551,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyLabelerDefs.LabelerViewerState: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk6(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.labeler.defs#labelerPolicies"] = { decoder in
                 do {
                     let decodedObject = try AppBskyLabelerDefs.LabelerPolicies(from: decoder)
@@ -1593,7 +1571,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyLabelerService: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk6(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.notification.declaration"] = { decoder in
                 do {
                     let decodedObject = try AppBskyNotificationDeclaration(from: decoder)
@@ -1823,9 +1803,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyUnspeccedDefs.ThreadItemNotFound: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk7(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.unspecced.defs#threadItemBlocked"] = { decoder in
                 do {
                     let decodedObject = try AppBskyUnspeccedDefs.ThreadItemBlocked(from: decoder)
@@ -1845,7 +1823,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding AppBskyUnspeccedDefs.AgeAssuranceState: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk7(into decoders: inout [String: DecoderFunction]) {
             decoders["app.bsky.unspecced.defs#ageAssuranceEvent"] = { decoder in
                 do {
                     let decodedObject = try AppBskyUnspeccedDefs.AgeAssuranceEvent(from: decoder)
@@ -2075,9 +2055,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ChatBskyConvoDefs.SystemMessageDataLockConvo: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk8(into decoders: inout [String: DecoderFunction]) {
             decoders["chat.bsky.convo.defs#systemMessageDataUnlockConvo"] = { decoder in
                 do {
                     let decodedObject = try ChatBskyConvoDefs.SystemMessageDataUnlockConvo(from: decoder)
@@ -2097,7 +2075,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ChatBskyConvoDefs.SystemMessageDataLockConvoPermanently: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk8(into decoders: inout [String: DecoderFunction]) {
             decoders["chat.bsky.convo.defs#systemMessageDataEditGroup"] = { decoder in
                 do {
                     let decodedObject = try ChatBskyConvoDefs.SystemMessageDataEditGroup(from: decoder)
@@ -2327,9 +2307,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ChatBskyConvoDefs.LogAddReaction: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk9(into decoders: inout [String: DecoderFunction]) {
             decoders["chat.bsky.convo.defs#logRemoveReaction"] = { decoder in
                 do {
                     let decodedObject = try ChatBskyConvoDefs.LogRemoveReaction(from: decoder)
@@ -2349,7 +2327,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ChatBskyConvoDefs.LogReadConvo: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk9(into decoders: inout [String: DecoderFunction]) {
             decoders["chat.bsky.convo.defs#logAddMember"] = { decoder in
                 do {
                     let decodedObject = try ChatBskyConvoDefs.LogAddMember(from: decoder)
@@ -2579,9 +2559,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ChatBskyGroupDefs.JoinLinkView: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk10(into decoders: inout [String: DecoderFunction]) {
             decoders["chat.bsky.group.defs#joinLinkPreviewView"] = { decoder in
                 do {
                     let decodedObject = try ChatBskyGroupDefs.JoinLinkPreviewView(from: decoder)
@@ -2601,7 +2579,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ChatBskyGroupDefs.DisabledJoinLinkPreviewView: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk10(into decoders: inout [String: DecoderFunction]) {
             decoders["chat.bsky.group.defs#invalidJoinLinkPreviewView"] = { decoder in
                 do {
                     let decodedObject = try ChatBskyGroupDefs.InvalidJoinLinkPreviewView(from: decoder)
@@ -2831,9 +2811,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoAdminDefs.AccountView: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk11(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.admin.defs#repoRef"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoAdminDefs.RepoRef(from: decoder)
@@ -2853,7 +2831,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoAdminDefs.RepoBlobRef: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk11(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.admin.defs#threatSignature"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoAdminDefs.ThreatSignature(from: decoder)
@@ -3083,9 +3063,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoRepoDefs.CommitMeta: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk12(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.repo.listMissingBlobs#recordBlob"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoRepoListMissingBlobs.RecordBlob(from: decoder)
@@ -3105,7 +3083,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoRepoListRecords.Record: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk12(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.repo.strongRef"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoRepoStrongRef(from: decoder)
@@ -3335,9 +3315,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoSyncListReposByCollection.Repo: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk13(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.sync.subscribeRepos#commit"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoSyncSubscribeRepos.Commit(from: decoder)
@@ -3357,7 +3335,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoSyncSubscribeRepos.Sync: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk13(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.sync.subscribeRepos#identity"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoSyncSubscribeRepos.Identity(from: decoder)
@@ -3699,8 +3679,15 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
         }
     }
 
-    /// In-memory lossless-decode check that tolerates $type framing differences,
-    /// unknown future fields, explicit nulls, and lenient optional degradations.
+    /// Checks that a typed value is a faithful view of the raw wire object.
+    ///
+    /// Generated types keep fields their Lexicon does not declare in `extraFields`, so
+    /// every non-null raw field must reappear in the typed encoding with the same value.
+    /// A raw field that is missing means the typed decode dropped it (an optional field
+    /// that did not match its schema); the Lexicon specification treats such data as
+    /// invalid as a whole, so the value stays raw (`.unknownType`) and nothing is lost
+    /// if it is written back. Tolerated differences: the `$type` discriminator on either
+    /// side, and `null` versus absent.
     public static func isSpecTolerantMatch(
         typed: ATProtocolValueContainer,
         raw: ATProtocolValueContainer
@@ -3758,6 +3745,12 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     if typedVal == .null {
                         continue
                     }
+                    return false
+                }
+            }
+            for (key, rawVal) in rawDict where typedDict[key] == nil {
+                // A wire field the typed value no longer carries was dropped while decoding.
+                if key != "$type", rawVal != .null {
                     return false
                 }
             }

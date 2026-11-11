@@ -3,26 +3,38 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.embed.images
 
+/// A set of images embedded in a Bluesky record (eg, a post).
 public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.embed.images"
-    public let images: [Image]
 
-    public init(images: [Image]) {
+    public let images: [Image]
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        images: [Image],
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.images = images
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         images = try container.decode([Image].self, forKey: .images)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(images, forKey: .images)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(images)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -30,7 +42,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         if images != other.images {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -41,8 +53,10 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
         var map = OrderedCBORMap()
         let imagesValue = try images.toCBORValue()
         map = map.adding(key: "images", value: imagesValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "images"]
 
     private enum CodingKeys: String, CodingKey {
         case images
@@ -50,48 +64,52 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
     public struct Image: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.images#image"
+
+        /// The raw image file. May be up to 2 MB, formerly limited to 1 MB.
         public let image: Blob
+        /// Alt text description of the image, for accessibility.
         public let alt: String
         public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            image: Blob, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil
+            image: Blob,
+            alt: String,
+            aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.image = image
             self.alt = alt
             self.aspectRatio = aspectRatio
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            image = try container.decode(Blob.self, forKey: .image)
+            alt = try container.decode(String.self, forKey: .alt)
             do {
-                image = try container.decode(Blob.self, forKey: .image)
+                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'image': \(error)")
-                throw error
-            }
-            do {
-                alt = try container.decode(String.self, forKey: .alt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'alt': \(error)")
-                throw error
-            }
-            do {
-                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
                 aspectRatio = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(image, forKey: .image)
             try container.encode(alt, forKey: .alt)
             try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -102,6 +120,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -115,7 +134,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             if aspectRatio != other.aspectRatio {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -124,7 +143,6 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let imageValue = try image.toCBORValue()
             map = map.adding(key: "image", value: imageValue)
             let altValue = try alt.toCBORValue()
@@ -133,11 +151,12 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
                 let aspectRatioValue = try value.toCBORValue()
                 map = map.adding(key: "aspectRatio", value: aspectRatioValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "image", "alt", "aspectRatio"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case image
             case alt
             case aspectRatio
@@ -146,32 +165,35 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
     public struct View: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.images#view"
+
         public let images: [ViewImage]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            images: [ViewImage]
+            images: [ViewImage],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.images = images
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                images = try container.decode([ViewImage].self, forKey: .images)
-            } catch {
-                LogManager.logError("Decoding error for required property 'images': \(error)")
-                throw error
-            }
+            images = try container.decode([ViewImage].self, forKey: .images)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(images, forKey: .images)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(images)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -179,7 +201,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             if images != other.images {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -188,71 +210,72 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let imagesValue = try images.toCBORValue()
             map = map.adding(key: "images", value: imagesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "images"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case images
         }
     }
 
     public struct ViewImage: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.images#viewImage"
+
+        /// Fully-qualified URL where a thumbnail of the image can be fetched. For example, CDN location provided by the App View.
         public let thumb: URI
+        /// Fully-qualified URL where a large version of the image can be fetched. May or may not be the exact original blob. For example, CDN location provided by the App View.
         public let fullsize: URI
+        /// Alt text description of the image, for accessibility.
         public let alt: String
         public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            thumb: URI, fullsize: URI, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil
+            thumb: URI,
+            fullsize: URI,
+            alt: String,
+            aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.thumb = thumb
             self.fullsize = fullsize
             self.alt = alt
             self.aspectRatio = aspectRatio
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            thumb = try container.decode(URI.self, forKey: .thumb)
+            fullsize = try container.decode(URI.self, forKey: .fullsize)
+            alt = try container.decode(String.self, forKey: .alt)
             do {
-                thumb = try container.decode(URI.self, forKey: .thumb)
+                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'thumb': \(error)")
-                throw error
-            }
-            do {
-                fullsize = try container.decode(URI.self, forKey: .fullsize)
-            } catch {
-                LogManager.logError("Decoding error for required property 'fullsize': \(error)")
-                throw error
-            }
-            do {
-                alt = try container.decode(String.self, forKey: .alt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'alt': \(error)")
-                throw error
-            }
-            do {
-                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
                 aspectRatio = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(thumb, forKey: .thumb)
             try container.encode(fullsize, forKey: .fullsize)
             try container.encode(alt, forKey: .alt)
             try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -264,6 +287,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -280,7 +304,7 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
             if aspectRatio != other.aspectRatio {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -289,7 +313,6 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let thumbValue = try thumb.toCBORValue()
             map = map.adding(key: "thumb", value: thumbValue)
             let fullsizeValue = try fullsize.toCBORValue()
@@ -300,11 +323,12 @@ public struct AppBskyEmbedImages: ATProtocolCodable, ATProtocolValue {
                 let aspectRatioValue = try value.toCBORValue()
                 map = map.adding(key: "aspectRatio", value: aspectRatioValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "thumb", "fullsize", "alt", "aspectRatio"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case thumb
             case fullsize
             case alt

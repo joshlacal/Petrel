@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.contact.importContacts
 
+/// Import contacts for securely matching with other users. This follows the protocol explained in https://docs.bsky.app/blog/contact-import-rfc. Requires authentication.
 public enum AppBskyContactImportContacts {
     public static let typeIdentifier = "app.bsky.contact.importContacts"
+
     public struct Input: ATProtocolCodable {
+        /// JWT to authenticate the call. Use the JWT received as a response to the call to `app.bsky.contact.verifyPhone`.
         public let token: String
+        /// List of phone numbers in global E.164 format (e.g., '+12125550123'). Phone numbers that cannot be normalized into a valid phone number will be discarded. Should not repeat the 'phone' input used in `app.bsky.contact.verifyPhone`.
         public let contacts: [String]
 
-        /// Standard public initializer
-        public init(token: String, contacts: [String]) {
+        public init(
+            token: String,
+            contacts: [String]
+        ) {
             self.token = token
             self.contacts = contacts
         }
@@ -43,34 +49,29 @@ public enum AppBskyContactImportContacts {
     }
 
     public struct Output: ATProtocolCodable {
+        /// The users that matched during import and their indexes on the input contacts, so the client can correlate with its local list.
         public let matchesAndContactIndexes: [AppBskyContactDefs.MatchAndContactIndex]
 
-        /// Standard public initializer
         public init(
             matchesAndContactIndexes: [AppBskyContactDefs.MatchAndContactIndex]
-
         ) {
             self.matchesAndContactIndexes = matchesAndContactIndexes
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             matchesAndContactIndexes = try container.decode([AppBskyContactDefs.MatchAndContactIndex].self, forKey: .matchesAndContactIndexes)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(matchesAndContactIndexes, forKey: .matchesAndContactIndexes)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let matchesAndContactIndexesValue = try matchesAndContactIndexes.toCBORValue()
             map = map.adding(key: "matchesAndContactIndexes", value: matchesAndContactIndexesValue)
-
             return map
         }
 
@@ -98,13 +99,12 @@ public enum AppBskyContactImportContacts {
 public extension ATProtoClient.App.Bsky.Contact {
     // MARK: - importContacts
 
-    // Import contacts for securely matching with other users. This follows the protocol explained in https://docs.bsky.app/blog/contact-import-rfc. Requires authentication.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Import contacts for securely matching with other users. This follows the protocol explained in https://docs.bsky.app/blog/contact-import-rfc. Requires authentication.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<AppBskyContactImportContacts.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func importContacts(
         input: AppBskyContactImportContacts.Input
 
@@ -135,40 +135,23 @@ public extension ATProtoClient.App.Bsky.Contact {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyContactImportContacts.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyContactImportContacts.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.contact.importContacts: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyContactImportContacts.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyContactImportContacts.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

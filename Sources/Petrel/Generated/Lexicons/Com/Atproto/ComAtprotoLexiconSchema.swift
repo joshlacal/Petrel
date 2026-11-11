@@ -3,27 +3,43 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.lexicon.schema
 
+/// Representation of Lexicon schemas themselves, when published as atproto records. Note that the schema language is not defined in Lexicon; this meta schema currently only includes a single version field ('lexicon'). See the atproto specifications for description of the other expected top-level fields ('id', 'defs', etc).
 public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.lexicon.schema"
-    public let lexicon: Int
 
-    public init(lexicon: Int) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "nsid")
+
+    /// Indicates the 'version' of the Lexicon language. Must be '1' for the current atproto/Lexicon schema system.
+    public let lexicon: Int
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        lexicon: Int,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.lexicon = lexicon
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         lexicon = try container.decode(Int.self, forKey: .lexicon)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(lexicon, forKey: .lexicon)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(lexicon)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -31,11 +47,11 @@ public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
         if lexicon != other.lexicon {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(lexicon)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -43,8 +59,10 @@ public struct ComAtprotoLexiconSchema: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "$type", value: Self.typeIdentifier)
         let lexiconValue = try lexicon.toCBORValue()
         map = map.adding(key: "lexicon", value: lexiconValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "lexicon"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

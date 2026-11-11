@@ -3,26 +3,38 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.embed.external
 
+/// A representation of some externally linked content (eg, a URL and 'card'), embedded in a Bluesky record (eg, a post).
 public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.embed.external"
-    public let external: External
 
-    public init(external: External) {
+    public let external: External
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        external: External,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.external = external
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         external = try container.decode(External.self, forKey: .external)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(external, forKey: .external)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(external)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -30,7 +42,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         if external != other.external {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -41,8 +53,10 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         var map = OrderedCBORMap()
         let externalValue = try external.toCBORValue()
         map = map.adding(key: "external", value: externalValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "external"]
 
     private enum CodingKeys: String, CodingKey {
         case external
@@ -50,68 +64,70 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
     public struct External: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#external"
+
         public let uri: URI
         public let title: String
         public let description: String
         public let thumb: Blob?
+        /// StrongRefs (uri+cid) of the Atmosphere records that backed this view.
         public let associatedRefs: [ComAtprotoRepoStrongRef]?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: URI, title: String, description: String, thumb: Blob? = nil, associatedRefs: [ComAtprotoRepoStrongRef]? = nil
+            uri: URI,
+            title: String,
+            description: String,
+            thumb: Blob? = nil,
+            associatedRefs: [ComAtprotoRepoStrongRef]? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.title = title
             self.description = description
             self.thumb = thumb
             self.associatedRefs = associatedRefs
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            uri = try container.decode(URI.self, forKey: .uri)
+            title = try container.decode(String.self, forKey: .title)
+            description = try container.decode(String.self, forKey: .description)
             do {
-                uri = try container.decode(URI.self, forKey: .uri)
+                thumb = try container.decodeIfPresent(Blob.self, forKey: .thumb, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                title = try container.decode(String.self, forKey: .title)
-            } catch {
-                LogManager.logError("Decoding error for required property 'title': \(error)")
-                throw error
-            }
-            do {
-                description = try container.decode(String.self, forKey: .description)
-            } catch {
-                LogManager.logError("Decoding error for required property 'description': \(error)")
-                throw error
-            }
-            do {
-                thumb = try container.decodeIfPresent(Blob.self, forKey: .thumb)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'thumb' — degrading to nil: \(error)")
                 thumb = nil
             }
             do {
-                associatedRefs = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .associatedRefs)
+                associatedRefs = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .associatedRefs, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'associatedRefs' — degrading to nil: \(error)")
                 associatedRefs = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encode(title, forKey: .title)
             try container.encode(description, forKey: .description)
             try container.encodeIfPresent(thumb, forKey: .thumb)
             try container.encodeIfPresent(associatedRefs, forKey: .associatedRefs)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -128,6 +144,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -147,7 +164,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if associatedRefs != other.associatedRefs {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -156,7 +173,6 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let titleValue = try title.toCBORValue()
@@ -171,11 +187,12 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 let associatedRefsValue = try value.toCBORValue()
                 map = map.adding(key: "associatedRefs", value: associatedRefsValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "title", "description", "thumb", "associatedRefs"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case title
             case description
@@ -186,32 +203,35 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
     public struct View: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#view"
+
         public let external: ViewExternal
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            external: ViewExternal
+            external: ViewExternal,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.external = external
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                external = try container.decode(ViewExternal.self, forKey: .external)
-            } catch {
-                LogManager.logError("Decoding error for required property 'external': \(error)")
-                throw error
-            }
+            external = try container.decode(ViewExternal.self, forKey: .external)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(external, forKey: .external)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(external)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -219,7 +239,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if external != other.external {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -228,34 +248,54 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let externalValue = try external.toCBORValue()
             map = map.adding(key: "external", value: externalValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "external"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case external
         }
     }
 
     public struct ViewExternal: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#viewExternal"
+
         public let uri: URI
         public let title: String
         public let description: String
         public let thumb: URI?
+        /// When the external content was created, if available. Example: a publication date, for an article.
         public let createdAt: ATProtocolDate?
+        /// When the external content was updated, if available.
         public let updatedAt: ATProtocolDate?
+        /// Estimated reading time in minutes, if applicable and available.
         public let readingTime: Int?
         public let labels: [ComAtprotoLabelDefs.Label]?
         public let source: ViewExternalSource?
+        /// StrongRefs (uri+cid) of the Atmosphere records that backed this view.
         public let associatedRefs: [ComAtprotoRepoStrongRef]?
+        /// Profiles of the owners of the Atmosphere records that backed this view.
         public let associatedProfiles: [AppBskyActorDefs.ProfileViewBasic]?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: URI, title: String, description: String, thumb: URI? = nil, createdAt: ATProtocolDate? = nil, updatedAt: ATProtocolDate? = nil, readingTime: Int? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, source: ViewExternalSource? = nil, associatedRefs: [ComAtprotoRepoStrongRef]? = nil, associatedProfiles: [AppBskyActorDefs.ProfileViewBasic]? = nil
+            uri: URI,
+            title: String,
+            description: String,
+            thumb: URI? = nil,
+            createdAt: ATProtocolDate? = nil,
+            updatedAt: ATProtocolDate? = nil,
+            readingTime: Int? = nil,
+            labels: [ComAtprotoLabelDefs.Label]? = nil,
+            source: ViewExternalSource? = nil,
+            associatedRefs: [ComAtprotoRepoStrongRef]? = nil,
+            associatedProfiles: [AppBskyActorDefs.ProfileViewBasic]? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.title = title
@@ -268,97 +308,100 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             self.source = source
             self.associatedRefs = associatedRefs
             self.associatedProfiles = associatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            uri = try container.decode(URI.self, forKey: .uri)
+            title = try container.decode(String.self, forKey: .title)
+            description = try container.decode(String.self, forKey: .description)
             do {
-                uri = try container.decode(URI.self, forKey: .uri)
+                thumb = try container.decodeIfPresent(URI.self, forKey: .thumb, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                title = try container.decode(String.self, forKey: .title)
-            } catch {
-                LogManager.logError("Decoding error for required property 'title': \(error)")
-                throw error
-            }
-            do {
-                description = try container.decode(String.self, forKey: .description)
-            } catch {
-                LogManager.logError("Decoding error for required property 'description': \(error)")
-                throw error
-            }
-            do {
-                thumb = try container.decodeIfPresent(URI.self, forKey: .thumb)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'thumb' — degrading to nil: \(error)")
                 thumb = nil
             }
             do {
-                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
                 createdAt = nil
             }
             do {
-                updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt)
+                updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'updatedAt' — degrading to nil: \(error)")
                 updatedAt = nil
             }
             do {
-                readingTime = try container.decodeIfPresent(Int.self, forKey: .readingTime)
+                readingTime = try container.decodeIfPresent(Int.self, forKey: .readingTime, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'readingTime' — degrading to nil: \(error)")
                 readingTime = nil
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
                 labels = nil
             }
             do {
-                source = try container.decodeIfPresent(ViewExternalSource.self, forKey: .source)
+                source = try container.decodeIfPresent(ViewExternalSource.self, forKey: .source, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'source' — degrading to nil: \(error)")
                 source = nil
             }
             do {
-                associatedRefs = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .associatedRefs)
+                associatedRefs = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .associatedRefs, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'associatedRefs' — degrading to nil: \(error)")
                 associatedRefs = nil
             }
             do {
-                associatedProfiles = try container.decodeIfPresent([AppBskyActorDefs.ProfileViewBasic].self, forKey: .associatedProfiles)
+                associatedProfiles = try container.decodeIfPresent([AppBskyActorDefs.ProfileViewBasic].self, forKey: .associatedProfiles, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'associatedProfiles' — degrading to nil: \(error)")
                 associatedProfiles = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encode(title, forKey: .title)
             try container.encode(description, forKey: .description)
@@ -370,6 +413,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(source, forKey: .source)
             try container.encodeIfPresent(associatedRefs, forKey: .associatedRefs)
             try container.encodeIfPresent(associatedProfiles, forKey: .associatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -416,6 +460,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -453,7 +498,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if associatedProfiles != other.associatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -462,7 +507,6 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let titleValue = try title.toCBORValue()
@@ -501,11 +545,12 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 let associatedProfilesValue = try value.toCBORValue()
                 map = map.adding(key: "associatedProfiles", value: associatedProfilesValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "title", "description", "thumb", "createdAt", "updatedAt", "readingTime", "labels", "source", "associatedRefs", "associatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case title
             case description
@@ -520,72 +565,83 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    /// The source of an external embed, such as a standard.site publication.
     public struct ViewExternalSource: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#viewExternalSource"
+
+        /// URI of the source, if available. Example: the https:// URL of a site.standard.publication record.
         public let uri: URI
+        /// Fully-qualified URL where an icon representing the source can be fetched. For example, CDN location provided by the App View.
         public let icon: URI?
         public let title: String
         public let description: String?
         public let theme: ViewExternalSourceTheme?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: URI, icon: URI? = nil, title: String, description: String? = nil, theme: ViewExternalSourceTheme? = nil
+            uri: URI,
+            icon: URI? = nil,
+            title: String,
+            description: String? = nil,
+            theme: ViewExternalSourceTheme? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.icon = icon
             self.title = title
             self.description = description
             self.theme = theme
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            uri = try container.decode(URI.self, forKey: .uri)
             do {
-                uri = try container.decode(URI.self, forKey: .uri)
+                icon = try container.decodeIfPresent(URI.self, forKey: .icon, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                icon = try container.decodeIfPresent(URI.self, forKey: .icon)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'icon' — degrading to nil: \(error)")
                 icon = nil
             }
+            title = try container.decode(String.self, forKey: .title)
             do {
-                title = try container.decode(String.self, forKey: .title)
+                description = try container.decodeIfPresent(String.self, forKey: .description, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'title': \(error)")
-                throw error
-            }
-            do {
-                description = try container.decodeIfPresent(String.self, forKey: .description)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
                 description = nil
             }
             do {
-                theme = try container.decodeIfPresent(ViewExternalSourceTheme.self, forKey: .theme)
+                theme = try container.decodeIfPresent(ViewExternalSourceTheme.self, forKey: .theme, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'theme' — degrading to nil: \(error)")
                 theme = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encodeIfPresent(icon, forKey: .icon)
             try container.encode(title, forKey: .title)
             try container.encodeIfPresent(description, forKey: .description)
             try container.encodeIfPresent(theme, forKey: .theme)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -606,6 +662,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -625,7 +682,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if theme != other.theme {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -634,7 +691,6 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             if let value = icon {
@@ -651,11 +707,12 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 let themeValue = try value.toCBORValue()
                 map = map.adding(key: "theme", value: themeValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "icon", "title", "description", "theme"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case icon
             case title
@@ -664,65 +721,85 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    /// The theme colors of an external source, such as a site.standard.publication. These colors may be used when rendering an embed from that source.
     public struct ViewExternalSourceTheme: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#viewExternalSourceTheme"
+
         public let backgroundRGB: ColorRGB?
         public let foregroundRGB: ColorRGB?
         public let accentRGB: ColorRGB?
         public let accentForegroundRGB: ColorRGB?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            backgroundRGB: ColorRGB? = nil, foregroundRGB: ColorRGB? = nil, accentRGB: ColorRGB? = nil, accentForegroundRGB: ColorRGB? = nil
+            backgroundRGB: ColorRGB? = nil,
+            foregroundRGB: ColorRGB? = nil,
+            accentRGB: ColorRGB? = nil,
+            accentForegroundRGB: ColorRGB? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.backgroundRGB = backgroundRGB
             self.foregroundRGB = foregroundRGB
             self.accentRGB = accentRGB
             self.accentForegroundRGB = accentForegroundRGB
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                backgroundRGB = try container.decodeIfPresent(ColorRGB.self, forKey: .backgroundRGB)
+                backgroundRGB = try container.decodeIfPresent(ColorRGB.self, forKey: .backgroundRGB, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'backgroundRGB' — degrading to nil: \(error)")
                 backgroundRGB = nil
             }
             do {
-                foregroundRGB = try container.decodeIfPresent(ColorRGB.self, forKey: .foregroundRGB)
+                foregroundRGB = try container.decodeIfPresent(ColorRGB.self, forKey: .foregroundRGB, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'foregroundRGB' — degrading to nil: \(error)")
                 foregroundRGB = nil
             }
             do {
-                accentRGB = try container.decodeIfPresent(ColorRGB.self, forKey: .accentRGB)
+                accentRGB = try container.decodeIfPresent(ColorRGB.self, forKey: .accentRGB, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'accentRGB' — degrading to nil: \(error)")
                 accentRGB = nil
             }
             do {
-                accentForegroundRGB = try container.decodeIfPresent(ColorRGB.self, forKey: .accentForegroundRGB)
+                accentForegroundRGB = try container.decodeIfPresent(ColorRGB.self, forKey: .accentForegroundRGB, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'accentForegroundRGB' — degrading to nil: \(error)")
                 accentForegroundRGB = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(backgroundRGB, forKey: .backgroundRGB)
             try container.encodeIfPresent(foregroundRGB, forKey: .foregroundRGB)
             try container.encodeIfPresent(accentRGB, forKey: .accentRGB)
             try container.encodeIfPresent(accentForegroundRGB, forKey: .accentForegroundRGB)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -746,6 +823,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -762,7 +840,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if accentForegroundRGB != other.accentForegroundRGB {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -771,7 +849,6 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = backgroundRGB {
                 let backgroundRGBValue = try value.toCBORValue()
                 map = map.adding(key: "backgroundRGB", value: backgroundRGBValue)
@@ -788,11 +865,12 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
                 let accentForegroundRGBValue = try value.toCBORValue()
                 map = map.adding(key: "accentForegroundRGB", value: accentForegroundRGBValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "backgroundRGB", "foregroundRGB", "accentRGB", "accentForegroundRGB"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case backgroundRGB
             case foregroundRGB
             case accentRGB
@@ -800,54 +878,50 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
         }
     }
 
+    /// RGB color definition, inspired by site.standard.theme.color#rgb
     public struct ColorRGB: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.external#colorRGB"
+
         public let r: Int
         public let g: Int
         public let b: Int
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            r: Int, g: Int, b: Int
+            r: Int,
+            g: Int,
+            b: Int,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.r = r
             self.g = g
             self.b = b
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                r = try container.decode(Int.self, forKey: .r)
-            } catch {
-                LogManager.logError("Decoding error for required property 'r': \(error)")
-                throw error
-            }
-            do {
-                g = try container.decode(Int.self, forKey: .g)
-            } catch {
-                LogManager.logError("Decoding error for required property 'g': \(error)")
-                throw error
-            }
-            do {
-                b = try container.decode(Int.self, forKey: .b)
-            } catch {
-                LogManager.logError("Decoding error for required property 'b': \(error)")
-                throw error
-            }
+            r = try container.decode(Int.self, forKey: .r)
+            g = try container.decode(Int.self, forKey: .g)
+            b = try container.decode(Int.self, forKey: .b)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(r, forKey: .r)
             try container.encode(g, forKey: .g)
             try container.encode(b, forKey: .b)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(r)
             hasher.combine(g)
             hasher.combine(b)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -861,7 +935,7 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
             if b != other.b {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -870,18 +944,18 @@ public struct AppBskyEmbedExternal: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let rValue = try r.toCBORValue()
             map = map.adding(key: "r", value: rValue)
             let gValue = try g.toCBORValue()
             map = map.adding(key: "g", value: gValue)
             let bValue = try b.toCBORValue()
             map = map.adding(key: "b", value: bValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "r", "g", "b"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case r
             case g
             case b

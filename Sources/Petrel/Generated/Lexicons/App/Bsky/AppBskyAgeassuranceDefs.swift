@@ -6,50 +6,54 @@ import Foundation
 public enum AppBskyAgeassuranceDefs {
     public static let typeIdentifier = "app.bsky.ageassurance.defs"
 
+    /// The user's computed Age Assurance state.
     public struct State: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#state"
+
+        /// The timestamp when this state was last updated.
         public let lastInitiatedAt: ATProtocolDate?
         public let status: AppBskyAgeassuranceDefs.Status
         public let access: AppBskyAgeassuranceDefs.Access
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            lastInitiatedAt: ATProtocolDate? = nil, status: AppBskyAgeassuranceDefs.Status, access: AppBskyAgeassuranceDefs.Access
+            lastInitiatedAt: ATProtocolDate? = nil,
+            status: AppBskyAgeassuranceDefs.Status,
+            access: AppBskyAgeassuranceDefs.Access,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.lastInitiatedAt = lastInitiatedAt
             self.status = status
             self.access = access
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                lastInitiatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastInitiatedAt)
+                lastInitiatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .lastInitiatedAt, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'lastInitiatedAt' — degrading to nil: \(error)")
                 lastInitiatedAt = nil
             }
-            do {
-                status = try container.decode(AppBskyAgeassuranceDefs.Status.self, forKey: .status)
-            } catch {
-                LogManager.logError("Decoding error for required property 'status': \(error)")
-                throw error
-            }
-            do {
-                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
+            status = try container.decode(AppBskyAgeassuranceDefs.Status.self, forKey: .status)
+            access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(lastInitiatedAt, forKey: .lastInitiatedAt)
             try container.encode(status, forKey: .status)
             try container.encode(access, forKey: .access)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -60,6 +64,7 @@ public enum AppBskyAgeassuranceDefs {
             }
             hasher.combine(status)
             hasher.combine(access)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -73,7 +78,7 @@ public enum AppBskyAgeassuranceDefs {
             if access != other.access {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -82,7 +87,6 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = lastInitiatedAt {
                 let lastInitiatedAtValue = try value.toCBORValue()
                 map = map.adding(key: "lastInitiatedAt", value: lastInitiatedAtValue)
@@ -91,43 +95,56 @@ public enum AppBskyAgeassuranceDefs {
             map = map.adding(key: "status", value: statusValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "lastInitiatedAt", "status", "access"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case lastInitiatedAt
             case status
             case access
         }
     }
 
+    /// Additional metadata needed to compute Age Assurance state client-side.
     public struct StateMetadata: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#stateMetadata"
+
+        /// The account creation timestamp.
         public let accountCreatedAt: ATProtocolDate?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            accountCreatedAt: ATProtocolDate? = nil
+            accountCreatedAt: ATProtocolDate? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.accountCreatedAt = accountCreatedAt
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                accountCreatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .accountCreatedAt)
+                accountCreatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .accountCreatedAt, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'accountCreatedAt' — degrading to nil: \(error)")
                 accountCreatedAt = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(accountCreatedAt, forKey: .accountCreatedAt)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -136,6 +153,7 @@ public enum AppBskyAgeassuranceDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -143,7 +161,7 @@ public enum AppBskyAgeassuranceDefs {
             if accountCreatedAt != other.accountCreatedAt {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -152,48 +170,52 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = accountCreatedAt {
                 let accountCreatedAtValue = try value.toCBORValue()
                 map = map.adding(key: "accountCreatedAt", value: accountCreatedAtValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "accountCreatedAt"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case accountCreatedAt
         }
     }
 
     public struct Config: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#config"
+
+        /// The per-region Age Assurance configuration.
         public let regions: [AppBskyAgeassuranceDefs.ConfigRegion]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            regions: [AppBskyAgeassuranceDefs.ConfigRegion]
+            regions: [AppBskyAgeassuranceDefs.ConfigRegion],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.regions = regions
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                regions = try container.decode([AppBskyAgeassuranceDefs.ConfigRegion].self, forKey: .regions)
-            } catch {
-                LogManager.logError("Decoding error for required property 'regions': \(error)")
-                throw error
-            }
+            regions = try container.decode([AppBskyAgeassuranceDefs.ConfigRegion].self, forKey: .regions)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(regions, forKey: .regions)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(regions)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -201,7 +223,7 @@ public enum AppBskyAgeassuranceDefs {
             if regions != other.regions {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -210,29 +232,46 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let regionsValue = try regions.toCBORValue()
             map = map.adding(key: "regions", value: regionsValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "regions"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case regions
         }
     }
 
+    /// The Age Assurance configuration for a specific region.
     public struct ConfigRegion: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegion"
+
+        /// The platforms this configuration applies to. If omitted, the configuration applies to all platforms.
         public let platforms: [String]?
+        /// The ISO 3166-1 alpha-2 country code this configuration applies to.
         public let countryCode: String
+        /// The ISO 3166-2 region code this configuration applies to. If omitted, the configuration applies to the entire country.
         public let regionCode: String?
+        /// The minimum age (as a whole integer) required to use Bluesky in this region.
         public let minAccessAge: Int
+        /// Verification methods permitted in this region in addition to the third-party (KWS) flow, which is always supported. `device` permits using the native on-device age APIs (e.g. Apple Declared Age Range, Google Play Age Signals).
         public let additionalVerificationMethods: [String]?
+        /// The ordered list of Age Assurance rules that apply to this region. Rules should be applied in order, and the first matching rule determines the access level granted. The rules array should always include a default rule as the last item.
         public let rules: [ConfigRegionRulesUnion]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            platforms: [String]? = nil, countryCode: String, regionCode: String? = nil, minAccessAge: Int, additionalVerificationMethods: [String]? = nil, rules: [ConfigRegionRulesUnion]
+            platforms: [String]? = nil,
+            countryCode: String,
+            regionCode: String? = nil,
+            minAccessAge: Int,
+            additionalVerificationMethods: [String]? = nil,
+            rules: [ConfigRegionRulesUnion],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.platforms = platforms
             self.countryCode = countryCode
@@ -240,63 +279,57 @@ public enum AppBskyAgeassuranceDefs {
             self.minAccessAge = minAccessAge
             self.additionalVerificationMethods = additionalVerificationMethods
             self.rules = rules
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                platforms = try container.decodeIfPresent([String].self, forKey: .platforms)
+                platforms = try container.decodeIfPresent([String].self, forKey: .platforms, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'platforms' — degrading to nil: \(error)")
                 platforms = nil
             }
+            countryCode = try container.decode(String.self, forKey: .countryCode)
             do {
-                countryCode = try container.decode(String.self, forKey: .countryCode)
+                regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'countryCode': \(error)")
-                throw error
-            }
-            do {
-                regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'regionCode' — degrading to nil: \(error)")
                 regionCode = nil
             }
+            minAccessAge = try container.decode(Int.self, forKey: .minAccessAge)
             do {
-                minAccessAge = try container.decode(Int.self, forKey: .minAccessAge)
+                additionalVerificationMethods = try container.decodeIfPresent([String].self, forKey: .additionalVerificationMethods, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'minAccessAge': \(error)")
-                throw error
-            }
-            do {
-                additionalVerificationMethods = try container.decodeIfPresent([String].self, forKey: .additionalVerificationMethods)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'additionalVerificationMethods' — degrading to nil: \(error)")
                 additionalVerificationMethods = nil
             }
-            do {
-                rules = try container.decode([ConfigRegionRulesUnion].self, forKey: .rules)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rules': \(error)")
-                throw error
-            }
+            rules = try container.decode([ConfigRegionRulesUnion].self, forKey: .rules)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(platforms, forKey: .platforms)
             try container.encode(countryCode, forKey: .countryCode)
             try container.encodeIfPresent(regionCode, forKey: .regionCode)
             try container.encode(minAccessAge, forKey: .minAccessAge)
             try container.encodeIfPresent(additionalVerificationMethods, forKey: .additionalVerificationMethods)
             try container.encode(rules, forKey: .rules)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -318,6 +351,7 @@ public enum AppBskyAgeassuranceDefs {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(rules)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -340,7 +374,7 @@ public enum AppBskyAgeassuranceDefs {
             if rules != other.rules {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -349,7 +383,6 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = platforms {
                 let platformsValue = try value.toCBORValue()
                 map = map.adding(key: "platforms", value: platformsValue)
@@ -368,11 +401,12 @@ public enum AppBskyAgeassuranceDefs {
             }
             let rulesValue = try rules.toCBORValue()
             map = map.adding(key: "rules", value: rulesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "platforms", "countryCode", "regionCode", "minAccessAge", "additionalVerificationMethods", "rules"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case platforms
             case countryCode
             case regionCode
@@ -382,34 +416,38 @@ public enum AppBskyAgeassuranceDefs {
         }
     }
 
+    /// Age Assurance rule that applies by default.
     public struct ConfigRegionRuleDefault: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleDefault"
+
         public let access: AppBskyAgeassuranceDefs.Access
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            access: AppBskyAgeassuranceDefs.Access
+            access: AppBskyAgeassuranceDefs.Access,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.access = access
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
+            access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(access, forKey: .access)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(access)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -417,7 +455,7 @@ public enum AppBskyAgeassuranceDefs {
             if access != other.access {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -426,56 +464,57 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "access"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case access
         }
     }
 
+    /// Age Assurance rule that applies if the user has declared themselves equal-to or over a certain age.
     public struct ConfigRegionRuleIfDeclaredOverAge: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredOverAge"
+
+        /// The age threshold as a whole integer.
         public let age: Int
         public let access: AppBskyAgeassuranceDefs.Access
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            age: Int, access: AppBskyAgeassuranceDefs.Access
+            age: Int,
+            access: AppBskyAgeassuranceDefs.Access,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.age = age
             self.access = access
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                age = try container.decode(Int.self, forKey: .age)
-            } catch {
-                LogManager.logError("Decoding error for required property 'age': \(error)")
-                throw error
-            }
-            do {
-                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
+            age = try container.decode(Int.self, forKey: .age)
+            access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(age, forKey: .age)
             try container.encode(access, forKey: .access)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(age)
             hasher.combine(access)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -486,7 +525,7 @@ public enum AppBskyAgeassuranceDefs {
             if access != other.access {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -495,59 +534,60 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let ageValue = try age.toCBORValue()
             map = map.adding(key: "age", value: ageValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "age", "access"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case age
             case access
         }
     }
 
+    /// Age Assurance rule that applies if the user has declared themselves under a certain age.
     public struct ConfigRegionRuleIfDeclaredUnderAge: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfDeclaredUnderAge"
+
+        /// The age threshold as a whole integer.
         public let age: Int
         public let access: AppBskyAgeassuranceDefs.Access
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            age: Int, access: AppBskyAgeassuranceDefs.Access
+            age: Int,
+            access: AppBskyAgeassuranceDefs.Access,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.age = age
             self.access = access
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                age = try container.decode(Int.self, forKey: .age)
-            } catch {
-                LogManager.logError("Decoding error for required property 'age': \(error)")
-                throw error
-            }
-            do {
-                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
+            age = try container.decode(Int.self, forKey: .age)
+            access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(age, forKey: .age)
             try container.encode(access, forKey: .access)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(age)
             hasher.combine(access)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -558,7 +598,7 @@ public enum AppBskyAgeassuranceDefs {
             if access != other.access {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -567,59 +607,60 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let ageValue = try age.toCBORValue()
             map = map.adding(key: "age", value: ageValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "age", "access"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case age
             case access
         }
     }
 
+    /// Age Assurance rule that applies if the user has been assured to be equal-to or over a certain age.
     public struct ConfigRegionRuleIfAssuredOverAge: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAssuredOverAge"
+
+        /// The age threshold as a whole integer.
         public let age: Int
         public let access: AppBskyAgeassuranceDefs.Access
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            age: Int, access: AppBskyAgeassuranceDefs.Access
+            age: Int,
+            access: AppBskyAgeassuranceDefs.Access,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.age = age
             self.access = access
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                age = try container.decode(Int.self, forKey: .age)
-            } catch {
-                LogManager.logError("Decoding error for required property 'age': \(error)")
-                throw error
-            }
-            do {
-                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
+            age = try container.decode(Int.self, forKey: .age)
+            access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(age, forKey: .age)
             try container.encode(access, forKey: .access)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(age)
             hasher.combine(access)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -630,7 +671,7 @@ public enum AppBskyAgeassuranceDefs {
             if access != other.access {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -639,59 +680,60 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let ageValue = try age.toCBORValue()
             map = map.adding(key: "age", value: ageValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "age", "access"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case age
             case access
         }
     }
 
+    /// Age Assurance rule that applies if the user has been assured to be under a certain age.
     public struct ConfigRegionRuleIfAssuredUnderAge: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAssuredUnderAge"
+
+        /// The age threshold as a whole integer.
         public let age: Int
         public let access: AppBskyAgeassuranceDefs.Access
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            age: Int, access: AppBskyAgeassuranceDefs.Access
+            age: Int,
+            access: AppBskyAgeassuranceDefs.Access,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.age = age
             self.access = access
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                age = try container.decode(Int.self, forKey: .age)
-            } catch {
-                LogManager.logError("Decoding error for required property 'age': \(error)")
-                throw error
-            }
-            do {
-                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
+            age = try container.decode(Int.self, forKey: .age)
+            access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(age, forKey: .age)
             try container.encode(access, forKey: .access)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(age)
             hasher.combine(access)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -702,7 +744,7 @@ public enum AppBskyAgeassuranceDefs {
             if access != other.access {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -711,59 +753,60 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let ageValue = try age.toCBORValue()
             map = map.adding(key: "age", value: ageValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "age", "access"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case age
             case access
         }
     }
 
+    /// Age Assurance rule that applies if the account is equal-to or newer than a certain date.
     public struct ConfigRegionRuleIfAccountNewerThan: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAccountNewerThan"
+
+        /// The date threshold as a datetime string.
         public let date: ATProtocolDate
         public let access: AppBskyAgeassuranceDefs.Access
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            date: ATProtocolDate, access: AppBskyAgeassuranceDefs.Access
+            date: ATProtocolDate,
+            access: AppBskyAgeassuranceDefs.Access,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.date = date
             self.access = access
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                date = try container.decode(ATProtocolDate.self, forKey: .date)
-            } catch {
-                LogManager.logError("Decoding error for required property 'date': \(error)")
-                throw error
-            }
-            do {
-                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
+            date = try container.decode(ATProtocolDate.self, forKey: .date)
+            access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(date, forKey: .date)
             try container.encode(access, forKey: .access)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(date)
             hasher.combine(access)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -774,7 +817,7 @@ public enum AppBskyAgeassuranceDefs {
             if access != other.access {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -783,59 +826,60 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let dateValue = try date.toCBORValue()
             map = map.adding(key: "date", value: dateValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "date", "access"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case date
             case access
         }
     }
 
+    /// Age Assurance rule that applies if the account is older than a certain date.
     public struct ConfigRegionRuleIfAccountOlderThan: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#configRegionRuleIfAccountOlderThan"
+
+        /// The date threshold as a datetime string.
         public let date: ATProtocolDate
         public let access: AppBskyAgeassuranceDefs.Access
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            date: ATProtocolDate, access: AppBskyAgeassuranceDefs.Access
+            date: ATProtocolDate,
+            access: AppBskyAgeassuranceDefs.Access,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.date = date
             self.access = access
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                date = try container.decode(ATProtocolDate.self, forKey: .date)
-            } catch {
-                LogManager.logError("Decoding error for required property 'date': \(error)")
-                throw error
-            }
-            do {
-                access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
+            date = try container.decode(ATProtocolDate.self, forKey: .date)
+            access = try container.decode(AppBskyAgeassuranceDefs.Access.self, forKey: .access)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(date, forKey: .date)
             try container.encode(access, forKey: .access)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(date)
             hasher.combine(access)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -846,7 +890,7 @@ public enum AppBskyAgeassuranceDefs {
             if access != other.access {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -855,37 +899,64 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let dateValue = try date.toCBORValue()
             map = map.adding(key: "date", value: dateValue)
             let accessValue = try access.toCBORValue()
             map = map.adding(key: "access", value: accessValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "date", "access"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case date
             case access
         }
     }
 
+    /// Object used to store Age Assurance data in stash.
     public struct Event: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.ageassurance.defs#event"
+
+        /// The date and time of this write operation.
         public let createdAt: ATProtocolDate
+        /// The unique identifier for this instance of the Age Assurance flow, in UUID format.
         public let attemptId: String
+        /// The status of the Age Assurance process.
         public let status: String
+        /// The access level granted based on Age Assurance data we've processed.
         public let access: String
+        /// The ISO 3166-1 alpha-2 country code provided when beginning the Age Assurance flow.
         public let countryCode: String
+        /// The ISO 3166-2 region code provided when beginning the Age Assurance flow.
         public let regionCode: String?
+        /// The email used for Age Assurance.
         public let email: String?
+        /// The IP address used when initiating the Age Assurance flow.
         public let initIp: String?
+        /// The user agent used when initiating the Age Assurance flow.
         public let initUa: String?
+        /// The IP address used when completing the Age Assurance flow.
         public let completeIp: String?
+        /// The user agent used when completing the Age Assurance flow.
         public let completeUa: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            createdAt: ATProtocolDate, attemptId: String, status: String, access: String, countryCode: String, regionCode: String? = nil, email: String? = nil, initIp: String? = nil, initUa: String? = nil, completeIp: String? = nil, completeUa: String? = nil
+            createdAt: ATProtocolDate,
+            attemptId: String,
+            status: String,
+            access: String,
+            countryCode: String,
+            regionCode: String? = nil,
+            email: String? = nil,
+            initIp: String? = nil,
+            initUa: String? = nil,
+            completeIp: String? = nil,
+            completeUa: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.createdAt = createdAt
             self.attemptId = attemptId
@@ -898,93 +969,82 @@ public enum AppBskyAgeassuranceDefs {
             self.initUa = initUa
             self.completeIp = completeIp
             self.completeUa = completeUa
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            attemptId = try container.decode(String.self, forKey: .attemptId)
+            status = try container.decode(String.self, forKey: .status)
+            access = try container.decode(String.self, forKey: .access)
+            countryCode = try container.decode(String.self, forKey: .countryCode)
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                attemptId = try container.decode(String.self, forKey: .attemptId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'attemptId': \(error)")
-                throw error
-            }
-            do {
-                status = try container.decode(String.self, forKey: .status)
-            } catch {
-                LogManager.logError("Decoding error for required property 'status': \(error)")
-                throw error
-            }
-            do {
-                access = try container.decode(String.self, forKey: .access)
-            } catch {
-                LogManager.logError("Decoding error for required property 'access': \(error)")
-                throw error
-            }
-            do {
-                countryCode = try container.decode(String.self, forKey: .countryCode)
-            } catch {
-                LogManager.logError("Decoding error for required property 'countryCode': \(error)")
-                throw error
-            }
-            do {
-                regionCode = try container.decodeIfPresent(String.self, forKey: .regionCode)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'regionCode' — degrading to nil: \(error)")
                 regionCode = nil
             }
             do {
-                email = try container.decodeIfPresent(String.self, forKey: .email)
+                email = try container.decodeIfPresent(String.self, forKey: .email, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
                 email = nil
             }
             do {
-                initIp = try container.decodeIfPresent(String.self, forKey: .initIp)
+                initIp = try container.decodeIfPresent(String.self, forKey: .initIp, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'initIp' — degrading to nil: \(error)")
                 initIp = nil
             }
             do {
-                initUa = try container.decodeIfPresent(String.self, forKey: .initUa)
+                initUa = try container.decodeIfPresent(String.self, forKey: .initUa, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'initUa' — degrading to nil: \(error)")
                 initUa = nil
             }
             do {
-                completeIp = try container.decodeIfPresent(String.self, forKey: .completeIp)
+                completeIp = try container.decodeIfPresent(String.self, forKey: .completeIp, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'completeIp' — degrading to nil: \(error)")
                 completeIp = nil
             }
             do {
-                completeUa = try container.decodeIfPresent(String.self, forKey: .completeUa)
+                completeUa = try container.decodeIfPresent(String.self, forKey: .completeUa, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'completeUa' — degrading to nil: \(error)")
                 completeUa = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encode(attemptId, forKey: .attemptId)
             try container.encode(status, forKey: .status)
@@ -996,6 +1056,7 @@ public enum AppBskyAgeassuranceDefs {
             try container.encodeIfPresent(initUa, forKey: .initUa)
             try container.encodeIfPresent(completeIp, forKey: .completeIp)
             try container.encodeIfPresent(completeUa, forKey: .completeUa)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1034,6 +1095,7 @@ public enum AppBskyAgeassuranceDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1071,7 +1133,7 @@ public enum AppBskyAgeassuranceDefs {
             if completeUa != other.completeUa {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1080,7 +1142,6 @@ public enum AppBskyAgeassuranceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
             let attemptIdValue = try attemptId.toCBORValue()
@@ -1115,11 +1176,12 @@ public enum AppBskyAgeassuranceDefs {
                 let completeUaValue = try value.toCBORValue()
                 map = map.adding(key: "completeUa", value: completeUaValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "attemptId", "status", "access", "countryCode", "regionCode", "email", "initIp", "initUa", "completeIp", "completeUa"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case createdAt
             case attemptId
             case status
@@ -1240,6 +1302,8 @@ public enum AppBskyAgeassuranceDefs {
         case appBskyAgeassuranceDefsConfigRegionRuleIfAssuredUnderAge(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAssuredUnderAge)
         case appBskyAgeassuranceDefsConfigRegionRuleIfAccountNewerThan(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountNewerThan)
         case appBskyAgeassuranceDefsConfigRegionRuleIfAccountOlderThan(AppBskyAgeassuranceDefs.ConfigRegionRuleIfAccountOlderThan)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyAgeassuranceDefs.ConfigRegionRuleDefault) {
             self = .appBskyAgeassuranceDefsConfigRegionRuleDefault(value)

@@ -3,17 +3,25 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.notification.registerPush
 
+/// Register to receive push notifications, via a specified service, for the requesting account. Requires auth.
 public enum AppBskyNotificationRegisterPush {
     public static let typeIdentifier = "app.bsky.notification.registerPush"
+
     public struct Input: ATProtocolCodable {
         public let serviceDid: DID
         public let token: String
         public let platform: String
         public let appId: String
+        /// Set to true when the actor is age restricted
         public let ageRestricted: Bool?
 
-        /// Standard public initializer
-        public init(serviceDid: DID, token: String, platform: String, appId: String, ageRestricted: Bool? = nil) {
+        public init(
+            serviceDid: DID,
+            token: String,
+            platform: String,
+            appId: String,
+            ageRestricted: Bool? = nil
+        ) {
             self.serviceDid = serviceDid
             self.token = token
             self.platform = platform
@@ -23,11 +31,12 @@ public enum AppBskyNotificationRegisterPush {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             serviceDid = try container.decode(DID.self, forKey: .serviceDid)
             token = try container.decode(String.self, forKey: .token)
             platform = try container.decode(String.self, forKey: .platform)
             appId = try container.decode(String.self, forKey: .appId)
-            ageRestricted = try container.decodeIfPresent(Bool.self, forKey: .ageRestricted)
+            ageRestricted = try container.decodeIfPresent(Bool.self, forKey: .ageRestricted, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -69,13 +78,12 @@ public enum AppBskyNotificationRegisterPush {
 public extension ATProtoClient.App.Bsky.Notification {
     // MARK: - registerPush
 
-    // Register to receive push notifications, via a specified service, for the requesting account. Requires auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Register to receive push notifications, via a specified service, for the requesting account. Requires auth.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func registerPush(
         input: AppBskyNotificationRegisterPush.Input
 
@@ -101,7 +109,13 @@ public extension ATProtoClient.App.Bsky.Notification {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.registerPush")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

@@ -3,38 +3,64 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.feed.threadgate
 
+/// Record defining interaction gating rules for a thread (aka, reply controls). The record key (rkey) of the threadgate record must match the record key of the thread's root post, and that record must be in the same repository.
 public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.feed.threadgate"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    /// Reference (AT-URI) to the post record.
     public let post: ATProtocolURI
+    /// List of rules defining who can reply to this post. If value is an empty array, no one can reply. If value is undefined, anyone can reply.
     public let allow: [AppBskyFeedThreadgateAllowUnion]?
     public let createdAt: ATProtocolDate
+    /// List of hidden reply URIs.
     public let hiddenReplies: [ATProtocolURI]?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(post: ATProtocolURI, allow: [AppBskyFeedThreadgateAllowUnion]? = nil, createdAt: ATProtocolDate, hiddenReplies: [ATProtocolURI]? = nil) {
+    public init(
+        post: ATProtocolURI,
+        allow: [AppBskyFeedThreadgateAllowUnion]? = nil,
+        createdAt: ATProtocolDate,
+        hiddenReplies: [ATProtocolURI]? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.post = post
         self.allow = allow
         self.createdAt = createdAt
         self.hiddenReplies = hiddenReplies
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         post = try container.decode(ATProtocolURI.self, forKey: .post)
         do {
-            allow = try container.decodeIfPresent([AppBskyFeedThreadgateAllowUnion].self, forKey: .allow)
+            allow = try container.decodeIfPresent([AppBskyFeedThreadgateAllowUnion].self, forKey: .allow, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'allow' — degrading to nil: \(error)")
             allow = nil
         }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         do {
-            hiddenReplies = try container.decodeIfPresent([ATProtocolURI].self, forKey: .hiddenReplies)
+            hiddenReplies = try container.decodeIfPresent([ATProtocolURI].self, forKey: .hiddenReplies, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'hiddenReplies' — degrading to nil: \(error)")
             hiddenReplies = nil
         }
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -44,10 +70,23 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(allow, forKey: .allow)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(hiddenReplies, forKey: .hiddenReplies)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(post)
+        if let value = allow {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        hasher.combine(createdAt)
+        if let value = hiddenReplies {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -64,22 +103,11 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         if hiddenReplies != other.hiddenReplies {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(post)
-        if let value = allow {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
-        hasher.combine(createdAt)
-        if let value = hiddenReplies {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -97,8 +125,10 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             let hiddenRepliesValue = try value.toCBORValue()
             map = map.adding(key: "hiddenReplies", value: hiddenRepliesValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "post", "allow", "createdAt", "hiddenReplies"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -108,24 +138,36 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         case hiddenReplies
     }
 
+    /// Allow replies from actors mentioned in your post.
     public struct MentionRule: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.threadgate#mentionRule"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -133,34 +175,45 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// Allow replies from actors who follow you.
     public struct FollowerRule: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.threadgate#followerRule"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -168,34 +221,45 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// Allow replies from actors you follow.
     public struct FollowingRule: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.threadgate#followingRule"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -203,44 +267,47 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// Allow replies from actors on a list.
     public struct ListRule: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.threadgate#listRule"
+
         public let list: ATProtocolURI
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            list: ATProtocolURI
+            list: ATProtocolURI,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.list = list
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                list = try container.decode(ATProtocolURI.self, forKey: .list)
-            } catch {
-                LogManager.logError("Decoding error for required property 'list': \(error)")
-                throw error
-            }
+            list = try container.decode(ATProtocolURI.self, forKey: .list)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(list, forKey: .list)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(list)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -248,7 +315,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             if list != other.list {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -257,14 +324,14 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let listValue = try list.toCBORValue()
             map = map.adding(key: "list", value: listValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "list"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case list
         }
     }
@@ -274,6 +341,8 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         case appBskyFeedThreadgateFollowerRule(AppBskyFeedThreadgate.FollowerRule)
         case appBskyFeedThreadgateFollowingRule(AppBskyFeedThreadgate.FollowingRule)
         case appBskyFeedThreadgateListRule(AppBskyFeedThreadgate.ListRule)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyFeedThreadgate.MentionRule) {
             self = .appBskyFeedThreadgateMentionRule(value)

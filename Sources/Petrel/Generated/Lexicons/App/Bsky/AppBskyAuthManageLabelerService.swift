@@ -5,4 +5,17 @@ import Foundation
 
 public enum AppBskyAuthManageLabelerService {
     public static let typeIdentifier = "app.bsky.authManageLabelerService"
+
+    /// The permission set this lexicon declares. Request it as an OAuth scope with
+    /// `permissionSet.includeScope(audience:)`.
+    public static let permissionSet = LexiconPermissionSet(
+        nsid: "app.bsky.authManageLabelerService",
+        title: "Manage Hosted Labeling Service",
+        titleLang: [:],
+        detail: "Configure labeler declaration records.",
+        detailLang: [:],
+        permissions: [
+            LexiconPermission(resource: "repo", parameters: ["action": ["create", "update", "delete"], "collection": ["app.bsky.labeler.service"]], inheritAud: false),
+        ]
+    )
 }

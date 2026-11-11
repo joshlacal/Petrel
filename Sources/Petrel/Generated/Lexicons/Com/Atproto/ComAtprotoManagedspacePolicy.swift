@@ -3,26 +3,41 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.managedspace.policy
 
+/// Space policy that defers each user access decision to an external managing app, which the authority asks via checkUserAccess.
 public struct ComAtprotoManagedspacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.managedspace.policy"
-    public let managingApp: String
-    public let publishPolicy: Bool?
 
-    public init(managingApp: String, publishPolicy: Bool? = nil) {
+    /// Service identifier of the managing app: a DID with an optional service fragment (e.g. 'did:web:example.com#forum').
+    public let managingApp: String
+    /// Publish the policy to readers as a com.atproto.space.policy record in the authority's repo in the space.
+    public let publishPolicy: Bool?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        managingApp: String,
+        publishPolicy: Bool? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.managingApp = managingApp
         self.publishPolicy = publishPolicy
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         managingApp = try container.decode(String.self, forKey: .managingApp)
-        publishPolicy = try container.decodeIfPresent(Bool.self, forKey: .publishPolicy)
+        publishPolicy = try container.decodeIfPresent(Bool.self, forKey: .publishPolicy, rejectingNull: strict)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(managingApp, forKey: .managingApp)
         try container.encodeIfPresent(publishPolicy, forKey: .publishPolicy)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -32,6 +47,7 @@ public struct ComAtprotoManagedspacePolicy: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?)
         }
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -42,7 +58,7 @@ public struct ComAtprotoManagedspacePolicy: ATProtocolCodable, ATProtocolValue {
         if publishPolicy != other.publishPolicy {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -57,8 +73,10 @@ public struct ComAtprotoManagedspacePolicy: ATProtocolCodable, ATProtocolValue {
             let publishPolicyValue = try value.toCBORValue()
             map = map.adding(key: "publishPolicy", value: publishPolicyValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "managingApp", "publishPolicy"]
 
     private enum CodingKeys: String, CodingKey {
         case managingApp

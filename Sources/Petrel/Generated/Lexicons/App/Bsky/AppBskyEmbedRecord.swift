@@ -3,26 +3,38 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.embed.record
 
+/// A representation of a record embedded in a Bluesky record (eg, a post). For example, a quote-post, or sharing a feed generator record.
 public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.embed.record"
-    public let record: ComAtprotoRepoStrongRef
 
-    public init(record: ComAtprotoRepoStrongRef) {
+    public let record: ComAtprotoRepoStrongRef
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        record: ComAtprotoRepoStrongRef,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.record = record
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         record = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .record)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(record, forKey: .record)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(record)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -30,7 +42,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         if record != other.record {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -41,8 +53,10 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         var map = OrderedCBORMap()
         let recordValue = try record.toCBORValue()
         map = map.adding(key: "record", value: recordValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "record"]
 
     private enum CodingKeys: String, CodingKey {
         case record
@@ -50,32 +64,35 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
     public struct View: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.record#view"
+
         public let record: ViewRecordUnion
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            record: ViewRecordUnion
+            record: ViewRecordUnion,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.record = record
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                record = try container.decode(ViewRecordUnion.self, forKey: .record)
-            } catch {
-                LogManager.logError("Decoding error for required property 'record': \(error)")
-                throw error
-            }
+            record = try container.decode(ViewRecordUnion.self, forKey: .record)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(record, forKey: .record)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(record)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -83,7 +100,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             if record != other.record {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -92,23 +109,25 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let recordValue = try record.toCBORValue()
             map = map.adding(key: "record", value: recordValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "record"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case record
         }
     }
 
     public struct ViewRecord: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.record#viewRecord"
+
         public let uri: ATProtocolURI
         public let cid: CID
         public let author: AppBskyActorDefs.ProfileViewBasic
+        /// The record data itself.
         public let value: ATProtocolValueContainer
         public let labels: [ComAtprotoLabelDefs.Label]?
         public let replyCount: Int?
@@ -117,9 +136,23 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         public let quoteCount: Int?
         public let embeds: [ViewRecordEmbedsUnion]?
         public let indexedAt: ATProtocolDate
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileViewBasic, value: ATProtocolValueContainer, labels: [ComAtprotoLabelDefs.Label]? = nil, replyCount: Int? = nil, repostCount: Int? = nil, likeCount: Int? = nil, quoteCount: Int? = nil, embeds: [ViewRecordEmbedsUnion]? = nil, indexedAt: ATProtocolDate
+            uri: ATProtocolURI,
+            cid: CID,
+            author: AppBskyActorDefs.ProfileViewBasic,
+            value: ATProtocolValueContainer,
+            labels: [ComAtprotoLabelDefs.Label]? = nil,
+            replyCount: Int? = nil,
+            repostCount: Int? = nil,
+            likeCount: Int? = nil,
+            quoteCount: Int? = nil,
+            embeds: [ViewRecordEmbedsUnion]? = nil,
+            indexedAt: ATProtocolDate,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.cid = cid
@@ -132,93 +165,82 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             self.quoteCount = quoteCount
             self.embeds = embeds
             self.indexedAt = indexedAt
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            cid = try container.decode(CID.self, forKey: .cid)
+            author = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .author)
+            value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                cid = try container.decode(CID.self, forKey: .cid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
-                throw error
-            }
-            do {
-                author = try container.decode(AppBskyActorDefs.ProfileViewBasic.self, forKey: .author)
-            } catch {
-                LogManager.logError("Decoding error for required property 'author': \(error)")
-                throw error
-            }
-            do {
-                value = try container.decode(ATProtocolValueContainer.self, forKey: .value)
-            } catch {
-                LogManager.logError("Decoding error for required property 'value': \(error)")
-                throw error
-            }
-            do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
                 labels = nil
             }
             do {
-                replyCount = try container.decodeIfPresent(Int.self, forKey: .replyCount)
+                replyCount = try container.decodeIfPresent(Int.self, forKey: .replyCount, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'replyCount' — degrading to nil: \(error)")
                 replyCount = nil
             }
             do {
-                repostCount = try container.decodeIfPresent(Int.self, forKey: .repostCount)
+                repostCount = try container.decodeIfPresent(Int.self, forKey: .repostCount, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'repostCount' — degrading to nil: \(error)")
                 repostCount = nil
             }
             do {
-                likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount)
+                likeCount = try container.decodeIfPresent(Int.self, forKey: .likeCount, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'likeCount' — degrading to nil: \(error)")
                 likeCount = nil
             }
             do {
-                quoteCount = try container.decodeIfPresent(Int.self, forKey: .quoteCount)
+                quoteCount = try container.decodeIfPresent(Int.self, forKey: .quoteCount, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'quoteCount' — degrading to nil: \(error)")
                 quoteCount = nil
             }
             do {
-                embeds = try container.decodeIfPresent([ViewRecordEmbedsUnion].self, forKey: .embeds)
+                embeds = try container.decodeIfPresent([ViewRecordEmbedsUnion].self, forKey: .embeds, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'embeds' — degrading to nil: \(error)")
                 embeds = nil
             }
-            do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
-                throw error
-            }
+            indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encode(cid, forKey: .cid)
             try container.encode(author, forKey: .author)
@@ -230,6 +252,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(quoteCount, forKey: .quoteCount)
             try container.encodeIfPresent(embeds, forKey: .embeds)
             try container.encode(indexedAt, forKey: .indexedAt)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -268,6 +291,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(indexedAt)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -305,7 +329,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             if indexedAt != other.indexedAt {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -314,7 +338,6 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
@@ -349,11 +372,12 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             }
             let indexedAtValue = try indexedAt.toCBORValue()
             map = map.adding(key: "indexedAt", value: indexedAtValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "value", "labels", "replyCount", "repostCount", "likeCount", "quoteCount", "embeds", "indexedAt"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case cid
             case author
@@ -370,42 +394,41 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
     public struct ViewNotFound: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.record#viewNotFound"
+
         public let uri: ATProtocolURI
         public let notFound: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: ATProtocolURI, notFound: Bool
+            uri: ATProtocolURI,
+            notFound: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.notFound = notFound
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                notFound = try container.decode(Bool.self, forKey: .notFound)
-            } catch {
-                LogManager.logError("Decoding error for required property 'notFound': \(error)")
-                throw error
-            }
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            notFound = try container.decode(Bool.self, forKey: .notFound)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encode(notFound, forKey: .notFound)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(uri)
             hasher.combine(notFound)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -416,7 +439,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             if notFound != other.notFound {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -425,16 +448,16 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let notFoundValue = try notFound.toCBORValue()
             map = map.adding(key: "notFound", value: notFoundValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "notFound"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case notFound
         }
@@ -442,52 +465,47 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
     public struct ViewBlocked: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.record#viewBlocked"
+
         public let uri: ATProtocolURI
         public let blocked: Bool
         public let author: AppBskyFeedDefs.BlockedAuthor
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: ATProtocolURI, blocked: Bool, author: AppBskyFeedDefs.BlockedAuthor
+            uri: ATProtocolURI,
+            blocked: Bool,
+            author: AppBskyFeedDefs.BlockedAuthor,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.blocked = blocked
             self.author = author
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                blocked = try container.decode(Bool.self, forKey: .blocked)
-            } catch {
-                LogManager.logError("Decoding error for required property 'blocked': \(error)")
-                throw error
-            }
-            do {
-                author = try container.decode(AppBskyFeedDefs.BlockedAuthor.self, forKey: .author)
-            } catch {
-                LogManager.logError("Decoding error for required property 'author': \(error)")
-                throw error
-            }
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            blocked = try container.decode(Bool.self, forKey: .blocked)
+            author = try container.decode(AppBskyFeedDefs.BlockedAuthor.self, forKey: .author)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encode(blocked, forKey: .blocked)
             try container.encode(author, forKey: .author)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(uri)
             hasher.combine(blocked)
             hasher.combine(author)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -501,7 +519,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             if author != other.author {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -510,18 +528,18 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let blockedValue = try blocked.toCBORValue()
             map = map.adding(key: "blocked", value: blockedValue)
             let authorValue = try author.toCBORValue()
             map = map.adding(key: "author", value: authorValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "blocked", "author"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case blocked
             case author
@@ -530,42 +548,41 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
     public struct ViewDetached: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.record#viewDetached"
+
         public let uri: ATProtocolURI
         public let detached: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: ATProtocolURI, detached: Bool
+            uri: ATProtocolURI,
+            detached: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.detached = detached
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                detached = try container.decode(Bool.self, forKey: .detached)
-            } catch {
-                LogManager.logError("Decoding error for required property 'detached': \(error)")
-                throw error
-            }
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            detached = try container.decode(Bool.self, forKey: .detached)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encode(detached, forKey: .detached)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(uri)
             hasher.combine(detached)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -576,7 +593,7 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
             if detached != other.detached {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -585,16 +602,16 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let detachedValue = try detached.toCBORValue()
             map = map.adding(key: "detached", value: detachedValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "detached"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case detached
         }
@@ -609,6 +626,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         case appBskyGraphDefsListView(AppBskyGraphDefs.ListView)
         case appBskyLabelerDefsLabelerView(AppBskyLabelerDefs.LabelerView)
         case appBskyGraphDefsStarterPackViewBasic(AppBskyGraphDefs.StarterPackViewBasic)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyEmbedRecord.ViewRecord) {
             self = .appBskyEmbedRecordViewRecord(value)
@@ -955,6 +974,8 @@ public struct AppBskyEmbedRecord: ATProtocolCodable, ATProtocolValue {
         case appBskyEmbedExternalView(AppBskyEmbedExternal.View)
         case appBskyEmbedRecordView(AppBskyEmbedRecord.View)
         case appBskyEmbedRecordWithMediaView(AppBskyEmbedRecordWithMedia.View)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyEmbedImages.View) {
             self = .appBskyEmbedImagesView(value)

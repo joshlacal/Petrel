@@ -117,6 +117,13 @@ struct ATProtocolValueContainerDecodingTests {
             ("Zm9v", Data("foo".utf8)),
             ("+/8=", Data([0xFB, 0xFF])),
             ("+/8", Data([0xFB, 0xFF])),
+            // Unused bits in the last character are ignored (RFC 4648 §3.5); the official
+            // interop vector lexicon/record-data-valid.json contains "$bytes": "123".
+            ("Zh==", Data("f".utf8)),
+            ("Zh", Data("f".utf8)),
+            ("Zm9=", Data("fo".utf8)),
+            ("Zm9", Data("fo".utf8)),
+            ("123", Data([0xD7, 0x6D])),
         ]
 
         for value in validValues {
@@ -139,10 +146,6 @@ struct ATProtocolValueContainerDecodingTests {
             "Zg===",
             "Zg=A",
             "====",
-            "Zh==",
-            "Zh",
-            "Zm9=",
-            "Zm9",
             "Z=g=",
             "Zg*=",
             "Zg ==",
@@ -515,8 +518,8 @@ struct ATProtocolValueContainerDecodingTests {
         }
     }
 
-    @Test("Known typed dispatch tolerates future fields and lenient optional degradation")
-    func knownTypedDispatchToleratesFutureAndLenientFields() throws {
+    @Test("Known typed dispatch keeps future fields and leaves a malformed record raw")
+    func knownTypedDispatchKeepsFutureFieldsAndLeavesMalformedRecordsRaw() throws {
         let type = AppBskyFeedPost.typeIdentifier
         let futurePost = ATProtocolValueContainer.object([
             "$type": .string(type),
@@ -530,10 +533,14 @@ struct ATProtocolValueContainerDecodingTests {
         guard case let .knownType(topValue) = decodedTopLevel,
               let topPost = topValue as? AppBskyFeedPost
         else {
-            Issue.record("Expected typed dispatch to ignore the top-level future field")
+            Issue.record("Expected typed dispatch for a record with a top-level future field")
             return
         }
         #expect(topPost.text == "future value")
+        // The field the Lexicon does not declare is kept, and writing the record back
+        // reproduces the original bytes (and therefore the original CID).
+        #expect(topPost.extraFields["future"] == .object(["enabled": .bool(true)]))
+        #expect(try decodedTopLevel.encodedDAGCBOR() == futurePostCBOR)
 
         let nestedRoot = ATProtocolValueContainer.object(["post": futurePost])
         let nestedCBOR = try nestedRoot.encodedDAGCBOR()
@@ -542,13 +549,15 @@ struct ATProtocolValueContainerDecodingTests {
               case let .knownType(nestedValue)? = nestedObject["post"],
               nestedValue is AppBskyFeedPost
         else {
-            Issue.record("Expected typed dispatch to ignore the nested future field")
+            Issue.record("Expected typed dispatch for a nested record with a future field")
             return
         }
+        #expect(try decodedNestedRoot.encodedDAGCBOR() == nestedCBOR)
 
-        // The generated decoder is lenient on langs (malformed value degrades to
-        // nil) and the dropped key is tolerated like an unknown field: the post
-        // renders without its language tags rather than tombstoning entirely.
+        // `langs` does not match its schema. The Lexicon specification treats such a
+        // record as invalid as a whole, and a typed view that silently dropped the
+        // field would delete it when the record is written back. The value therefore
+        // stays raw, with every field intact.
         let malformedPost = ATProtocolValueContainer.object([
             "$type": .string(type),
             "text": .string("malformed optional value"),
@@ -557,14 +566,23 @@ struct ATProtocolValueContainerDecodingTests {
         ])
         let malformedCBOR = try malformedPost.encodedDAGCBOR()
         let decodedMalformed = try ATProtocolValueContainer.decodedFromDAGCBOR(malformedCBOR)
-        guard case let .knownType(malformedValue) = decodedMalformed,
-              let malformedTyped = malformedValue as? AppBskyFeedPost
-        else {
-            Issue.record("Expected lenient typed dispatch for a malformed optional field")
+        guard case let .unknownType(malformedType, .object(malformedRaw)) = decodedMalformed else {
+            Issue.record("Expected a record with a malformed optional field to stay raw, got \(decodedMalformed)")
             return
         }
-        #expect(malformedTyped.text == "malformed optional value")
-        #expect(malformedTyped.langs == nil)
+        #expect(malformedType == type)
+        #expect(malformedRaw["langs"] == .string("not-an-array"))
+        #expect(try decodedMalformed.encodedDAGCBOR() == malformedCBOR)
+
+        // Decoding the type directly is still lenient by default, and strict on request.
+        let malformedJSON = Data(
+            #"{"$type":"app.bsky.feed.post","text":"x","createdAt":"2026-07-15T12:00:00.000Z","langs":"not-an-array"}"#.utf8
+        )
+        let lenient = try JSONDecoder().decode(AppBskyFeedPost.self, from: malformedJSON)
+        #expect(lenient.langs == nil)
+        #expect(throws: DecodingError.self) {
+            try ATProtoDecoding.strictJSONDecoder().decode(AppBskyFeedPost.self, from: malformedJSON)
+        }
     }
 
     @Test("Link and bytes cases satisfy same-value Equatable and Hashable contracts")
@@ -686,7 +704,7 @@ struct ATProtocolValueContainerDecodingTests {
         #expect(jsonDecodedRaw["uri"] == .string(spacedURI))
     }
 
-    @Test("Direct spec-tolerant comparison detects lossy field mutation and tolerates unknown fields")
+    @Test("Direct spec-tolerant comparison detects lossy field mutation and dropped unknown fields")
     func specTolerantComparisonDetectsLossyDecodeDirectly() throws {
         let type = AppBskyFeedPost.typeIdentifier
         let postA = AppBskyFeedPost(
@@ -710,14 +728,31 @@ struct ATProtocolValueContainerDecodingTests {
         ])
         #expect(!ATProtocolValueContainer.isSpecTolerantMatch(typed: typedContainerA, raw: divergentRaw))
 
-        // Compatible raw object with unknown field
-        let compatibleRawWithUnknown = ATProtocolValueContainer.object([
+        // A raw object with a field the Lexicon does not declare: a typed value that
+        // carries it in `extraFields` is a faithful view, one that lost it is not.
+        let rawWithUnknown = ATProtocolValueContainer.object([
             "$type": .string(type),
             "text": .string("Hello World"),
             "createdAt": .string("2026-08-21T12:00:00.000Z"),
             "via": .string("ThirdPartyClient"),
         ])
-        #expect(ATProtocolValueContainer.isSpecTolerantMatch(typed: typedContainerA, raw: compatibleRawWithUnknown))
+        #expect(!ATProtocolValueContainer.isSpecTolerantMatch(typed: typedContainerA, raw: rawWithUnknown))
+
+        let postKeepingUnknown = AppBskyFeedPost(
+            text: "Hello World",
+            createdAt: postA.createdAt,
+            extraFields: ["via": .string("ThirdPartyClient")]
+        )
+        #expect(ATProtocolValueContainer.isSpecTolerantMatch(typed: .knownType(postKeepingUnknown), raw: rawWithUnknown))
+
+        // null and absent are the same thing for an optional field.
+        let rawWithNull = ATProtocolValueContainer.object([
+            "$type": .string(type),
+            "text": .string("Hello World"),
+            "createdAt": .string("2026-08-21T12:00:00.000Z"),
+            "langs": .null,
+        ])
+        #expect(ATProtocolValueContainer.isSpecTolerantMatch(typed: typedContainerA, raw: rawWithNull))
     }
 
     @Test("Direct spec-tolerant comparison rejects equal objects containing knownType with decode error")

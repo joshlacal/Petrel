@@ -5,6 +5,7 @@ import Foundation
 
 public enum ChatBskyModerationGetMessageContext {
     public static let typeIdentifier = "chat.bsky.moderation.getMessageContext"
+
     public struct Parameters: Parametrizable {
         public let convoId: String?
         public let messageId: String
@@ -30,32 +31,26 @@ public enum ChatBskyModerationGetMessageContext {
     public struct Output: ATProtocolCodable {
         public let messages: [OutputMessagesUnion]
 
-        /// Standard public initializer
         public init(
             messages: [OutputMessagesUnion]
-
         ) {
             self.messages = messages
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             messages = try container.decode([OutputMessagesUnion].self, forKey: .messages)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(messages, forKey: .messages)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let messagesValue = try messages.toCBORValue()
             map = map.adding(key: "messages", value: messagesValue)
-
             return map
         }
 
@@ -67,6 +62,8 @@ public enum ChatBskyModerationGetMessageContext {
     public enum OutputMessagesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsSystemMessageView(ChatBskyConvoDefs.SystemMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -200,12 +197,11 @@ public enum ChatBskyModerationGetMessageContext {
 public extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - getMessageContext
 
-    ///
+    /// Calls `chat.bsky.moderation.getMessageContext`.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getMessageContext(input: ChatBskyModerationGetMessageContext.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetMessageContext.Output?) {
         let endpoint = "chat.bsky.moderation.getMessageContext"
 
@@ -222,35 +218,26 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.moderation.getMessageContext")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyModerationGetMessageContext.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.moderation.getMessageContext: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyModerationGetMessageContext.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.convo.leaveConvo
 
+/// Leaves a conversation (direct or group). For group, this effectively removes membership. For direct, membership is never removed, only changed to remove from enumerations by the user who left.
 public enum ChatBskyConvoLeaveConvo {
     public static let typeIdentifier = "chat.bsky.convo.leaveConvo"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
 
-        /// Standard public initializer
-        public init(convoId: String) {
+        public init(
+            convoId: String
+        ) {
             self.convoId = convoId
         }
 
@@ -37,46 +40,34 @@ public enum ChatBskyConvoLeaveConvo {
 
     public struct Output: ATProtocolCodable {
         public let convoId: String
-
         public let rev: String
 
-        /// Standard public initializer
         public init(
             convoId: String,
-
             rev: String
-
         ) {
             self.convoId = convoId
-
             self.rev = rev
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             convoId = try container.decode(String.self, forKey: .convoId)
-
             rev = try container.decode(String.self, forKey: .rev)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(convoId, forKey: .convoId)
-
             try container.encode(rev, forKey: .rev)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
-
             return map
         }
 
@@ -103,13 +94,12 @@ public enum ChatBskyConvoLeaveConvo {
 public extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - leaveConvo
 
-    // Leaves a conversation (direct or group). For group, this effectively removes membership. For direct, membership is never removed, only changed to remove from enumerations by the user who left.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Leaves a conversation (direct or group). For group, this effectively removes membership. For direct, membership is never removed, only changed to remove from enumerations by the user who left.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ChatBskyConvoLeaveConvo.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func leaveConvo(
         input: ChatBskyConvoLeaveConvo.Input
 
@@ -140,40 +130,23 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ChatBskyConvoLeaveConvo.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyConvoLeaveConvo.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.leaveConvo: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ChatBskyConvoLeaveConvo.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyConvoLeaveConvo.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,56 +3,90 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.labeler.service
 
+/// A declaration of the existence of labeler service.
 public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.labeler.service"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
+
     public let policies: AppBskyLabelerDefs.LabelerPolicies
     public let labels: AppBskyLabelerServiceLabelsUnion?
     public let createdAt: ATProtocolDate
+    /// The set of report reason 'codes' which are in-scope for this service to review and action. These usually align to policy categories. If not defined (distinct from empty array), all reason types are allowed.
     public let reasonTypes: [ComAtprotoModerationDefs.ReasonType]?
+    /// The set of subject types (account, record, etc) this service accepts reports on.
     public let subjectTypes: [ComAtprotoModerationDefs.SubjectType]?
+    /// Set of record types (collection NSIDs) which can be reported to this service. If not defined (distinct from empty array), default is any record type.
     public let subjectCollections: [NSID]?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(policies: AppBskyLabelerDefs.LabelerPolicies, labels: AppBskyLabelerServiceLabelsUnion? = nil, createdAt: ATProtocolDate, reasonTypes: [ComAtprotoModerationDefs.ReasonType]? = nil, subjectTypes: [ComAtprotoModerationDefs.SubjectType]? = nil, subjectCollections: [NSID]? = nil) {
+    public init(
+        policies: AppBskyLabelerDefs.LabelerPolicies,
+        labels: AppBskyLabelerServiceLabelsUnion? = nil,
+        createdAt: ATProtocolDate,
+        reasonTypes: [ComAtprotoModerationDefs.ReasonType]? = nil,
+        subjectTypes: [ComAtprotoModerationDefs.SubjectType]? = nil,
+        subjectCollections: [NSID]? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.policies = policies
         self.labels = labels
         self.createdAt = createdAt
         self.reasonTypes = reasonTypes
         self.subjectTypes = subjectTypes
         self.subjectCollections = subjectCollections
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         policies = try container.decode(AppBskyLabelerDefs.LabelerPolicies.self, forKey: .policies)
         do {
-            labels = try container.decodeIfPresent(AppBskyLabelerServiceLabelsUnion.self, forKey: .labels)
+            labels = try container.decodeIfPresent(AppBskyLabelerServiceLabelsUnion.self, forKey: .labels, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
             labels = nil
         }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         do {
-            reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes)
+            reasonTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.ReasonType].self, forKey: .reasonTypes, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'reasonTypes' — degrading to nil: \(error)")
             reasonTypes = nil
         }
         do {
-            subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes)
+            subjectTypes = try container.decodeIfPresent([ComAtprotoModerationDefs.SubjectType].self, forKey: .subjectTypes, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'subjectTypes' — degrading to nil: \(error)")
             subjectTypes = nil
         }
         do {
-            subjectCollections = try container.decodeIfPresent([NSID].self, forKey: .subjectCollections)
+            subjectCollections = try container.decodeIfPresent([NSID].self, forKey: .subjectCollections, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'subjectCollections' — degrading to nil: \(error)")
             subjectCollections = nil
         }
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -64,33 +98,7 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(reasonTypes, forKey: .reasonTypes)
         try container.encodeIfPresent(subjectTypes, forKey: .subjectTypes)
         try container.encodeIfPresent(subjectCollections, forKey: .subjectCollections)
-    }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-        if policies != other.policies {
-            return false
-        }
-        if labels != other.labels {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        if reasonTypes != other.reasonTypes {
-            return false
-        }
-        if subjectTypes != other.subjectTypes {
-            return false
-        }
-        if subjectCollections != other.subjectCollections {
-            return false
-        }
-        return true
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -116,6 +124,34 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?)
         }
+        hasher.combine(extraFields)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if policies != other.policies {
+            return false
+        }
+        if labels != other.labels {
+            return false
+        }
+        if createdAt != other.createdAt {
+            return false
+        }
+        if reasonTypes != other.reasonTypes {
+            return false
+        }
+        if subjectTypes != other.subjectTypes {
+            return false
+        }
+        if subjectCollections != other.subjectCollections {
+            return false
+        }
+        return extraFields == other.extraFields
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -141,8 +177,10 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
             let subjectCollectionsValue = try value.toCBORValue()
             map = map.adding(key: "subjectCollections", value: subjectCollectionsValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "policies", "labels", "createdAt", "reasonTypes", "subjectTypes", "subjectCollections"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -156,6 +194,8 @@ public struct AppBskyLabelerService: ATProtocolCodable, ATProtocolValue {
 
     public enum AppBskyLabelerServiceLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoLabelDefs.SelfLabels) {
             self = .comAtprotoLabelDefsSelfLabels(value)

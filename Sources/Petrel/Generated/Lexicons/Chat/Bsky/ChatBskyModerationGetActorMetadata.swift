@@ -8,55 +8,45 @@ public enum ChatBskyModerationGetActorMetadata {
 
     public struct Metadata: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.getActorMetadata#metadata"
+
         public let messagesSent: Int
         public let messagesReceived: Int
         public let convos: Int
         public let convosStarted: Int
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            messagesSent: Int, messagesReceived: Int, convos: Int, convosStarted: Int
+            messagesSent: Int,
+            messagesReceived: Int,
+            convos: Int,
+            convosStarted: Int,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.messagesSent = messagesSent
             self.messagesReceived = messagesReceived
             self.convos = convos
             self.convosStarted = convosStarted
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                messagesSent = try container.decode(Int.self, forKey: .messagesSent)
-            } catch {
-                LogManager.logError("Decoding error for required property 'messagesSent': \(error)")
-                throw error
-            }
-            do {
-                messagesReceived = try container.decode(Int.self, forKey: .messagesReceived)
-            } catch {
-                LogManager.logError("Decoding error for required property 'messagesReceived': \(error)")
-                throw error
-            }
-            do {
-                convos = try container.decode(Int.self, forKey: .convos)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convos': \(error)")
-                throw error
-            }
-            do {
-                convosStarted = try container.decode(Int.self, forKey: .convosStarted)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convosStarted': \(error)")
-                throw error
-            }
+            messagesSent = try container.decode(Int.self, forKey: .messagesSent)
+            messagesReceived = try container.decode(Int.self, forKey: .messagesReceived)
+            convos = try container.decode(Int.self, forKey: .convos)
+            convosStarted = try container.decode(Int.self, forKey: .convosStarted)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(messagesSent, forKey: .messagesSent)
             try container.encode(messagesReceived, forKey: .messagesReceived)
             try container.encode(convos, forKey: .convos)
             try container.encode(convosStarted, forKey: .convosStarted)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -64,6 +54,7 @@ public enum ChatBskyModerationGetActorMetadata {
             hasher.combine(messagesReceived)
             hasher.combine(convos)
             hasher.combine(convosStarted)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -80,7 +71,7 @@ public enum ChatBskyModerationGetActorMetadata {
             if convosStarted != other.convosStarted {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -89,7 +80,6 @@ public enum ChatBskyModerationGetActorMetadata {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let messagesSentValue = try messagesSent.toCBORValue()
             map = map.adding(key: "messagesSent", value: messagesSentValue)
             let messagesReceivedValue = try messagesReceived.toCBORValue()
@@ -98,11 +88,12 @@ public enum ChatBskyModerationGetActorMetadata {
             map = map.adding(key: "convos", value: convosValue)
             let convosStartedValue = try convosStarted.toCBORValue()
             map = map.adding(key: "convosStarted", value: convosStartedValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "messagesSent", "messagesReceived", "convos", "convosStarted"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case messagesSent
             case messagesReceived
             case convos
@@ -122,59 +113,41 @@ public enum ChatBskyModerationGetActorMetadata {
 
     public struct Output: ATProtocolCodable {
         public let day: Metadata
-
         public let month: Metadata
-
         public let all: Metadata
 
-        /// Standard public initializer
         public init(
             day: Metadata,
-
             month: Metadata,
-
             all: Metadata
-
         ) {
             self.day = day
-
             self.month = month
-
             self.all = all
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             day = try container.decode(Metadata.self, forKey: .day)
-
             month = try container.decode(Metadata.self, forKey: .month)
-
             all = try container.decode(Metadata.self, forKey: .all)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(day, forKey: .day)
-
             try container.encode(month, forKey: .month)
-
             try container.encode(all, forKey: .all)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let dayValue = try day.toCBORValue()
             map = map.adding(key: "day", value: dayValue)
-
             let monthValue = try month.toCBORValue()
             map = map.adding(key: "month", value: monthValue)
-
             let allValue = try all.toCBORValue()
             map = map.adding(key: "all", value: allValue)
-
             return map
         }
 
@@ -189,12 +162,11 @@ public enum ChatBskyModerationGetActorMetadata {
 public extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - getActorMetadata
 
-    ///
+    /// Calls `chat.bsky.moderation.getActorMetadata`.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getActorMetadata(input: ChatBskyModerationGetActorMetadata.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetActorMetadata.Output?) {
         let endpoint = "chat.bsky.moderation.getActorMetadata"
 
@@ -211,35 +183,26 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.moderation.getActorMetadata")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyModerationGetActorMetadata.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.moderation.getActorMetadata: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyModerationGetActorMetadata.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

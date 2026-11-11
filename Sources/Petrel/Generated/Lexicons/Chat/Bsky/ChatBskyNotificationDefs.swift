@@ -8,42 +8,41 @@ public enum ChatBskyNotificationDefs {
 
     public struct Preferences: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.notification.defs#preferences"
+
         public let chat: ChatPreference
         public let chatRequest: ChatPreference
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            chat: ChatPreference, chatRequest: ChatPreference
+            chat: ChatPreference,
+            chatRequest: ChatPreference,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.chat = chat
             self.chatRequest = chatRequest
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                chat = try container.decode(ChatPreference.self, forKey: .chat)
-            } catch {
-                LogManager.logError("Decoding error for required property 'chat': \(error)")
-                throw error
-            }
-            do {
-                chatRequest = try container.decode(ChatPreference.self, forKey: .chatRequest)
-            } catch {
-                LogManager.logError("Decoding error for required property 'chatRequest': \(error)")
-                throw error
-            }
+            chat = try container.decode(ChatPreference.self, forKey: .chat)
+            chatRequest = try container.decode(ChatPreference.self, forKey: .chatRequest)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(chat, forKey: .chat)
             try container.encode(chatRequest, forKey: .chatRequest)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(chat)
             hasher.combine(chatRequest)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +53,7 @@ public enum ChatBskyNotificationDefs {
             if chatRequest != other.chatRequest {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +62,16 @@ public enum ChatBskyNotificationDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let chatValue = try chat.toCBORValue()
             map = map.adding(key: "chat", value: chatValue)
             let chatRequestValue = try chatRequest.toCBORValue()
             map = map.adding(key: "chatRequest", value: chatRequestValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "chat", "chatRequest"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case chat
             case chatRequest
         }
@@ -80,42 +79,41 @@ public enum ChatBskyNotificationDefs {
 
     public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.notification.defs#chatPreference"
+
         public let include: String
         public let push: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            include: String, push: Bool
+            include: String,
+            push: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.include = include
             self.push = push
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                include = try container.decode(String.self, forKey: .include)
-            } catch {
-                LogManager.logError("Decoding error for required property 'include': \(error)")
-                throw error
-            }
-            do {
-                push = try container.decode(Bool.self, forKey: .push)
-            } catch {
-                LogManager.logError("Decoding error for required property 'push': \(error)")
-                throw error
-            }
+            include = try container.decode(String.self, forKey: .include)
+            push = try container.decode(Bool.self, forKey: .push)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(include, forKey: .include)
             try container.encode(push, forKey: .push)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(include)
             hasher.combine(push)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -126,7 +124,7 @@ public enum ChatBskyNotificationDefs {
             if push != other.push {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -135,16 +133,16 @@ public enum ChatBskyNotificationDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let includeValue = try include.toCBORValue()
             map = map.adding(key: "include", value: includeValue)
             let pushValue = try push.toCBORValue()
             map = map.adding(key: "push", value: pushValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "include", "push"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case include
             case push
         }

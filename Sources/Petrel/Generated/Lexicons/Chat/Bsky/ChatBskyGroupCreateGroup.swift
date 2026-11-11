@@ -3,14 +3,19 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.group.createGroup
 
+/// Creates a group convo, specifying the members to be added to it. Unlike getConvoForMembers, this isn't idempotent. It will create new groups even if the membership is identical to pre-existing groups. Will create 'request' membership for all members, except the owner who is 'accepted'.
 public enum ChatBskyGroupCreateGroup {
     public static let typeIdentifier = "chat.bsky.group.createGroup"
+
     public struct Input: ATProtocolCodable {
+        /// The members to add to the group. The owner is automatically added. Implementations may enforce a lower maximum than the 10,000-item schema limit; Bluesky currently supports up to 100 total members. If the owner is included in this list, the list may contain up to the implementation's total member limit. Otherwise, it may contain one fewer.
         public let members: [DID]
         public let name: String
 
-        /// Standard public initializer
-        public init(members: [DID], name: String) {
+        public init(
+            members: [DID],
+            name: String
+        ) {
             self.members = members
             self.name = name
         }
@@ -45,32 +50,26 @@ public enum ChatBskyGroupCreateGroup {
     public struct Output: ATProtocolCodable {
         public let convo: ChatBskyConvoDefs.ConvoView
 
-        /// Standard public initializer
         public init(
             convo: ChatBskyConvoDefs.ConvoView
-
         ) {
             self.convo = convo
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             convo = try container.decode(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(convo, forKey: .convo)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let convoValue = try convo.toCBORValue()
             map = map.adding(key: "convo", value: convoValue)
-
             return map
         }
 
@@ -100,13 +99,12 @@ public enum ChatBskyGroupCreateGroup {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - createGroup
 
-    // Creates a group convo, specifying the members to be added to it. Unlike getConvoForMembers, this isn't idempotent. It will create new groups even if the membership is identical to pre-existing groups. Will create 'request' membership for all members, except the owner who is 'accepted'.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Creates a group convo, specifying the members to be added to it. Unlike getConvoForMembers, this isn't idempotent. It will create new groups even if the membership is identical to pre-existing groups. Will create 'request' membership for all members, except the owner who is 'accepted'.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ChatBskyGroupCreateGroup.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func createGroup(
         input: ChatBskyGroupCreateGroup.Input
 
@@ -137,40 +135,23 @@ public extension ATProtoClient.Chat.Bsky.Group {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ChatBskyGroupCreateGroup.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyGroupCreateGroup.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.createGroup: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ChatBskyGroupCreateGroup.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyGroupCreateGroup.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

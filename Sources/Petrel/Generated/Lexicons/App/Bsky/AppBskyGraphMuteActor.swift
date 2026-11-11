@@ -3,15 +3,22 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.graph.muteActor
 
+/// Creates a mute relationship for the specified account. If a mute already exists for the account, it is updated in place: the stored scope is replaced with the scope in this request. Mutes are private in Bluesky. Requires auth.
 public enum AppBskyGraphMuteActor {
     public static let typeIdentifier = "app.bsky.graph.muteActor"
+
     public struct Input: ATProtocolCodable {
         public let actor: ATIdentifier
+        /// Restrict the mute to the account's reposts. When any 'only' scope is set, just the scoped content is muted; when none are set, the account is fully muted. Repeat calls replace the stored scope rather than adding to it.
         public let onlyReposts: Bool?
+        /// Restrict the mute to the account's quote posts. See onlyReposts.
         public let onlyQuoteposts: Bool?
 
-        /// Standard public initializer
-        public init(actor: ATIdentifier, onlyReposts: Bool? = nil, onlyQuoteposts: Bool? = nil) {
+        public init(
+            actor: ATIdentifier,
+            onlyReposts: Bool? = nil,
+            onlyQuoteposts: Bool? = nil
+        ) {
             self.actor = actor
             self.onlyReposts = onlyReposts
             self.onlyQuoteposts = onlyQuoteposts
@@ -19,9 +26,10 @@ public enum AppBskyGraphMuteActor {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             actor = try container.decode(ATIdentifier.self, forKey: .actor)
-            onlyReposts = try container.decodeIfPresent(Bool.self, forKey: .onlyReposts)
-            onlyQuoteposts = try container.decodeIfPresent(Bool.self, forKey: .onlyQuoteposts)
+            onlyReposts = try container.decodeIfPresent(Bool.self, forKey: .onlyReposts, rejectingNull: strict)
+            onlyQuoteposts = try container.decodeIfPresent(Bool.self, forKey: .onlyQuoteposts, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -57,13 +65,12 @@ public enum AppBskyGraphMuteActor {
 public extension ATProtoClient.App.Bsky.Graph {
     // MARK: - muteActor
 
-    // Creates a mute relationship for the specified account. If a mute already exists for the account, it is updated in place: the stored scope is replaced with the scope in this request. Mutes are private in Bluesky. Requires auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Creates a mute relationship for the specified account. If a mute already exists for the account, it is updated in place: the stored scope is replaced with the scope in this request. Mutes are private in Bluesky. Requires auth.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func muteActor(
         input: AppBskyGraphMuteActor.Input
 
@@ -89,7 +96,13 @@ public extension ATProtoClient.App.Bsky.Graph {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.graph.muteActor")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

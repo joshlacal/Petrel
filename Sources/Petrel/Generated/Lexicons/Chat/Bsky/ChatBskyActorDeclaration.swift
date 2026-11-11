@@ -3,26 +3,45 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.actor.declaration
 
+/// A declaration of a Bluesky chat account.
 public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "chat.bsky.actor.declaration"
-    public let allowIncoming: String
-    public let allowGroupInvites: String?
 
-    public init(allowIncoming: String, allowGroupInvites: String? = nil) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
+
+    public let allowIncoming: String
+    /// Declaration about group chat invitation preferences for the record owner.
+    public let allowGroupInvites: String?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        allowIncoming: String,
+        allowGroupInvites: String? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.allowIncoming = allowIncoming
         self.allowGroupInvites = allowGroupInvites
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         allowIncoming = try container.decode(String.self, forKey: .allowIncoming)
         do {
-            allowGroupInvites = try container.decodeIfPresent(String.self, forKey: .allowGroupInvites)
+            allowGroupInvites = try container.decodeIfPresent(String.self, forKey: .allowGroupInvites, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'allowGroupInvites' — degrading to nil: \(error)")
             allowGroupInvites = nil
         }
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -30,10 +49,17 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(allowIncoming, forKey: .allowIncoming)
         try container.encodeIfPresent(allowGroupInvites, forKey: .allowGroupInvites)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(allowIncoming)
+        if let value = allowGroupInvites {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -44,16 +70,11 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
         if allowGroupInvites != other.allowGroupInvites {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(allowIncoming)
-        if let value = allowGroupInvites {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -65,8 +86,10 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
             let allowGroupInvitesValue = try value.toCBORValue()
             map = map.adding(key: "allowGroupInvites", value: allowGroupInvitesValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "allowIncoming", "allowGroupInvites"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

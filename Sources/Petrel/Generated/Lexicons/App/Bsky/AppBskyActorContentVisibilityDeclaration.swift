@@ -3,27 +3,43 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.actor.contentVisibilityDeclaration
 
+/// A declaration of an account's preferences for appearing in content discovery surfaces.
 public struct AppBskyActorContentVisibilityDeclaration: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.actor.contentVisibilityDeclaration"
-    public let hideFromAlgorithmicRecommendations: Bool
 
-    public init(hideFromAlgorithmicRecommendations: Bool) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
+
+    /// Whether the account requests that its posts be hidden from algorithmic recommendations. Consumers must treat a missing record as false.
+    public let hideFromAlgorithmicRecommendations: Bool
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        hideFromAlgorithmicRecommendations: Bool,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.hideFromAlgorithmicRecommendations = hideFromAlgorithmicRecommendations
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         hideFromAlgorithmicRecommendations = try container.decode(Bool.self, forKey: .hideFromAlgorithmicRecommendations)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(hideFromAlgorithmicRecommendations, forKey: .hideFromAlgorithmicRecommendations)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(hideFromAlgorithmicRecommendations)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -31,11 +47,11 @@ public struct AppBskyActorContentVisibilityDeclaration: ATProtocolCodable, ATPro
         if hideFromAlgorithmicRecommendations != other.hideFromAlgorithmicRecommendations {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(hideFromAlgorithmicRecommendations)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -43,8 +59,10 @@ public struct AppBskyActorContentVisibilityDeclaration: ATProtocolCodable, ATPro
         map = map.adding(key: "$type", value: Self.typeIdentifier)
         let hideFromAlgorithmicRecommendationsValue = try hideFromAlgorithmicRecommendations.toCBORValue()
         map = map.adding(key: "hideFromAlgorithmicRecommendations", value: hideFromAlgorithmicRecommendationsValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "hideFromAlgorithmicRecommendations"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

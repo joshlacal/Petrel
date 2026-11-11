@@ -3,13 +3,17 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.sync.notifyOfUpdate
 
+/// Notify a crawling service of a recent update, and that crawling should resume. Intended use is after a gap between repo stream events caused the crawling service to disconnect. Does not require auth; implemented by Relay. DEPRECATED: just use com.atproto.sync.requestCrawl
 public enum ComAtprotoSyncNotifyOfUpdate {
     public static let typeIdentifier = "com.atproto.sync.notifyOfUpdate"
+
     public struct Input: ATProtocolCodable {
+        /// Hostname of the current service (usually a PDS) that is notifying of update.
         public let hostname: String
 
-        /// Standard public initializer
-        public init(hostname: String) {
+        public init(
+            hostname: String
+        ) {
             self.hostname = hostname
         }
 
@@ -39,13 +43,12 @@ public enum ComAtprotoSyncNotifyOfUpdate {
 public extension ATProtoClient.Com.Atproto.Sync {
     // MARK: - notifyOfUpdate
 
-    // Notify a crawling service of a recent update, and that crawling should resume. Intended use is after a gap between repo stream events caused the crawling service to disconnect. Does not require auth; implemented by Relay. DEPRECATED: just use com.atproto.sync.requestCrawl
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Notify a crawling service of a recent update, and that crawling should resume. Intended use is after a gap between repo stream events caused the crawling service to disconnect. Does not require auth; implemented by Relay. DEPRECATED: just use com.atproto.sync.requestCrawl
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func notifyOfUpdate(
         input: ComAtprotoSyncNotifyOfUpdate.Input
 
@@ -71,7 +74,13 @@ public extension ATProtoClient.Com.Atproto.Sync {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.sync.notifyOfUpdate")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

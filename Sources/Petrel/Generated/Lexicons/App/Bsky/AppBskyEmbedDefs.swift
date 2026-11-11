@@ -6,44 +6,44 @@ import Foundation
 public enum AppBskyEmbedDefs {
     public static let typeIdentifier = "app.bsky.embed.defs"
 
+    /// width:height represents an aspect ratio. It may be approximate, and may not correspond to absolute dimensions in any given unit.
     public struct AspectRatio: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.defs#aspectRatio"
+
         public let width: Int
         public let height: Int
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            width: Int, height: Int
+            width: Int,
+            height: Int,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.width = width
             self.height = height
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                width = try container.decode(Int.self, forKey: .width)
-            } catch {
-                LogManager.logError("Decoding error for required property 'width': \(error)")
-                throw error
-            }
-            do {
-                height = try container.decode(Int.self, forKey: .height)
-            } catch {
-                LogManager.logError("Decoding error for required property 'height': \(error)")
-                throw error
-            }
+            width = try container.decode(Int.self, forKey: .width)
+            height = try container.decode(Int.self, forKey: .height)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(width, forKey: .width)
             try container.encode(height, forKey: .height)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(width)
             hasher.combine(height)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +54,7 @@ public enum AppBskyEmbedDefs {
             if height != other.height {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +63,16 @@ public enum AppBskyEmbedDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let widthValue = try width.toCBORValue()
             map = map.adding(key: "width", value: widthValue)
             let heightValue = try height.toCBORValue()
             map = map.adding(key: "height", value: heightValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "width", "height"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case width
             case height
         }

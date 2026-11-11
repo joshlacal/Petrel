@@ -3,17 +3,36 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.graph.list
 
+/// Record representing a list of accounts (actors). Scope includes both moderation-oriented lists and curration-oriented lists.
 public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.graph.list"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    /// Defines the purpose of the list (aka, moderation-oriented or curration-oriented)
     public let purpose: AppBskyGraphDefs.ListPurpose
+    /// Display name for list; can not be empty.
     public let name: String
     public let description: String?
     public let descriptionFacets: [AppBskyRichtextFacet]?
     public let avatar: Blob?
     public let labels: AppBskyGraphListLabelsUnion?
     public let createdAt: ATProtocolDate
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(purpose: AppBskyGraphDefs.ListPurpose, name: String, description: String? = nil, descriptionFacets: [AppBskyRichtextFacet]? = nil, avatar: Blob? = nil, labels: AppBskyGraphListLabelsUnion? = nil, createdAt: ATProtocolDate) {
+    public init(
+        purpose: AppBskyGraphDefs.ListPurpose,
+        name: String,
+        description: String? = nil,
+        descriptionFacets: [AppBskyRichtextFacet]? = nil,
+        avatar: Blob? = nil,
+        labels: AppBskyGraphListLabelsUnion? = nil,
+        createdAt: ATProtocolDate,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.purpose = purpose
         self.name = name
         self.description = description
@@ -21,41 +40,56 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
         self.avatar = avatar
         self.labels = labels
         self.createdAt = createdAt
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         purpose = try container.decode(AppBskyGraphDefs.ListPurpose.self, forKey: .purpose)
         name = try container.decode(String.self, forKey: .name)
         do {
-            description = try container.decodeIfPresent(String.self, forKey: .description)
+            description = try container.decodeIfPresent(String.self, forKey: .description, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
             description = nil
         }
         do {
-            descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets)
+            descriptionFacets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .descriptionFacets, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'descriptionFacets' — degrading to nil: \(error)")
             descriptionFacets = nil
         }
         do {
-            avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar)
+            avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
             avatar = nil
         }
         do {
-            labels = try container.decodeIfPresent(AppBskyGraphListLabelsUnion.self, forKey: .labels)
+            labels = try container.decodeIfPresent(AppBskyGraphListLabelsUnion.self, forKey: .labels, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
             labels = nil
         }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -68,36 +102,7 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(avatar, forKey: .avatar)
         try container.encodeIfPresent(labels, forKey: .labels)
         try container.encode(createdAt, forKey: .createdAt)
-    }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-        if purpose != other.purpose {
-            return false
-        }
-        if name != other.name {
-            return false
-        }
-        if description != other.description {
-            return false
-        }
-        if descriptionFacets != other.descriptionFacets {
-            return false
-        }
-        if avatar != other.avatar {
-            return false
-        }
-        if labels != other.labels {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        return true
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -124,6 +129,37 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
             hasher.combine(nil as Int?)
         }
         hasher.combine(createdAt)
+        hasher.combine(extraFields)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if purpose != other.purpose {
+            return false
+        }
+        if name != other.name {
+            return false
+        }
+        if description != other.description {
+            return false
+        }
+        if descriptionFacets != other.descriptionFacets {
+            return false
+        }
+        if avatar != other.avatar {
+            return false
+        }
+        if labels != other.labels {
+            return false
+        }
+        if createdAt != other.createdAt {
+            return false
+        }
+        return extraFields == other.extraFields
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -151,8 +187,10 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
         }
         let createdAtValue = try createdAt.toCBORValue()
         map = map.adding(key: "createdAt", value: createdAtValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "purpose", "name", "description", "descriptionFacets", "avatar", "labels", "createdAt"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -167,6 +205,8 @@ public struct AppBskyGraphList: ATProtocolCodable, ATProtocolValue {
 
     public enum AppBskyGraphListLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoLabelDefs.SelfLabels) {
             self = .comAtprotoLabelDefsSelfLabels(value)

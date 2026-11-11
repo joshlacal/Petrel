@@ -3,46 +3,60 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.describeServer
 
+/// Describes the server's account creation requirements and capabilities. Implemented by PDS.
 public enum ComAtprotoServerDescribeServer {
     public static let typeIdentifier = "com.atproto.server.describeServer"
 
     public struct Links: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.server.describeServer#links"
+
         public let privacyPolicy: URI?
         public let termsOfService: URI?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            privacyPolicy: URI? = nil, termsOfService: URI? = nil
+            privacyPolicy: URI? = nil,
+            termsOfService: URI? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.privacyPolicy = privacyPolicy
             self.termsOfService = termsOfService
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                privacyPolicy = try container.decodeIfPresent(URI.self, forKey: .privacyPolicy)
+                privacyPolicy = try container.decodeIfPresent(URI.self, forKey: .privacyPolicy, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'privacyPolicy' — degrading to nil: \(error)")
                 privacyPolicy = nil
             }
             do {
-                termsOfService = try container.decodeIfPresent(URI.self, forKey: .termsOfService)
+                termsOfService = try container.decodeIfPresent(URI.self, forKey: .termsOfService, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'termsOfService' — degrading to nil: \(error)")
                 termsOfService = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(privacyPolicy, forKey: .privacyPolicy)
             try container.encodeIfPresent(termsOfService, forKey: .termsOfService)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -56,6 +70,7 @@ public enum ComAtprotoServerDescribeServer {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -66,7 +81,7 @@ public enum ComAtprotoServerDescribeServer {
             if termsOfService != other.termsOfService {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -75,7 +90,6 @@ public enum ComAtprotoServerDescribeServer {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = privacyPolicy {
                 let privacyPolicyValue = try value.toCBORValue()
                 map = map.adding(key: "privacyPolicy", value: privacyPolicyValue)
@@ -84,11 +98,12 @@ public enum ComAtprotoServerDescribeServer {
                 let termsOfServiceValue = try value.toCBORValue()
                 map = map.adding(key: "termsOfService", value: termsOfServiceValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "privacyPolicy", "termsOfService"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case privacyPolicy
             case termsOfService
         }
@@ -96,30 +111,40 @@ public enum ComAtprotoServerDescribeServer {
 
     public struct Contact: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.server.describeServer#contact"
+
         public let email: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            email: String? = nil
+            email: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.email = email
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                email = try container.decodeIfPresent(String.self, forKey: .email)
+                email = try container.decodeIfPresent(String.self, forKey: .email, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'email' — degrading to nil: \(error)")
                 email = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(email, forKey: .email)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -128,6 +153,7 @@ public enum ComAtprotoServerDescribeServer {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -135,7 +161,7 @@ public enum ComAtprotoServerDescribeServer {
             if email != other.email {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -144,177 +170,147 @@ public enum ComAtprotoServerDescribeServer {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = email {
                 let emailValue = try value.toCBORValue()
                 map = map.adding(key: "email", value: emailValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "email"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case email
         }
     }
 
     public struct Output: ATProtocolCodable {
+        /// If true, an invite code must be supplied to create an account on this instance.
         public let inviteCodeRequired: Bool?
-
+        /// If true, a phone verification token must be supplied to create an account on this instance.
         public let phoneVerificationRequired: Bool?
-
+        /// Maximum size of a blob that can be uploaded via com.atproto.repo.uploadBlob, in bytes.
         public let blobUploadLimit: Int?
-
+        /// List of domain suffixes that can be used in account handles.
         public let availableUserDomains: [String]
-
+        /// URLs of service policy documents.
         public let links: Links?
-
+        /// Contact information
         public let contact: Contact?
-
         public let did: DID
 
-        /// Standard public initializer
         public init(
             inviteCodeRequired: Bool? = nil,
-
             phoneVerificationRequired: Bool? = nil,
-
             blobUploadLimit: Int? = nil,
-
             availableUserDomains: [String],
-
             links: Links? = nil,
-
             contact: Contact? = nil,
-
             did: DID
-
         ) {
             self.inviteCodeRequired = inviteCodeRequired
-
             self.phoneVerificationRequired = phoneVerificationRequired
-
             self.blobUploadLimit = blobUploadLimit
-
             self.availableUserDomains = availableUserDomains
-
             self.links = links
-
             self.contact = contact
-
             self.did = did
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                inviteCodeRequired = try container.decodeIfPresent(Bool.self, forKey: .inviteCodeRequired)
+                inviteCodeRequired = try container.decodeIfPresent(Bool.self, forKey: .inviteCodeRequired, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'inviteCodeRequired' — degrading to nil: \(error)")
                 inviteCodeRequired = nil
             }
-
             do {
-                phoneVerificationRequired = try container.decodeIfPresent(Bool.self, forKey: .phoneVerificationRequired)
+                phoneVerificationRequired = try container.decodeIfPresent(Bool.self, forKey: .phoneVerificationRequired, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'phoneVerificationRequired' — degrading to nil: \(error)")
                 phoneVerificationRequired = nil
             }
-
             do {
-                blobUploadLimit = try container.decodeIfPresent(Int.self, forKey: .blobUploadLimit)
+                blobUploadLimit = try container.decodeIfPresent(Int.self, forKey: .blobUploadLimit, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'blobUploadLimit' — degrading to nil: \(error)")
                 blobUploadLimit = nil
             }
-
             availableUserDomains = try container.decode([String].self, forKey: .availableUserDomains)
-
             do {
-                links = try container.decodeIfPresent(Links.self, forKey: .links)
+                links = try container.decodeIfPresent(Links.self, forKey: .links, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
                 links = nil
             }
-
             do {
-                contact = try container.decodeIfPresent(Contact.self, forKey: .contact)
+                contact = try container.decodeIfPresent(Contact.self, forKey: .contact, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'contact' — degrading to nil: \(error)")
                 contact = nil
             }
-
             did = try container.decode(DID.self, forKey: .did)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(inviteCodeRequired, forKey: .inviteCodeRequired)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(phoneVerificationRequired, forKey: .phoneVerificationRequired)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(blobUploadLimit, forKey: .blobUploadLimit)
-
             try container.encode(availableUserDomains, forKey: .availableUserDomains)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(links, forKey: .links)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(contact, forKey: .contact)
-
             try container.encode(did, forKey: .did)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = inviteCodeRequired {
-                // Encode optional property even if it's an empty array for CBOR
                 let inviteCodeRequiredValue = try value.toCBORValue()
                 map = map.adding(key: "inviteCodeRequired", value: inviteCodeRequiredValue)
             }
-
             if let value = phoneVerificationRequired {
-                // Encode optional property even if it's an empty array for CBOR
                 let phoneVerificationRequiredValue = try value.toCBORValue()
                 map = map.adding(key: "phoneVerificationRequired", value: phoneVerificationRequiredValue)
             }
-
             if let value = blobUploadLimit {
-                // Encode optional property even if it's an empty array for CBOR
                 let blobUploadLimitValue = try value.toCBORValue()
                 map = map.adding(key: "blobUploadLimit", value: blobUploadLimitValue)
             }
-
             let availableUserDomainsValue = try availableUserDomains.toCBORValue()
             map = map.adding(key: "availableUserDomains", value: availableUserDomainsValue)
-
             if let value = links {
-                // Encode optional property even if it's an empty array for CBOR
                 let linksValue = try value.toCBORValue()
                 map = map.adding(key: "links", value: linksValue)
             }
-
             if let value = contact {
-                // Encode optional property even if it's an empty array for CBOR
                 let contactValue = try value.toCBORValue()
                 map = map.adding(key: "contact", value: contactValue)
             }
-
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
             return map
         }
 
@@ -335,8 +331,8 @@ public extension ATProtoClient.Com.Atproto.Server {
 
     /// Describes the server's account creation requirements and capabilities. Implemented by PDS.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func describeServer() async throws -> (responseCode: Int, data: ComAtprotoServerDescribeServer.Output?) {
         let endpoint = "com.atproto.server.describeServer"
 
@@ -353,35 +349,26 @@ public extension ATProtoClient.Com.Atproto.Server {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.describeServer")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoServerDescribeServer.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.describeServer: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoServerDescribeServer.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

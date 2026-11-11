@@ -3,44 +3,54 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.moderation.createReport
 
+/// Submit a moderation report regarding an atproto account or record. Implemented by moderation services (with PDS proxying), and requires auth.
 public enum ComAtprotoModerationCreateReport {
     public static let typeIdentifier = "com.atproto.moderation.createReport"
 
+    /// Moderation tool information for tracing the source of the action
     public struct ModTool: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.moderation.createReport#modTool"
+
+        /// Name/identifier of the source (e.g., 'bsky-app/android', 'bsky-web/chrome')
         public let name: String
+        /// Additional arbitrary metadata about the source
         public let meta: ATProtocolValueContainer?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            name: String, meta: ATProtocolValueContainer? = nil
+            name: String,
+            meta: ATProtocolValueContainer? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.name = name
             self.meta = meta
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            name = try container.decode(String.self, forKey: .name)
             do {
-                name = try container.decode(String.self, forKey: .name)
+                meta = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .meta, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
-                throw error
-            }
-            do {
-                meta = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .meta)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'meta' — degrading to nil: \(error)")
                 meta = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(meta, forKey: .meta)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -50,6 +60,7 @@ public enum ComAtprotoModerationCreateReport {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -60,7 +71,7 @@ public enum ComAtprotoModerationCreateReport {
             if meta != other.meta {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -69,31 +80,37 @@ public enum ComAtprotoModerationCreateReport {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let nameValue = try name.toCBORValue()
             map = map.adding(key: "name", value: nameValue)
             if let value = meta {
                 let metaValue = try value.toCBORValue()
                 map = map.adding(key: "meta", value: metaValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "meta"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case name
             case meta
         }
     }
 
     public struct Input: ATProtocolCodable {
+        /// Indicates the broad category of violation the report is for.
         public let reasonType: ComAtprotoModerationDefs.ReasonType
+        /// Additional context about the content and violation.
         public let reason: String?
         public let subject: InputSubjectUnion
         public let modTool: ModTool?
 
-        /// Standard public initializer
-        public init(reasonType: ComAtprotoModerationDefs.ReasonType, reason: String? = nil, subject: InputSubjectUnion, modTool: ModTool? = nil) {
+        public init(
+            reasonType: ComAtprotoModerationDefs.ReasonType,
+            reason: String? = nil,
+            subject: InputSubjectUnion,
+            modTool: ModTool? = nil
+        ) {
             self.reasonType = reasonType
             self.reason = reason
             self.subject = subject
@@ -102,10 +119,11 @@ public enum ComAtprotoModerationCreateReport {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             reasonType = try container.decode(ComAtprotoModerationDefs.ReasonType.self, forKey: .reasonType)
-            reason = try container.decodeIfPresent(String.self, forKey: .reason)
+            reason = try container.decodeIfPresent(String.self, forKey: .reason, rejectingNull: strict)
             subject = try container.decode(InputSubjectUnion.self, forKey: .subject)
-            modTool = try container.decodeIfPresent(ModTool.self, forKey: .modTool)
+            modTool = try container.decodeIfPresent(ModTool.self, forKey: .modTool, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -143,108 +161,74 @@ public enum ComAtprotoModerationCreateReport {
 
     public struct Output: ATProtocolCodable {
         public let id: Int
-
         public let reasonType: ComAtprotoModerationDefs.ReasonType
-
         public let reason: String?
-
         public let subject: OutputSubjectUnion
-
         public let reportedBy: DID
-
         public let createdAt: ATProtocolDate
 
-        /// Standard public initializer
         public init(
             id: Int,
-
             reasonType: ComAtprotoModerationDefs.ReasonType,
-
             reason: String? = nil,
-
             subject: OutputSubjectUnion,
-
             reportedBy: DID,
-
             createdAt: ATProtocolDate
-
         ) {
             self.id = id
-
             self.reasonType = reasonType
-
             self.reason = reason
-
             self.subject = subject
-
             self.reportedBy = reportedBy
-
             self.createdAt = createdAt
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             id = try container.decode(Int.self, forKey: .id)
-
             reasonType = try container.decode(ComAtprotoModerationDefs.ReasonType.self, forKey: .reasonType)
-
             do {
-                reason = try container.decodeIfPresent(String.self, forKey: .reason)
+                reason = try container.decodeIfPresent(String.self, forKey: .reason, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'reason' — degrading to nil: \(error)")
                 reason = nil
             }
-
             subject = try container.decode(OutputSubjectUnion.self, forKey: .subject)
-
             reportedBy = try container.decode(DID.self, forKey: .reportedBy)
-
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(id, forKey: .id)
-
             try container.encode(reasonType, forKey: .reasonType)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(reason, forKey: .reason)
-
             try container.encode(subject, forKey: .subject)
-
             try container.encode(reportedBy, forKey: .reportedBy)
-
             try container.encode(createdAt, forKey: .createdAt)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
-
             let reasonTypeValue = try reasonType.toCBORValue()
             map = map.adding(key: "reasonType", value: reasonTypeValue)
-
             if let value = reason {
-                // Encode optional property even if it's an empty array for CBOR
                 let reasonValue = try value.toCBORValue()
                 map = map.adding(key: "reason", value: reasonValue)
             }
-
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-
             let reportedByValue = try reportedBy.toCBORValue()
             map = map.adding(key: "reportedBy", value: reportedByValue)
-
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
-
             return map
         }
 
@@ -261,6 +245,8 @@ public enum ComAtprotoModerationCreateReport {
     public enum InputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoAdminDefs.RepoRef) {
             self = .comAtprotoAdminDefsRepoRef(value)
@@ -393,6 +379,8 @@ public enum ComAtprotoModerationCreateReport {
     public enum OutputSubjectUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case comAtprotoAdminDefsRepoRef(ComAtprotoAdminDefs.RepoRef)
         case comAtprotoRepoStrongRef(ComAtprotoRepoStrongRef)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoAdminDefs.RepoRef) {
             self = .comAtprotoAdminDefsRepoRef(value)
@@ -526,13 +514,12 @@ public enum ComAtprotoModerationCreateReport {
 public extension ATProtoClient.Com.Atproto.Moderation {
     // MARK: - createReport
 
-    // Submit a moderation report regarding an atproto account or record. Implemented by moderation services (with PDS proxying), and requires auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Submit a moderation report regarding an atproto account or record. Implemented by moderation services (with PDS proxying), and requires auth.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func createReport(
         input: ComAtprotoModerationCreateReport.Input
 
@@ -560,34 +547,26 @@ public extension ATProtoClient.Com.Atproto.Moderation {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.moderation.createReport")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoModerationCreateReport.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.moderation.createReport: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoModerationCreateReport.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

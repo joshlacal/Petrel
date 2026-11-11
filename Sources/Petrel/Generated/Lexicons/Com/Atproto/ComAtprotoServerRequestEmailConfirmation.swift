@@ -3,6 +3,7 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.requestEmailConfirmation
 
+/// Request an email with a code to confirm ownership of email.
 public enum ComAtprotoServerRequestEmailConfirmation {
     public static let typeIdentifier = "com.atproto.server.requestEmailConfirmation"
 }
@@ -12,8 +13,8 @@ public extension ATProtoClient.Com.Atproto.Server {
 
     /// Request an email with a code to confirm ownership of email.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func requestEmailConfirmation(
     ) async throws -> Int {
         let endpoint = "com.atproto.server.requestEmailConfirmation"
@@ -35,7 +36,13 @@ public extension ATProtoClient.Com.Atproto.Server {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.requestEmailConfirmation")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

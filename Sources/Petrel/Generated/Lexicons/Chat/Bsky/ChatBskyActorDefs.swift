@@ -8,6 +8,7 @@ public enum ChatBskyActorDefs {
 
     public struct ProfileViewBasic: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.actor.defs#profileViewBasic"
+
         public let did: DID
         public let handle: Handle
         public let displayName: String?
@@ -16,12 +17,28 @@ public enum ChatBskyActorDefs {
         public let viewer: AppBskyActorDefs.ViewerState?
         public let labels: [ComAtprotoLabelDefs.Label]?
         public let createdAt: ATProtocolDate?
+        /// Set to true when the actor cannot actively participate in conversations
         public let chatDisabled: Bool?
         public let verification: AppBskyActorDefs.VerificationState?
+        /// Union field that has data specific to different kinds of convos.
         public let kind: ProfileViewBasicKindUnion?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID, handle: Handle, displayName: String? = nil, avatar: URI? = nil, associated: AppBskyActorDefs.ProfileAssociated? = nil, viewer: AppBskyActorDefs.ViewerState? = nil, labels: [ComAtprotoLabelDefs.Label]? = nil, createdAt: ATProtocolDate? = nil, chatDisabled: Bool? = nil, verification: AppBskyActorDefs.VerificationState? = nil, kind: ProfileViewBasicKindUnion? = nil
+            did: DID,
+            handle: Handle,
+            displayName: String? = nil,
+            avatar: URI? = nil,
+            associated: AppBskyActorDefs.ProfileAssociated? = nil,
+            viewer: AppBskyActorDefs.ViewerState? = nil,
+            labels: [ComAtprotoLabelDefs.Label]? = nil,
+            createdAt: ATProtocolDate? = nil,
+            chatDisabled: Bool? = nil,
+            verification: AppBskyActorDefs.VerificationState? = nil,
+            kind: ProfileViewBasicKindUnion? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
             self.handle = handle
@@ -34,99 +51,109 @@ public enum ChatBskyActorDefs {
             self.chatDisabled = chatDisabled
             self.verification = verification
             self.kind = kind
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            did = try container.decode(DID.self, forKey: .did)
+            handle = try container.decode(Handle.self, forKey: .handle)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                displayName = try container.decodeIfPresent(String.self, forKey: .displayName, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                handle = try container.decode(Handle.self, forKey: .handle)
-            } catch {
-                LogManager.logError("Decoding error for required property 'handle': \(error)")
-                throw error
-            }
-            do {
-                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'displayName' — degrading to nil: \(error)")
                 displayName = nil
             }
             do {
-                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar)
+                avatar = try container.decodeIfPresent(URI.self, forKey: .avatar, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
                 avatar = nil
             }
             do {
-                associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated)
+                associated = try container.decodeIfPresent(AppBskyActorDefs.ProfileAssociated.self, forKey: .associated, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'associated' — degrading to nil: \(error)")
                 associated = nil
             }
             do {
-                viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer)
+                viewer = try container.decodeIfPresent(AppBskyActorDefs.ViewerState.self, forKey: .viewer, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'viewer' — degrading to nil: \(error)")
                 viewer = nil
             }
             do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
                 labels = nil
             }
             do {
-                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
                 createdAt = nil
             }
             do {
-                chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled)
+                chatDisabled = try container.decodeIfPresent(Bool.self, forKey: .chatDisabled, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'chatDisabled' — degrading to nil: \(error)")
                 chatDisabled = nil
             }
             do {
-                verification = try container.decodeIfPresent(AppBskyActorDefs.VerificationState.self, forKey: .verification)
+                verification = try container.decodeIfPresent(AppBskyActorDefs.VerificationState.self, forKey: .verification, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'verification' — degrading to nil: \(error)")
                 verification = nil
             }
             do {
-                kind = try container.decodeIfPresent(ProfileViewBasicKindUnion.self, forKey: .kind)
+                kind = try container.decodeIfPresent(ProfileViewBasicKindUnion.self, forKey: .kind, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'kind' — degrading to nil: \(error)")
                 kind = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
             try container.encode(handle, forKey: .handle)
             try container.encodeIfPresent(displayName, forKey: .displayName)
@@ -138,6 +165,7 @@ public enum ChatBskyActorDefs {
             try container.encodeIfPresent(chatDisabled, forKey: .chatDisabled)
             try container.encodeIfPresent(verification, forKey: .verification)
             try container.encodeIfPresent(kind, forKey: .kind)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -188,6 +216,7 @@ public enum ChatBskyActorDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -225,7 +254,7 @@ public enum ChatBskyActorDefs {
             if kind != other.kind {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -234,7 +263,6 @@ public enum ChatBskyActorDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
             let handleValue = try handle.toCBORValue()
@@ -275,11 +303,12 @@ public enum ChatBskyActorDefs {
                 let kindValue = try value.toCBORValue()
                 map = map.adding(key: "kind", value: kindValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "handle", "displayName", "avatar", "associated", "viewer", "labels", "createdAt", "chatDisabled", "verification", "kind"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
             case handle
             case displayName
@@ -297,21 +326,32 @@ public enum ChatBskyActorDefs {
     public struct DirectConvoMember: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.actor.defs#directConvoMember"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -319,51 +359,59 @@ public enum ChatBskyActorDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// A current group convo member.
     public struct GroupConvoMember: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.actor.defs#groupConvoMember"
+
+        /// Who added this member. Only present if the member was added (instead of joining via link).
         public let addedBy: ProfileViewBasic?
+        /// The member's role within this conversation. Only present in group conversation member lists.
         public let role: MemberRole
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            addedBy: ProfileViewBasic? = nil, role: MemberRole
+            addedBy: ProfileViewBasic? = nil,
+            role: MemberRole,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.addedBy = addedBy
             self.role = role
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                addedBy = try container.decodeIfPresent(ProfileViewBasic.self, forKey: .addedBy)
+                addedBy = try container.decodeIfPresent(ProfileViewBasic.self, forKey: .addedBy, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'addedBy' — degrading to nil: \(error)")
                 addedBy = nil
             }
-            do {
-                role = try container.decode(MemberRole.self, forKey: .role)
-            } catch {
-                LogManager.logError("Decoding error for required property 'role': \(error)")
-                throw error
-            }
+            role = try container.decode(MemberRole.self, forKey: .role)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(addedBy, forKey: .addedBy)
             try container.encode(role, forKey: .role)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -373,6 +421,7 @@ public enum ChatBskyActorDefs {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(role)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -383,7 +432,7 @@ public enum ChatBskyActorDefs {
             if role != other.role {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -392,41 +441,53 @@ public enum ChatBskyActorDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = addedBy {
                 let addedByValue = try value.toCBORValue()
                 map = map.adding(key: "addedBy", value: addedByValue)
             }
             let roleValue = try role.toCBORValue()
             map = map.adding(key: "role", value: roleValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "addedBy", "role"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case addedBy
             case role
         }
     }
 
+    /// A past group convo member.
     public struct PastGroupConvoMember: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.actor.defs#pastGroupConvoMember"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -434,14 +495,13 @@ public enum ChatBskyActorDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
     public struct MemberRole: Codable, ATProtocolCodable, ATProtocolValue {
@@ -491,6 +551,8 @@ public enum ChatBskyActorDefs {
         case chatBskyActorDefsDirectConvoMember(ChatBskyActorDefs.DirectConvoMember)
         case chatBskyActorDefsGroupConvoMember(ChatBskyActorDefs.GroupConvoMember)
         case chatBskyActorDefsPastGroupConvoMember(ChatBskyActorDefs.PastGroupConvoMember)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyActorDefs.DirectConvoMember) {
             self = .chatBskyActorDefsDirectConvoMember(value)

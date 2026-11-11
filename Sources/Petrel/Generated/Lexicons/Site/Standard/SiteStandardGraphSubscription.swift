@@ -3,26 +3,45 @@ import Foundation
 
 // lexicon: 1, id: site.standard.graph.subscription
 
+/// Record declaring a subscription to a publication.
 public struct SiteStandardGraphSubscription: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "site.standard.graph.subscription"
-    public let createdAt: ATProtocolDate?
-    public let publication: ATProtocolURI
 
-    public init(createdAt: ATProtocolDate? = nil, publication: ATProtocolURI) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    public let createdAt: ATProtocolDate?
+    /// AT-URI reference to the publication record being subscribed to (ex: at://did:plc:abc123/site.standard.publication/xyz789).
+    public let publication: ATProtocolURI
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        createdAt: ATProtocolDate? = nil,
+        publication: ATProtocolURI,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.createdAt = createdAt
         self.publication = publication
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         do {
-            createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+            createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
             createdAt = nil
         }
         publication = try container.decode(ATProtocolURI.self, forKey: .publication)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -30,10 +49,17 @@ public struct SiteStandardGraphSubscription: ATProtocolCodable, ATProtocolValue 
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
         try container.encode(publication, forKey: .publication)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        if let value = createdAt {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        hasher.combine(publication)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -44,16 +70,11 @@ public struct SiteStandardGraphSubscription: ATProtocolCodable, ATProtocolValue 
         if publication != other.publication {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        if let value = createdAt {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
-        hasher.combine(publication)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -65,8 +86,10 @@ public struct SiteStandardGraphSubscription: ATProtocolCodable, ATProtocolValue 
         }
         let publicationValue = try publication.toCBORValue()
         map = map.adding(key: "publication", value: publicationValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "publication"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

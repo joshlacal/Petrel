@@ -3,77 +3,72 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.video.getUploadLimits
 
+/// Get video upload limits for the authenticated user.
 public enum AppBskyVideoGetUploadLimits {
     public static let typeIdentifier = "app.bsky.video.getUploadLimits"
 
     public struct Output: ATProtocolCodable {
         public let canUpload: Bool
-
         public let remainingDailyVideos: Int?
-
         public let remainingDailyBytes: Int?
-
         public let message: String?
-
         public let error: String?
 
-        /// Standard public initializer
         public init(
             canUpload: Bool,
-
             remainingDailyVideos: Int? = nil,
-
             remainingDailyBytes: Int? = nil,
-
             message: String? = nil,
-
             error: String? = nil
-
         ) {
             self.canUpload = canUpload
-
             self.remainingDailyVideos = remainingDailyVideos
-
             self.remainingDailyBytes = remainingDailyBytes
-
             self.message = message
-
             self.error = error
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             canUpload = try container.decode(Bool.self, forKey: .canUpload)
-
             do {
-                remainingDailyVideos = try container.decodeIfPresent(Int.self, forKey: .remainingDailyVideos)
+                remainingDailyVideos = try container.decodeIfPresent(Int.self, forKey: .remainingDailyVideos, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'remainingDailyVideos' — degrading to nil: \(error)")
                 remainingDailyVideos = nil
             }
-
             do {
-                remainingDailyBytes = try container.decodeIfPresent(Int.self, forKey: .remainingDailyBytes)
+                remainingDailyBytes = try container.decodeIfPresent(Int.self, forKey: .remainingDailyBytes, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'remainingDailyBytes' — degrading to nil: \(error)")
                 remainingDailyBytes = nil
             }
-
             do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
+                message = try container.decodeIfPresent(String.self, forKey: .message, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
                 message = nil
             }
-
             do {
-                error = try container.decodeIfPresent(String.self, forKey: .error)
+                error = try container.decodeIfPresent(String.self, forKey: .error, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'error' — degrading to nil: \(error)")
                 self.error = nil
             }
@@ -81,52 +76,33 @@ public enum AppBskyVideoGetUploadLimits {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(canUpload, forKey: .canUpload)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(remainingDailyVideos, forKey: .remainingDailyVideos)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(remainingDailyBytes, forKey: .remainingDailyBytes)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(message, forKey: .message)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(error, forKey: .error)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let canUploadValue = try canUpload.toCBORValue()
             map = map.adding(key: "canUpload", value: canUploadValue)
-
             if let value = remainingDailyVideos {
-                // Encode optional property even if it's an empty array for CBOR
                 let remainingDailyVideosValue = try value.toCBORValue()
                 map = map.adding(key: "remainingDailyVideos", value: remainingDailyVideosValue)
             }
-
             if let value = remainingDailyBytes {
-                // Encode optional property even if it's an empty array for CBOR
                 let remainingDailyBytesValue = try value.toCBORValue()
                 map = map.adding(key: "remainingDailyBytes", value: remainingDailyBytesValue)
             }
-
             if let value = message {
-                // Encode optional property even if it's an empty array for CBOR
                 let messageValue = try value.toCBORValue()
                 map = map.adding(key: "message", value: messageValue)
             }
-
             if let value = error {
-                // Encode optional property even if it's an empty array for CBOR
                 let errorValue = try value.toCBORValue()
                 map = map.adding(key: "error", value: errorValue)
             }
-
             return map
         }
 
@@ -145,8 +121,8 @@ public extension ATProtoClient.App.Bsky.Video {
 
     /// Get video upload limits for the authenticated user.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getUploadLimits() async throws -> (responseCode: Int, data: AppBskyVideoGetUploadLimits.Output?) {
         let endpoint = "app.bsky.video.getUploadLimits"
 
@@ -163,35 +139,26 @@ public extension ATProtoClient.App.Bsky.Video {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.video.getUploadLimits")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyVideoGetUploadLimits.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.getUploadLimits: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyVideoGetUploadLimits.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

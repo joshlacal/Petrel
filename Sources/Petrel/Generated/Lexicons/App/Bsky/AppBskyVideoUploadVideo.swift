@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.video.uploadVideo
 
+/// Upload a video to be processed then stored on the PDS.
 public enum AppBskyVideoUploadVideo {
     public static let typeIdentifier = "app.bsky.video.uploadVideo"
+
     public struct Input: ATProtocolCodable {
         public let data: Data
 
-        /// Standard public initializer
-        public init(data: Data) {
+        public init(
+            data: Data
+        ) {
             self.data = data
         }
 
@@ -38,32 +41,26 @@ public enum AppBskyVideoUploadVideo {
     public struct Output: ATProtocolCodable {
         public let jobStatus: AppBskyVideoDefs.JobStatus
 
-        /// Standard public initializer
         public init(
             jobStatus: AppBskyVideoDefs.JobStatus
-
         ) {
             self.jobStatus = jobStatus
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             jobStatus = try container.decode(AppBskyVideoDefs.JobStatus.self, forKey: .jobStatus)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(jobStatus, forKey: .jobStatus)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let jobStatusValue = try jobStatus.toCBORValue()
             map = map.adding(key: "jobStatus", value: jobStatusValue)
-
             return map
         }
 
@@ -76,23 +73,21 @@ public enum AppBskyVideoUploadVideo {
 public extension ATProtoClient.App.Bsky.Video {
     // MARK: - uploadVideo
 
-    // Upload a video to be processed then stored on the PDS.
-    //
-    // - Parameter data: The binary data to upload
-
+    /// Upload a video to be processed then stored on the PDS.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - data: The request body bytes
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func uploadVideo(
         data: Data
 
     ) async throws -> (responseCode: Int, data: AppBskyVideoUploadVideo.Output?) {
         let endpoint = "app.bsky.video.uploadVideo"
 
-        let dataToUpload = data
         var headers: [String: String] = [
             "Content-Type": "video/mp4",
-            "Content-Length": "\(dataToUpload.count)",
+            "Content-Length": "\(data.count)",
         ]
 
         headers["Accept"] = "application/json"
@@ -103,41 +98,33 @@ public extension ATProtoClient.App.Bsky.Video {
             endpoint: endpoint,
             method: "POST",
             headers: headers,
-            body: dataToUpload,
+            body: data,
             queryItems: queryItems
         )
 
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.video.uploadVideo")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyVideoUploadVideo.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.uploadVideo: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyVideoUploadVideo.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

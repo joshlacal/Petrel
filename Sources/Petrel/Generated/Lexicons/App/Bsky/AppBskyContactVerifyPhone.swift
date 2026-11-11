@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.contact.verifyPhone
 
+/// Verifies control over a phone number with a code received via SMS and starts a contact import session. Requires authentication.
 public enum AppBskyContactVerifyPhone {
     public static let typeIdentifier = "app.bsky.contact.verifyPhone"
+
     public struct Input: ATProtocolCodable {
+        /// The phone number to verify. Should be the same as the one passed to `app.bsky.contact.startPhoneVerification`.
         public let phone: String
+        /// The code received via SMS as a result of the call to `app.bsky.contact.startPhoneVerification`.
         public let code: String
 
-        /// Standard public initializer
-        public init(phone: String, code: String) {
+        public init(
+            phone: String,
+            code: String
+        ) {
             self.phone = phone
             self.code = code
         }
@@ -43,34 +49,29 @@ public enum AppBskyContactVerifyPhone {
     }
 
     public struct Output: ATProtocolCodable {
+        /// JWT to be used in a call to `app.bsky.contact.importContacts`. It is only valid for a single call.
         public let token: String
 
-        /// Standard public initializer
         public init(
             token: String
-
         ) {
             self.token = token
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             token = try container.decode(String.self, forKey: .token)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(token, forKey: .token)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let tokenValue = try token.toCBORValue()
             map = map.adding(key: "token", value: tokenValue)
-
             return map
         }
 
@@ -98,13 +99,12 @@ public enum AppBskyContactVerifyPhone {
 public extension ATProtoClient.App.Bsky.Contact {
     // MARK: - verifyPhone
 
-    // Verifies control over a phone number with a code received via SMS and starts a contact import session. Requires authentication.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Verifies control over a phone number with a code received via SMS and starts a contact import session. Requires authentication.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<AppBskyContactVerifyPhone.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func verifyPhone(
         input: AppBskyContactVerifyPhone.Input
 
@@ -135,40 +135,23 @@ public extension ATProtoClient.App.Bsky.Contact {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyContactVerifyPhone.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyContactVerifyPhone.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.contact.verifyPhone: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyContactVerifyPhone.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyContactVerifyPhone.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

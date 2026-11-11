@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.convo.getConvoAvailability
 
+/// Check whether the requester and the other members can start a 1-1 chat. Only applicable to direct (non-group) conversations. If an existing convo is found for these members, it is returned. Does not create a new convo if it doesn't exist.
 public enum ChatBskyConvoGetConvoAvailability {
     public static let typeIdentifier = "chat.bsky.convo.getConvoAvailability"
+
     public struct Parameters: Parametrizable {
         public let members: [DID]
 
@@ -17,30 +19,27 @@ public enum ChatBskyConvoGetConvoAvailability {
 
     public struct Output: ATProtocolCodable {
         public let canChat: Bool
-
         public let convo: ChatBskyConvoDefs.ConvoView?
 
-        /// Standard public initializer
         public init(
             canChat: Bool,
-
             convo: ChatBskyConvoDefs.ConvoView? = nil
-
         ) {
             self.canChat = canChat
-
             self.convo = convo
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             canChat = try container.decode(Bool.self, forKey: .canChat)
-
             do {
-                convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
+                convo = try container.decodeIfPresent(ChatBskyConvoDefs.ConvoView.self, forKey: .convo, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'convo' — degrading to nil: \(error)")
                 convo = nil
             }
@@ -48,25 +47,18 @@ public enum ChatBskyConvoGetConvoAvailability {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(canChat, forKey: .canChat)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(convo, forKey: .convo)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let canChatValue = try canChat.toCBORValue()
             map = map.adding(key: "canChat", value: canChatValue)
-
             if let value = convo {
-                // Encode optional property even if it's an empty array for CBOR
                 let convoValue = try value.toCBORValue()
                 map = map.adding(key: "convo", value: convoValue)
             }
-
             return map
         }
 
@@ -83,9 +75,8 @@ public extension ATProtoClient.Chat.Bsky.Convo {
     /// Check whether the requester and the other members can start a 1-1 chat. Only applicable to direct (non-group) conversations. If an existing convo is found for these members, it is returned. Does not create a new convo if it doesn't exist.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getConvoAvailability(input: ChatBskyConvoGetConvoAvailability.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetConvoAvailability.Output?) {
         let endpoint = "chat.bsky.convo.getConvoAvailability"
 
@@ -102,35 +93,26 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.convo.getConvoAvailability")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyConvoGetConvoAvailability.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.getConvoAvailability: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyConvoGetConvoAvailability.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,47 +3,47 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.unspecced.getConfig
 
+/// Get miscellaneous runtime configuration.
 public enum AppBskyUnspeccedGetConfig {
     public static let typeIdentifier = "app.bsky.unspecced.getConfig"
 
     public struct LiveNowConfig: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.unspecced.getConfig#liveNowConfig"
+
         public let did: DID
         public let domains: [String]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID, domains: [String]
+            did: DID,
+            domains: [String],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
             self.domains = domains
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                domains = try container.decode([String].self, forKey: .domains)
-            } catch {
-                LogManager.logError("Decoding error for required property 'domains': \(error)")
-                throw error
-            }
+            did = try container.decode(DID.self, forKey: .did)
+            domains = try container.decode([String].self, forKey: .domains)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
             try container.encode(domains, forKey: .domains)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
             hasher.combine(domains)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +54,7 @@ public enum AppBskyUnspeccedGetConfig {
             if domains != other.domains {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +63,16 @@ public enum AppBskyUnspeccedGetConfig {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
             let domainsValue = try domains.toCBORValue()
             map = map.adding(key: "domains", value: domainsValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "domains"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
             case domains
         }
@@ -80,36 +80,36 @@ public enum AppBskyUnspeccedGetConfig {
 
     public struct Output: ATProtocolCodable {
         public let checkEmailConfirmed: Bool?
-
         public let liveNow: [LiveNowConfig]?
 
-        /// Standard public initializer
         public init(
             checkEmailConfirmed: Bool? = nil,
-
             liveNow: [LiveNowConfig]? = nil
-
         ) {
             self.checkEmailConfirmed = checkEmailConfirmed
-
             self.liveNow = liveNow
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                checkEmailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .checkEmailConfirmed)
+                checkEmailConfirmed = try container.decodeIfPresent(Bool.self, forKey: .checkEmailConfirmed, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'checkEmailConfirmed' — degrading to nil: \(error)")
                 checkEmailConfirmed = nil
             }
-
             do {
-                liveNow = try container.decodeIfPresent([LiveNowConfig].self, forKey: .liveNow)
+                liveNow = try container.decodeIfPresent([LiveNowConfig].self, forKey: .liveNow, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'liveNow' — degrading to nil: \(error)")
                 liveNow = nil
             }
@@ -117,29 +117,20 @@ public enum AppBskyUnspeccedGetConfig {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(checkEmailConfirmed, forKey: .checkEmailConfirmed)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(liveNow, forKey: .liveNow)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = checkEmailConfirmed {
-                // Encode optional property even if it's an empty array for CBOR
                 let checkEmailConfirmedValue = try value.toCBORValue()
                 map = map.adding(key: "checkEmailConfirmed", value: checkEmailConfirmedValue)
             }
-
             if let value = liveNow {
-                // Encode optional property even if it's an empty array for CBOR
                 let liveNowValue = try value.toCBORValue()
                 map = map.adding(key: "liveNow", value: liveNowValue)
             }
-
             return map
         }
 
@@ -155,8 +146,8 @@ public extension ATProtoClient.App.Bsky.Unspecced {
 
     /// Get miscellaneous runtime configuration.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getConfig() async throws -> (responseCode: Int, data: AppBskyUnspeccedGetConfig.Output?) {
         let endpoint = "app.bsky.unspecced.getConfig"
 
@@ -173,35 +164,26 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.unspecced.getConfig")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyUnspeccedGetConfig.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getConfig: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyUnspeccedGetConfig.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.graph.muteActorList
 
+/// Creates a mute relationship for the specified list of accounts. Mutes are private in Bluesky. Requires auth.
 public enum AppBskyGraphMuteActorList {
     public static let typeIdentifier = "app.bsky.graph.muteActorList"
+
     public struct Input: ATProtocolCodable {
         public let list: ATProtocolURI
 
-        /// Standard public initializer
-        public init(list: ATProtocolURI) {
+        public init(
+            list: ATProtocolURI
+        ) {
             self.list = list
         }
 
@@ -39,13 +42,12 @@ public enum AppBskyGraphMuteActorList {
 public extension ATProtoClient.App.Bsky.Graph {
     // MARK: - muteActorList
 
-    // Creates a mute relationship for the specified list of accounts. Mutes are private in Bluesky. Requires auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Creates a mute relationship for the specified list of accounts. Mutes are private in Bluesky. Requires auth.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func muteActorList(
         input: AppBskyGraphMuteActorList.Input
 
@@ -71,7 +73,13 @@ public extension ATProtoClient.App.Bsky.Graph {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.graph.muteActorList")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

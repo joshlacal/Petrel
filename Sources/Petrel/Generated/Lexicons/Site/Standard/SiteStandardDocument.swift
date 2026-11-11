@@ -3,24 +3,61 @@ import Foundation
 
 // lexicon: 1, id: site.standard.document
 
+/// A document record representing a published article, blog post, or other content. Documents can belong to a publication or exist independently.
 public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "site.standard.document"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    /// Strong reference to a Bluesky post. Useful to keep track of comments off-platform.
     public let bskyPostRef: ComAtprotoRepoStrongRef?
+    /// Open union used to define the record's content. Each entry must specify a $type and may be extended with other lexicons to support additional content formats.
     public let content: SiteStandardDocumentContentUnion?
     public let contributors: [Contributor]?
+    /// Image to used for thumbnail or cover image. Less than 1MB is size.
     public let coverImage: Blob?
+    /// A brief description or excerpt from the document.
     public let description: String?
+    /// Self-label values for this post. Effectively content warnings.
     public let labels: SiteStandardDocumentLabelsUnion?
+    /// Array of values describing relationships between this document and external resources
     public let links: SiteStandardDocumentLinksUnion?
+    /// Combine with site or publication url to construct a canonical URL to the document. Prepend with a leading slash.
     public let path: String?
+    /// Timestamp of the documents publish time.
     public let publishedAt: ATProtocolDate
+    /// Points to a publication record (at://) or a publication url (https://) for loose documents. Avoid trailing slashes.
     public let site: URI
+    /// Array of strings used to tag or categorize the document. Avoid prepending tags with hashtags.
     public let tags: [String]?
+    /// Plaintext representation of the documents contents. Should not contain markdown or other formatting.
     public let textContent: String?
+    /// Title of the document.
     public let title: String
+    /// Timestamp of the documents last edit.
     public let updatedAt: ATProtocolDate?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(bskyPostRef: ComAtprotoRepoStrongRef? = nil, content: SiteStandardDocumentContentUnion? = nil, contributors: [Contributor]? = nil, coverImage: Blob? = nil, description: String? = nil, labels: SiteStandardDocumentLabelsUnion? = nil, links: SiteStandardDocumentLinksUnion? = nil, path: String? = nil, publishedAt: ATProtocolDate, site: URI, tags: [String]? = nil, textContent: String? = nil, title: String, updatedAt: ATProtocolDate? = nil) {
+    public init(
+        bskyPostRef: ComAtprotoRepoStrongRef? = nil,
+        content: SiteStandardDocumentContentUnion? = nil,
+        contributors: [Contributor]? = nil,
+        coverImage: Blob? = nil,
+        description: String? = nil,
+        labels: SiteStandardDocumentLabelsUnion? = nil,
+        links: SiteStandardDocumentLinksUnion? = nil,
+        path: String? = nil,
+        publishedAt: ATProtocolDate,
+        site: URI,
+        tags: [String]? = nil,
+        textContent: String? = nil,
+        title: String,
+        updatedAt: ATProtocolDate? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.bskyPostRef = bskyPostRef
         self.content = content
         self.contributors = contributors
@@ -35,90 +72,126 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
         self.textContent = textContent
         self.title = title
         self.updatedAt = updatedAt
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         do {
-            bskyPostRef = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .bskyPostRef)
+            bskyPostRef = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .bskyPostRef, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'bskyPostRef' — degrading to nil: \(error)")
             bskyPostRef = nil
         }
         do {
-            content = try container.decodeIfPresent(SiteStandardDocumentContentUnion.self, forKey: .content)
+            content = try container.decodeIfPresent(SiteStandardDocumentContentUnion.self, forKey: .content, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'content' — degrading to nil: \(error)")
             content = nil
         }
         do {
-            contributors = try container.decodeIfPresent([Contributor].self, forKey: .contributors)
+            contributors = try container.decodeIfPresent([Contributor].self, forKey: .contributors, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'contributors' — degrading to nil: \(error)")
             contributors = nil
         }
         do {
-            coverImage = try container.decodeIfPresent(Blob.self, forKey: .coverImage)
+            coverImage = try container.decodeIfPresent(Blob.self, forKey: .coverImage, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'coverImage' — degrading to nil: \(error)")
             coverImage = nil
         }
         do {
-            description = try container.decodeIfPresent(String.self, forKey: .description)
+            description = try container.decodeIfPresent(String.self, forKey: .description, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
             description = nil
         }
         do {
-            labels = try container.decodeIfPresent(SiteStandardDocumentLabelsUnion.self, forKey: .labels)
+            labels = try container.decodeIfPresent(SiteStandardDocumentLabelsUnion.self, forKey: .labels, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
             labels = nil
         }
         do {
-            links = try container.decodeIfPresent(SiteStandardDocumentLinksUnion.self, forKey: .links)
+            links = try container.decodeIfPresent(SiteStandardDocumentLinksUnion.self, forKey: .links, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
             links = nil
         }
         do {
-            path = try container.decodeIfPresent(String.self, forKey: .path)
+            path = try container.decodeIfPresent(String.self, forKey: .path, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'path' — degrading to nil: \(error)")
             path = nil
         }
         publishedAt = try container.decode(ATProtocolDate.self, forKey: .publishedAt)
         site = try container.decode(URI.self, forKey: .site)
         do {
-            tags = try container.decodeIfPresent([String].self, forKey: .tags)
+            tags = try container.decodeIfPresent([String].self, forKey: .tags, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'tags' — degrading to nil: \(error)")
             tags = nil
         }
         do {
-            textContent = try container.decodeIfPresent(String.self, forKey: .textContent)
+            textContent = try container.decodeIfPresent(String.self, forKey: .textContent, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'textContent' — degrading to nil: \(error)")
             textContent = nil
         }
         title = try container.decode(String.self, forKey: .title)
         do {
-            updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt)
+            updatedAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .updatedAt, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'updatedAt' — degrading to nil: \(error)")
             updatedAt = nil
         }
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -138,57 +211,7 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(textContent, forKey: .textContent)
         try container.encode(title, forKey: .title)
         try container.encodeIfPresent(updatedAt, forKey: .updatedAt)
-    }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-        if bskyPostRef != other.bskyPostRef {
-            return false
-        }
-        if content != other.content {
-            return false
-        }
-        if contributors != other.contributors {
-            return false
-        }
-        if coverImage != other.coverImage {
-            return false
-        }
-        if description != other.description {
-            return false
-        }
-        if labels != other.labels {
-            return false
-        }
-        if links != other.links {
-            return false
-        }
-        if path != other.path {
-            return false
-        }
-        if publishedAt != other.publishedAt {
-            return false
-        }
-        if site != other.site {
-            return false
-        }
-        if tags != other.tags {
-            return false
-        }
-        if textContent != other.textContent {
-            return false
-        }
-        if title != other.title {
-            return false
-        }
-        if updatedAt != other.updatedAt {
-            return false
-        }
-        return true
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -250,6 +273,58 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?)
         }
+        hasher.combine(extraFields)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if bskyPostRef != other.bskyPostRef {
+            return false
+        }
+        if content != other.content {
+            return false
+        }
+        if contributors != other.contributors {
+            return false
+        }
+        if coverImage != other.coverImage {
+            return false
+        }
+        if description != other.description {
+            return false
+        }
+        if labels != other.labels {
+            return false
+        }
+        if links != other.links {
+            return false
+        }
+        if path != other.path {
+            return false
+        }
+        if publishedAt != other.publishedAt {
+            return false
+        }
+        if site != other.site {
+            return false
+        }
+        if tags != other.tags {
+            return false
+        }
+        if textContent != other.textContent {
+            return false
+        }
+        if title != other.title {
+            return false
+        }
+        if updatedAt != other.updatedAt {
+            return false
+        }
+        return extraFields == other.extraFields
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -305,8 +380,10 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
             let updatedAtValue = try value.toCBORValue()
             map = map.adding(key: "updatedAt", value: updatedAtValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "bskyPostRef", "content", "contributors", "coverImage", "description", "labels", "links", "path", "publishedAt", "site", "tags", "textContent", "title", "updatedAt"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -328,50 +405,59 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
 
     public struct Contributor: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "site.standard.document#contributor"
+
         public let did: DID
         public let displayName: String?
         public let role: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID, displayName: String? = nil, role: String? = nil
+            did: DID,
+            displayName: String? = nil,
+            role: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
             self.displayName = displayName
             self.role = role
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            did = try container.decode(DID.self, forKey: .did)
             do {
-                did = try container.decode(DID.self, forKey: .did)
+                displayName = try container.decodeIfPresent(String.self, forKey: .displayName, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'displayName' — degrading to nil: \(error)")
                 displayName = nil
             }
             do {
-                role = try container.decodeIfPresent(String.self, forKey: .role)
+                role = try container.decodeIfPresent(String.self, forKey: .role, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'role' — degrading to nil: \(error)")
                 role = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
             try container.encodeIfPresent(displayName, forKey: .displayName)
             try container.encodeIfPresent(role, forKey: .role)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -386,6 +472,7 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -399,7 +486,7 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
             if role != other.role {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -408,7 +495,6 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
             if let value = displayName {
@@ -419,11 +505,12 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
                 let roleValue = try value.toCBORValue()
                 map = map.adding(key: "role", value: roleValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "displayName", "role"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
             case displayName
             case role
@@ -431,6 +518,8 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
     }
 
     public enum SiteStandardDocumentContentUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
 
         public init(from decoder: Decoder) throws {
@@ -486,6 +575,8 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
 
     public enum SiteStandardDocumentLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoLabelDefs.SelfLabels) {
             self = .comAtprotoLabelDefsSelfLabels(value)
@@ -581,6 +672,8 @@ public struct SiteStandardDocument: ATProtocolCodable, ATProtocolValue {
     }
 
     public enum SiteStandardDocumentLinksUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
 
         public init(from decoder: Decoder) throws {

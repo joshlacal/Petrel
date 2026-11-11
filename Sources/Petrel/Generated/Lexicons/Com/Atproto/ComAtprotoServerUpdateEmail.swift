@@ -3,15 +3,21 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.updateEmail
 
+/// Update an account's email.
 public enum ComAtprotoServerUpdateEmail {
     public static let typeIdentifier = "com.atproto.server.updateEmail"
+
     public struct Input: ATProtocolCodable {
         public let email: String
         public let emailAuthFactor: Bool?
+        /// Requires a token from com.atproto.sever.requestEmailUpdate if the account's email has been confirmed.
         public let token: String?
 
-        /// Standard public initializer
-        public init(email: String, emailAuthFactor: Bool? = nil, token: String? = nil) {
+        public init(
+            email: String,
+            emailAuthFactor: Bool? = nil,
+            token: String? = nil
+        ) {
             self.email = email
             self.emailAuthFactor = emailAuthFactor
             self.token = token
@@ -19,9 +25,10 @@ public enum ComAtprotoServerUpdateEmail {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             email = try container.decode(String.self, forKey: .email)
-            emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor)
-            token = try container.decodeIfPresent(String.self, forKey: .token)
+            emailAuthFactor = try container.decodeIfPresent(Bool.self, forKey: .emailAuthFactor, rejectingNull: strict)
+            token = try container.decodeIfPresent(String.self, forKey: .token, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -70,13 +77,12 @@ public enum ComAtprotoServerUpdateEmail {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - updateEmail
 
-    // Update an account's email.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Update an account's email.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoServerUpdateEmail.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func updateEmail(
         input: ComAtprotoServerUpdateEmail.Input
 
@@ -105,14 +111,8 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoServerUpdateEmail.Error.self
-            ) {
-                throw atprotoError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoServerUpdateEmail.Error.self)
         }
 
         return responseCode

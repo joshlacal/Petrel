@@ -3,14 +3,18 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.resetPassword
 
+/// Reset a user account password using a token.
 public enum ComAtprotoServerResetPassword {
     public static let typeIdentifier = "com.atproto.server.resetPassword"
+
     public struct Input: ATProtocolCodable {
         public let token: String
         public let password: String
 
-        /// Standard public initializer
-        public init(token: String, password: String) {
+        public init(
+            token: String,
+            password: String
+        ) {
             self.token = token
             self.password = password
         }
@@ -58,13 +62,12 @@ public enum ComAtprotoServerResetPassword {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - resetPassword
 
-    // Reset a user account password using a token.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Reset a user account password using a token.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoServerResetPassword.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func resetPassword(
         input: ComAtprotoServerResetPassword.Input
 
@@ -93,14 +96,8 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoServerResetPassword.Error.self
-            ) {
-                throw atprotoError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoServerResetPassword.Error.self)
         }
 
         return responseCode

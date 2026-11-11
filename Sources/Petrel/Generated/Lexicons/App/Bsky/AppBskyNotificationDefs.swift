@@ -9,21 +9,32 @@ public enum AppBskyNotificationDefs {
     public struct RecordDeleted: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.notification.defs#recordDeleted"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -31,54 +42,53 @@ public enum AppBskyNotificationDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// Deprecated: use chat.bsky.notification preferences instead. This will only return a default value.
     public struct ChatPreference: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.notification.defs#chatPreference"
+
         public let include: String
         public let push: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            include: String, push: Bool
+            include: String,
+            push: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.include = include
             self.push = push
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                include = try container.decode(String.self, forKey: .include)
-            } catch {
-                LogManager.logError("Decoding error for required property 'include': \(error)")
-                throw error
-            }
-            do {
-                push = try container.decode(Bool.self, forKey: .push)
-            } catch {
-                LogManager.logError("Decoding error for required property 'push': \(error)")
-                throw error
-            }
+            include = try container.decode(String.self, forKey: .include)
+            push = try container.decode(Bool.self, forKey: .push)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(include, forKey: .include)
             try container.encode(push, forKey: .push)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(include)
             hasher.combine(push)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -89,7 +99,7 @@ public enum AppBskyNotificationDefs {
             if push != other.push {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -98,16 +108,16 @@ public enum AppBskyNotificationDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let includeValue = try include.toCBORValue()
             map = map.adding(key: "include", value: includeValue)
             let pushValue = try push.toCBORValue()
             map = map.adding(key: "push", value: pushValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "include", "push"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case include
             case push
         }
@@ -115,52 +125,47 @@ public enum AppBskyNotificationDefs {
 
     public struct FilterablePreference: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.notification.defs#filterablePreference"
+
         public let include: String
         public let list: Bool
         public let push: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            include: String, list: Bool, push: Bool
+            include: String,
+            list: Bool,
+            push: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.include = include
             self.list = list
             self.push = push
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                include = try container.decode(String.self, forKey: .include)
-            } catch {
-                LogManager.logError("Decoding error for required property 'include': \(error)")
-                throw error
-            }
-            do {
-                list = try container.decode(Bool.self, forKey: .list)
-            } catch {
-                LogManager.logError("Decoding error for required property 'list': \(error)")
-                throw error
-            }
-            do {
-                push = try container.decode(Bool.self, forKey: .push)
-            } catch {
-                LogManager.logError("Decoding error for required property 'push': \(error)")
-                throw error
-            }
+            include = try container.decode(String.self, forKey: .include)
+            list = try container.decode(Bool.self, forKey: .list)
+            push = try container.decode(Bool.self, forKey: .push)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(include, forKey: .include)
             try container.encode(list, forKey: .list)
             try container.encode(push, forKey: .push)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(include)
             hasher.combine(list)
             hasher.combine(push)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -174,7 +179,7 @@ public enum AppBskyNotificationDefs {
             if push != other.push {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -183,18 +188,18 @@ public enum AppBskyNotificationDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let includeValue = try include.toCBORValue()
             map = map.adding(key: "include", value: includeValue)
             let listValue = try list.toCBORValue()
             map = map.adding(key: "list", value: listValue)
             let pushValue = try push.toCBORValue()
             map = map.adding(key: "push", value: pushValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "include", "list", "push"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case include
             case list
             case push
@@ -203,42 +208,41 @@ public enum AppBskyNotificationDefs {
 
     public struct Preference: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.notification.defs#preference"
+
         public let list: Bool
         public let push: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            list: Bool, push: Bool
+            list: Bool,
+            push: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.list = list
             self.push = push
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                list = try container.decode(Bool.self, forKey: .list)
-            } catch {
-                LogManager.logError("Decoding error for required property 'list': \(error)")
-                throw error
-            }
-            do {
-                push = try container.decode(Bool.self, forKey: .push)
-            } catch {
-                LogManager.logError("Decoding error for required property 'push': \(error)")
-                throw error
-            }
+            list = try container.decode(Bool.self, forKey: .list)
+            push = try container.decode(Bool.self, forKey: .push)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(list, forKey: .list)
             try container.encode(push, forKey: .push)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(list)
             hasher.combine(push)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -249,7 +253,7 @@ public enum AppBskyNotificationDefs {
             if push != other.push {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -258,16 +262,16 @@ public enum AppBskyNotificationDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let listValue = try list.toCBORValue()
             map = map.adding(key: "list", value: listValue)
             let pushValue = try push.toCBORValue()
             map = map.adding(key: "push", value: pushValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "list", "push"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case list
             case push
         }
@@ -275,6 +279,8 @@ public enum AppBskyNotificationDefs {
 
     public struct Preferences: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.notification.defs#preferences"
+
+        /// Deprecated: use chat.bsky.notification preferences instead. This will only return a default value.
         public let chat: ChatPreference
         public let follow: FilterablePreference
         public let like: FilterablePreference
@@ -288,9 +294,25 @@ public enum AppBskyNotificationDefs {
         public let subscribedPost: Preference
         public let unverified: Preference
         public let verified: Preference
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            chat: ChatPreference, follow: FilterablePreference, like: FilterablePreference, likeViaRepost: FilterablePreference, mention: FilterablePreference, quote: FilterablePreference, reply: FilterablePreference, repost: FilterablePreference, repostViaRepost: FilterablePreference, starterpackJoined: Preference, subscribedPost: Preference, unverified: Preference, verified: Preference
+            chat: ChatPreference,
+            follow: FilterablePreference,
+            like: FilterablePreference,
+            likeViaRepost: FilterablePreference,
+            mention: FilterablePreference,
+            quote: FilterablePreference,
+            reply: FilterablePreference,
+            repost: FilterablePreference,
+            repostViaRepost: FilterablePreference,
+            starterpackJoined: Preference,
+            subscribedPost: Preference,
+            unverified: Preference,
+            verified: Preference,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.chat = chat
             self.follow = follow
@@ -305,93 +327,29 @@ public enum AppBskyNotificationDefs {
             self.subscribedPost = subscribedPost
             self.unverified = unverified
             self.verified = verified
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                chat = try container.decode(ChatPreference.self, forKey: .chat)
-            } catch {
-                LogManager.logError("Decoding error for required property 'chat': \(error)")
-                throw error
-            }
-            do {
-                follow = try container.decode(FilterablePreference.self, forKey: .follow)
-            } catch {
-                LogManager.logError("Decoding error for required property 'follow': \(error)")
-                throw error
-            }
-            do {
-                like = try container.decode(FilterablePreference.self, forKey: .like)
-            } catch {
-                LogManager.logError("Decoding error for required property 'like': \(error)")
-                throw error
-            }
-            do {
-                likeViaRepost = try container.decode(FilterablePreference.self, forKey: .likeViaRepost)
-            } catch {
-                LogManager.logError("Decoding error for required property 'likeViaRepost': \(error)")
-                throw error
-            }
-            do {
-                mention = try container.decode(FilterablePreference.self, forKey: .mention)
-            } catch {
-                LogManager.logError("Decoding error for required property 'mention': \(error)")
-                throw error
-            }
-            do {
-                quote = try container.decode(FilterablePreference.self, forKey: .quote)
-            } catch {
-                LogManager.logError("Decoding error for required property 'quote': \(error)")
-                throw error
-            }
-            do {
-                reply = try container.decode(FilterablePreference.self, forKey: .reply)
-            } catch {
-                LogManager.logError("Decoding error for required property 'reply': \(error)")
-                throw error
-            }
-            do {
-                repost = try container.decode(FilterablePreference.self, forKey: .repost)
-            } catch {
-                LogManager.logError("Decoding error for required property 'repost': \(error)")
-                throw error
-            }
-            do {
-                repostViaRepost = try container.decode(FilterablePreference.self, forKey: .repostViaRepost)
-            } catch {
-                LogManager.logError("Decoding error for required property 'repostViaRepost': \(error)")
-                throw error
-            }
-            do {
-                starterpackJoined = try container.decode(Preference.self, forKey: .starterpackJoined)
-            } catch {
-                LogManager.logError("Decoding error for required property 'starterpackJoined': \(error)")
-                throw error
-            }
-            do {
-                subscribedPost = try container.decode(Preference.self, forKey: .subscribedPost)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subscribedPost': \(error)")
-                throw error
-            }
-            do {
-                unverified = try container.decode(Preference.self, forKey: .unverified)
-            } catch {
-                LogManager.logError("Decoding error for required property 'unverified': \(error)")
-                throw error
-            }
-            do {
-                verified = try container.decode(Preference.self, forKey: .verified)
-            } catch {
-                LogManager.logError("Decoding error for required property 'verified': \(error)")
-                throw error
-            }
+            chat = try container.decode(ChatPreference.self, forKey: .chat)
+            follow = try container.decode(FilterablePreference.self, forKey: .follow)
+            like = try container.decode(FilterablePreference.self, forKey: .like)
+            likeViaRepost = try container.decode(FilterablePreference.self, forKey: .likeViaRepost)
+            mention = try container.decode(FilterablePreference.self, forKey: .mention)
+            quote = try container.decode(FilterablePreference.self, forKey: .quote)
+            reply = try container.decode(FilterablePreference.self, forKey: .reply)
+            repost = try container.decode(FilterablePreference.self, forKey: .repost)
+            repostViaRepost = try container.decode(FilterablePreference.self, forKey: .repostViaRepost)
+            starterpackJoined = try container.decode(Preference.self, forKey: .starterpackJoined)
+            subscribedPost = try container.decode(Preference.self, forKey: .subscribedPost)
+            unverified = try container.decode(Preference.self, forKey: .unverified)
+            verified = try container.decode(Preference.self, forKey: .verified)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(chat, forKey: .chat)
             try container.encode(follow, forKey: .follow)
             try container.encode(like, forKey: .like)
@@ -405,6 +363,7 @@ public enum AppBskyNotificationDefs {
             try container.encode(subscribedPost, forKey: .subscribedPost)
             try container.encode(unverified, forKey: .unverified)
             try container.encode(verified, forKey: .verified)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -421,6 +380,7 @@ public enum AppBskyNotificationDefs {
             hasher.combine(subscribedPost)
             hasher.combine(unverified)
             hasher.combine(verified)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -464,7 +424,7 @@ public enum AppBskyNotificationDefs {
             if verified != other.verified {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -473,7 +433,6 @@ public enum AppBskyNotificationDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let chatValue = try chat.toCBORValue()
             map = map.adding(key: "chat", value: chatValue)
             let followValue = try follow.toCBORValue()
@@ -500,11 +459,12 @@ public enum AppBskyNotificationDefs {
             map = map.adding(key: "unverified", value: unverifiedValue)
             let verifiedValue = try verified.toCBORValue()
             map = map.adding(key: "verified", value: verifiedValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "chat", "follow", "like", "likeViaRepost", "mention", "quote", "reply", "repost", "repostViaRepost", "starterpackJoined", "subscribedPost", "unverified", "verified"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case chat
             case follow
             case like
@@ -523,42 +483,41 @@ public enum AppBskyNotificationDefs {
 
     public struct ActivitySubscription: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.notification.defs#activitySubscription"
+
         public let post: Bool
         public let reply: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            post: Bool, reply: Bool
+            post: Bool,
+            reply: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.post = post
             self.reply = reply
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                post = try container.decode(Bool.self, forKey: .post)
-            } catch {
-                LogManager.logError("Decoding error for required property 'post': \(error)")
-                throw error
-            }
-            do {
-                reply = try container.decode(Bool.self, forKey: .reply)
-            } catch {
-                LogManager.logError("Decoding error for required property 'reply': \(error)")
-                throw error
-            }
+            post = try container.decode(Bool.self, forKey: .post)
+            reply = try container.decode(Bool.self, forKey: .reply)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(post, forKey: .post)
             try container.encode(reply, forKey: .reply)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(post)
             hasher.combine(reply)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -569,7 +528,7 @@ public enum AppBskyNotificationDefs {
             if reply != other.reply {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -578,59 +537,59 @@ public enum AppBskyNotificationDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let postValue = try post.toCBORValue()
             map = map.adding(key: "post", value: postValue)
             let replyValue = try reply.toCBORValue()
             map = map.adding(key: "reply", value: replyValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "post", "reply"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case post
             case reply
         }
     }
 
+    /// Object used to store activity subscription data in stash.
     public struct SubjectActivitySubscription: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.notification.defs#subjectActivitySubscription"
+
         public let subject: DID
         public let activitySubscription: ActivitySubscription
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            subject: DID, activitySubscription: ActivitySubscription
+            subject: DID,
+            activitySubscription: ActivitySubscription,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.subject = subject
             self.activitySubscription = activitySubscription
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                subject = try container.decode(DID.self, forKey: .subject)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subject': \(error)")
-                throw error
-            }
-            do {
-                activitySubscription = try container.decode(ActivitySubscription.self, forKey: .activitySubscription)
-            } catch {
-                LogManager.logError("Decoding error for required property 'activitySubscription': \(error)")
-                throw error
-            }
+            subject = try container.decode(DID.self, forKey: .subject)
+            activitySubscription = try container.decode(ActivitySubscription.self, forKey: .activitySubscription)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(subject, forKey: .subject)
             try container.encode(activitySubscription, forKey: .activitySubscription)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(subject)
             hasher.combine(activitySubscription)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -641,7 +600,7 @@ public enum AppBskyNotificationDefs {
             if activitySubscription != other.activitySubscription {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -650,16 +609,16 @@ public enum AppBskyNotificationDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
             let activitySubscriptionValue = try activitySubscription.toCBORValue()
             map = map.adding(key: "activitySubscription", value: activitySubscriptionValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "activitySubscription"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case subject
             case activitySubscription
         }

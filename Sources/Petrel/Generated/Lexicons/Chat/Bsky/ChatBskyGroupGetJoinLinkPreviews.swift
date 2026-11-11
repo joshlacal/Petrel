@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.group.getJoinLinkPreviews
 
+/// Get public information about groups from join links. The output array matches the input codes one-to-one by position (and each view also carries its 'code'). Disabled codes return a disabledJoinLinkPreviewView, and codes that do not map to a previewable link return an invalidJoinLinkPreviewView.
 public enum ChatBskyGroupGetJoinLinkPreviews {
     public static let typeIdentifier = "chat.bsky.group.getJoinLinkPreviews"
+
     public struct Parameters: Parametrizable {
         public let codes: [String]
 
@@ -18,32 +20,26 @@ public enum ChatBskyGroupGetJoinLinkPreviews {
     public struct Output: ATProtocolCodable {
         public let joinLinkPreviews: [OutputJoinLinkPreviewsUnion]
 
-        /// Standard public initializer
         public init(
             joinLinkPreviews: [OutputJoinLinkPreviewsUnion]
-
         ) {
             self.joinLinkPreviews = joinLinkPreviews
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             joinLinkPreviews = try container.decode([OutputJoinLinkPreviewsUnion].self, forKey: .joinLinkPreviews)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(joinLinkPreviews, forKey: .joinLinkPreviews)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let joinLinkPreviewsValue = try joinLinkPreviews.toCBORValue()
             map = map.adding(key: "joinLinkPreviews", value: joinLinkPreviewsValue)
-
             return map
         }
 
@@ -56,6 +52,8 @@ public enum ChatBskyGroupGetJoinLinkPreviews {
         case chatBskyGroupDefsJoinLinkPreviewView(ChatBskyGroupDefs.JoinLinkPreviewView)
         case chatBskyGroupDefsDisabledJoinLinkPreviewView(ChatBskyGroupDefs.DisabledJoinLinkPreviewView)
         case chatBskyGroupDefsInvalidJoinLinkPreviewView(ChatBskyGroupDefs.InvalidJoinLinkPreviewView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyGroupDefs.JoinLinkPreviewView) {
             self = .chatBskyGroupDefsJoinLinkPreviewView(value)
@@ -227,9 +225,8 @@ public extension ATProtoClient.Chat.Bsky.Group {
     /// Get public information about groups from join links. The output array matches the input codes one-to-one by position (and each view also carries its 'code'). Disabled codes return a disabledJoinLinkPreviewView, and codes that do not map to a previewable link return an invalidJoinLinkPreviewView.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getJoinLinkPreviews(input: ChatBskyGroupGetJoinLinkPreviews.Parameters) async throws -> (responseCode: Int, data: ChatBskyGroupGetJoinLinkPreviews.Output?) {
         let endpoint = "chat.bsky.group.getJoinLinkPreviews"
 
@@ -246,35 +243,26 @@ public extension ATProtoClient.Chat.Bsky.Group {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.group.getJoinLinkPreviews")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyGroupGetJoinLinkPreviews.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.getJoinLinkPreviews: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyGroupGetJoinLinkPreviews.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.unspecced.getSuggestionsSkeleton
 
+/// Get a skeleton of suggested actors. Intended to be called and then hydrated through app.bsky.actor.getSuggestions
 public enum AppBskyUnspeccedGetSuggestionsSkeleton {
     public static let typeIdentifier = "app.bsky.unspecced.getSuggestionsSkeleton"
+
     public struct Parameters: Parametrizable {
         public let viewer: DID?
         public let limit: Int?
@@ -26,72 +28,69 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-
         public let actors: [AppBskyUnspeccedDefs.SkeletonSearchActor]
-
+        /// DID of the account these suggestions are relative to. If this is returned undefined, suggestions are based on the viewer.
         public let relativeToDid: DID?
-
+        /// DEPRECATED: use recIdStr instead.
         public let recId: Int?
-
+        /// Snowflake for this recommendation, use when submitting recommendation events.
         public let recIdStr: String?
 
-        /// Standard public initializer
         public init(
             cursor: String? = nil,
-
             actors: [AppBskyUnspeccedDefs.SkeletonSearchActor],
-
             relativeToDid: DID? = nil,
-
             recId: Int? = nil,
-
             recIdStr: String? = nil
-
         ) {
             self.cursor = cursor
-
             self.actors = actors
-
             self.relativeToDid = relativeToDid
-
             self.recId = recId
-
             self.recIdStr = recIdStr
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
             actors = try container.decode([AppBskyUnspeccedDefs.SkeletonSearchActor].self, forKey: .actors)
-
             do {
-                relativeToDid = try container.decodeIfPresent(DID.self, forKey: .relativeToDid)
+                relativeToDid = try container.decodeIfPresent(DID.self, forKey: .relativeToDid, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'relativeToDid' — degrading to nil: \(error)")
                 relativeToDid = nil
             }
-
             do {
-                recId = try container.decodeIfPresent(Int.self, forKey: .recId)
+                recId = try container.decodeIfPresent(Int.self, forKey: .recId, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'recId' — degrading to nil: \(error)")
                 recId = nil
             }
-
             do {
-                recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr)
+                recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
                 recIdStr = nil
             }
@@ -99,52 +98,33 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
             try container.encode(actors, forKey: .actors)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(relativeToDid, forKey: .relativeToDid)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(recId, forKey: .recId)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
             let actorsValue = try actors.toCBORValue()
             map = map.adding(key: "actors", value: actorsValue)
-
             if let value = relativeToDid {
-                // Encode optional property even if it's an empty array for CBOR
                 let relativeToDidValue = try value.toCBORValue()
                 map = map.adding(key: "relativeToDid", value: relativeToDidValue)
             }
-
             if let value = recId {
-                // Encode optional property even if it's an empty array for CBOR
                 let recIdValue = try value.toCBORValue()
                 map = map.adding(key: "recId", value: recIdValue)
             }
-
             if let value = recIdStr {
-                // Encode optional property even if it's an empty array for CBOR
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-
             return map
         }
 
@@ -164,9 +144,8 @@ public extension ATProtoClient.App.Bsky.Unspecced {
     /// Get a skeleton of suggested actors. Intended to be called and then hydrated through app.bsky.actor.getSuggestions
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getSuggestionsSkeleton(input: AppBskyUnspeccedGetSuggestionsSkeleton.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetSuggestionsSkeleton.Output?) {
         let endpoint = "app.bsky.unspecced.getSuggestionsSkeleton"
 
@@ -183,35 +162,26 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.unspecced.getSuggestionsSkeleton")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyUnspeccedGetSuggestionsSkeleton.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getSuggestionsSkeleton: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyUnspeccedGetSuggestionsSkeleton.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,18 +3,37 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.graph.verification
 
+/// Record declaring a verification relationship between two accounts. Verifications are only considered valid by an app if issued by an account the app considers trusted.
 public struct AppBskyGraphVerification: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.graph.verification"
-    public let subject: DID
-    public let handle: Handle
-    public let displayName: String
-    public let createdAt: ATProtocolDate
 
-    public init(subject: DID, handle: Handle, displayName: String, createdAt: ATProtocolDate) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    /// DID of the subject the verification applies to.
+    public let subject: DID
+    /// Handle of the subject the verification applies to at the moment of verifying, which might not be the same at the time of viewing. The verification is only valid if the current handle matches the one at the time of verifying.
+    public let handle: Handle
+    /// Display name of the subject the verification applies to at the moment of verifying, which might not be the same at the time of viewing. The verification is only valid if the current displayName matches the one at the time of verifying.
+    public let displayName: String
+    /// Date of when the verification was created.
+    public let createdAt: ATProtocolDate
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        subject: DID,
+        handle: Handle,
+        displayName: String,
+        createdAt: ATProtocolDate,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.subject = subject
         self.handle = handle
         self.displayName = displayName
         self.createdAt = createdAt
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
@@ -23,6 +42,7 @@ public struct AppBskyGraphVerification: ATProtocolCodable, ATProtocolValue {
         handle = try container.decode(Handle.self, forKey: .handle)
         displayName = try container.decode(String.self, forKey: .displayName)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -32,10 +52,15 @@ public struct AppBskyGraphVerification: ATProtocolCodable, ATProtocolValue {
         try container.encode(handle, forKey: .handle)
         try container.encode(displayName, forKey: .displayName)
         try container.encode(createdAt, forKey: .createdAt)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(subject)
+        hasher.combine(handle)
+        hasher.combine(displayName)
+        hasher.combine(createdAt)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -52,14 +77,11 @@ public struct AppBskyGraphVerification: ATProtocolCodable, ATProtocolValue {
         if createdAt != other.createdAt {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(subject)
-        hasher.combine(handle)
-        hasher.combine(displayName)
-        hasher.combine(createdAt)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -73,8 +95,10 @@ public struct AppBskyGraphVerification: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "displayName", value: displayNameValue)
         let createdAtValue = try createdAt.toCBORValue()
         map = map.adding(key: "createdAt", value: createdAtValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "handle", "displayName", "createdAt"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

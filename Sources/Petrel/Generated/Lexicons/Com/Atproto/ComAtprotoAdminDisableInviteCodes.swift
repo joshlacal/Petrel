@@ -3,22 +3,27 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.admin.disableInviteCodes
 
+/// Disable some set of codes and/or all codes associated with a set of users.
 public enum ComAtprotoAdminDisableInviteCodes {
     public static let typeIdentifier = "com.atproto.admin.disableInviteCodes"
+
     public struct Input: ATProtocolCodable {
         public let codes: [String]?
         public let accounts: [String]?
 
-        /// Standard public initializer
-        public init(codes: [String]? = nil, accounts: [String]? = nil) {
+        public init(
+            codes: [String]? = nil,
+            accounts: [String]? = nil
+        ) {
             self.codes = codes
             self.accounts = accounts
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            codes = try container.decodeIfPresent([String].self, forKey: .codes)
-            accounts = try container.decodeIfPresent([String].self, forKey: .accounts)
+            let strict = decoder.isATProtoStrictDecoding
+            codes = try container.decodeIfPresent([String].self, forKey: .codes, rejectingNull: strict)
+            accounts = try container.decodeIfPresent([String].self, forKey: .accounts, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -50,13 +55,12 @@ public enum ComAtprotoAdminDisableInviteCodes {
 public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - disableInviteCodes
 
-    // Disable some set of codes and/or all codes associated with a set of users.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Disable some set of codes and/or all codes associated with a set of users.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func disableInviteCodes(
         input: ComAtprotoAdminDisableInviteCodes.Input
 
@@ -82,7 +86,13 @@ public extension ATProtoClient.Com.Atproto.Admin {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.admin.disableInviteCodes")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

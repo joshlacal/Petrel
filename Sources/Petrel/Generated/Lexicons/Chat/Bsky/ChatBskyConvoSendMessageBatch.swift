@@ -3,47 +3,47 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.convo.sendMessageBatch
 
+/// Sends a batch of messages to a conversation.
 public enum ChatBskyConvoSendMessageBatch {
     public static let typeIdentifier = "chat.bsky.convo.sendMessageBatch"
 
     public struct BatchItem: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.sendMessageBatch#batchItem"
+
         public let convoId: String
         public let message: ChatBskyConvoDefs.MessageInput
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            convoId: String, message: ChatBskyConvoDefs.MessageInput
+            convoId: String,
+            message: ChatBskyConvoDefs.MessageInput,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(ChatBskyConvoDefs.MessageInput.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(ChatBskyConvoDefs.MessageInput.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +54,7 @@ public enum ChatBskyConvoSendMessageBatch {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +63,16 @@ public enum ChatBskyConvoSendMessageBatch {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case convoId
             case message
         }
@@ -81,8 +81,9 @@ public enum ChatBskyConvoSendMessageBatch {
     public struct Input: ATProtocolCodable {
         public let items: [BatchItem]
 
-        /// Standard public initializer
-        public init(items: [BatchItem]) {
+        public init(
+            items: [BatchItem]
+        ) {
             self.items = items
         }
 
@@ -111,32 +112,26 @@ public enum ChatBskyConvoSendMessageBatch {
     public struct Output: ATProtocolCodable {
         public let items: [ChatBskyConvoDefs.MessageView]
 
-        /// Standard public initializer
         public init(
             items: [ChatBskyConvoDefs.MessageView]
-
         ) {
             self.items = items
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             items = try container.decode([ChatBskyConvoDefs.MessageView].self, forKey: .items)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(items, forKey: .items)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let itemsValue = try items.toCBORValue()
             map = map.adding(key: "items", value: itemsValue)
-
             return map
         }
 
@@ -162,13 +157,12 @@ public enum ChatBskyConvoSendMessageBatch {
 public extension ATProtoClient.Chat.Bsky.Convo {
     // MARK: - sendMessageBatch
 
-    // Sends a batch of messages to a conversation.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Sends a batch of messages to a conversation.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ChatBskyConvoSendMessageBatch.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func sendMessageBatch(
         input: ChatBskyConvoSendMessageBatch.Input
 
@@ -199,40 +193,23 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ChatBskyConvoSendMessageBatch.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyConvoSendMessageBatch.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.sendMessageBatch: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ChatBskyConvoSendMessageBatch.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyConvoSendMessageBatch.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

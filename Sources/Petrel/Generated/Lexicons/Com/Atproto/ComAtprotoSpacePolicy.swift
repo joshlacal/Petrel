@@ -3,27 +3,43 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.policy
 
+/// The policy governing a space, optionally published in the space so that syncers can view a description of the space's policy. Written to the space authority's own repo in the space, and kept in sync with the policy. Only authoritative in the authority's repo.
 public struct ComAtprotoSpacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.space.policy"
-    public let policy: ComAtprotoSpacePolicyPolicyUnion
 
-    public init(policy: ComAtprotoSpacePolicyPolicyUnion) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
+
+    /// The current policy governing the space, including its configuration.
+    public let policy: ComAtprotoSpacePolicyPolicyUnion
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        policy: ComAtprotoSpacePolicyPolicyUnion,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.policy = policy
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         policy = try container.decode(ComAtprotoSpacePolicyPolicyUnion.self, forKey: .policy)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(policy, forKey: .policy)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(policy)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -31,11 +47,11 @@ public struct ComAtprotoSpacePolicy: ATProtocolCodable, ATProtocolValue {
         if policy != other.policy {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(policy)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -43,8 +59,10 @@ public struct ComAtprotoSpacePolicy: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "$type", value: Self.typeIdentifier)
         let policyValue = try policy.toCBORValue()
         map = map.adding(key: "policy", value: policyValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "policy"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -55,6 +73,8 @@ public struct ComAtprotoSpacePolicy: ATProtocolCodable, ATProtocolValue {
         case comAtprotoPersonalspacePolicy(ComAtprotoPersonalspacePolicy)
         case comAtprotoMemberspacePolicy(ComAtprotoMemberspacePolicy)
         case comAtprotoManagedspacePolicy(ComAtprotoManagedspacePolicy)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoPersonalspacePolicy) {
             self = .comAtprotoPersonalspacePolicy(value)

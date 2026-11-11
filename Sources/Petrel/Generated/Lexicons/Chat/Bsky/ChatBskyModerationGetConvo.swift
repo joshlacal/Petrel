@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.moderation.getConvo
 
+/// Gets an existing conversation by its ID, for moderation purposes. Does not require the requester to be a member of the conversation.
 public enum ChatBskyModerationGetConvo {
     public static let typeIdentifier = "chat.bsky.moderation.getConvo"
+
     public struct Parameters: Parametrizable {
         public let convoId: String
 
@@ -18,32 +20,26 @@ public enum ChatBskyModerationGetConvo {
     public struct Output: ATProtocolCodable {
         public let convo: ChatBskyModerationDefs.ConvoView
 
-        /// Standard public initializer
         public init(
             convo: ChatBskyModerationDefs.ConvoView
-
         ) {
             self.convo = convo
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             convo = try container.decode(ChatBskyModerationDefs.ConvoView.self, forKey: .convo)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(convo, forKey: .convo)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let convoValue = try convo.toCBORValue()
             map = map.adding(key: "convo", value: convoValue)
-
             return map
         }
 
@@ -70,9 +66,8 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
     /// Gets an existing conversation by its ID, for moderation purposes. Does not require the requester to be a member of the conversation.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ChatBskyModerationGetConvo.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getConvo(input: ChatBskyModerationGetConvo.Parameters) async throws -> (responseCode: Int, data: ChatBskyModerationGetConvo.Output?) {
         let endpoint = "chat.bsky.moderation.getConvo"
 
@@ -92,41 +87,23 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ChatBskyModerationGetConvo.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyModerationGetConvo.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.moderation.getConvo: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ChatBskyModerationGetConvo.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyModerationGetConvo.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

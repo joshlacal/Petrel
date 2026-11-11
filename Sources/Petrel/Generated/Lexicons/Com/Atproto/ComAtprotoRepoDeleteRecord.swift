@@ -3,17 +3,29 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.repo.deleteRecord
 
+/// Delete a repository record, or ensure it doesn't exist. Requires auth, implemented by PDS.
 public enum ComAtprotoRepoDeleteRecord {
     public static let typeIdentifier = "com.atproto.repo.deleteRecord"
+
     public struct Input: ATProtocolCodable {
+        /// The handle or DID of the repo (aka, current account).
         public let repo: ATIdentifier
+        /// The NSID of the record collection.
         public let collection: NSID
+        /// The Record Key.
         public let rkey: RecordKey
+        /// Compare and swap with the previous record by CID.
         public let swapRecord: CID?
+        /// Compare and swap with the previous commit by CID.
         public let swapCommit: CID?
 
-        /// Standard public initializer
-        public init(repo: ATIdentifier, collection: NSID, rkey: RecordKey, swapRecord: CID? = nil, swapCommit: CID? = nil) {
+        public init(
+            repo: ATIdentifier,
+            collection: NSID,
+            rkey: RecordKey,
+            swapRecord: CID? = nil,
+            swapCommit: CID? = nil
+        ) {
             self.repo = repo
             self.collection = collection
             self.rkey = rkey
@@ -23,11 +35,12 @@ public enum ComAtprotoRepoDeleteRecord {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             repo = try container.decode(ATIdentifier.self, forKey: .repo)
             collection = try container.decode(NSID.self, forKey: .collection)
             rkey = try container.decode(RecordKey.self, forKey: .rkey)
-            swapRecord = try container.decodeIfPresent(CID.self, forKey: .swapRecord)
-            swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit)
+            swapRecord = try container.decodeIfPresent(CID.self, forKey: .swapRecord, rejectingNull: strict)
+            swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -70,21 +83,22 @@ public enum ComAtprotoRepoDeleteRecord {
     public struct Output: ATProtocolCodable {
         public let commit: ComAtprotoRepoDefs.CommitMeta?
 
-        /// Standard public initializer
         public init(
             commit: ComAtprotoRepoDefs.CommitMeta? = nil
-
         ) {
             self.commit = commit
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+                commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
                 commit = nil
             }
@@ -92,20 +106,15 @@ public enum ComAtprotoRepoDeleteRecord {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(commit, forKey: .commit)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = commit {
-                // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
                 map = map.adding(key: "commit", value: commitValue)
             }
-
             return map
         }
 
@@ -129,13 +138,12 @@ public enum ComAtprotoRepoDeleteRecord {
 public extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - deleteRecord
 
-    // Delete a repository record, or ensure it doesn't exist. Requires auth, implemented by PDS.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Delete a repository record, or ensure it doesn't exist. Requires auth, implemented by PDS.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoRepoDeleteRecord.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func deleteRecord(
         input: ComAtprotoRepoDeleteRecord.Input
 
@@ -166,40 +174,23 @@ public extension ATProtoClient.Com.Atproto.Repo {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoRepoDeleteRecord.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoRepoDeleteRecord.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.repo.deleteRecord: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoRepoDeleteRecord.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoRepoDeleteRecord.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

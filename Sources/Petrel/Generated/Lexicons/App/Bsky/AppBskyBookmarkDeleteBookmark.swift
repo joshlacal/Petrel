@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.bookmark.deleteBookmark
 
+/// Deletes a private bookmark for the specified record. Currently, only `app.bsky.feed.post` records are supported. Requires authentication.
 public enum AppBskyBookmarkDeleteBookmark {
     public static let typeIdentifier = "app.bsky.bookmark.deleteBookmark"
+
     public struct Input: ATProtocolCodable {
         public let uri: ATProtocolURI
 
-        /// Standard public initializer
-        public init(uri: ATProtocolURI) {
+        public init(
+            uri: ATProtocolURI
+        ) {
             self.uri = uri
         }
 
@@ -51,13 +54,12 @@ public enum AppBskyBookmarkDeleteBookmark {
 public extension ATProtoClient.App.Bsky.Bookmark {
     // MARK: - deleteBookmark
 
-    // Deletes a private bookmark for the specified record. Currently, only `app.bsky.feed.post` records are supported. Requires authentication.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Deletes a private bookmark for the specified record. Currently, only `app.bsky.feed.post` records are supported. Requires authentication.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<AppBskyBookmarkDeleteBookmark.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func deleteBookmark(
         input: AppBskyBookmarkDeleteBookmark.Input
 
@@ -86,14 +88,8 @@ public extension ATProtoClient.App.Bsky.Bookmark {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyBookmarkDeleteBookmark.Error.self
-            ) {
-                throw atprotoError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyBookmarkDeleteBookmark.Error.self)
         }
 
         return responseCode

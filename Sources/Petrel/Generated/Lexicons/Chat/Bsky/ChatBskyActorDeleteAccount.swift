@@ -7,35 +7,31 @@ public enum ChatBskyActorDeleteAccount {
     public static let typeIdentifier = "chat.bsky.actor.deleteAccount"
 
     public struct Output: ATProtocolCodable {
-        // Empty output - no properties (response is {})
-
-        /// Standard public initializer
         public init() {}
 
         public init(from decoder: Decoder) throws {
-            // Empty output - just validate it's an object by trying to get any container
-            _ = try decoder.singleValueContainer()
+            _ = try decoder.container(keyedBy: CodingKeys.self)
         }
 
         public func encode(to encoder: Encoder) throws {
-            // Empty output - encode empty object
-            _ = encoder.singleValueContainer()
+            _ = encoder.container(keyedBy: CodingKeys.self)
         }
 
         public func toCBORValue() throws -> Any {
-            // Empty output - return empty CBOR map
             return OrderedCBORMap()
         }
+
+        private enum CodingKeys: CodingKey {}
     }
 }
 
 public extension ATProtoClient.Chat.Bsky.Actor {
     // MARK: - deleteAccount
 
+    /// Calls `chat.bsky.actor.deleteAccount`.
     ///
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func deleteAccount(
     ) async throws -> (responseCode: Int, data: ChatBskyActorDeleteAccount.Output?) {
         let endpoint = "chat.bsky.actor.deleteAccount"
@@ -59,34 +55,26 @@ public extension ATProtoClient.Chat.Bsky.Actor {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.actor.deleteAccount")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyActorDeleteAccount.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.actor.deleteAccount: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyActorDeleteAccount.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

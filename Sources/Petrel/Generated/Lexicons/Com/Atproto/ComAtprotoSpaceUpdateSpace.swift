@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.updateSpace
 
+/// Replace the policy of a space wholesale. A policy with a different $type migrates the space, discarding state held by the previous policy (such as a member list). The authenticated user must be the space owner. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceUpdateSpace {
     public static let typeIdentifier = "com.atproto.space.updateSpace"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space to update.
         public let space: SpaceRef
+        /// The policy governing the space, including its configuration. Replaces the current policy.
         public let policy: InputPolicyUnion
 
-        /// Standard public initializer
-        public init(space: SpaceRef, policy: InputPolicyUnion) {
+        public init(
+            space: SpaceRef,
+            policy: InputPolicyUnion
+        ) {
             self.space = space
             self.policy = policy
         }
@@ -81,6 +87,8 @@ public enum ComAtprotoSpaceUpdateSpace {
         case comAtprotoPersonalspacePolicy(ComAtprotoPersonalspacePolicy)
         case comAtprotoMemberspacePolicy(ComAtprotoMemberspacePolicy)
         case comAtprotoManagedspacePolicy(ComAtprotoManagedspacePolicy)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoPersonalspacePolicy) {
             self = .comAtprotoPersonalspacePolicy(value)
@@ -249,13 +257,12 @@ public enum ComAtprotoSpaceUpdateSpace {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - updateSpace
 
-    // Replace the policy of a space wholesale. A policy with a different $type migrates the space, discarding state held by the previous policy (such as a member list). The authenticated user must be the space owner. Requires auth, implemented by PDS.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Replace the policy of a space wholesale. A policy with a different $type migrates the space, discarding state held by the previous policy (such as a member list). The authenticated user must be the space owner. Requires auth, implemented by PDS.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoSpaceUpdateSpace.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func updateSpace(
         input: ComAtprotoSpaceUpdateSpace.Input
 
@@ -284,18 +291,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceUpdateSpace.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceUpdateSpace.Error.self)
         }
 
         return responseCode

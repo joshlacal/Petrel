@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.importRepo
 
+/// Import the authenticated account's repo in a space from a STAR file, as served by getRepo, during account migration, replacing whatever this host holds for that repo. The archive's commit names the space and must name the account as its repo. If the account is the space's authority, the space must first be imported with importSpaceMeta. Blobs are not included and are uploaded separately. Requires OAuth with a create grant for every collection in the archive, implemented by PDS.
 public enum ComAtprotoSpaceImportRepo {
     public static let typeIdentifier = "com.atproto.space.importRepo"
+
     public struct Input: ATProtocolCodable {
         public let data: Data
 
-        /// Standard public initializer
-        public init(data: Data) {
+        public init(
+            data: Data
+        ) {
             self.data = data
         }
 
@@ -72,23 +75,21 @@ public enum ComAtprotoSpaceImportRepo {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - importRepo
 
-    // Import the authenticated account's repo in a space from a STAR file, as served by getRepo, during account migration, replacing whatever this host holds for that repo. The archive's commit names the space and must name the account as its repo. If the account is the space's authority, the space must first be imported with importSpaceMeta. Blobs are not included and are uploaded separately. Requires OAuth with a create grant for every collection in the archive, implemented by PDS.
-    //
-    // - Parameter data: The binary data to upload
-
+    /// Import the authenticated account's repo in a space from a STAR file, as served by getRepo, during account migration, replacing whatever this host holds for that repo. The archive's commit names the space and must name the account as its repo. If the account is the space's authority, the space must first be imported with importSpaceMeta. Blobs are not included and are uploaded separately. Requires OAuth with a create grant for every collection in the archive, implemented by PDS.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - data: The request body bytes
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoSpaceImportRepo.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func importRepo(
         data: Data
 
     ) async throws -> Int {
         let endpoint = "com.atproto.space.importRepo"
 
-        let dataToUpload = data
         let headers: [String: String] = [
             "Content-Type": "application/octet-stream",
-            "Content-Length": "\(dataToUpload.count)",
+            "Content-Length": "\(data.count)",
         ]
 
         let queryItems: [URLQueryItem]? = nil
@@ -97,7 +98,7 @@ public extension ATProtoClient.Com.Atproto.Space {
             endpoint: endpoint,
             method: "POST",
             headers: headers,
-            body: dataToUpload,
+            body: data,
             queryItems: queryItems
         )
 
@@ -107,18 +108,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceImportRepo.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceImportRepo.Error.self)
         }
 
         return responseCode

@@ -1,0 +1,353 @@
+import Foundation
+#if canImport(FoundationNetworking)
+    import FoundationNetworking
+#endif
+@testable import Petrel
+import XCTest
+
+/// Wire behaviour of generated XRPC calls, exercised through the real `NetworkService`
+/// pipeline against a stubbed transport.
+///
+/// XCTest rather than Swift Testing: the stub is installed through the process-wide
+/// `NetworkService.setNetworkTestProtocolClasses`, which the suites sharing it serialise
+/// on by running as XCTest classes.
+final class GeneratedXRPCCallTests: XCTestCase {
+    override class func setUp() {
+        super.setUp()
+        NetworkService.setNetworkTestProtocolClasses([XRPCStubURLProtocol.self])
+    }
+
+    override class func tearDown() {
+        XRPCStubURLProtocol.reset()
+        NetworkService.setNetworkTestProtocolClasses(nil)
+        super.tearDown()
+    }
+
+    override func tearDown() {
+        XRPCStubURLProtocol.reset()
+        super.tearDown()
+    }
+
+    private let baseURL = URL(string: "https://example.com")!
+
+    private func client() -> ATProtoClient.App {
+        ATProtoClient.App(networkService: NetworkService(baseURL: baseURL))
+    }
+
+    private func atproto() -> ATProtoClient.Com.Atproto {
+        ATProtoClient.Com(networkService: NetworkService(baseURL: baseURL)).atproto
+    }
+
+    // MARK: - Error envelope (lex-3)
+
+    /// `app.bsky.feed.getTimeline` declares no errors. The server's envelope must still reach
+    /// the caller, with the status code and headers.
+    func testEndpointWithoutDeclaredErrorsThrowsTheEnvelope() async throws {
+        XRPCStubURLProtocol.install(
+            status: 400,
+            body: #"{"error":"InvalidRequest","message":"limit must be at most 100"}"#
+        )
+
+        do {
+            _ = try await client().bsky.feed.getTimeline(input: .init(limit: 500))
+            XCTFail("a 400 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "InvalidRequest")
+            XCTAssertEqual(error.message, "limit must be at most 100")
+            XCTAssertEqual(error.statusCode, 400)
+            XCTAssertEqual(error.headers["content-type"], "application/json")
+        }
+    }
+
+    /// Statuses 402-499 used to surface as a bare `NetworkError.responseError(statusCode:)`.
+    func testRateLimitResponseCarriesTheEnvelopeAndRateLimitHeaders() async throws {
+        XRPCStubURLProtocol.install(
+            status: 429,
+            body: #"{"error":"RateLimitExceeded","message":"Rate Limit Exceeded"}"#,
+            headers: [
+                "RateLimit-Limit": "3000",
+                "RateLimit-Remaining": "0",
+                "RateLimit-Reset": "1767225600",
+                "RateLimit-Policy": "3000;w=300",
+                "Retry-After": "42",
+            ]
+        )
+
+        do {
+            _ = try await client().bsky.feed.getTimeline(input: .init())
+            XCTFail("a 429 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "RateLimitExceeded")
+            XCTAssertEqual(error.statusCode, 429)
+            XCTAssertEqual(
+                error.rateLimit,
+                XRPCRateLimit(
+                    limit: 3000,
+                    remaining: 0,
+                    reset: Date(timeIntervalSince1970: 1_767_225_600),
+                    policy: "3000;w=300"
+                )
+            )
+            XCTAssertEqual(error.retryAfter, 42)
+        }
+    }
+
+    /// `com.atproto.repo.getRecord` declares `RecordNotFound`: a declared name is thrown typed.
+    func testDeclaredErrorIsThrownTyped() async throws {
+        XRPCStubURLProtocol.install(
+            status: 400,
+            body: #"{"error":"RecordNotFound","message":"Could not locate record"}"#
+        )
+
+        do {
+            _ = try await atproto().repo.getRecord(input: getRecordParameters())
+            XCTFail("a 400 response must throw")
+        } catch let error as ATProtoError<ComAtprotoRepoGetRecord.Error> {
+            XCTAssertEqual(error.error, .recordNotFound)
+            XCTAssertEqual(error.message, "Could not locate record")
+            XCTAssertEqual(error.statusCode, 400)
+        }
+    }
+
+    /// The same endpoint answering with a name its Lexicon does not declare used to return
+    /// `(400, nil)`; the envelope must not be dropped.
+    func testUndeclaredErrorOnAnEndpointWithDeclaredErrorsThrowsTheEnvelope() async throws {
+        XRPCStubURLProtocol.install(
+            status: 403,
+            body: #"{"error":"AccountTakedown","message":"Account has been taken down"}"#
+        )
+
+        do {
+            _ = try await atproto().repo.getRecord(input: getRecordParameters())
+            XCTFail("a 403 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "AccountTakedown")
+            XCTAssertEqual(error.message, "Account has been taken down")
+            XCTAssertEqual(error.statusCode, 403)
+        }
+    }
+
+    /// A gateway that answers with HTML still produces a typed error: no envelope to quote,
+    /// so the status is the error and the body text is the message.
+    func testNonEnvelopeErrorBodyIsReportedWithItsStatus() async throws {
+        XRPCStubURLProtocol.install(
+            status: 404,
+            body: "<html>not here</html>",
+            headers: ["Content-Type": "text/html"]
+        )
+
+        do {
+            _ = try await client().bsky.feed.getTimeline(input: .init())
+            XCTFail("a 404 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "HTTP 404")
+            XCTAssertEqual(error.message, "<html>not here</html>")
+            XCTAssertEqual(error.statusCode, 404)
+        }
+    }
+
+    func testEmptyErrorBodyIsReportedWithItsStatus() async throws {
+        XRPCStubURLProtocol.install(status: 403, body: "")
+
+        do {
+            _ = try await client().bsky.feed.getTimeline(input: .init())
+            XCTFail("a 403 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "HTTP 403")
+            XCTAssertNil(error.message)
+        }
+    }
+
+    /// A procedure without an output schema returns only the status code, and must throw the
+    /// envelope too.
+    func testProcedureWithoutOutputThrowsTheEnvelope() async throws {
+        XRPCStubURLProtocol.install(
+            status: 400,
+            body: #"{"error":"InvalidRequest","message":"Input/handle must be a valid handle"}"#
+        )
+
+        do {
+            _ = try await atproto().identity.updateHandle(
+                input: .init(handle: Handle(handleString: "alice.test"))
+            )
+            XCTFail("a 400 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "InvalidRequest")
+            XCTAssertEqual(error.statusCode, 400)
+        }
+    }
+
+    /// A 2xx body that does not match the output schema used to come back as `(200, nil)`.
+    func testUndecodableSuccessBodyThrows() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: #"{"feed":"not an array"}"#)
+
+        do {
+            _ = try await client().bsky.feed.getTimeline(input: .init())
+            XCTFail("an undecodable 200 response must throw")
+        } catch let error as XRPCResponseDecodingError {
+            XCTAssertEqual(error.endpoint, "app.bsky.feed.getTimeline")
+            XCTAssertEqual(error.statusCode, 200)
+            XCTAssertTrue(error.underlying is DecodingError)
+        }
+    }
+
+    func testSuccessReturnsTheStatusAndDecodedBody() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: #"{"feed":[],"cursor":"abc"}"#)
+
+        let (status, output) = try await client().bsky.feed.getTimeline(input: .init())
+
+        XCTAssertEqual(status, 200)
+        XCTAssertEqual(output?.cursor, "abc")
+        XCTAssertEqual(output?.feed.count, 0)
+    }
+
+    // MARK: - Query string (v-2)
+
+    /// `URLComponents` leaves `+` literal; servers that parse the query as form data read it
+    /// as a space.
+    func testPlusIsPercentEncodedInQueryValues() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: #"{"posts":[]}"#)
+
+        _ = try await client().bsky.feed.searchPosts(
+            input: .init(q: "c++ & 1+1=2", since: "2026-01-01T00:00:00+01:00", cursor: "a+b/c==")
+        )
+
+        let query = try XCTUnwrap(XRPCStubURLProtocol.lastRequest?.url?.query(percentEncoded: true))
+        XCTAssertFalse(query.contains("+"), "literal '+' left in \(query)")
+        XCTAssertTrue(query.contains("q=c%2B%2B%20%26%201%2B1%3D2"), query)
+        XCTAssertTrue(query.contains("since=2026-01-01T00:00:00%2B01:00"), query)
+        XCTAssertTrue(query.contains("cursor=a%2Bb/c%3D%3D"), query)
+
+        // What a form-decoding server reads back.
+        let items = URLComponents(string: "https://example.com/?" + query)?.queryItems ?? []
+        XCTAssertEqual(items.first { $0.name == "q" }?.value, "c++ & 1+1=2")
+        XCTAssertEqual(items.first { $0.name == "cursor" }?.value, "a+b/c==")
+    }
+
+    // MARK: - Blob upload (lex-5, bsky-6)
+
+    /// A `*/*` body is opaque: every byte and the caller's Content-Type go out untouched,
+    /// for images, video and arbitrary data alike.
+    func testUploadBlobSendsTheBodyUntouched() async throws {
+        // A PNG header followed by bytes no image decoder would accept: if anything tried
+        // to decode or re-encode the "image", the body would change or the call would throw.
+        let png = Data([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]) + Data((0 ..< 64).map { UInt8($0) })
+        let mp4 = Data([0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70]) + Data(repeating: 0xAB, count: 256)
+        let octets = Data((0 ... 255).map { UInt8($0) })
+        let blobResponse = """
+        {"blob":{"$type":"blob","ref":{"$link":"bafkreihdwdcefgh4dqkjv67uzcmw7ojee6xedzdetojuzjevtenxquvyku"},\
+        "mimeType":"application/octet-stream","size":256}}
+        """
+
+        for (data, mimeType) in [(png, "image/png"), (mp4, "video/mp4"), (octets, "application/octet-stream")] {
+            XRPCStubURLProtocol.install(status: 200, body: blobResponse)
+
+            let (status, output) = try await atproto().repo.uploadBlob(data: data, mimeType: mimeType)
+
+            XCTAssertEqual(status, 200)
+            XCTAssertNotNil(output?.blob)
+            let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), mimeType)
+            XCTAssertEqual(XRPCStubURLProtocol.lastBody, data, "\(mimeType) body was modified")
+        }
+    }
+
+    // MARK: - Helpers
+
+    private func getRecordParameters() throws -> ComAtprotoRepoGetRecord.Parameters {
+        try ComAtprotoRepoGetRecord.Parameters(
+            repo: ATIdentifier(string: "did:plc:ewvi7nxzyoun6zhxrhs64oiz"),
+            collection: NSID(nsidString: "app.bsky.feed.post"),
+            rkey: RecordKey(keyString: "3jwdwj2ctlk26")
+        )
+    }
+}
+
+/// Answers every request with one canned response and records what was sent.
+final class XRPCStubURLProtocol: URLProtocol {
+    private struct Stub {
+        let status: Int
+        let body: Data
+        let headers: [String: String]
+    }
+
+    private static let lock = NSLock()
+    private nonisolated(unsafe) static var stub: Stub?
+    private nonisolated(unsafe) static var recordedRequest: URLRequest?
+    private nonisolated(unsafe) static var recordedBody: Data?
+
+    static var lastRequest: URLRequest? {
+        lock.withLock { recordedRequest }
+    }
+
+    /// The request body as it reached the transport.
+    static var lastBody: Data? {
+        lock.withLock { recordedBody }
+    }
+
+    static func install(status: Int, body: String, headers: [String: String] = [:]) {
+        var merged = ["Content-Type": "application/json"]
+        merged.merge(headers) { _, new in new }
+        lock.withLock {
+            stub = Stub(status: status, body: Data(body.utf8), headers: merged)
+            recordedRequest = nil
+            recordedBody = nil
+        }
+    }
+
+    static func reset() {
+        lock.withLock {
+            stub = nil
+            recordedRequest = nil
+            recordedBody = nil
+        }
+    }
+
+    override class func canInit(with _: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        let body = request.httpBody ?? request.httpBodyStream.map(Self.read)
+        let stub = Self.lock.withLock { () -> Stub? in
+            Self.recordedRequest = request
+            Self.recordedBody = body
+            return Self.stub
+        }
+        guard let stub,
+              let url = request.url,
+              let response = HTTPURLResponse(
+                  url: url,
+                  statusCode: stub.status,
+                  httpVersion: "HTTP/1.1",
+                  headerFields: stub.headers
+              )
+        else {
+            client?.urlProtocol(self, didFailWithError: URLError(.resourceUnavailable))
+            return
+        }
+        client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+        client?.urlProtocol(self, didLoad: stub.body)
+        client?.urlProtocolDidFinishLoading(self)
+    }
+
+    override func stopLoading() {}
+
+    private static func read(_ stream: InputStream) -> Data {
+        stream.open()
+        defer { stream.close() }
+        var data = Data()
+        var buffer = [UInt8](repeating: 0, count: 16384)
+        while stream.hasBytesAvailable {
+            let count = stream.read(&buffer, maxLength: buffer.count)
+            guard count > 0 else { break }
+            data.append(buffer, count: count)
+        }
+        return data
+    }
+}
