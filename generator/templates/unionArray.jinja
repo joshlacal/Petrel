@@ -54,7 +54,11 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
     {%- for ref in refs %}
     case {{ ref.camel_case_label | lowerCamelCase }}({{ ref.swift_ref }})
     {%- endfor %}
+    {%- if not closed %}
+    /// A value whose `$type` this union does not declare. Open unions accept and
+    /// re-encode such values unchanged.
     case unexpected(ATProtocolValueContainer)
+    {%- endif %}
 
     {%- for ref in refs %}
     public init(_ value: {{ ref.swift_ref }}) {
@@ -73,13 +77,23 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
             self = .{{ ref.camel_case_label | lowerCamelCase }}(value)
         {%- endfor %}
         default:
+            {%- if closed %}
+            throw DecodingError.dataCorruptedError(
+                forKey: .type,
+                in: container,
+                debugDescription: "'\(typeValue)' is not a member of this closed union"
+            )
+            {%- else %}
             let unknownValue = try ATProtocolValueContainer(from: decoder)
             self = .unexpected(unknownValue)
+            {%- endif %}
         }
     }
 
     public func encode(to encoder: Encoder) throws {
+        {%- if refs %}
         var container = encoder.container(keyedBy: CodingKeys.self)
+        {%- endif %}
 
         switch self {
         {%- for ref in refs %}
@@ -87,8 +101,10 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
             try container.encode("{{ ref.ref | escapeStringLiteral }}", forKey: .type)
             try value.encode(to: encoder)
         {%- endfor %}
-        case .unexpected(let ATProtocolValueContainer):
-            try ATProtocolValueContainer.encode(to: encoder)
+        {%- if not closed %}
+        case .unexpected(let unknownValue):
+            try unknownValue.encode(to: encoder)
+        {%- endif %}
         }
     }
 
@@ -99,9 +115,11 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
             hasher.combine("{{ ref.ref | escapeStringLiteral }}")
             hasher.combine(value)
         {%- endfor %}
-        case .unexpected(let ATProtocolValueContainer):
+        {%- if not closed %}
+        case .unexpected(let unknownValue):
             hasher.combine("unexpected")
-            hasher.combine(ATProtocolValueContainer)
+            hasher.combine(unknownValue)
+        {%- endif %}
         }
     }
 
@@ -114,10 +132,14 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
               .{{ ref.camel_case_label | lowerCamelCase }}(let otherValue)):
             return selfValue == otherValue
         {%- endfor %}
+        {%- if not closed %}
         case (.unexpected(let selfValue), .unexpected(let otherValue)):
             return selfValue.isEqual(to: otherValue)
+        {%- endif %}
+        {%- if (refs | length) + (0 if closed else 1) > 1 %}
         default:
             return false
+        {%- endif %}
         }
     }
 
@@ -127,7 +149,9 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
     
     // DAGCBOR encoding with field ordering
     public func toCBORValue() throws -> Any {
+        {%- if refs %}
         var map = OrderedCBORMap()
+        {%- endif %}
         
         switch self {
         {%- for ref in refs %}
@@ -149,8 +173,10 @@ public enum {{ union_name | convertRefToSwift }}ForUnionArray: Codable, ATProtoc
             }
             return map
         {%- endfor %}
+        {%- if not closed %}
         case .unexpected(let container):
             return try container.toCBORValue()
+        {%- endif %}
         }
     }
 }

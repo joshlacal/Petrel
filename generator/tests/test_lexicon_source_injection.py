@@ -49,7 +49,6 @@ class LexiconSourceInjectionTests(unittest.TestCase):
             "prop ${injection}",
             "prop\\(injection)",
             "prop.subprop",
-            "prop-hyphen-in-identifier",
             "",
         ]
         for bad_name in invalid_names:
@@ -268,8 +267,8 @@ class LexiconSourceInjectionTests(unittest.TestCase):
         self.assertNotIn("* tag", sub_rendered)
         self.assertIn('// "multi\n// line\n// tag" -> payload type `Bytes` is', sub_rendered)
 
-    def test_blob_upload_procedure_fails_closed_template_contract(self):
-        """Blob upload procedure must render guard ImageMetadataStripper.stripMetadata with fail-closed throw and preserve opt-out."""
+    def test_wildcard_input_procedure_sends_the_body_untouched(self):
+        """A `*/*` input is opaque bytes: no ImageIO pass, no re-encode, no UIKit import."""
         upload_lexicon = {
             "lexicon": 1,
             "id": "com.atproto.repo.uploadBlob",
@@ -290,11 +289,23 @@ class LexiconSourceInjectionTests(unittest.TestCase):
             },
         }
         swift_code = SwiftCodeGenerator(upload_lexicon, self.cycle_detector).convert()
-        self.assertIn("stripMetadata: Bool = true", swift_code)
-        self.assertIn("if stripMetadata {", swift_code)
-        self.assertIn("guard let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) else {", swift_code)
-        self.assertIn("throw NetworkError.metadataStrippingFailed", swift_code)
-        self.assertIn("dataToUpload = strippedData", swift_code)
+        self.assertRegex(
+            swift_code,
+            r"public func uploadBlob\(\s*data: Data,\s*mimeType: String\s*\) async throws",
+        )
+        self.assertIn('"Content-Type": mimeType', swift_code)
+        self.assertIn('"Content-Length": "\\(data.count)"', swift_code)
+        self.assertRegex(swift_code, r"body: data,")
+        for forbidden in (
+            "stripMetadata",
+            "ImageMetadataStripper",
+            "compressImage",
+            "jpegData",
+            "import UIKit",
+            "import AppKit",
+            "metadataStrippingFailed",
+        ):
+            self.assertNotIn(forbidden, swift_code)
 
     def test_string_literal_escaping_in_all_templates_and_contexts(self):
         """String-literal contexts (encodings, knownValues, union refs, @SerialName) must escape quotes, backslashes, and interpolation."""

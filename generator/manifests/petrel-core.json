@@ -13,7 +13,16 @@
   "swift": {
     "output": "Sources/Petrel/Generated",
     "emit_server_contracts": ["com.atproto.space", "com.atproto.memberspace", "com.atproto.managedspace", "com.atproto.personalspace"],
-    "emit_xrpc_error_parsing": ["com.atproto.space", "com.atproto.memberspace", "com.atproto.managedspace", "com.atproto.personalspace"]
+    "$comment_property_type_overrides": "Lexicon types these DID documents as `unknown`. Petrel ships a hand-written DIDDocument model, so the core package types them with it. Keyed by lexicon id, then `<StructName>.<property>`.",
+    "property_type_overrides": {
+      "com.atproto.identity.defs": {"IdentityInfo.didDoc": "DIDDocument"},
+      "com.atproto.identity.resolveDid": {"Output.didDoc": "DIDDocument"},
+      "com.atproto.repo.describeRepo": {"Output.didDoc": "DIDDocument"},
+      "com.atproto.server.createAccount": {"Output.didDoc": "DIDDocument"},
+      "com.atproto.server.createSession": {"Output.didDoc": "DIDDocument"},
+      "com.atproto.server.getSession": {"Output.didDoc": "DIDDocument"},
+      "com.atproto.server.refreshSession": {"Output.didDoc": "DIDDocument"}
+    }
   },
   "kotlin": {
     "output": "kotlin/src/main/kotlin/blue/catbird/petrel/generated"

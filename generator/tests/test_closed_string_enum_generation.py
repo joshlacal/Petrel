@@ -15,6 +15,8 @@ sys.path.insert(0, str(GENERATOR_DIR))
 from cycle_detector import CycleDetector
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from swift_test_stubs import CONTAINER_STUB
 
 
 def _gradle_env():
@@ -328,7 +330,9 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             }}
             public enum LogManager {{
                 public static func logError(_ message: String) {{}}
+                public static func logWarning(_ message: String) {{}}
             }}
+            {CONTAINER_STUB}
 
             {declarations}
 
@@ -343,10 +347,12 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             )
             precondition(decodedEnvelope == envelope)
 
-            let input = BlueCatbirdTestNamed.Input(data: .value_on)
+            // A ref-typed input is the referenced value itself: no `data` wrapper.
+            let input: BlueCatbirdTestNamed.Input = .value_on
             let inputData = try! JSONEncoder().encode(input)
+            precondition(String(decoding: inputData, as: UTF8.self) == "\\"on\\"")
             precondition(
-                try! JSONDecoder().decode(BlueCatbirdTestNamed.Input.self, from: inputData).data
+                try! JSONDecoder().decode(BlueCatbirdTestNamed.Input.self, from: inputData)
                     == .value_on
             )
 
@@ -388,7 +394,10 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
             generated,
         )
         self.assertNotIn("property 'optionalStrict' — degrading to nil", generated)
-        self.assertIn("decodeIfPresent(Receipt.self, forKey: .optionalOrdinary)", generated)
+        self.assertIn(
+            "decodeIfPresent(Receipt.self, forKey: .optionalOrdinary, rejectingNull: strict)",
+            generated,
+        )
 
     def test_inline_closed_enum_is_typed_in_swift_and_kotlin(self):
         swift = SwiftCodeGenerator(procedure_lexicon()).convert()
@@ -524,7 +533,8 @@ class ClosedStringEnumGenerationTests(unittest.TestCase):
                 ).convert()
                 self.assertIn("public let local: DefsMode", generated)
                 self.assertIn("public let qualified: DefsMode", generated)
-                self.assertIn("public let data: DefsMode", generated)
+                self.assertIn("public typealias Input = DefsMode", generated)
+                self.assertNotIn("public let data:", generated)
                 self.assertIn("public typealias Output = DefsMode", generated)
                 self._run_swift_named_ref_fixture(generated)
 

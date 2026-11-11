@@ -13,6 +13,8 @@ sys.path.insert(0, str(GENERATOR_DIR))
 
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from swift_test_stubs import CONTAINER_STUB
 
 
 def required_nullable_lexicon():
@@ -33,12 +35,16 @@ class RequiredNullableGenerationTests(unittest.TestCase):
             "self.nullableScalar = try container.decodeIfPresent(String.self, forKey: .nullableScalar)",
             "self.nullableCID = try container.decodeIfPresent(CID.self, forKey: .nullableCID)",
             "self.requiredCount = try container.decode(Int.self, forKey: .requiredCount)",
-            "self.optionalNote = try container.decodeIfPresent(String.self, forKey: .optionalNote)",
-            "try container.encode(nullableScalar, forKey: .nullableScalar)",
-            "try container.encode(nullableCID, forKey: .nullableCID)",
-            "try container.encode(requiredCount, forKey: .requiredCount)",
-            "try container.encodeIfPresent(optionalNote, forKey: .optionalNote)",
-            "nullableScalar: String?, nullableCID: CID?, requiredCount: Int, optionalNote: String? = nil",
+            "self.optionalNote = try container.decodeIfPresent(String.self, forKey: .optionalNote, rejectingNull: strict)",
+            "try container.encode(self.nullableScalar, forKey: .nullableScalar)",
+            "try container.encode(self.nullableCID, forKey: .nullableCID)",
+            "try container.encode(self.requiredCount, forKey: .requiredCount)",
+            "try container.encodeIfPresent(self.optionalNote, forKey: .optionalNote)",
+            # A required-nullable property has no default; an optional one does.
+            "nullableScalar: String?,",
+            "nullableCID: CID?,",
+            "requiredCount: Int,",
+            "optionalNote: String? = nil,",
         )
         normalized = {line.strip() for line in generated.splitlines()}
         for line in expected_lines:
@@ -46,11 +52,11 @@ class RequiredNullableGenerationTests(unittest.TestCase):
                 self.assertIn(line, normalized)
 
         self.assertNotIn(
-            "try container.encodeIfPresent(nullableScalar, forKey: .nullableScalar)",
+            "try container.encodeIfPresent(self.nullableScalar, forKey: .nullableScalar)",
             normalized,
         )
         self.assertNotIn(
-            "try container.encodeIfPresent(nullableCID, forKey: .nullableCID)",
+            "try container.encodeIfPresent(self.nullableCID, forKey: .nullableCID)",
             normalized,
         )
         self.assertNotIn("nullableScalar: String? = nil", generated)
@@ -90,6 +96,7 @@ class RequiredNullableGenerationTests(unittest.TestCase):
                 public static func logWarning(_ message: String) {{}}
                 public static func logDebug(_ message: String) {{}}
             }}
+            {CONTAINER_STUB}
             public struct CID: Codable, Equatable, Hashable {{
                 public let value: String
                 public init(from decoder: Decoder) throws {{

@@ -12,6 +12,8 @@ sys.path.insert(0, str(GENERATOR_DIR))
 
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from swift_test_stubs import CONTAINER_STUB
 from cycle_detector import CycleDetector
 
 
@@ -236,6 +238,7 @@ class StrictRefUnknownKeysTests(unittest.TestCase):
                 public static func logError(_ message: String) {{}}
                 public static func logWarning(_ message: String) {{}}
             }}
+            {CONTAINER_STUB}
             extension Int {{ public func toCBORValue() throws -> Any {{ self }} }}
             extension String {{ public func toCBORValue() throws -> Any {{ self }} }}
 

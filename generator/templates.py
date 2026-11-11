@@ -1,6 +1,6 @@
 import os
 import jinja2
-from utils import convert_to_camel_case
+from utils import convert_to_camel_case, convert_ref, swift_member_name
 
 # Swift reserved keywords that cannot be used as bare identifiers.
 # Mirror of sanitize_kotlin_keyword in kotlin_templates.py. Case-sensitive:
@@ -55,11 +55,14 @@ def escape_swift_string_literal(s: str) -> str:
 def sanitize_swift_keyword(s: str) -> str:
     """Escape Swift reserved keywords by wrapping in backticks.
 
+    Wire names that are not valid identifiers (`foo-bar`) are camel-cased first.
+
     Applied only at identifier positions in templates (declarations, member
     access, CodingKeys cases) — never inside string literals, where the raw
     wire name must be preserved. A backticked enum case still gets the
     unescaped implicit raw value, so CodingKeys stay wire-correct.
     """
+    s = swift_member_name(s)
     if s in SWIFT_KEYWORDS:
         return f'`{s}`'
     return s
@@ -73,6 +76,7 @@ class TemplateManager:
         self.env.filters['lowerCamelCase'] = self.lowerCamelCase
         self.env.filters['convertRefToSwift'] = self.convert_ref_to_swift
         self.env.filters['enum_case'] = self.enum_case_filter
+        self.env.filters['knownValueCase'] = self.known_value_case
         self.env.filters['sanitizeKeyword'] = sanitize_swift_keyword
         self.env.filters['escapeComment'] = escape_swift_comment
         self.env.filters['escapeStringLiteral'] = escape_swift_string_literal
@@ -108,16 +112,30 @@ class TemplateManager:
 
     @staticmethod
     def convert_ref_to_swift(ref: str) -> str:
-        if '#' in ref:
-            parts = ref.split('#')
-            if parts[0] == '':
-                return convert_to_camel_case(parts[1])
-            else:
-                pre_hash_parts = parts[0].split('.')
-                camel_case_pre_hash = ''.join([convert_to_camel_case(part) for part in pre_hash_parts])
-                return camel_case_pre_hash + '.' + convert_to_camel_case(parts[1])
+        return convert_ref(ref)
+
+    @staticmethod
+    def known_value_case(value: str) -> str:
+        """Constant name for one `knownValues` entry.
+
+        These names are public API (`LabelValue.exclamationhide`,
+        `LabelValue.graphicdashmedia`, `ListPurpose.appbskygraphdefsmodlist`), so the
+        spelling rules are frozen: only `.` and `#` separate words here, `!` and `-`
+        are spelled out by `enum_case_filter`, and the result is lowercased. The
+        identifier rules used everywhere else (utils.convert_to_camel_case) would
+        rename them.
+        """
+        def join_words(name: str) -> str:
+            return ''.join(part[0].upper() + part[1:] for part in name.split('.') if part)
+
+        nsid, separator, fragment = value.partition('#')
+        if not separator:
+            swift_name = join_words(value)
+        elif not nsid:
+            swift_name = join_words(fragment)
         else:
-            return convert_to_camel_case(ref)
+            swift_name = join_words(nsid) + '.' + join_words(fragment)
+        return TemplateManager.enum_case_filter(TemplateManager.lowerCamelCase(swift_name))
 
     @staticmethod
     def enum_case_filter(value: str) -> str:

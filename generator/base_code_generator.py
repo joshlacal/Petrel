@@ -10,7 +10,11 @@ NSID_PATTERN = re.compile(
     r"^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\.[a-zA-Z][a-zA-Z0-9]{0,62}$"
 )
 DEF_NAME_PATTERN = re.compile(r"^[a-zA-Z][a-zA-Z0-9_-]{0,63}$")
-PROPERTY_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_$]+$")
+# Property names end up in identifiers and string literals of generated source, so
+# the accepted alphabet is explicit. Hyphens are legal (the official interop catalog
+# uses `cid-link`); the generators camel-case them into identifiers and keep the
+# wire name in CodingKeys / @SerialName.
+PROPERTY_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_$-]+$")
 ERROR_NAME_PATTERN = re.compile(r"^[a-zA-Z0-9_]+$")
 REF_PATTERN = re.compile(
     r"^#([a-zA-Z][a-zA-Z0-9_-]{0,63})$|^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)(\.([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?))+\.[a-zA-Z][a-zA-Z0-9]{0,62}(#[a-zA-Z][a-zA-Z0-9_-]{0,63})?$"

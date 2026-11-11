@@ -5,52 +5,56 @@ class TypeConverter:
     def __init__(self, swift_code_generator):
         self.swift_code_generator = swift_code_generator
 
+    # Definition types with a generated struct, enum or container of their own; a ref
+    # to a `main` of any other type resolves to the container's `Main` alias.
+    _NAMED_MAIN_TYPES = frozenset({
+        'object', 'record', 'query', 'procedure', 'subscription', 'permission-set', 'token', 'space',
+    })
+
     def convert_ref(self, ref: str) -> str:
         """Resolve a `ref` to a Swift type.
 
         Per the Lexicon spec, `blob`, `bytes`, and `cid-link` are valid top-level
         definitions and can be `ref`'d. They have no named Swift type of their
         own, so a ref to such a def must resolve to the built-in primitive type
-        (matching inline usage), not a mangled name. All other refs
-        (object/record/token/array/string defs) keep their generated named type.
+        (`Blob`, `Bytes`, `ATProtoLink`) (matching inline usage), not a mangled
+        name. All other refs keep their generated named type.
 
-        Handles both the `#frag` shorthand and a fully-qualified self-reference
-        (`{current lexicon id}#frag`). External refs to primitive defs would need
-        the reference-lexicon corpus to resolve and fall through unchanged.
+        Handles the `#frag` shorthand, a fully-qualified self-reference
+        (`{current lexicon id}#frag`) and, through the cycle detector's schema
+        registry, refs into every other loaded lexicon. `nsid#main` and `nsid`
+        are the same ref.
         """
         nsid, separator, fragment = ref.partition('#')
         fragment = fragment or 'main'
-        if not nsid or nsid == self.swift_code_generator.lexicon_id:
+        is_local = not nsid or nsid == self.swift_code_generator.lexicon_id
+        if is_local:
             target = self.swift_code_generator.defs.get(fragment)
-            if isinstance(target, dict):
-                target_type = target.get('type')
-                if target_type == 'string' and 'enum' in target:
-                    return f"Defs{convert_to_camel_case(fragment)}"
-                if target_type == 'blob':
-                    return 'Blob'
-                if target_type == 'bytes':
-                    return 'Bytes'
-                if target_type == 'cid-link':
-                    return 'CID'
-            return convert_swift_ref(ref)
+            container = ''
+        else:
+            registry = getattr(self.swift_code_generator.cycle_detector, 'schemas_by_ref', None)
+            # The registry keys a main definition by its bare NSID.
+            registry_key = nsid if fragment == 'main' else f"{nsid}#{fragment}"
+            target = registry.get(registry_key) if registry is not None else None
+            container = convert_to_camel_case(nsid) + '.'
 
-        registry = getattr(self.swift_code_generator.cycle_detector, 'schemas_by_ref', None)
-        if registry is not None:
-            qualified_ref = ref if separator else f"{ref}#main"
-            target = registry.get(qualified_ref)
-            if isinstance(target, dict):
-                target_type = target.get('type')
-                if target_type == 'string' and 'enum' in target:
-                    pre_hash_parts = nsid.split('.')
-                    camel_case_pre_hash = ''.join([convert_to_camel_case(part) for part in pre_hash_parts])
-                    return f"{camel_case_pre_hash}.Defs{convert_to_camel_case(fragment)}"
-                if target_type == 'blob':
-                    return 'Blob'
-                if target_type == 'bytes':
-                    return 'Bytes'
-                if target_type == 'cid-link':
-                    return 'CID'
+        if isinstance(target, dict):
+            target_type = target.get('type')
+            if target_type == 'string' and 'enum' in target:
+                return f"{container}Defs{convert_to_camel_case(fragment)}"
+            if target_type == 'blob':
+                return 'Blob'
+            if target_type == 'bytes':
+                return 'Bytes'
+            if target_type == 'cid-link':
+                return 'ATProtoLink'
+            if fragment == 'main' and target_type not in self._NAMED_MAIN_TYPES:
+                # A scalar, array or union `main` is emitted as `Container.Main`.
+                owner = convert_to_camel_case(nsid or self.swift_code_generator.lexicon_id)
+                return f"{owner}.Main"
 
+        if is_local and fragment == 'main':
+            return convert_to_camel_case(self.swift_code_generator.lexicon_id)
         return convert_swift_ref(ref)
 
     def determine_swift_type(self, name: str, prop: Dict[str, Any], required_fields: List[str], current_struct_name: str, isOptional: bool = None, context_identity=None) -> str:
@@ -105,34 +109,41 @@ class TypeConverter:
             swift_type = self.convert_ref(prop['ref'])
         elif prop_type == 'integer':
             swift_type = "Int" 
-        elif prop_type == 'number':
-            swift_type = "Double" 
         elif prop_type == 'boolean':
             swift_type = "Bool" 
         elif prop_type == 'cid-link':
-            swift_type = "CID"
+            # `ATProtoLink` is the `{"$link": ...}` JSON / CBOR tag 42 form. `CID`
+            # is the plain-string form used by `format: cid` strings.
+            swift_type = "ATProtoLink"
         elif prop_type == 'bytes':
             swift_type = "Bytes"
         elif prop_type == 'blob':
             swift_type = "Blob"
         elif prop_type == 'object':
-            swift_type = "[String: ATProtocolValueContainer]" 
-        elif prop_type == 'unknown':
-            if name == 'didDoc':
-                swift_type = "DIDDocument"
+            if isinstance(prop.get('properties'), dict) and prop['properties']:
+                swift_type = self.swift_code_generator.generate_inline_object(
+                    current_struct_name, name, prop, context_identity,
+                )
             else:
-                swift_type = "ATProtocolValueContainer"
+                # No declared properties: every key is undeclared data.
+                swift_type = "[String: ATProtocolValueContainer]"
+        elif prop_type == 'unknown':
+            swift_type = "ATProtocolValueContainer"
         elif prop_type == 'union':
             union_name = f"{convert_to_camel_case(current_struct_name)}{convert_to_camel_case(name)}Union"
             refs = prop.get('refs', [])
-            self.swift_code_generator.enum_generator.generate_enum_for_union(current_struct_name, name, refs)
+            self.swift_code_generator.enum_generator.generate_enum_for_union(
+                current_struct_name, name, refs, closed=prop.get('closed', False),
+            )
             return union_name
         elif prop_type == 'array':
             items = prop['items']
             if items.get('type') == 'union':
                 union_name = f"{convert_to_camel_case(current_struct_name)}{convert_to_camel_case(name)}Union"
-                refs = items['refs']
-                self.swift_code_generator.enum_generator.generate_enum_for_union(current_struct_name, name, refs)
+                refs = items.get('refs', [])
+                self.swift_code_generator.enum_generator.generate_enum_for_union(
+                    current_struct_name, name, refs, closed=items.get('closed', False),
+                )
                 item_type = union_name
             else:
                 item_type = self.determine_swift_type(
@@ -141,7 +152,10 @@ class TypeConverter:
                 )
             swift_type = f"[{item_type}]"
         else:
-            swift_type = prop_type.capitalize()
+            raise ValueError(
+                f"{self.swift_code_generator.lexicon_id}: property '{name}' has type {prop_type!r}, "
+                "which is not a Lexicon field type"
+            )
 
         return swift_type
 

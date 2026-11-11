@@ -1,14 +1,22 @@
     public struct Parameters: Parametrizable {
     {%- for prop in properties %}
-        public let {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
+        public let {{ prop.ident }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
     {%- endfor %}
         
         public init({% for prop in properties %}
-            {{ prop.name|sanitizeKeyword }}: {{ prop.type }}{% if prop.optional %}?{% if prop.wire_optional %} = nil{% endif %}{% endif %}{% if not loop.last %}, {% endif %}
+            {{ prop.ident }}: {{ prop.type }}{% if prop.optional %}?{% if prop.wire_optional %} = nil{% endif %}{% endif %}{% if not loop.last %}, {% endif %}
         {%- endfor %}
             ) {
             {% for prop in properties -%}
-            self.{{ prop.name|sanitizeKeyword }} = {{ prop.name|sanitizeKeyword }}
+            self.{{ prop.ident }} = {{ prop.ident }}
             {% endfor %}
         }
+        {%- if properties | selectattr('key_needs_raw_value') | list %}
+
+        /// Query parameter names that are not valid Swift identifiers, keyed by the
+        /// property that carries them.
+        public static var queryParameterNames: [String: String] {
+            [{% for prop in properties | selectattr('key_needs_raw_value') %}"{{ prop.ident_bare }}": "{{ prop.name | escapeStringLiteral }}"{% if not loop.last %}, {% endif %}{% endfor %}]
+        }
+        {%- endif %}
     }

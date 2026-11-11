@@ -40,7 +40,11 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
     {%- for variant in variants %}
     case {{ variant | convertRefToSwift | lowerCamelCase }}({{ variant | convertRefToSwift }})
     {%- endfor %}
+    {%- if not closed %}
+    /// A value whose `$type` this union does not declare. Open unions accept and
+    /// re-encode such values unchanged.
     case unexpected(ATProtocolValueContainer)
+    {%- endif %}
     
     {%- for variant in variants %}
     public init(_ value: {{ variant | convertRefToSwift }}) {
@@ -59,8 +63,16 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
             self = .{{ variant | convertRefToSwift | lowerCamelCase }}(value)
         {%- endfor %}
         default:
+            {%- if closed %}
+            throw DecodingError.dataCorruptedError(
+                forKey: .type,
+                in: container,
+                debugDescription: "'\(typeValue)' is not a member of this closed union"
+            )
+            {%- else %}
             let unknownValue = try ATProtocolValueContainer(from: decoder)
             self = .unexpected(unknownValue)
+            {%- endif %}
         }
     }
 
@@ -75,8 +87,10 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
             try container.encode("{{ variant | escapeStringLiteral }}", forKey: .type)
             try value.encode(to: encoder)
         {%- endfor %}
+        {%- if not closed %}
         case .unexpected(let container):
             try container.encode(to: encoder)
+        {%- endif %}
         }
     }
 
@@ -87,9 +101,11 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
             hasher.combine("{{ variant | escapeStringLiteral }}")
             hasher.combine(value)
         {%- endfor %}
+        {%- if not closed %}
         case .unexpected(let container):
             hasher.combine("unexpected")
             hasher.combine(container)
+        {%- endif %}
         }
     }
 
@@ -104,9 +120,11 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
               .{{ variant | convertRefToSwift | lowerCamelCase }}(let rhsValue)):
             return lhsValue == rhsValue
         {%- endfor %}
+        {%- if not closed %}
         case (.unexpected(let lhsValue), .unexpected(let rhsValue)):
             return lhsValue.isEqual(to: rhsValue)
-        {%- if variants %}
+        {%- endif %}
+        {%- if (variants | length) + (0 if closed else 1) > 1 %}
         default:
             return false
         {%- endif %}
@@ -145,8 +163,10 @@ public {{ 'indirect ' if is_recursive else '' }}enum {{ name }}: Codable, ATProt
             }
             return map
         {%- endfor %}
+        {%- if not closed %}
         case .unexpected(let container):
             return try container.toCBORValue()
+        {%- endif %}
         }
     }
 }

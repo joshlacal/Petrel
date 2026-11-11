@@ -162,17 +162,18 @@ class KotlinStrictRefByteStabilityTests(unittest.TestCase):
     def test_ordinary_swift_shapes_remain_byte_identical_to_pre_strict_ref_output(self):
         expected = {
             "blue.catbird.test.ordinaryObject": (
-                "3e6c64d3f955f3f2e7c76ff67b7f064464775c6681874090bfb5cd668c5ef99b"
+                "113cde43cb20176b56202d0d3e8a435c226872674fec4d7f4fd90a015fe4b745"
             ),
-            # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
+            # Re-pinned by the sdk-green generator pass: typed XRPC errors on every endpoint,
+            # undeclared-field round trip (extraFields) and the shared object template.
             "blue.catbird.test.ordinaryProcedure": (
-                "d29ff2cef9cadbfa554448c42a6ab432d676ade992671bc19e3e72ca25604137"
+                "33b2021aaeae016831e86ee6d2b1c81be15cb6488cb3e759a3b51f3eadaebb11"
             ),
             "blue.catbird.test.ordinaryRecord": (
-                "64d9efecd9bfc95390371a71cae9960a42195e0c6fe697aaca511186bcfce9c4"
+                "15e04b341cd7fd68eee2c980d4df28fa682e58419174faca613cd411755854ff"
             ),
             "blue.catbird.test.ordinarySubscription": (
-                "09d9b312435723060b7044ceec839df9a766b9c3ef319a6e782dfbcf7d414c7a"
+                "f5e151d76ad87ac39b402edd0afcf2977a7d60f7d50eabcd338c0b7bc60fac16"
             ),
         }
         for lexicon in ordinary_lexicons():
