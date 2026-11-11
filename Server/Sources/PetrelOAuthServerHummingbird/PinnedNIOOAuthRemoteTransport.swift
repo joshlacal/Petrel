@@ -82,16 +82,24 @@ public struct PinnedNIOOAuthRemoteTransport: OAuthRemoteTransport {
         lastError = error
         continue
       }
+      // The collector is in the pipeline from the start, so it sees a TLS
+      // handshake failure, which can happen before the request is written.
+      let loop = group.next()
+      let promise = loop.makePromise(of: Received.self)
       let channel: any Channel
       do {
-        channel = try await connect(to: address, host: scheme == "https" ? host : nil, deadline: deadline)
+        channel = try await connect(
+          to: address, host: scheme == "https" ? host : nil, on: loop,
+          promise: promise, maximumBodyBytes: maximumBodyBytes,
+          deadline: deadline
+        )
       } catch {
+        promise.fail(error)
         lastError = error
         continue
       }
       let response = try await exchange(
-        on: channel, target: target, hostHeader: hostHeader,
-        maximumBodyBytes: maximumBodyBytes, deadline: deadline
+        on: channel, promise: promise, target: target, hostHeader: hostHeader, deadline: deadline
       )
       return OAuthRemoteHTTPResponse(
         status: response.status, headers: response.headers, body: response.body,
@@ -102,11 +110,18 @@ public struct PinnedNIOOAuthRemoteTransport: OAuthRemoteTransport {
     throw OAuthServerError.unavailable("OAuth remote host could not be reached")
   }
 
-  private func connect(to address: SocketAddress, host: String?, deadline: NIODeadline) async throws -> any Channel {
+  private func connect(
+    to address: SocketAddress,
+    host: String?,
+    on loop: any EventLoop,
+    promise: EventLoopPromise<Received>,
+    maximumBodyBytes: Int,
+    deadline: NIODeadline
+  ) async throws -> any Channel {
     let tlsContext = tlsContext
     let remaining = deadline - .now()
     guard remaining > .zero else { throw OAuthServerError.unavailable("OAuth remote fetch timed out") }
-    return try await ClientBootstrap(group: group)
+    return try await ClientBootstrap(group: loop)
       .connectTimeout(remaining)
       .channelInitializer { channel in
         channel.eventLoop.makeCompletedFuture {
@@ -117,6 +132,9 @@ public struct PinnedNIOOAuthRemoteTransport: OAuthRemoteTransport {
             try channel.pipeline.syncOperations.addHandler(handler)
           }
           try channel.pipeline.syncOperations.addHTTPClientHandlers()
+          try channel.pipeline.syncOperations.addHandler(
+            ResponseCollector(promise: promise, maximumBodyBytes: maximumBodyBytes)
+          )
         }
       }
       .connect(to: address)
@@ -131,13 +149,11 @@ public struct PinnedNIOOAuthRemoteTransport: OAuthRemoteTransport {
 
   private func exchange(
     on channel: any Channel,
+    promise: EventLoopPromise<Received>,
     target: String,
     hostHeader: String,
-    maximumBodyBytes: Int,
     deadline: NIODeadline
   ) async throws -> Received {
-    let promise = channel.eventLoop.makePromise(of: Received.self)
-    let collector = ResponseCollector(promise: promise, maximumBodyBytes: maximumBodyBytes)
     let timeout = channel.eventLoop.scheduleTask(deadline: deadline) {
       promise.fail(OAuthServerError.unavailable("OAuth remote fetch timed out"))
     }
@@ -148,12 +164,6 @@ public struct PinnedNIOOAuthRemoteTransport: OAuthRemoteTransport {
     let userAgent = userAgent
     return try await withTaskCancellationHandler {
       try await channel.eventLoop.flatSubmit {
-        do {
-          try channel.pipeline.syncOperations.addHandler(collector)
-        } catch {
-          promise.fail(error)
-          return promise.futureResult
-        }
         var head = HTTPRequestHead(version: .http1_1, method: .GET, uri: target)
         head.headers.add(name: "Host", value: hostHeader)
         head.headers.add(name: "Accept", value: "application/json")
