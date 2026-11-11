@@ -840,3 +840,163 @@ struct ImageMetadataStripperLegacyTests {
         #expect(error.recoverySuggestion?.contains("metadata") == true)
     }
 }
+
+// MARK: - Helpers on the wire
+
+@Suite("Bluesky image uploads strip metadata by default")
+struct BskyImageUploadTests {
+    private let photo = JPEGFixture.loaded(JPEGFixture.baseline, orientation: 6)
+    private let screenshot = PNGFixture.loaded(orientation: 1)
+
+    private func uploads(_ pds: BskyFakePDS) -> [BskyStubRequest] {
+        pds.server.requests(to: "com.atproto.repo.uploadBlob")
+    }
+
+    @Test("post(_:images:) uploads stripped bytes and embeds the blobs with alt text and size")
+    func postStripsByDefault() async throws {
+        let pds = BskyFakePDS()
+        let agent = try await pds.server.makeAgent()
+
+        let post = try await agent.post("Seen today", images: [
+            PostImage(data: Data(photo), mimeType: "image/jpeg", alt: "A storm petrel", width: 1600, height: 900),
+            PostImage(data: Data(screenshot), mimeType: "image/png", alt: "A chart"),
+        ])
+
+        let sent = uploads(pds)
+        #expect(sent.count == 2)
+        #expect(sent.map { $0.header("Content-Type") } == ["image/jpeg", "image/png"])
+        // What left the device is exactly what the stripper produces, and holds no metadata.
+        #expect(try sent[0].body == ImageMetadataStripper.stripMetadata(from: Data(photo), mimeType: "image/jpeg"))
+        #expect(try sent[1].body == ImageMetadataStripper.stripMetadata(from: Data(screenshot), mimeType: "image/png"))
+        for request in sent {
+            expectNoSecrets([UInt8](request.body))
+        }
+        #expect(sent[0].body != Data(photo))
+        // The pictures themselves are untouched, and the photo keeps its rotation.
+        #expect(JPEGFixture.scans([UInt8](sent[0].body)) == JPEGFixture.scans(JPEGFixture.baseline))
+        #expect(contains([UInt8](sent[0].body), be16(0x0112) + be16(3) + be32(1) + be16(6)))
+
+        let record = try #require(pds.record(at: post.uri.uriString())?.value)
+        #expect(record["text"] == "Seen today")
+        let images = try #require(record["embed"]?["images"]?.arrayValue)
+        #expect(record["embed"]?["$type"] == "app.bsky.embed.images")
+        #expect(images.map { $0["alt"]?.stringValue } == ["A storm petrel", "A chart"])
+        #expect(images[0]["aspectRatio"]?["width"] == 1600)
+        #expect(images[0]["image"]?["mimeType"] == "image/jpeg")
+        #expect(images[0]["image"]?["size"] == .integer(sent[0].body.count))
+        #expect(images[1]["aspectRatio"] == nil)
+    }
+
+    @Test("post(_:images:stripImageMetadata: false) uploads the files as they are")
+    func postOptOut() async throws {
+        let pds = BskyFakePDS()
+        let agent = try await pds.server.makeAgent()
+
+        try await agent.post(
+            "Keep the EXIF",
+            images: [PostImage(data: Data(photo), mimeType: "image/jpeg", alt: "")],
+            stripImageMetadata: false
+        )
+
+        #expect(uploads(pds).map(\.body) == [Data(photo)])
+        #expect(contains([UInt8](uploads(pds)[0].body), Secret.gpsLatitude))
+    }
+
+    @Test("an image that cannot be stripped stops the post before anything is uploaded")
+    func failsClosed() async throws {
+        let pds = BskyFakePDS()
+        let agent = try await pds.server.makeAgent()
+        let truncated = Data(photo.prefix(200)) // cut in the middle of a segment
+
+        await #expect(throws: ImageMetadataStrippingError.malformedImage) {
+            try await agent.post("two pictures", images: [
+                PostImage(data: Data(photo), mimeType: "image/jpeg", alt: "fine"),
+                PostImage(data: truncated, mimeType: "image/jpeg", alt: "broken"),
+            ])
+        }
+        #expect(pds.server.requests.isEmpty)
+
+        // The same files go through when the caller opts out of stripping.
+        try await agent.post(
+            "two pictures",
+            images: [PostImage(data: truncated, mimeType: "image/jpeg", alt: "broken")],
+            stripImageMetadata: false
+        )
+        #expect(uploads(pds).map(\.body) == [truncated])
+    }
+
+    @Test("post(_:images:) takes one to four images of an image media type, and can quote")
+    func validation() async throws {
+        let pds = BskyFakePDS()
+        let agent = try await pds.server.makeAgent()
+        let image = PostImage(data: Data(JPEGFixture.baseline), mimeType: "image/jpeg", alt: "")
+
+        await #expect(throws: BskyAgentError.self) { try await agent.post("none", images: []) }
+        await #expect(throws: BskyAgentError.self) {
+            try await agent.post("five", images: Array(repeating: image, count: 5))
+        }
+        await #expect(throws: BskyAgentError.self) {
+            try await agent.post("video", images: [PostImage(data: Data([0, 0, 0, 24]), mimeType: "video/mp4", alt: "")])
+        }
+        let signedOut = try await pds.server.makeAgent(did: nil)
+        await #expect(throws: BskyAgentError.notAuthenticated) { try await signedOut.post("hi", images: [image]) }
+        #expect(pds.server.requests.isEmpty)
+
+        let quoted = try ComAtprotoRepoStrongRef(
+            uri: ATProtocolURI(uriString: "at://did:plc:bob/app.bsky.feed.post/3kquoted"),
+            cid: CID.fromDAGCBOR(Data("quoted".utf8))
+        )
+        let post = try await agent.post("with a quote", images: [image], quote: quoted)
+        let embed = pds.record(at: post.uri.uriString())?.value["embed"]
+        #expect(embed?["$type"] == "app.bsky.embed.recordWithMedia")
+        #expect(embed?["record"]?["record"]?["uri"] == "at://did:plc:bob/app.bsky.feed.post/3kquoted")
+        #expect(embed?["media"]?["images"]?.arrayValue?.count == 1)
+    }
+
+    @Test("uploadImage strips by default; uploadBlob never does")
+    func uploadImageVersusUploadBlob() async throws {
+        let pds = BskyFakePDS()
+        let agent = try await pds.server.makeAgent()
+
+        let stripped = try await agent.uploadImage(Data(photo), mimeType: "image/jpeg")
+        let optedOut = try await agent.uploadImage(Data(photo), mimeType: "image/jpeg", stripMetadata: false)
+        let raw = try await agent.uploadBlob(Data(photo), mimeType: "image/jpeg")
+
+        let sent = uploads(pds).map(\.body)
+        expectNoSecrets([UInt8](sent[0]))
+        #expect(sent[1] == Data(photo))
+        #expect(sent[2] == Data(photo))
+        #expect(stripped.size < raw.size)
+        #expect(optedOut.size == raw.size)
+
+        await #expect(throws: BskyAgentError.self) {
+            try await agent.uploadImage(Data([1, 2, 3]), mimeType: "application/pdf")
+        }
+        #expect(uploads(pds).count == 3)
+    }
+
+    @Test("setAvatar and setBanner upload stripped images and leave the rest of the profile alone")
+    func profileImages() async throws {
+        let pds = BskyFakePDS()
+        let profileURI = "at://did:plc:alice/app.bsky.actor.profile/self"
+        pds.seed(profileURI, ["$type": "app.bsky.actor.profile", "displayName": "Storm Petrel"])
+        let agent = try await pds.server.makeAgent()
+
+        try await agent.setAvatar(Data(photo), mimeType: "image/jpeg")
+        try await agent.setBanner(Data(screenshot), mimeType: "image/png")
+
+        let sent = uploads(pds)
+        #expect(sent.count == 2)
+        for request in sent {
+            expectNoSecrets([UInt8](request.body))
+        }
+        let profile = try #require(pds.record(at: profileURI)?.value)
+        #expect(profile["displayName"] == "Storm Petrel")
+        #expect(profile["avatar"]?["mimeType"] == "image/jpeg")
+        #expect(profile["avatar"]?["size"] == .integer(sent[0].body.count))
+        #expect(profile["banner"]?["mimeType"] == "image/png")
+
+        try await agent.setAvatar(Data(photo), mimeType: "image/jpeg", stripMetadata: false)
+        #expect(uploads(pds).last?.body == Data(photo))
+    }
+}

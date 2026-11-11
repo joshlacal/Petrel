@@ -11,6 +11,11 @@ public extension BskyAgent {
     /// the bytes to the video service, and polls the processing job until the
     /// service hands back the blob to embed.
     ///
+    /// **Video metadata is not removed.** The file is uploaded as given;
+    /// container metadata such as location or device tags stays in what is
+    /// sent to the video service. Remove it before calling this method if that
+    /// matters for your users.
+    ///
     /// ```swift
     /// let video = try await client.bsky.uploadVideo(data, name: "landing.mp4")
     /// try await client.bsky.post("Landing", embed: .video(video, alt: "A petrel landing"))

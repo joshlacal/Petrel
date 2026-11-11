@@ -4,6 +4,7 @@ import Foundation
 /// record, or both.
 ///
 /// ```swift
+/// let blob = try await client.bsky.uploadImage(jpegData, mimeType: "image/jpeg")
 /// let embed = try PostEmbed.images([
 ///     .init(image: blob, alt: "A petrel over the sea", width: 1600, height: 900),
 /// ])
@@ -48,7 +49,13 @@ public struct PostEmbed: Sendable, Hashable {
         }
     }
 
-    /// Embeds one to four images that were uploaded with ``BskyAgent/uploadBlob(_:mimeType:)``.
+    /// Embeds one to four images that were already uploaded.
+    ///
+    /// Upload them with ``BskyAgent/uploadImage(_:mimeType:stripMetadata:)``,
+    /// which removes their metadata, or let
+    /// ``BskyAgent/post(_:images:stripImageMetadata:quote:reply:langs:labels:tags:createdAt:)``
+    /// upload and embed in one step. ``BskyAgent/uploadBlob(_:mimeType:)``
+    /// uploads bytes as they are, metadata included.
     /// - Throws: ``BskyAgentError/invalidInput(_:)`` for zero or more than four images.
     public static func images(_ images: [AppBskyEmbedImages.Image]) throws -> PostEmbed {
         guard !images.isEmpty, images.count <= maxImages else {
@@ -119,6 +126,36 @@ public struct PostEmbed: Sendable, Hashable {
                 media: mediaUnion
             ))
         }
+    }
+}
+
+/// An image file to attach to a post with ``BskyAgent/post(_:images:stripImageMetadata:quote:reply:langs:labels:tags:createdAt:)``.
+public struct PostImage: Sendable, Hashable {
+    /// The file contents.
+    public var data: Data
+    /// The media type of the file, for example `image/jpeg`.
+    public var mimeType: String
+    /// Alt text describing the image for people who cannot see it.
+    public var alt: String
+    /// The pixel dimensions, so clients can lay the image out before it loads.
+    public var aspectRatio: AppBskyEmbedDefs.AspectRatio?
+
+    /// Creates an image attachment.
+    public init(data: Data, mimeType: String, alt: String, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil) {
+        self.data = data
+        self.mimeType = mimeType
+        self.alt = alt
+        self.aspectRatio = aspectRatio
+    }
+
+    /// Creates an image attachment with its pixel dimensions.
+    public init(data: Data, mimeType: String, alt: String, width: Int, height: Int) {
+        self.init(
+            data: data,
+            mimeType: mimeType,
+            alt: alt,
+            aspectRatio: AppBskyEmbedDefs.AspectRatio(width: width, height: height)
+        )
     }
 }
 
@@ -336,13 +373,148 @@ public extension BskyAgent {
         return try await putRecord(record, collection: AppBskyFeedPostgate.typeIdentifier, rkey: location.rkey)
     }
 
+    // MARK: Images
+
+    /// Uploads an image, removing its metadata first.
+    ///
+    /// By default the image is passed through
+    /// ``ImageMetadataStripper/stripMetadata(from:mimeType:)`` before it leaves
+    /// the device: location (GPS), capture time, device details, embedded
+    /// thumbnails and similar metadata are removed, while the pixels, colour
+    /// profile and orientation are kept and the format is unchanged. If the
+    /// metadata cannot be removed, the upload does not happen.
+    ///
+    /// - Parameters:
+    ///   - data: The image file.
+    ///   - mimeType: The media type, for example `image/jpeg`. Must be `image/*`.
+    ///   - stripMetadata: Pass `false` to upload the file with its metadata intact.
+    /// - Returns: The uploaded blob, for use in an embed or a profile.
+    /// - Throws: ``ImageMetadataStrippingError`` when stripping is requested
+    ///   and not possible; ``BskyAgentError/invalidInput(_:)`` when `mimeType`
+    ///   is not an image type.
+    func uploadImage(_ data: Data, mimeType: String, stripMetadata: Bool = true) async throws -> Blob {
+        try await uploadBlob(Self.preparedImage(data, mimeType: mimeType, stripMetadata: stripMetadata), mimeType: mimeType)
+    }
+
+    /// Publishes a post with images, uploading them first.
+    ///
+    /// Image metadata is removed before upload unless `stripImageMetadata` is
+    /// `false`; see ``uploadImage(_:mimeType:stripMetadata:)``. All images are
+    /// checked and stripped before the first one is uploaded, so a problem
+    /// with any of them leaves nothing behind. Links, mentions and hashtags in
+    /// the text are detected as in the text-only `post`.
+    ///
+    /// ```swift
+    /// try await client.bsky.post("Seen today", images: [
+    ///     PostImage(data: jpegData, mimeType: "image/jpeg", alt: "A storm petrel", width: 1600, height: 900),
+    /// ])
+    /// ```
+    ///
+    /// - Parameters:
+    ///   - text: The post text.
+    ///   - images: One to four images.
+    ///   - stripImageMetadata: Pass `false` to upload the files with their metadata intact.
+    ///   - quote: A record to quote alongside the images.
+    ///   - reply: The thread position when this post is a reply.
+    ///   - langs: BCP 47 language tags of the text, at most three.
+    ///   - labels: Self-label values, for example `"porn"` or `"graphic-media"`.
+    ///   - tags: Additional hashtags that are not part of the text.
+    ///   - createdAt: The post's timestamp; defaults to now.
+    /// - Returns: The URI and CID of the new post.
+    @discardableResult
+    func post(
+        _ text: String,
+        images: [PostImage],
+        stripImageMetadata: Bool = true,
+        quote: ComAtprotoRepoStrongRef? = nil,
+        reply: AppBskyFeedPost.ReplyRef? = nil,
+        langs: [String]? = nil,
+        labels: [String]? = nil,
+        tags: [String]? = nil,
+        createdAt: Date = Date()
+    ) async throws -> ComAtprotoRepoStrongRef {
+        guard !images.isEmpty, images.count <= PostEmbed.maxImages else {
+            throw BskyAgentError.invalidInput(
+                "A post embeds between 1 and \(PostEmbed.maxImages) images, got \(images.count)"
+            )
+        }
+        _ = try await did() // fail before doing any work when signed out
+        let prepared = try images.map {
+            try Self.preparedImage($0.data, mimeType: $0.mimeType, stripMetadata: stripImageMetadata)
+        }
+        var uploaded: [AppBskyEmbedImages.Image] = []
+        for (image, data) in zip(images, prepared) {
+            let blob = try await uploadBlob(data, mimeType: image.mimeType)
+            uploaded.append(AppBskyEmbedImages.Image(image: blob, alt: image.alt, aspectRatio: image.aspectRatio))
+        }
+        let embed = try PostEmbed.images(uploaded)
+        return try await post(
+            text,
+            reply: reply,
+            embed: quote.map(embed.quoting) ?? embed,
+            langs: langs,
+            labels: labels,
+            tags: tags,
+            createdAt: createdAt
+        )
+    }
+
+    /// Sets the profile picture, uploading it first.
+    ///
+    /// Image metadata is removed before upload unless `stripMetadata` is
+    /// `false`; see ``uploadImage(_:mimeType:stripMetadata:)``. The rest of
+    /// the profile is left as it is.
+    @discardableResult
+    func setAvatar(_ data: Data, mimeType: String, stripMetadata: Bool = true) async throws -> ComAtprotoRepoStrongRef {
+        _ = try await did()
+        let blob = try await uploadImage(data, mimeType: mimeType, stripMetadata: stripMetadata)
+        return try await upsertProfile { existing in
+            var profile = ProfileUpdate(existing)
+            profile.avatar = blob
+            return profile.record
+        }
+    }
+
+    /// Sets the profile banner, uploading it first.
+    ///
+    /// Image metadata is removed before upload unless `stripMetadata` is
+    /// `false`; see ``uploadImage(_:mimeType:stripMetadata:)``. The rest of
+    /// the profile is left as it is.
+    @discardableResult
+    func setBanner(_ data: Data, mimeType: String, stripMetadata: Bool = true) async throws -> ComAtprotoRepoStrongRef {
+        _ = try await did()
+        let blob = try await uploadImage(data, mimeType: mimeType, stripMetadata: stripMetadata)
+        return try await upsertProfile { existing in
+            var profile = ProfileUpdate(existing)
+            profile.banner = blob
+            return profile.record
+        }
+    }
+
+    /// The bytes to upload for an image: stripped of metadata unless the caller opted out.
+    private static func preparedImage(_ data: Data, mimeType: String, stripMetadata: Bool) throws -> Data {
+        let type = mimeType.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false).first ?? ""
+        guard type.trimmingCharacters(in: .whitespacesAndNewlines).lowercased().hasPrefix("image/") else {
+            throw BskyAgentError.invalidInput("Not an image media type: \(mimeType)")
+        }
+        guard stripMetadata else { return data }
+        return try ImageMetadataStripper.stripMetadata(from: data, mimeType: mimeType)
+    }
+
     // MARK: Blobs and handles
 
     /// Uploads a blob to the account's PDS exactly as given.
     ///
-    /// The bytes are sent unmodified with `mimeType` as the content type, so a
-    /// PNG stays a PNG. Reference the returned blob from a record promptly;
-    /// unreferenced blobs are garbage-collected by the PDS.
+    /// **The bytes are sent unmodified, including any metadata embedded in
+    /// them. A photo uploaded this way keeps its EXIF data, which can include
+    /// the GPS position where it was taken.** To upload an image with its
+    /// metadata removed, use ``uploadImage(_:mimeType:stripMetadata:)`` or
+    /// ``post(_:images:stripImageMetadata:quote:reply:langs:labels:tags:createdAt:)``,
+    /// or strip it yourself with ``ImageMetadataStripper/stripMetadata(from:mimeType:)``.
+    ///
+    /// `mimeType` is sent as the content type, so a PNG stays a PNG. Reference
+    /// the returned blob from a record promptly; unreferenced blobs are
+    /// garbage-collected by the PDS.
     ///
     /// - Parameters:
     ///   - data: The blob bytes.

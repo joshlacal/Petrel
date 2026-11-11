@@ -98,12 +98,21 @@ struct BskyDocumentationExampleTests {
     }
 
     func exampleImages(bsky: BskyAgent, imageData: Data) async throws {
-        // The bytes are uploaded as they are; say what they are.
-        let blob = try await bsky.uploadBlob(imageData, mimeType: "image/png")
+        // Upload and embed in one step. Location and other metadata are
+        // removed from the file before it is sent.
+        try await bsky.post("Seen today", images: [
+            PostImage(
+                data: imageData,
+                mimeType: "image/jpeg",
+                alt: "A storm petrel skimming the waves",
+                width: 1600,
+                height: 900
+            ),
+        ])
 
-        try await bsky.post("Seen today", embed: .images([
-            .init(image: blob, alt: "A storm petrel skimming the waves", width: 1600, height: 900),
-        ]))
+        // Or upload first and build the embed yourself.
+        let blob = try await bsky.uploadImage(imageData, mimeType: "image/jpeg")
+        try await bsky.post("Seen today", embed: .images([.init(image: blob, alt: "The same petrel")]))
 
         // A link card instead of an image:
         try await bsky.post("Background reading", embed: .external(
@@ -117,10 +126,17 @@ struct BskyDocumentationExampleTests {
     func images() async throws {
         let pds = BskyFakePDS()
         let bsky = try await pds.server.makeAgent()
-        try await exampleImages(bsky: bsky, imageData: Data([0x89, 0x50, 0x4E, 0x47]))
+        // A small real JPEG with a comment block standing in for camera metadata.
+        let jpeg = try #require(Data(base64Encoded: "/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAAgGBgcGBQgHBwcJCQgKDBQNDAsLDBkSEw8UHRofHh0aHBwgJC4nICIsIxwcKDcpLDAxNDQ0Hyc5PTgyPC4zNDL/2wBDAQkJCQwLDBgNDRgyIRwhMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjIyMjL/wgARCAAQABADASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAABQb/xAAUAQEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAGbXSXP/8QAFRABAQAAAAAAAAAAAAAAAAAAAwD/2gAIAQEAAQUCMIwjCML/xAAVEQEBAAAAAAAAAAAAAAAAAAAEAP/aAAgBAwEBPwED7//EABURAQEAAAAAAAAAAAAAAAAAAAIA/9oACAECAQE/ASr/xAAUEAEAAAAAAAAAAAAAAAAAAAAg/9oACAEBAAY/Ah//xAAVEAEBAAAAAAAAAAAAAAAAAAAAYf/aAAgBAQABPyGKKKL/2gAMAwEAAgADAAAAEAP/xAAWEQADAAAAAAAAAAAAAAAAAAAAITH/2gAIAQMBAT8Qgz//xAAUEQEAAAAAAAAAAAAAAAAAAAAA/9oACAECAQE/EH//xAAWEAEBAQAAAAAAAAAAAAAAAAAAMcH/2gAIAQEAAT8QmzynlN//2Q=="))
+        let comment = Data([0xFF, 0xFE, 0x00, 0x0E]) + Data("shot-at-home".utf8)
+        let photo = jpeg.prefix(20) + comment + jpeg.dropFirst(20)
+
+        try await exampleImages(bsky: bsky, imageData: photo)
 
         #expect(pds.calledMethods == [
-            "com.atproto.repo.uploadBlob", "com.atproto.repo.createRecord", "com.atproto.repo.createRecord",
+            "com.atproto.repo.uploadBlob", "com.atproto.repo.createRecord",
+            "com.atproto.repo.uploadBlob", "com.atproto.repo.createRecord",
+            "com.atproto.repo.createRecord",
         ])
         let first = try #require(try await bsky.getRecord(AppBskyFeedPost.self, at: ATProtocolURI(uriString: pds.recordURIs[0])))
         guard case let .appBskyEmbedImages(images) = first.value.embed else {
@@ -129,7 +145,9 @@ struct BskyDocumentationExampleTests {
         }
         #expect(images.images.first?.alt == "A storm petrel skimming the waves")
         #expect(images.images.first?.aspectRatio == AppBskyEmbedDefs.AspectRatio(width: 1600, height: 900))
-        #expect(images.images.first?.image.mimeType == "image/png")
+        #expect(images.images.first?.image.mimeType == "image/jpeg")
+        // The uploaded file is the clean JPEG: the comment block is gone.
+        #expect(images.images.first?.image.size == jpeg.count)
     }
 
     func exampleSocialGraph(bsky: BskyAgent, post: ComAtprotoRepoStrongRef, author: DID) async throws {

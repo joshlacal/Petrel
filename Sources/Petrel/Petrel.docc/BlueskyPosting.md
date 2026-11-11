@@ -70,15 +70,22 @@ If you already hold the parent as an `AppBskyFeedDefs.PostView`, `bsky.replyRef(
 
 ### Attach images, video or a link card
 
-Upload the bytes first, then reference the returned blob from a ``PostEmbed``. `uploadBlob(_:mimeType:)` sends the data unmodified with the media type you give it.
-
 ```swift
-// The bytes are uploaded as they are; say what they are.
-let blob = try await bsky.uploadBlob(imageData, mimeType: "image/png")
+// Upload and embed in one step. Location and other metadata are
+// removed from the file before it is sent.
+try await bsky.post("Seen today", images: [
+    PostImage(
+        data: imageData,
+        mimeType: "image/jpeg",
+        alt: "A storm petrel skimming the waves",
+        width: 1600,
+        height: 900
+    ),
+])
 
-try await bsky.post("Seen today", embed: .images([
-    .init(image: blob, alt: "A storm petrel skimming the waves", width: 1600, height: 900),
-]))
+// Or upload first and build the embed yourself.
+let blob = try await bsky.uploadImage(imageData, mimeType: "image/jpeg")
+try await bsky.post("Seen today", embed: .images([.init(image: blob, alt: "The same petrel")]))
 
 // A link card instead of an image:
 try await bsky.post("Background reading", embed: .external(
@@ -96,6 +103,18 @@ Video does not go to the PDS like an image. `uploadVideo(_:mimeType:name:)` asks
 let video = try await bsky.uploadVideo(data, name: "landing.mp4")
 try await bsky.post("Landing", embed: .video(video, alt: "A petrel landing"))
 ```
+
+### Image metadata
+
+Photos carry more than pixels: the GPS position where they were taken, the time, the device, sometimes the owner's name, and thumbnails of the picture before it was cropped. **Every helper that uploads an image removes that metadata by default**: `post(_:images:)`, `uploadImage(_:mimeType:)`, `setAvatar(_:mimeType:)` and `setBanner(_:mimeType:)`.
+
+- JPEG, PNG, WebP and GIF are rewritten losslessly on every platform, Linux included. Metadata blocks are left out and the compressed image data is copied as it is: the pixels do not change, nothing is re-encoded, and the format stays the same. The ICC colour profile, transparency and animation are kept. If the image is rotated by its EXIF orientation, that one value is kept so it still displays the right way up.
+- Other image types (HEIC, HEIF, AVIF, TIFF) are re-encoded in their own format by ImageIO on Apple platforms. On other platforms they are refused.
+- If metadata cannot be removed, because the format is unsupported or the file is damaged, the helper throws ``ImageMetadataStrippingError`` and nothing is uploaded.
+
+To upload a file with its metadata intact, say so: pass `stripImageMetadata: false` to `post(_:images:)`, or `stripMetadata: false` to the other three. `uploadBlob(_:mimeType:)` is the raw path: it sends bytes exactly as given and never strips anything. Video uploaded with `uploadVideo` is not stripped either.
+
+``ImageMetadataStripper/stripMetadata(from:mimeType:)`` is the function behind the helpers and can be called directly.
 
 ### Like, repost, follow, mute and block
 
@@ -163,6 +182,9 @@ let parsed = pasted.flatMap { BskyAppURL.atURI(from: $0) }
 ### Records and embeds
 
 - ``PostEmbed``
+- ``PostImage``
+- ``ImageMetadataStripper``
+- ``ImageMetadataStrippingError``
 - ``ProfileUpdate``
 - ``RecordSwap``
 
