@@ -508,6 +508,58 @@ class NonObjectDefinitionTests(unittest.TestCase):
         self.assertIn('LexiconPermission(resource: "hologram", parameters: ["beam": ["wide"]], inheritAud: false)', generated)
 
 
+class SchemaRuleTests(unittest.TestCase):
+    """lex-27: documents the Lexicon specification calls invalid do not generate."""
+
+    def test_only_language_version_one_is_read(self):
+        for version in (2, "1", None):
+            with self.subTest(version=version):
+                document = {"lexicon": version, "id": "com.example.thing", "defs": {"main": object_def()}}
+                if version is None:
+                    del document["lexicon"]
+                with self.assertRaisesRegex(ValueError, "Unsupported Lexicon language version"):
+                    validate_lexicon_schema(document)
+
+    def test_a_lexicon_needs_at_least_one_definition(self):
+        with self.assertRaisesRegex(ValueError, "has no definitions"):
+            validate_lexicon_schema({"lexicon": 1, "id": "com.example.thing", "defs": {}})
+
+    def test_a_primary_type_must_be_named_main(self):
+        for primary in ("record", "query", "procedure", "subscription", "permission-set"):
+            with self.subTest(primary=primary):
+                with self.assertRaisesRegex(ValueError, "only allowed as 'main'"):
+                    validate_lexicon_schema(lexicon("com.example.thing", {"other": {"type": primary}}))
+        validate_lexicon_schema(lexicon("com.example.thing", {"main": {"type": "query"}}))
+
+    def test_definition_types_that_cannot_be_named_are_rejected(self):
+        for kind in ({"type": "ref", "ref": "com.atproto.repo.strongRef"}, {"type": "unknown"}, {"type": "params"}):
+            with self.subTest(kind=kind["type"]):
+                with self.assertRaisesRegex(ValueError, "cannot be a named definition"):
+                    validate_lexicon_schema(lexicon("com.example.thing", {"demo": kind}))
+
+    def test_a_record_must_wrap_an_object_schema(self):
+        with self.assertRaisesRegex(ValueError, "must declare a 'record' schema of type 'object'"):
+            validate_lexicon_schema(lexicon("com.example.thing", {"main": {"type": "record", "key": "any", "record": {"properties": {}}}}))
+
+    def test_every_official_invalid_schema_vector_is_rejected(self):
+        # atproto-interop-tests/lexicon/lexicon-invalid.json, vendored for the runtime
+        # model (Tests/PetrelLexiconTests), read here from the same file.
+        vectors = REPOSITORY_ROOT / "Tests" / "PetrelLexiconTests" / "Vectors" / "lexicon" / "lexicon-invalid.json"
+        if not vectors.exists():
+            self.skipTest("lexicon vectors are not part of this checkout")
+        rejected = []
+        cases = json.loads(vectors.read_text())
+        for case in cases:
+            try:
+                validate_lexicon_schema(case["lexicon"])
+                with contextlib.redirect_stdout(io.StringIO()):
+                    SwiftCodeGenerator(case["lexicon"]).convert()
+            except Exception:
+                rejected.append(case["name"])
+        self.assertEqual(len(cases), 7)
+        self.assertEqual(rejected, [case["name"] for case in cases])
+
+
 class OverlayManifestTests(unittest.TestCase):
     def test_petrel_core_token_resolves_to_the_bundled_lexicons_and_their_exclusions(self):
         directories, exclude = resolve_reference_dirs([CORE_REFERENCE_TOKEN, "other/dir"], ("com.example.private",))

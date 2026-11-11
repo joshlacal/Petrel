@@ -21,19 +21,52 @@ REF_PATTERN = re.compile(
 )
 
 
+PRIMARY_DEFINITION_TYPES = frozenset({"record", "query", "procedure", "subscription", "permission-set"})
+
+
 def validate_lexicon_schema(lexicon: Dict[str, Any]) -> None:
     """Validate that lexicon ID, definition names, and properties adhere to grammar."""
     lexicon_id = lexicon.get("id")
     if not isinstance(lexicon_id, str) or not NSID_PATTERN.match(lexicon_id):
         raise ValueError(f"Invalid lexicon NSID: {lexicon_id!r}")
 
+    # Lexicon language version. Only version 1 exists; anything else is a document
+    # this generator does not know how to read.
+    if lexicon.get("lexicon") != 1:
+        raise ValueError(
+            f"Unsupported Lexicon language version {lexicon.get('lexicon')!r} in {lexicon_id!r} (expected 1)"
+        )
+
     defs = lexicon.get("defs", {})
     if not isinstance(defs, dict):
         raise ValueError(f"Lexicon defs must be a dictionary in {lexicon_id!r}")
+    if not defs:
+        raise ValueError(f"Lexicon {lexicon_id!r} has no definitions")
 
     for def_name, def_schema in defs.items():
         if not isinstance(def_name, str) or not DEF_NAME_PATTERN.match(def_name):
             raise ValueError(f"Invalid definition name {def_name!r} in {lexicon_id!r}")
+        # A primary type describes the lexicon itself: at most one, and it is `main`.
+        if (
+            def_name != "main"
+            and isinstance(def_schema, dict)
+            and def_schema.get("type") in PRIMARY_DEFINITION_TYPES
+        ):
+            raise ValueError(
+                f"Definition {def_name!r} in {lexicon_id!r} has primary type "
+                f"{def_schema.get('type')!r}, which is only allowed as 'main'"
+            )
+        # `ref`, `unknown` and `params` only describe a field or a parameter list; they
+        # cannot stand as a definition of their own.
+        if isinstance(def_schema, dict) and def_schema.get("type") in ("ref", "unknown", "params"):
+            raise ValueError(
+                f"Definition {def_name!r} in {lexicon_id!r} has type {def_schema.get('type')!r}, "
+                "which cannot be a named definition"
+            )
+        if isinstance(def_schema, dict) and def_schema.get("type") == "record":
+            record_schema = def_schema.get("record")
+            if not isinstance(record_schema, dict) or record_schema.get("type") != "object":
+                raise ValueError(f"Record {lexicon_id!r} must declare a 'record' schema of type 'object'")
         _validate_def_schema_properties_and_errors(lexicon_id, def_schema)
 
 
