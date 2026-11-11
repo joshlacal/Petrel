@@ -189,13 +189,27 @@ let package = Package(
             name: "PetrelRepoTests",
             dependencies: ["PetrelRepo"]
         ),
+        // Test support only (not a product): a loopback WebSocket server on a real socket and an
+        // independent DAG-CBOR fixture encoder, shared by the two streaming test targets.
+        .target(
+            name: "PetrelStreamingTestSupport",
+            dependencies: [
+                "PetrelFirehose",
+                .product(name: "Crypto", package: "swift-crypto"),
+            ],
+            path: "Tests/PetrelStreamingTestSupport",
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .testTarget(
             name: "PetrelFirehoseTests",
-            dependencies: ["PetrelFirehose", "PetrelRepo"]
+            dependencies: ["PetrelFirehose", "PetrelRepo", "PetrelStreamingTestSupport"],
+            resources: [.copy("Vectors")]
         ),
         .testTarget(
             name: "PetrelJetstreamTests",
-            dependencies: ["PetrelJetstream", "PetrelFirehose"]
+            dependencies: ["PetrelJetstream", "PetrelFirehose", "PetrelStreamingTestSupport"]
         ),
         .testTarget(
             name: "PetrelPLCTests",
