@@ -357,11 +357,11 @@ public enum ServiceJWT {
 
     /// Verifies a service JWT under an explicit signature-encoding policy.
     ///
-    /// - Parameter signatureOptions:
-    ///   ``ATProtoSignatureVerificationOptions/jwt`` (compact, either S) is
-    ///   what the specification asks for;
-    ///   ``ATProtoSignatureVerificationOptions/strict`` additionally
-    ///   rejects high-S.
+    /// For `signatureOptions`,
+    /// ``ATProtoSignatureVerificationOptions/jwt`` (compact, either S) is
+    /// what the specification asks for;
+    /// ``ATProtoSignatureVerificationOptions/strict`` additionally rejects
+    /// high-S.
     public static func verify(
         _ compact: String,
         publicKey: ATProtoJWTVerificationKey,
@@ -435,10 +435,9 @@ public enum ServiceJWT {
     }
 
     /// Verifies a service JWT against a validated ``ATProtoPublicKey`` on
-    /// either curve.
-    ///
-    /// - Parameter signatureOptions: Defaults to
-    ///   ``ATProtoSignatureVerificationOptions/jwt``.
+    /// either curve. `signatureOptions` defaults to
+    /// ``ATProtoSignatureVerificationOptions/jwt``: compact encoding,
+    /// either S value.
     public static func verify(
         _ compact: String,
         publicKey: ATProtoPublicKey,
