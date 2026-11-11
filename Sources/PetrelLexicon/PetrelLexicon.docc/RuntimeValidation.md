@@ -46,6 +46,16 @@ record's `key` type.
 A catalog is a value type. Build it once, then share copies freely across
 tasks.
 
+A whole directory of Lexicon files loads in one call; subdirectories are
+searched.
+
+<!-- Mirrors DocumentationSnippetTests.documentationLoadDirectory -->
+
+```swift
+var catalog = LexiconCatalog()
+try catalog.add(contentsOfDirectory: lexiconsDirectory)
+```
+
 ## Read the issues
 
 ``LexiconValidationError`` carries every problem found, each with a JSON
@@ -206,6 +216,35 @@ alongside the body.
 // by a body that has no `$type` of its own.
 let body: LexValue = ["seq": 42]
 try catalog.validateSubscriptionMessage(body, nsid: "com.example.stream", type: "#tick")
+```
+
+## Permission sets
+
+A `permission-set` definition is kept as written, because the set of
+resources and parameters is expected to grow. Interpreting it is a separate,
+deliberately conservative step: `grants(publishedAs:)` returns only the
+declarations a service may act on. A declaration is dropped when its resource
+is not `repo` or `rpc`, when it carries a parameter this version does not
+know, when a parameter is malformed or uses a wildcard, and when it names a
+collection or endpoint outside the namespace of the set's own NSID.
+
+<!-- Mirrors DocumentationSnippetTests.documentationPermissionSet -->
+
+```swift
+var granted: [String] = []
+
+guard case let .permissionSet(set)? = catalog.definition("com.example.calendar.authBasic") else { return }
+
+for grant in set.grants(publishedAs: "com.example.calendar.authBasic") {
+    switch grant {
+    case let .repo(collections, actions):
+        // Write access to `collections`, limited to `actions` when not nil.
+        granted.append("repo \(collections) \(actions ?? ["create", "update", "delete"])")
+    case let .rpc(methods, inheritAudience):
+        // Calls to `methods`, against any audience or the inherited one.
+        granted.append("rpc \(methods) \(inheritAudience ? "inherited audience" : "any audience")")
+    }
+}
 ```
 
 ## Schemas beyond Lexicon version 1
