@@ -134,7 +134,8 @@ struct EventStreamsDocumentationTests {
       seq: commit.seq, repo: commit.repo, commitCID: commit.commitCID, rev: commit.rev,
       since: nil, blocks: Data(), ops: commit.ops, prevDataCID: nil, time: commit.time
     )
-    #expect(try empty.records().map { $0.record == nil } == [true, true])
+    let recordsMissing: [Bool] = try empty.records().map { $0.record == nil }
+    #expect(recordsMissing == [true, true])
   }
 
   @Test("Read labels, or any other subscription")

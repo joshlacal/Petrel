@@ -43,7 +43,8 @@ struct EventStreamFrameDecoderTests {
     #expect(commit.ops.first?.cid == Self.cid)
     #expect(commit.ops.first?.prev == nil)
     #expect(commit.repo.description == Self.did)
-    #expect(commit.blocks.data == Data([1, 2, 3]))
+    let expectedBlocks = Data([1, 2, 3] as [UInt8])
+    #expect(commit.blocks.data == expectedBlocks)
   }
 
   @Test("a cid-link without the 0x00 multibase prefix is rejected")
@@ -56,9 +57,12 @@ struct EventStreamFrameDecoderTests {
 
   @Test("a real error frame (op: -1) is recognised and typed")
   func errorFrame() throws {
-    let wire = Data([0xA1, 0x62, 0x6F, 0x70, 0x20]) + TestDAGCBOR.map([
+    let headerBytes: [UInt8] = [0xA1, 0x62, 0x6F, 0x70, 0x20]
+    let payloadFields: [(String, TestDAGCBOR)] = [
       ("error", .text("FutureCursor")), ("message", .text("Cursor in the future.")),
-    ]).encoded
+    ]
+    var wire = Data(headerBytes)
+    wire.append(TestDAGCBOR.map(payloadFields).encoded)
     guard case let .error(error) = try ATProtoWebSocketFrameDecoder.decode(wire) else {
       Issue.record("expected an error frame")
       return

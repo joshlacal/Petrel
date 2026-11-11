@@ -55,7 +55,10 @@ struct LabelSubscriptionTests {
       switch event {
       case let .message(.labels(batch), sequence):
         #expect(Int64(batch.seq) == sequence)
-        #expect(batch.labels.allSatisfy { $0.src.description == Self.labeler && $0.sig?.data.count == 64 })
+        let sourcesMatch: Bool = batch.labels.allSatisfy { $0.src.description == Self.labeler }
+        let signaturesPresent: Bool = batch.labels.allSatisfy { $0.sig?.data.count == 64 }
+        #expect(sourcesMatch)
+        #expect(signaturesPresent)
         batches.append((sequence, batch.labels.map(\.val)))
       case let .message(.info(info), sequence):
         #expect(sequence == nil)
@@ -67,10 +70,14 @@ struct LabelSubscriptionTests {
     }
 
     #expect(infoNames == ["OutdatedCursor"])
-    #expect(batches.map(\.seq) == [1, 2])
-    #expect(batches.map(\.values) == [["porn"], ["spam", "!hide"]])
-    #expect(await factory.connectedURLs.map(\.absoluteString)
-      == ["wss://mod.example/xrpc/com.atproto.label.subscribeLabels?cursor=0"])
+    let sequences: [Int64?] = batches.map(\.seq)
+    let expectedSequences: [Int64?] = [1, 2]
+    #expect(sequences == expectedSequences)
+    let values: [[String]] = batches.map(\.values)
+    let expectedValues: [[String]] = [["porn"], ["spam", "!hide"]]
+    #expect(values == expectedValues)
+    let urls: [String] = await factory.connectedURLs.map(\.absoluteString)
+    #expect(urls == ["wss://mod.example/xrpc/com.atproto.label.subscribeLabels?cursor=0"])
     #expect(await storage.loadCursor() == 1)
   }
 

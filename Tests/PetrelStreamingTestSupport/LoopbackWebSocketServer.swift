@@ -46,6 +46,14 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
     case wait(TimeInterval)
     /// Block until the client has sent at least this many text messages on this connection.
     case awaitClientText(count: Int)
+    /// Block until the server has received at least this many ping frames, over all
+    /// connections. Use this instead of a fixed wait when a test is about pings: the script
+    /// then advances on the event itself, however slowly the client is scheduled.
+    case awaitPings(count: Int)
+    /// Block until the test calls ``LoopbackWebSocketServer/openGate(_:)`` with this name.
+    /// Lets a test sequence a server action (a drop, a close) after something it observed on
+    /// the client, instead of racing it.
+    case awaitGate(String)
     /// Send a close frame, then close the socket.
     case close(code: UInt16)
     /// Close the TCP connection without a close frame.
@@ -70,6 +78,10 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
   private var clientTexts: [Int: [String]] = [:]
   private var pongs = 0
   private var pings = 0
+  private var openGates: Set<String> = []
+  /// Upper bound for every blocking script step. It only turns a broken test into a failure
+  /// instead of a hang; no step relies on it elapsing.
+  private static let stepDeadline: TimeInterval = 120
   private var openSockets: Set<Int32> = []
 
   /// Starts listening on `127.0.0.1` at an ephemeral port. `handler` is called once per
@@ -162,6 +174,25 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
     return clientTexts.keys.sorted().flatMap { clientTexts[$0] ?? [] }
   }
 
+  /// Lets every `.awaitGate(name)` step, current and future, proceed.
+  public func openGate(_ name: String) {
+    lock.lock()
+    openGates.insert(name)
+    lock.broadcast()
+    lock.unlock()
+  }
+
+  /// Blocks the calling (server) thread until `condition` holds, the server stops, or the
+  /// step deadline passes. `condition` is evaluated with the state lock held.
+  private func waitUntil(_ condition: () -> Bool) {
+    let deadline = Date().addingTimeInterval(Self.stepDeadline)
+    lock.lock()
+    while !stopped, !condition() {
+      if !lock.wait(until: deadline) { break }
+    }
+    lock.unlock()
+  }
+
   /// Number of ping frames received from clients.
   public var pingCount: Int {
     lock.lock()
@@ -219,7 +250,9 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
         head += "\(name): \(value)\r\n"
       }
       head += "\r\n"
-      _ = sendAll(socket, Data(head.utf8) + body)
+      var response = Data(head.utf8)
+      response.append(body)
+      _ = sendAll(socket, response)
 
     case let .accept(subprotocol, script):
       guard request.isUpgrade, let key = request.headers["sec-websocket-key"] else {
@@ -253,11 +286,11 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
         case let .wait(interval):
           Thread.sleep(forTimeInterval: interval)
         case let .awaitClientText(count):
-          lock.lock()
-          while !stopped, (clientTexts[index]?.count ?? 0) < count {
-            if !lock.wait(until: Date().addingTimeInterval(10)) { break }
-          }
-          lock.unlock()
+          waitUntil { (clientTexts[index]?.count ?? 0) >= count }
+        case let .awaitPings(count):
+          waitUntil { pings >= count }
+        case let .awaitGate(name):
+          waitUntil { openGates.contains(name) }
         case let .close(code):
           var payload = Data()
           payload.append(UInt8(code >> 8))
@@ -313,6 +346,7 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
       case 0x9:
         lock.lock()
         pings += 1
+        lock.broadcast()
         lock.unlock()
         _ = sendFrame(socket, opcode: 0xA, payload: Data(payload), writeLock: writeLock)
       case 0xA:

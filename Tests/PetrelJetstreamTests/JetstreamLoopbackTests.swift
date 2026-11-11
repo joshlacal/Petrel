@@ -11,11 +11,16 @@ import Testing
 /// `JetstreamSubscription` with its default transports (URLSession WebSocket and HTTP) against
 /// a real loopback server that frames messages the way production does: JSON as WebSocket TEXT
 /// messages, zstd as BINARY.
+///
+/// As in the firehose real-socket suite, nothing here may depend on timing: the process can
+/// stall for seconds on a loaded runner. Scripts advance on observed events and the time limit
+/// only turns a hang into a failure.
 @Suite(
   "Jetstream over a real socket",
   .enabled("URLSession cannot open WebSockets on this platform") {
     await URLSessionWebSocketAvailability.shared.isAvailable()
-  }
+  },
+  .timeLimit(.minutes(3))
 )
 struct JetstreamLoopbackTests {
   static let fastBackoff = FirehoseBackoffConfiguration(initialDelay: 0.01, maxDelay: 0.05, multiplier: 2)
@@ -87,7 +92,9 @@ struct JetstreamLoopbackTests {
   func compressedBinaryFrames() async throws {
     let dictionary = Data(repeating: 0x42, count: 128)
     let frames = try (1 ... 3).map { try JetstreamZstd.compress(Data(Self.commit(seq: $0).utf8), dictionary: dictionary) }
-    #expect(frames[0].prefix(4) == Data([0x28, 0xB5, 0x2F, 0xFD]))
+    let magic: [UInt8] = Array(frames[0].prefix(4))
+    let zstdMagic: [UInt8] = [0x28, 0xB5, 0x2F, 0xFD]
+    #expect(magic == zstdMagic)
     let server = try LoopbackWebSocketServer { _, request in
       if request.path == "/xrpc/network.bsky.jetstream.getZstdDictionary" {
         return .http(status: 200, headers: ["Content-Type": "application/octet-stream"], body: dictionary)

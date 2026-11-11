@@ -62,7 +62,9 @@ public indirect enum TestDAGCBOR: Sendable {
         value.encode(into: &out)
       }
     case let .link(cidBytes):
-      TestDAGCBOR.tag(42, .bytes(Data([0x00]) + cidBytes)).encode(into: &out)
+      var prefixed = Data([0x00] as [UInt8])
+      prefixed.append(cidBytes)
+      TestDAGCBOR.tag(42, .bytes(prefixed)).encode(into: &out)
     case let .tag(tag, value):
       Self.head(major: 6, argument: tag, into: &out)
       value.encode(into: &out)

@@ -19,13 +19,14 @@ struct RelayFrameLenientDecodingTests {
     extraHeader: [(String, TestDAGCBOR)] = [],
     extraBody: [(String, TestDAGCBOR)] = []
   ) -> Data {
-    TestDAGCBOR.frame(
-      header: .map([("op", .unsigned(1)), ("t", .text("#identity"))] + extraHeader),
-      payload: .map([
-        ("seq", .int(seq)), ("did", .text(did)), ("time", .text(time)),
-        ("handle", .text("alice.test")),
-      ] + extraBody)
-    )
+    var header: [(String, TestDAGCBOR)] = [("op", .unsigned(1)), ("t", .text("#identity"))]
+    header.append(contentsOf: extraHeader)
+    var body: [(String, TestDAGCBOR)] = [
+      ("seq", .int(seq)), ("did", .text(did)), ("time", .text(time)),
+      ("handle", .text("alice.test")),
+    ]
+    body.append(contentsOf: extraBody)
+    return TestDAGCBOR.frame(header: .map(header), payload: .map(body))
   }
 
   static func account(active: Bool, status: String?) -> Data {
@@ -53,7 +54,9 @@ struct RelayFrameLenientDecodingTests {
     if let since {
       body.append(("since", since))
     }
-    return TestDAGCBOR.messageFrame(type: "#commit", payload: body + flags + extra)
+    body.append(contentsOf: flags)
+    body.append(contentsOf: extra)
+    return TestDAGCBOR.messageFrame(type: "#commit", payload: body)
   }
 
   static func op(_ action: String, prev: Bool) -> TestDAGCBOR {
@@ -70,11 +73,18 @@ struct RelayFrameLenientDecodingTests {
 
   @Test("the test encoder reproduces the header bytes captured from bsky.network")
   func headerLayoutMatchesProductionCapture() {
-    let header = TestDAGCBOR.map([("op", .unsigned(1)), ("t", .text("#commit"))]).encoded
-    #expect(Array(header) == [0xA2, 0x61, 0x74, 0x67] + Array("#commit".utf8) + [0x62, 0x6F, 0x70, 0x01])
+    // Operands are typed constants: Swift 6.1 cannot type-check literal arithmetic inside
+    // `#expect` in reasonable time.
+    let headerFields: [(String, TestDAGCBOR)] = [("op", .unsigned(1)), ("t", .text("#commit"))]
+    let header: [UInt8] = Array(TestDAGCBOR.map(headerFields).encoded)
+    var expectedHeader: [UInt8] = [0xA2, 0x61, 0x74, 0x67]
+    expectedHeader.append(contentsOf: Array("#commit".utf8))
+    expectedHeader.append(contentsOf: [0x62, 0x6F, 0x70, 0x01])
+    #expect(header == expectedHeader)
     // cid-link: tag 42, 37-byte string, multibase identity prefix 0x00, then CIDv1 dag-cbor sha-256.
-    let link = TestDAGCBOR.link(Self.cid.bytes).encoded
-    #expect(Array(link.prefix(9)) == [0xD8, 0x2A, 0x58, 0x25, 0x00, 0x01, 0x71, 0x12, 0x20])
+    let link: [UInt8] = Array(TestDAGCBOR.link(Self.cid.bytes).encoded.prefix(9))
+    let expectedLink: [UInt8] = [0xD8, 0x2A, 0x58, 0x25, 0x00, 0x01, 0x71, 0x12, 0x20]
+    #expect(link == expectedLink)
   }
 
   @Test("unknown header and payload fields are ignored")
@@ -85,8 +95,9 @@ struct RelayFrameLenientDecodingTests {
         ("future", .map([("nested", .array([.unsigned(1), .null, .float64(1.5)]))])),
       ]
     )
-    #expect(try RelayFrameDecoder.decode(frame)
-      == .identity(.init(seq: 7, did: Self.did, time: Self.time, handle: "alice.test")))
+    let expected = RelayEvent.identity(.init(seq: 7, did: Self.did, time: Self.time, handle: "alice.test"))
+    let decoded = try RelayFrameDecoder.decode(frame)
+    #expect(decoded == expected)
     #expect(throws: RelayVerifierError.invalidFrameHeader) {
       try RelayFrameDecoder.decode(frame, mode: .strict)
     }
@@ -104,7 +115,10 @@ struct RelayFrameLenientDecodingTests {
   )
   func accountStatusIsOpen(active: Bool, status: String?) throws {
     let event = try RelayFrameDecoder.decode(Self.account(active: active, status: status))
-    #expect(event == .account(.init(seq: 8, did: Self.did, time: Self.time, active: active, status: status)))
+    let expected = RelayEvent.account(
+      .init(seq: 8, did: Self.did, time: Self.time, active: active, status: status)
+    )
+    #expect(event == expected)
   }
 
   @Test("strict mode still pins the account status rules used on relay captures")
@@ -137,7 +151,8 @@ struct RelayFrameLenientDecodingTests {
       Issue.record("expected a commit")
       return
     }
-    #expect(trimmed.ops.map(\.action) == [.create])
+    let trimmedActions: [RelayRepoAction] = trimmed.ops.map(\.action)
+    #expect(trimmedActions == [RelayRepoAction.create])
 
     #expect(throws: RelayVerifierError.invalidEventBody) {
       try RelayFrameDecoder.decode(legacy, mode: .strict)
@@ -154,8 +169,12 @@ struct RelayFrameLenientDecodingTests {
       Issue.record("expected a commit")
       return
     }
-    #expect(event.ops.map(\.action) == [.create, .update, .delete, .update, .delete])
-    #expect(event.ops.map { $0.prev != nil } == [false, false, false, true, true])
+    let actions: [RelayRepoAction] = event.ops.map(\.action)
+    let expectedActions: [RelayRepoAction] = [.create, .update, .delete, .update, .delete]
+    #expect(actions == expectedActions)
+    let hasPrev: [Bool] = event.ops.map { $0.prev != nil }
+    let expectedHasPrev: [Bool] = [false, false, false, true, true]
+    #expect(hasPrev == expectedHasPrev)
     #expect(event.ops[2].cid == nil)
 
     #expect(throws: RelayVerifierError.invalidRepositoryOperation) {
@@ -182,9 +201,11 @@ struct RelayFrameLenientDecodingTests {
     let frame = TestDAGCBOR.messageFrame(type: type, payload: [
       ("seq", .unsigned(41)), ("did", .text(Self.did)), ("time", .text(Self.time)),
     ])
-    #expect(try RelayFrameDecoder.decodeFrame(frame) == .ignored(.init(
-      operation: 1, type: type, sequence: 41, reason: .unknownType
-    )))
+    let expected = RelayFrame.ignored(
+      EventStreamIgnoredFrame(operation: 1, type: type, sequence: 41, reason: .unknownType)
+    )
+    let decoded = try RelayFrameDecoder.decodeFrame(frame)
+    #expect(decoded == expected)
     // `RelayEvent` cannot represent the frame, so the typed entry point reports it.
     #expect(throws: RelayVerifierError.unknownEventKind) { try RelayFrameDecoder.decode(frame) }
     #expect(throws: RelayVerifierError.unknownEventKind) {
@@ -198,9 +219,11 @@ struct RelayFrameLenientDecodingTests {
       header: .map([("op", .unsigned(2)), ("t", .text("#identity"))]),
       payload: .map([("seq", .unsigned(5))])
     )
-    #expect(try RelayFrameDecoder.decodeFrame(frame) == .ignored(.init(
-      operation: 2, type: "#identity", sequence: 5, reason: .unknownOperation
-    )))
+    let expected = RelayFrame.ignored(
+      EventStreamIgnoredFrame(operation: 2, type: "#identity", sequence: 5, reason: .unknownOperation)
+    )
+    let decoded = try RelayFrameDecoder.decodeFrame(frame)
+    #expect(decoded == expected)
     #expect(throws: RelayVerifierError.invalidFrameHeader) {
       try RelayFrameDecoder.decodeFrame(frame, mode: .strict)
     }
@@ -209,20 +232,26 @@ struct RelayFrameLenientDecodingTests {
   @Test("an error frame decodes from its wire bytes")
   func errorFrameFromWireBytes() throws {
     // Header {"op": -1} is exactly a1 62 6f 70 20.
-    let header = Data([0xA1, 0x62, 0x6F, 0x70, 0x20])
-    let payload = TestDAGCBOR.map([
+    let headerBytes: [UInt8] = [0xA1, 0x62, 0x6F, 0x70, 0x20]
+    let payloadFields: [(String, TestDAGCBOR)] = [
       ("error", .text("FutureCursor")), ("message", .text("Cursor in the future.")),
-    ]).encoded
-    #expect(TestDAGCBOR.errorFrame(error: "FutureCursor", message: "Cursor in the future.") == header + payload)
-    #expect(try RelayFrameDecoder.decode(header + payload)
-      == .error(.init(error: "FutureCursor", message: "Cursor in the future.")))
+    ]
+    var wire = Data(headerBytes)
+    wire.append(TestDAGCBOR.map(payloadFields).encoded)
+    let built: Data = TestDAGCBOR.errorFrame(error: "FutureCursor", message: "Cursor in the future.")
+    #expect(built == wire)
+    let expected = RelayEvent.error(.init(error: "FutureCursor", message: "Cursor in the future."))
+    let decoded = try RelayFrameDecoder.decode(wire)
+    #expect(decoded == expected)
 
     // Extra header and payload fields on an error frame are ignored as well.
     let decorated = TestDAGCBOR.frame(
       header: .map([("op", .negative(-1)), ("t", .text("#error"))]),
       payload: .map([("error", .text("ConsumerTooSlow")), ("retryAfter", .unsigned(5))])
     )
-    #expect(try RelayFrameDecoder.decode(decorated) == .error(.init(error: "ConsumerTooSlow", message: nil)))
+    let expectedDecorated = RelayEvent.error(.init(error: "ConsumerTooSlow", message: nil))
+    let decodedDecorated = try RelayFrameDecoder.decode(decorated)
+    #expect(decodedDecorated == expectedDecorated)
   }
 
   @Test("invalid framing stays a hard error in lenient mode")

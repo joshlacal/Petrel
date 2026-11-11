@@ -123,12 +123,21 @@ struct JetstreamLegacyAPITests {
     #expect(components.scheme == "wss")
     #expect(components.path == "/subscribe")
     let items = components.queryItems ?? []
-    #expect(items.filter { $0.name == "wantedCollections" }.map(\.value) == ["app.bsky.feed.like", "app.bsky.graph.*"])
-    #expect(items.filter { $0.name == "wantedDids" }.map(\.value) == ["did:plc:eygmaihciaxprqvxpfvl6flk"])
-    #expect(items.first { $0.name == "cursor" }?.value == "1725911162329308")
-    #expect(items.first { $0.name == "maxMessageSizeBytes" }?.value == "1000000")
+    func values(_ name: String) -> [String?] {
+      items.filter { $0.name == name }.map(\.value)
+    }
+    let wantedCollections: [String?] = values("wantedCollections")
+    let wantedDids: [String?] = values("wantedDids")
+    let cursor: [String?] = values("cursor")
+    let maxMessageSize: [String?] = values("maxMessageSizeBytes")
+    #expect(wantedCollections == ["app.bsky.feed.like", "app.bsky.graph.*"])
+    #expect(wantedDids == ["did:plc:eygmaihciaxprqvxpfvl6flk"])
+    #expect(cursor == ["1725911162329308"])
+    #expect(maxMessageSize == ["1000000"])
     // No v2-only parameters, and no JSON subprotocol offer on the legacy endpoint.
-    #expect(!items.contains { ["kinds", "dids", "collections", "zstdDictionary", "compress"].contains($0.name) })
+    let v2Only: Set<String> = ["kinds", "dids", "collections", "zstdDictionary", "compress"]
+    let names: Set<String> = Set(items.map(\.name))
+    #expect(names.isDisjoint(with: v2Only))
     #expect(await factory.offeredSubprotocols == [[]])
   }
 

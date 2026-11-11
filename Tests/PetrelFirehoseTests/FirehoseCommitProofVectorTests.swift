@@ -47,7 +47,8 @@ struct FirehoseCommitProofVectorTests {
   @Test("the vector file is present and complete")
   func vectorFileLoads() {
     #expect(Self.fixtures.count == 6)
-    #expect(Self.fixtures.allSatisfy { !$0.blocksInProof.isEmpty })
+    let allHaveProofs: Bool = Self.fixtures.allSatisfy { !$0.blocksInProof.isEmpty }
+    #expect(allHaveProofs)
   }
 
   @Test("each commit proof survives the firehose: frame, subscription, diff CAR", arguments: fixtures)
@@ -114,16 +115,25 @@ struct FirehoseCommitProofVectorTests {
 
     #expect(commit.commitCID == commitCID)
     #expect(commit.prevDataCID?.string == fixture.rootBeforeCommit)
-    #expect(commit.ops.filter { $0.action == .create }.map(\.path) == fixture.adds)
-    #expect(commit.ops.filter { $0.action == .delete }.map(\.path) == fixture.dels)
-    #expect(commit.ops.filter { $0.action == .create }.allSatisfy { $0.cid == leaf && $0.prev == nil })
-    #expect(commit.ops.filter { $0.action == .delete }.allSatisfy { $0.cid == nil && $0.prev == leaf })
+    let creates: [RelayRepoOp] = commit.ops.filter { $0.action == .create }
+    let deletes: [RelayRepoOp] = commit.ops.filter { $0.action == .delete }
+    let createdPaths: [String] = creates.map(\.path)
+    let deletedPaths: [String] = deletes.map(\.path)
+    #expect(createdPaths == fixture.adds)
+    #expect(deletedPaths == fixture.dels)
+    let createsCarryLeaf: Bool = creates.allSatisfy { $0.cid == leaf && $0.prev == nil }
+    let deletesCarryPrev: Bool = deletes.allSatisfy { $0.cid == nil && $0.prev == leaf }
+    #expect(createsCarryLeaf)
+    #expect(deletesCarryPrev)
 
     // The delivered `blocks` are a CAR rooted at the commit, holding the commit plus exactly
     // the fixture's proof blocks, each of which hashes to its CID.
     let reader = try CARReader(data: commit.blocks)
     #expect(reader.roots == [commitCID])
-    #expect(Set(reader.rawBlockIndex.keys) == Set(proofCIDs.map(\.bytes) + [commitCID.bytes]))
+    let deliveredBlocks: Set<Data> = Set(reader.rawBlockIndex.keys)
+    var expectedBlocks: Set<Data> = Set(proofCIDs.map(\.bytes))
+    expectedBlocks.insert(commitCID.bytes)
+    #expect(deliveredBlocks == expectedBlocks)
     for cid in proofCIDs {
       let bytes = try reader.rawBlockData(for: cid)
       #expect(CID.fromDAGCBOR(bytes) == cid)
@@ -131,7 +141,10 @@ struct FirehoseCommitProofVectorTests {
     // The commit block in the CAR points at the fixture's root after the commit.
     let deliveredCommit = try reader.rawBlockData(for: commitCID)
     #expect(deliveredCommit == commitBytes)
-    #expect(deliveredCommit.range(of: Data([0x00]) + rootAfter.bytes) != nil)
+    var rootLink = Data([0x00] as [UInt8])
+    rootLink.append(rootAfter.bytes)
+    let pointsAtRootAfter: Bool = deliveredCommit.range(of: rootLink) != nil
+    #expect(pointsAtRootAfter)
   }
 }
 

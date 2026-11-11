@@ -73,7 +73,10 @@ struct FirehoseSubscriptionResilienceTests {
         ("seq", .int(Int64(2 + index))), ("did", .text(Self.did)), ("time", .text(Self.time)),
       ])
     }
-    let session = ScriptedWebSocketSession(messages: [Self.identity(1)] + legacy + [Self.identity(6), Self.identity(7)])
+    var messages: [Data] = [Self.identity(1)]
+    messages.append(contentsOf: legacy)
+    messages.append(contentsOf: [Self.identity(6), Self.identity(7)])
+    let session = ScriptedWebSocketSession(messages: messages)
     let storage = InMemoryFirehoseCursorStorage()
     let subscription = Self.subscription(ScriptedWebSocketFactory(sessions: [session]), storage: storage, autoAcknowledge: true)
 
@@ -106,9 +109,10 @@ struct FirehoseSubscriptionResilienceTests {
       events.append(event)
       if events.count == 3 { break }
     }
-    #expect(events[1] == .ignoredFrame(.init(
+    let expected = FirehoseSubscriptionEvent.ignoredFrame(EventStreamIgnoredFrame(
       operation: 1, type: "#identity", sequence: 2, reason: .undecodablePayload("invalidEventBody")
-    )))
+    ))
+    #expect(events[1] == expected)
     #expect(Self.summary(events[2]) == "event 3")
   }
 
@@ -234,9 +238,10 @@ struct FirehoseSubscriptionResilienceTests {
     for try await event in subscription.events() {
       // While event N is being processed the saved cursor is still N-1: a crash here replays N.
       cursorsSeenWhileProcessing.append(await storage.loadCursor())
-      if event == .event(.identity(.init(seq: 3, did: Self.did, time: Self.time, handle: nil))) { break }
+      if case let .event(relayEvent) = event, relayEvent.sequence == 3 { break }
     }
-    #expect(cursorsSeenWhileProcessing == [nil, 1, 2])
+    let expectedCursors: [Int64?] = [nil, 1, 2]
+    #expect(cursorsSeenWhileProcessing == expectedCursors)
     #expect(await subscription.currentCursor() == 2)
   }
 
@@ -302,8 +307,10 @@ struct FirehoseSubscriptionResilienceTests {
   func transportErrorClassification() throws {
     let url = URL(string: "https://relay.example/xrpc/com.atproto.sync.subscribeRepos")!
     let rejected = HTTPURLResponse(url: url, statusCode: 429, httpVersion: nil, headerFields: ["Retry-After": "7"])
-    #expect(URLSessionFirehoseWebSocketSession.classify(URLError(.badServerResponse), response: rejected)
-      as? FirehoseSubscriptionError == .upgradeRejected(status: 429, retryAfter: 7))
+    let classifiedRejection = URLSessionFirehoseWebSocketSession.classify(
+      URLError(.badServerResponse), response: rejected
+    ) as? FirehoseSubscriptionError
+    #expect(classifiedRejection == FirehoseSubscriptionError.upgradeRejected(status: 429, retryAfter: 7))
 
     // What swift-corelibs-foundation reports when libcurl lacks WebSocket support.
     let unsupported = URLSessionFirehoseWebSocketSession.classify(URLError(.unsupportedURL), response: nil)
@@ -313,12 +320,15 @@ struct FirehoseSubscriptionResilienceTests {
     }
 
     let tooLong = NSError(domain: NSPOSIXErrorDomain, code: Int(EMSGSIZE))
-    #expect(URLSessionFirehoseWebSocketSession.classify(tooLong, response: nil)
-      as? FirehoseSubscriptionError == .frameTooLarge)
+    let classifiedTooLong = URLSessionFirehoseWebSocketSession.classify(tooLong, response: nil)
+      as? FirehoseSubscriptionError
+    #expect(classifiedTooLong == FirehoseSubscriptionError.frameTooLarge)
 
     let upgraded = HTTPURLResponse(url: url, statusCode: 101, httpVersion: nil, headerFields: nil)
-    #expect(URLSessionFirehoseWebSocketSession.classify(URLError(.networkConnectionLost), response: upgraded)
-      is URLError)
+    let passedThrough = URLSessionFirehoseWebSocketSession.classify(
+      URLError(.networkConnectionLost), response: upgraded
+    )
+    #expect(passedThrough is URLError)
   }
 
   // MARK: - Cancellation and backoff

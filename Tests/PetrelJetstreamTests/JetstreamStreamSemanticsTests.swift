@@ -178,7 +178,9 @@ struct JetstreamStreamSemanticsTests {
       consumed += 1
       #expect(await session.deliveredCount == consumed)
       // While event N is being processed, the saved cursor is N-1.
-      #expect(await storage.loadCursor() == (consumed == 1 ? nil : Int64(consumed - 1)))
+      let saved: Int64? = await storage.loadCursor()
+      let expectedSaved: Int64? = consumed == 1 ? nil : Int64(consumed - 1)
+      #expect(saved == expectedSaved)
       if consumed == 20 { break }
     }
     #expect(consumed == 20)
@@ -198,7 +200,9 @@ struct JetstreamStreamSemanticsTests {
       if consumed == 5 {
         try await Task.sleep(nanoseconds: 50_000_000)
         // 5 consumed, at most 4 buffered, 1 waiting to be buffered, 1 being read.
-        #expect(await session.deliveredCount <= 5 + 4 + 2)
+        let delivered: Int = await session.deliveredCount
+        let upperBound = 11
+        #expect(delivered <= upperBound)
         break
       }
     }
