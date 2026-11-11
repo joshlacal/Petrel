@@ -386,7 +386,13 @@ final class PLCClientTests: XCTestCase {
         ]
         for response in cases {
             let transport = RecordingPLCTransport(responses: [response])
-            let client = try PLCDirectoryClient(configuration: .production(origin: URL(string: "https://plc.example.com")!), transport: transport)
+            let client = try PLCDirectoryClient(
+                configuration: .production(
+                    origin: URL(string: "https://plc.example.com")!,
+                    maximumAuditBytes: 512 * 1_024
+                ),
+                transport: transport
+            )
             await XCTAssertThrowsErrorAsync(try await client.fetchAudit(did: fixture.did))
         }
     }
@@ -967,9 +973,10 @@ final class PLCClientTests: XCTestCase {
             method: .get, url: validURL, headers: [:], body: nil, timeout: 5, maximumResponseBytes: 0
         )))
 
-        // maximumResponseBytes > 1_048_576
+        // maximumResponseBytes above the transport ceiling
         await XCTAssertThrowsErrorAsync(try await transport.execute(PLCHTTPRequest(
-            method: .get, url: validURL, headers: [:], body: nil, timeout: 5, maximumResponseBytes: 1_048_577
+            method: .get, url: validURL, headers: [:], body: nil, timeout: 5,
+            maximumResponseBytes: PLCClientConfiguration.maximumResponseBytesCeiling + 1
         )))
 
         // Body > 32KB

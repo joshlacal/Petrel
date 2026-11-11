@@ -1,6 +1,12 @@
 import Foundation
 
+/// Syntax validation for the identifiers of an AT Protocol account.
 public enum AccountIdentifiers {
+    /// Validates an account DID: a `did:plc` (24 base32 characters) or a
+    /// `did:web`.
+    ///
+    /// - Returns: `did`, unchanged.
+    /// - Throws: ``PetrelPLCError/invalidIdentifier(_:)``.
     public static func validateDID(_ did: String) throws -> String {
         let bytes = Array(did.utf8)
         guard bytes.count <= 2_048,
@@ -29,6 +35,10 @@ public enum AccountIdentifiers {
         return did
     }
 
+    /// Validates a handle (a DNS name of at least two labels) and returns it
+    /// lower-cased.
+    ///
+    /// - Throws: ``PetrelPLCError/invalidIdentifier(_:)``.
     public static func canonicalHandle(_ handle: String) throws -> String {
         let input = Array(handle.utf8)
         guard !input.isEmpty, input.count <= 253,
