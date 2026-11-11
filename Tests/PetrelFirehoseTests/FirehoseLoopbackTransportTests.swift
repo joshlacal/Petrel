@@ -213,6 +213,28 @@ struct FirehoseLoopbackTransportTests {
     #expect(server.pingCount >= 2)
   }
 
+  @Test("an idle stream outlives URLSession's request timeout")
+  func idleStreamStaysOpen() async throws {
+    let server = try LoopbackWebSocketServer { _, _ in
+      .accept(script: [.wait(2.5), .binary(Self.identity(1))])
+    }
+    defer { server.stop() }
+
+    // A request timeout far below the silence the server keeps, with keep-alive pings on.
+    let configuration = URLSessionConfiguration.ephemeral
+    configuration.timeoutIntervalForRequest = 1
+    var factory = URLSessionFirehoseWebSocketFactory(session: URLSession(configuration: configuration))
+    factory.options.pingInterval = 0.3
+
+    let subscription = FirehoseSubscription(
+      url: server.webSocketURL(Self.path), backoff: Self.fastBackoff, sessionFactory: factory
+    )
+    #expect(try await Self.sequences(subscription, count: 1) == [1])
+    // The event arrived on the first connection: no timeout, no reconnect.
+    #expect(server.upgradeRequests.count == 1)
+    #expect(server.pingCount >= 3)
+  }
+
   @Test("cancelling the consumer closes the real socket")
   func cancellationClosesTheSocket() async throws {
     let server = try LoopbackWebSocketServer { _, _ in .accept(script: [.binary(Self.identity(1))]) }

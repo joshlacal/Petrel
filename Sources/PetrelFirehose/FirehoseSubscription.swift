@@ -118,7 +118,7 @@ public struct FirehoseSubscriptionConfiguration: Sendable {
   /// ``FirehoseSubscription/acknowledge(sequence:)``.
   public var autoAcknowledge: Bool
   /// Whether to reconnect from the cursor after a `ConsumerTooSlow` error frame instead of
-  /// ending the stream with ``Petrel/EventStreamError/consumerTooSlow(message:)``.
+  /// ending the stream with `EventStreamError.consumerTooSlow`.
   public var reconnectsOnConsumerTooSlow = false
 
   public init(
@@ -153,7 +153,7 @@ public struct FirehoseSubscriptionConfiguration: Sendable {
 ///
 /// The stream reconnects with exponential backoff and resumes from the cursor. It ends by
 /// throwing when continuing would be wrong: an error frame such as `FutureCursor`
-/// (``Petrel/EventStreamError``), invalid framing or CBOR (``RelayVerifierError``), a
+/// (`EventStreamError`), invalid framing or CBOR (``RelayVerifierError``), a
 /// duplicate or decreasing sequence number, or an upgrade response that must not be retried.
 public final class FirehoseSubscription: Sendable {
   public let configuration: FirehoseSubscriptionConfiguration

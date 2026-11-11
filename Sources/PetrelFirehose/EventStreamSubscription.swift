@@ -101,6 +101,10 @@ public extension EventStreamSubscription where Message == ComAtprotoLabelSubscri
   ///     `wss` and `ws`.
   ///   - cursorStorage: Where the cursor is kept. An initial cursor of `0` replays every label
   ///     the labeler still has.
+  ///   - backoff: Reconnection delays.
+  ///   - sessionFactory: The WebSocket transport.
+  ///   - autoAcknowledge: Whether the cursor is saved automatically once the consumer has
+  ///     processed an element.
   static func labels(
     service: URL,
     cursorStorage: any FirehoseCursorStorage = InMemoryFirehoseCursorStorage(),

@@ -9,8 +9,8 @@ import Petrel
 /// This is the transport seam of `PetrelFirehose` and `PetrelJetstream`. The package ships a
 /// `URLSession` implementation (``URLSessionFirehoseWebSocketSession``). On Linux,
 /// `URLSessionWebSocketTask` only works when the system libcurl was built with WebSocket
-/// support, which the Swift 6.1 Ubuntu 22.04 and 24.04 images are not; there, supply your own
-/// conformance backed by a WebSocket client of your choice.
+/// support. The Swift 6.1 image for Ubuntu 22.04 (libcurl 7.81) is not; on such a system,
+/// supply your own conformance backed by a WebSocket client of your choice.
 public protocol FirehoseWebSocketSession: Sendable {
   /// Waits for the next message and returns its payload.
   ///
@@ -146,9 +146,9 @@ public final class URLSessionFirehoseWebSocketSession: FirehoseWebSocketSession,
     keepAlive?.cancel()
   }
 
-  /// Pings on an interval. Besides keeping idle streams (labelers, small PDS firehoses,
-  /// narrowly filtered Jetstream) from being reaped by intermediaries, an unanswered ping is
-  /// the only way to notice a peer that vanished without closing the connection.
+  /// Pings on an interval. This keeps idle streams (labelers, small PDS firehoses, narrowly
+  /// filtered Jetstream) from being reaped by proxies and load balancers, and an unanswered
+  /// ping is the only way to notice a peer that vanished without closing the connection.
   private static func startKeepAlive(_ box: WebSocketTaskBox, interval: TimeInterval) -> Task<Void, Never> {
     let tracker = PongTracker()
     return Task.detached {
@@ -226,6 +226,7 @@ public final class URLSessionFirehoseWebSocketSession: FirehoseWebSocketSession,
     return error
   }
 
+  /// Sends a WebSocket text message.
   public func sendText(_ text: String) async throws {
     try await task.send(.string(text))
   }
@@ -261,8 +262,9 @@ public struct URLSessionFirehoseWebSocketFactory: FirehoseWebSocketSessionFactor
   public init(options: FirehoseWebSocketOptions, limits: NetworkResponseLimits = .default) {
     let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
     let config = URLSessionConfiguration.ephemeral
-    // URLSession applies the request timeout to WebSocket tasks as an idle-receive timeout.
-    // A quiet stream is healthy, so liveness is left to the keep-alive ping.
+    // A quiet stream is healthy, so the request timeout must never be what ends it; liveness
+    // is the keep-alive ping's job. (Idle WebSocket tasks have been reported to fail with a
+    // timeout after the request interval on some OS releases; current macOS does not do so.)
     config.timeoutIntervalForRequest = Self.idleTimeout
     self.delegate = delegate
     self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
@@ -275,6 +277,8 @@ public struct URLSessionFirehoseWebSocketFactory: FirehoseWebSocketSessionFactor
     try await makeSession(url: url, subprotocols: [])
   }
 
+  /// Opens a connection after validating the URL (`wss://`, or `ws://` to loopback), with the
+  /// factory's ``options`` and the given `Sec-WebSocket-Protocol` offer.
   public func makeSession(url: URL, subprotocols: [String]) async throws -> any FirehoseWebSocketSession {
     if !(try await NetworkService.validateURL(url)) {
       throw NetworkError.securityViolation
