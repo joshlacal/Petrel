@@ -517,6 +517,12 @@ actor LegacyPasswordStrategy: AuthStrategy {
                 await refreshCircuitBreaker.recordFailure(for: did, kind: .server)
                 throw AuthError.tokenRefreshFailed
             }
+            if response.statusCode == 429 {
+                // Rate limited: the PDS has not looked at the token, so it is
+                // still the one to present once the limit has passed.
+                await refreshCircuitBreaker.recordFailure(for: did, kind: .server)
+                throw AuthError.rateLimited
+            }
             if let statusError = Self.sessionError(status: response.statusCode, body: data) as? AccountStatusError {
                 // The account's hosting status, not a fault of the token: nothing
                 // for the circuit breaker to count, and the status is what to report.

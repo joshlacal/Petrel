@@ -437,6 +437,24 @@ struct AccountStatusAndPasswordTests {
         }
     }
 
+    @Test("A rate-limited refresh is reported as rate limited and does not spend the refresh token")
+    func refreshSurvivesRateLimit() async throws {
+        let pds = FakePasswordPDS()
+        pds.add(Self.alice)
+        try await withOAuthTestNetwork([pds]) {
+            let client = await makeClient(namespace: "password.refresh.429", pds: pds)
+            _ = try await signIn(client)
+            pds.forcedStatus["com.atproto.server.refreshSession"] = 429
+            await #expect(throws: AuthError.rateLimited) {
+                _ = try await client.strategy.refreshTokenIfNeeded(forceRefresh: true)
+            }
+            // Once the limit has passed, the same refresh token is presented again
+            // and the PDS accepts it: the replay guard did not keep it as spent.
+            pds.forcedStatus = [:]
+            #expect(try await client.strategy.refreshTokenIfNeeded(forceRefresh: true) == .refreshedSuccessfully)
+        }
+    }
+
     @Test("Refreshing a taken-down account reports the status")
     func refreshReportsStatus() async throws {
         let pds = FakePasswordPDS()
