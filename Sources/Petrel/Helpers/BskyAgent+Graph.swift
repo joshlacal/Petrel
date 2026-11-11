@@ -256,9 +256,13 @@ public struct ProfileUpdate: Sendable {
     public var pinnedPost: ComAtprotoRepoStrongRef?
     /// When the profile was first created.
     public var createdAt: ATProtocolDate?
+    /// Fields of the stored record that this version of the Lexicon does not declare.
+    /// They are written back unchanged, so an update never deletes them.
+    public var extraFields: [String: ATProtocolValueContainer]
 
     /// Starts from an existing profile record, or from an empty profile.
     public init(_ existing: AppBskyActorProfile? = nil) {
+        extraFields = existing?.extraFields ?? [:]
         displayName = existing?.displayName
         description = existing?.description
         pronouns = existing?.pronouns
@@ -283,7 +287,8 @@ public struct ProfileUpdate: Sendable {
             labels: labels,
             joinedViaStarterPack: joinedViaStarterPack,
             pinnedPost: pinnedPost,
-            createdAt: createdAt
+            createdAt: createdAt,
+            extraFields: extraFields
         )
     }
 }
