@@ -35,6 +35,25 @@ extension ScopeFamily {
     public func canonicalScopeString() throws(ScopeParseError) -> String {
         try Self.schema.format(scopeParameters)
     }
+
+    /// The canonical scope string with `+` and `%` left percent-encoded where
+    /// un-escaping them would change how the string parses.
+    func parseableScopeString() throws(ScopeParseError) -> String {
+        try Self.schema.formatParseable(scopeParameters)
+    }
+
+    /// What this scope grants, independent of how it was written.
+    var meaning: ScopeMeaning {
+        ScopeMeaning(resource: Self.schema.prefix, parameters: Self.schema.meaning(of: scopeParameters))
+    }
+}
+
+/// What a scope grants, independent of how it was written: the resource and
+/// the normalised values of its parameters. Equal for two scopes exactly when
+/// they are the same grant.
+struct ScopeMeaning: Hashable {
+    let resource: String
+    let parameters: [String: Set<String>]
 }
 
 /// A scope that grants access to a resource (`repo:`, `rpc:`, `blob:`,
@@ -127,6 +146,40 @@ public enum ATProtoScope: Sendable, Hashable {
         case let .include(s): try s.canonicalScopeString()
         case let .repo(p): try p.canonicalScopeString()
         case let .rpc(p): try p.canonicalScopeString()
+        }
+    }
+}
+
+extension ATProtoScope {
+    /// What this scope grants, independent of how it was written.
+    var meaning: ScopeMeaning {
+        switch self {
+        case .atproto: ScopeMeaning(resource: "atproto", parameters: [:])
+        case .transitionEmail: ScopeMeaning(resource: "transition:email", parameters: [:])
+        case .transitionGeneric: ScopeMeaning(resource: "transition:generic", parameters: [:])
+        case .transitionChatBsky: ScopeMeaning(resource: "transition:chat.bsky", parameters: [:])
+        case let .account(p): p.meaning
+        case let .blob(p): p.meaning
+        case let .identity(p): p.meaning
+        case let .include(s): s.meaning
+        case let .repo(p): p.meaning
+        case let .rpc(p): p.meaning
+        }
+    }
+
+    /// The canonical scope string with `+` and `%` left percent-encoded where
+    /// un-escaping them would change how the string parses. Equal to
+    /// ``canonicalScopeString()`` for every other value.
+    func parseableScopeString() throws(ScopeParseError) -> String {
+        switch self {
+        case .atproto, .transitionEmail, .transitionGeneric, .transitionChatBsky:
+            try canonicalScopeString()
+        case let .account(p): try p.parseableScopeString()
+        case let .blob(p): try p.parseableScopeString()
+        case let .identity(p): try p.parseableScopeString()
+        case let .include(s): try s.parseableScopeString()
+        case let .repo(p): try p.parseableScopeString()
+        case let .rpc(p): try p.parseableScopeString()
         }
     }
 }

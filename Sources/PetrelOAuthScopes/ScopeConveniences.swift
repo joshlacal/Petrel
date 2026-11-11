@@ -19,10 +19,29 @@ public extension ATProtoScope {
         self = try Self.parse(string)
     }
 
-    /// The canonical scope string, or `nil` in the rare case a value has no
-    /// canonical form (see ``canonicalScopeString()``).
+    /// The scope string to send to a server or store: a string that parses
+    /// back to this scope.
+    ///
+    /// For almost every scope this is ``canonicalScopeString()``. The
+    /// exception is a value containing `+` or `%` in a named parameter, where
+    /// the canonical form — kept byte-identical with the reference
+    /// implementation — would be read back as a different value or rejected
+    /// (see <doc:ReferenceParity>). For those the `+` or `%` stays
+    /// percent-encoded: `blob?accept=image/png&accept=image/svg%2Bxml` rather
+    /// than the canonical `…&accept=image/svg+xml`.
+    ///
+    /// `nil` only for a value that no scope string describes: one assembled
+    /// through a permission's own initializer from parts the parser would
+    /// reject, such as an `rpc` permission for every method on every service.
+    /// The builders (``repo(collections:actions:)`` and the others) parse
+    /// what they build, so they never return such a value.
     var scopeString: String? {
-        try? canonicalScopeString()
+        guard let canonical = try? canonicalScopeString() else { return nil }
+        if (try? Self.parse(canonical))?.meaning == meaning { return canonical }
+        guard let escaped = try? parseableScopeString(), (try? Self.parse(escaped))?.meaning == meaning else {
+            return nil
+        }
+        return escaped
     }
 
     /// `repo:` — write access to record collections.
@@ -100,8 +119,50 @@ public extension ATProtoScope {
 
 extension ATProtoScopeSet: ExpressibleByArrayLiteral {
     /// Creates a set from typed scopes.
+    ///
+    /// The scopes are kept as given — nothing is serialised and parsed again,
+    /// so what the set grants is exactly what the values say. ``rawScopes``
+    /// holds each scope's ``ATProtoScope/scopeString``, which parses back to
+    /// it, so `ATProtoScopeSet(scopes)` equals
+    /// `ATProtoScopeSet(scope: ATProtoScopeSet(scopes).scopeString)` and
+    /// grants the same.
+    ///
+    /// A value that no scope string describes (see
+    /// ``ATProtoScope/scopeString``) grants nothing and is recorded in
+    /// ``rejected`` with the parser's reason. Its canonical form, when it has
+    /// one, is kept in ``rawScopes`` — so ``scopeString`` carries it and a
+    /// server refuses it — exactly as if that string had arrived in a token.
     public init(_ scopes: [ATProtoScope]) {
-        self.init(rawScopes: Set(scopes.compactMap(\.scopeString)))
+        var rawScopes = Set<String>()
+        var grants: [(string: String, scope: ATProtoScope)] = []
+        var rejected: [String: ScopeParseError] = [:]
+        for scope in scopes {
+            if let string = scope.scopeString {
+                if rawScopes.insert(string).inserted {
+                    grants.append((string, scope))
+                }
+                continue
+            }
+            guard let canonical = try? scope.canonicalScopeString() else {
+                let label = String(describing: scope)
+                rejected[label] = .notAScopeToken(label)
+                continue
+            }
+            do {
+                // Reads back as some other scope: never let that stand in for this one.
+                _ = try ATProtoScope.parse(canonical)
+                rejected[canonical] = .notAScopeToken(canonical)
+            } catch {
+                rawScopes.insert(canonical)
+                rejected[canonical] = error
+            }
+        }
+        // The same order `init(rawScopes:)` produces: by scope string.
+        self.init(
+            rawScopes: rawScopes,
+            grants: grants.sorted { $0.string < $1.string }.map(\.scope),
+            rejected: rejected
+        )
     }
 
     public init(arrayLiteral elements: ATProtoScope...) {
@@ -136,10 +197,11 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
     }
 
     /// The set as a space-delimited `scope` value with every recognised scope
-    /// in canonical form, duplicates removed and sorted. Unrecognised strings
-    /// are kept as they are.
+    /// written as its ``ATProtoScope/scopeString`` — the canonical form, except
+    /// where that would not parse back to the same scope — duplicates removed
+    /// and sorted. Unrecognised strings are kept as they are.
     public var normalizedScopeString: String {
-        Set(rawScopes.map { raw in (try? ATProtoScope.parse(raw).canonicalScopeString()) ?? raw })
+        Set(rawScopes.map { raw in (try? ATProtoScope.parse(raw))?.scopeString ?? raw })
             .sorted().joined(separator: " ")
     }
 
@@ -149,15 +211,30 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
     /// Whether everything `needed` describes is granted by this set.
     ///
     /// A client uses this to decide whether a session it already holds is
-    /// enough for an operation, or whether it must ask for more. The answer is
-    /// conservative: it is `true` only when every collection, method, MIME
-    /// type and action `needed` names is allowed, and a wildcard in `needed` is
-    /// covered only by a grant that is itself that wide (or by
-    /// `transition:generic` where the reference implementation lets it stand
-    /// in). An `include:` is covered only by the same `include:`, because what
-    /// it expands to is not known here.
+    /// enough for an operation, or whether it must ask for more.
+    ///
+    /// The answer agrees with the matchers. For a need that names only
+    /// concrete things — collections, methods with a service, media types,
+    /// attributes — it is `true` exactly when ``allowsRepo(_:)``,
+    /// ``allowsRPC(_:)``, ``allowsBlob(_:)``, ``allowsAccount(_:)`` or
+    /// ``allowsIdentity(_:)`` allows every one of them, transition scopes
+    /// included. For a need with a wildcard it is `true` only when the grant
+    /// is at least that wide, so that everything the wildcard could stand for
+    /// would be allowed:
+    ///
+    /// - any collection: `repo:*` for the action, or `transition:generic`;
+    /// - a method on any service (`aud=*`): an `rpc` grant for the method with
+    ///   `aud=*`, or the transition scope that covers the method, since
+    ///   transition scopes are not tied to a service;
+    /// - any method on a service: an `rpc:*` grant for that service, or
+    ///   `transition:generic` together with `transition:chat.bsky`, since
+    ///   neither alone covers every method;
+    /// - `type/*` or `*/*`: a `blob` grant with that pattern or `*/*`, or
+    ///   `transition:generic`.
+    ///
+    /// An `include:` is covered only by the same `include:`, because what it
+    /// expands to is not known here.
     public func covers(_ needed: ATProtoScope) -> Bool {
-        if let canonical = needed.scopeString, canonicalStrings.contains(canonical) { return true }
         switch needed {
         case .atproto:
             return hasBaseATProtocolScope
@@ -167,8 +244,11 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
             return hasTransitionEmail
         case .transitionChatBsky:
             return hasTransitionChatBsky
-        case .include:
-            return false
+        case let .include(include):
+            return grants.contains {
+                guard case let .include(grant) = $0 else { return false }
+                return grant.meaning == include.meaning
+            }
         case let .repo(permission):
             return permission.action.allSatisfy { action in
                 permission.collection.allSatisfy { collection in
@@ -188,12 +268,21 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
                 switch (lxm, permission.aud) {
                 case let (.nsid(method), .service(audience)):
                     return allowsRPC(.init(lxm: method, aud: audience))
-                default:
+                case let (.nsid(method), .any):
+                    // Transition scopes allow a method on every service.
+                    if hasTransitionGeneric, !method.hasPrefix("chat.bsky.") { return true }
+                    if hasTransitionChatBsky, method.hasPrefix("chat.bsky.") { return true }
                     return grants.contains {
                         guard case let .rpc(grant) = $0 else { return false }
-                        let audienceCovered = grant.aud == .any || grant.aud == permission.aud
-                        let methodCovered = grant.lxm.contains(.any) || grant.lxm.contains(lxm)
-                        return audienceCovered && methodCovered
+                        return grant.aud == .any && (grant.lxm.contains(.any) || grant.lxm.contains(lxm))
+                    }
+                case (.any, _):
+                    // Every method: the two transition scopes together, or a
+                    // wildcard grant for this audience.
+                    if hasTransitionGeneric, hasTransitionChatBsky { return true }
+                    return grants.contains {
+                        guard case let .rpc(grant) = $0 else { return false }
+                        return grant.lxm.contains(.any) && (grant.aud == .any || grant.aud == permission.aud)
                     }
                 }
             }
@@ -219,10 +308,6 @@ extension ATProtoScopeSet: ExpressibleByArrayLiteral {
     /// Whether every recognised scope of `needed` is covered by this set.
     public func covers(_ needed: ATProtoScopeSet) -> Bool {
         needed.grants.allSatisfy(covers)
-    }
-
-    private var canonicalStrings: Set<String> {
-        Set(grants.compactMap(\.scopeString))
     }
 }
 

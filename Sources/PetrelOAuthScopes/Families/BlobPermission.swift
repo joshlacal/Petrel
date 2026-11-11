@@ -26,7 +26,14 @@ public enum AcceptPattern: Sendable, Equatable, Hashable, Comparable {
     /// Parses a pattern (`lib/mime.ts:3-13`, `:23-28`): exactly one `/` with a
     /// non-empty part on each side, no SPACE, and `*` only as the whole of a
     /// part, where a `*` type requires a `*` subtype.
+    ///
+    /// The pattern is held in lower case. Media type names are
+    /// case-insensitive (RFC 6838 §4.2) and the canonical scope string
+    /// lower-cases them (`scopes/blob-permission.ts:46`), so `blob:IMAGE/PNG`
+    /// and `blob:image/png` are the same permission: they canonicalise alike
+    /// and they match alike. See ``BlobPermission/matches(_:)``.
     public init?(_ raw: String) {
+        let raw = raw.lowercased()
         guard !raw.isEmpty, !raw.contains(" ") else { return nil }
         let parts = raw.split(separator: "/", omittingEmptySubsequences: false)
         guard parts.count == 2 else { return nil }
@@ -132,8 +139,14 @@ public struct BlobPermission: ScopePermission {
     /// The requested media type is checked first: unless it is itself a
     /// concrete `type/subtype`, nothing matches it, not even `*/*`
     /// (`lib/mime.test.ts:67-74`).
+    ///
+    /// The comparison ignores case, on both sides. The reference
+    /// implementation compares the strings exactly as written, while its
+    /// canonical form lower-cases the pattern, so there a permission can stop
+    /// matching, or start matching, when it is canonicalised. Here a
+    /// permission means the same before and after: see <doc:ReferenceParity>.
     public func matches(_ target: Target) -> Bool {
-        guard let concrete = ConcreteMime(target.mime) else { return false }
+        guard let concrete = ConcreteMime(target.mime.lowercased()) else { return false }
         return accept.contains { Self.covers($0, concrete) }
     }
 

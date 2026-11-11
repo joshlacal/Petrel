@@ -46,6 +46,14 @@ public struct ATProtoScopeSet: Sendable, Equatable, Hashable {
         self.rejected = rejected
     }
 
+    /// Creates a set from grants that are already typed, without parsing
+    /// anything: `rawScopes` are the strings the grants serialise to.
+    init(rawScopes: Set<String>, grants: [ATProtoScope], rejected: [String: ScopeParseError]) {
+        self.rawScopes = rawScopes
+        self.grants = grants
+        self.rejected = rejected
+    }
+
     /// Parses an OAuth `scope` value — scope tokens separated by SPACE — as
     /// it appears in a token response or an access-token claim.
     public init(scope: String) {

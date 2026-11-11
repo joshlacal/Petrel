@@ -226,6 +226,56 @@ extension ScopeStringSyntax {
         return scope
     }
 
+    /// A scope string for these parts that is guaranteed to parse back to
+    /// them.
+    ///
+    /// It is ``canonicalString()`` except that the two un-escapings the
+    /// canonical form inherits from the reference implementation and that do
+    /// not survive a re-parse are left out: a `%` stays `%25` everywhere, and
+    /// a `+` stays `%2B` in the query (in the positional segment a raw `+` is
+    /// literal, so it is kept). For parts containing neither character the two
+    /// strings are byte-identical.
+    ///
+    /// - Throws: ``ScopeParseError/notAScopeToken(_:)`` when the result is not
+    ///   an RFC 6749 `scope-token`.
+    func parseableString() throws(ScopeParseError) -> String {
+        var scope = prefix
+        if let positional {
+            scope += ":" + Self.unescape(Self.encodeURIComponent(positional), ["%3A", "%2F", "%2B", "%2C", "%40"])
+        }
+        if !parameters.isEmpty {
+            let query = parameters.entries
+                .map { Self.encodeFormComponent($0.key) + "=" + Self.encodeFormComponent($0.value) }
+                .joined(separator: "&")
+            scope += "?" + Self.unescape(query, ["%3A", "%2F", "%2C", "%40"])
+        }
+        guard ScopeToken.isScopeToken(scope) else { throw .notAScopeToken(scope) }
+        return scope
+    }
+
+    /// Replaces each of `escapes` (upper-case `%XX`) with the character it
+    /// encodes. `%25` is never among them, so an un-escaped character can
+    /// never combine with a following pair into a new escape.
+    private static func unescape(_ value: String, _ escapes: [String]) -> String {
+        var out = ""
+        var index = value.startIndex
+        while index < value.endIndex {
+            if value[index] == "%", let end = value.index(index, offsetBy: 3, limitedBy: value.endIndex) {
+                let triplet = String(value[index ..< end])
+                if escapes.contains(triplet), let byte = UInt8(triplet.dropFirst(), radix: 16) {
+                    out.unicodeScalars.append(Unicode.Scalar(byte))
+                } else {
+                    out += triplet
+                }
+                index = end
+            } else {
+                out.append(value[index])
+                index = value.index(after: index)
+            }
+        }
+        return out
+    }
+
     /// JavaScript `encodeURIComponent`: leaves A-Z a-z 0-9 and `-_.!~*'()`
     /// unencoded.
     static func encodeURIComponent(_ value: String) -> String {
