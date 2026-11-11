@@ -154,6 +154,12 @@ struct RichTextDetectionTests {
         #expect(links("see example.museum now") == ["https://example.museum"])
         #expect(links("see example.notatld now") == [])
         #expect(links("photo.jpg and archive.tar.gz") == [])
+        // A bare domain that merely starts with "http" is still a bare domain:
+        // it gets a scheme and its TLD is checked.
+        #expect(links("try httpbin.org/get") == ["https://httpbin.org/get"])
+        #expect(links("https.example.com") == ["https://https.example.com"])
+        #expect(links("httpfoo.notatld") == [])
+        #expect(links("http://example.com and https://httpbin.org") == ["http://example.com", "https://httpbin.org"])
         // As in the reference: the scheme check is case-sensitive, so this is
         // neither an `http` link nor a bare domain.
         #expect(links("HTTPS://EXAMPLE.COM") == [])

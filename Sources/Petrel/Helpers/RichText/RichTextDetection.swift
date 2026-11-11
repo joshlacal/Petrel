@@ -106,7 +106,12 @@ enum RichTextDetector {
         for match in urlRegex.matches(in: text, options: [], range: whole) {
             let linkRange = match.range(at: 2)
             var uri = utf16.substring(with: linkRange)
-            if !uri.utf8.starts(with: "http".utf8) {
+            // Only a full scheme counts: a bare domain such as `httpbin.org`
+            // still needs its TLD checked and `https://` added. (The reference
+            // tests for the prefix `http`, which lets such domains through
+            // unchecked and without a scheme.) Uppercase schemes stay
+            // non-links, as in the reference.
+            if !uri.hasPrefix("http://"), !uri.hasPrefix("https://") {
                 let domainRange = match.range(at: 5)
                 guard domainRange.location != NSNotFound,
                       TopLevelDomains.isValidDomain(utf16.substring(with: domainRange))
