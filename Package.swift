@@ -50,6 +50,12 @@ let package = Package(
             name: "PetrelOAuthServer",
             targets: ["PetrelOAuthServer"]
         ),
+        // Authenticated Lexicon resolution for `include:` permission sets
+        // (DNS → DID → com.atproto.sync.getRecord → repository proof).
+        .library(
+            name: "PetrelOAuthServerLexicon",
+            targets: ["PetrelOAuthServerLexicon"]
+        ),
         .library(
             name: "PetrelOzone",
             targets: ["PetrelOzone"]
@@ -215,6 +221,20 @@ let package = Package(
             ]
         ),
         .target(
+            name: "PetrelOAuthServerLexicon",
+            dependencies: [
+                "Petrel",
+                "PetrelCrypto",
+                "PetrelLexicon",
+                "PetrelOAuthScopes",
+                "PetrelOAuthServer",
+                "PetrelRepo",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
             name: "PetrelPLCPDS",
             dependencies: [
                 "Petrel",
@@ -330,7 +350,10 @@ let package = Package(
             name: "PetrelOAuthServerTests",
             dependencies: [
                 "PetrelOAuthServer",
+                "PetrelOAuthServerLexicon",
                 "PetrelCrypto",
+                "PetrelRepo",
+                "Petrel",
                 .product(name: "Crypto", package: "swift-crypto"),
             ]
         ),
