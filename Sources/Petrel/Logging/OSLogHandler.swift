@@ -52,14 +52,26 @@
             osLogger = os.Logger(subsystem: label, category: category)
         }
 
+        public func log(event: Logging.LogEvent) {
+            emit(level: event.level, message: event.message, metadata: event.metadata)
+        }
+
         public func log(
             level: Logging.Logger.Level,
             message: Logging.Logger.Message,
             metadata: Logging.Logger.Metadata?,
-            source: String,
-            file: String,
-            function: String,
-            line: UInt
+            source _: String,
+            file _: String,
+            function _: String,
+            line _: UInt
+        ) {
+            emit(level: level, message: message, metadata: metadata)
+        }
+
+        private func emit(
+            level: Logging.Logger.Level,
+            message: Logging.Logger.Message,
+            metadata: Logging.Logger.Metadata?
         ) {
             // Combine instance metadata with per-log metadata
             let effectiveMetadata = self.metadata.merging(metadata ?? [:]) { _, new in new }

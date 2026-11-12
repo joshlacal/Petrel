@@ -55,7 +55,7 @@ private final class TLSFixtureServer: Sendable {
       headers.add(name: "X-Seen-Host", value: request.headers["Host"].first ?? "")
       context.write(wrapOutboundOut(.head(HTTPResponseHead(version: .http1_1, status: .ok, headers: headers))), promise: nil)
       context.write(wrapOutboundOut(.body(.byteBuffer(ByteBuffer(bytes: body)))), promise: nil)
-      context.writeAndFlush(wrapOutboundOut(.end(nil))).whenComplete { _ in context.close(promise: nil) }
+      context.writeAndFlush(wrapOutboundOut(.end(nil))).assumeIsolated().whenComplete { _ in context.close(promise: nil) }
     }
   }
 }

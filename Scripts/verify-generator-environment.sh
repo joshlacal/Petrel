@@ -32,8 +32,8 @@ for module in ("jinja2", "aiofiles", "orjson", "markupsafe"):
 expected = {
     "jinja2": "3.1.6",
     "aiofiles": "25.1.0",
-    "orjson": "3.11.7",
-    "markupsafe": "3.0.3",
+    "orjson": "3.13.0",
+    "markupsafe": "3.0.4",
 }
 allowed_bootstrap = {"pip", "setuptools", "wheel"}
 

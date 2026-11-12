@@ -30,8 +30,8 @@ expected = {
     ),
     "swift-async-dns-resolver": (
         "https://github.com/apple/swift-async-dns-resolver",
-        "0.7.0",
-        "0.8.0",
+        "0.8.1",
+        "0.9.0",
     ),
     # PetrelCrypto's K-256 backend (Sources/PetrelCrypto/K256Backend.swift)
     # wraps this package's P256K module, the renamed successor of
@@ -41,8 +41,8 @@ expected = {
     # explicit policy review.
     "swift-secp256k1": (
         "https://github.com/21-DOT-DEV/swift-secp256k1.git",
-        "0.24.0",
         "0.25.0",
+        "0.26.0",
     ),
 }
 # No dependency is currently held to one exact release. The mechanism stays
