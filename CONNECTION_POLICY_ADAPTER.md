@@ -128,14 +128,14 @@ public final class NamespaceRoutingAdapter: ConnectionPolicyAdapter, Sendable {
 }
 ```
 
-If your application uses private overlay lexicons (such as proprietary service extensions like `blue.catbird.mls.*` that are not part of standard AT Protocol lexicon distributions), you can use this same pattern to direct those calls to your private infrastructure:
+If your application uses private overlay lexicons (namespaces such as `com.example.private.*` that are served by your own infrastructure rather than the account's PDS), you can use this same pattern to direct those calls to your private infrastructure:
 
 ```swift
 public func resolveConnectionURL(_ url: URL, endpoint: String?) async -> URL {
     // Route private overlay lexicon endpoints to custom infrastructure
-    if let endpoint, endpoint.hasPrefix("blue.catbird.mls.") {
+    if let endpoint, endpoint.hasPrefix("com.example.private.") {
         var components = URLComponents(url: url, resolvingAgainstBaseURL: true)
-        components?.host = "mls.example.internal"
+        components?.host = "private-api.example.com"
         return components?.url ?? url
     }
 

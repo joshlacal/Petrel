@@ -71,12 +71,6 @@ await client.updateServiceDIDs(
     bskyAppViewDID: "did:web:custom.appview.example#custom_appview",
     bskyChatDID: "did:web:custom.chat.example#custom_chat"
 )
-
-// Update and persist service DIDs to the active account record in storage
-try await client.updateServiceDIDsForCurrentAccount(
-    bskyAppViewDID: "did:web:custom.appview.example#custom_appview",
-    bskyChatDID: "did:web:custom.chat.example#custom_chat"
-)
 ```
 
 ## Typed service references and per-endpoint routing

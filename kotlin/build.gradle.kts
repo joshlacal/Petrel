@@ -10,7 +10,7 @@ plugins {
 }
 
 group = "blue.catbird"
-version = providers.gradleProperty("version").orNull?.takeIf { it != "unspecified" } ?: "0.1.0"
+version = providers.gradleProperty("version").orNull?.takeIf { it != "unspecified" } ?: "2.0.0"
 
 // JMH requires classes annotated with @State to be non-final
 allOpen {

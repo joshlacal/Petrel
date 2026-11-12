@@ -79,9 +79,9 @@ Downstream packages consume Petrel using `.upToNextMinor(from:)`. Under this con
 
 | Change | Version Bump | Example |
 |---|---|---|
-| Bug fix with no changes to any public declaration | **patch** | `0.2.0` → `0.2.1` |
-| Lexicon regeneration or addition to `api-breakage-allowlist.txt` | **minor** | `0.2.1` → `0.3.0` |
-| Deliberate redesign or breaking rewrite of hand-written API surface | **major** | `0.3.0` → `1.0.0` |
+| Bug fix with no changes to any public declaration | **patch** | `2.0.0` → `2.0.1` |
+| Lexicon regeneration or addition to `api-breakage-allowlist.txt` | **minor** | `2.0.1` → `2.1.0` |
+| Deliberate redesign or breaking rewrite of hand-written API surface | **major** | `2.1.0` → `3.0.0` |
 
 ### Why Lexicon Regenerations Require a Minor Bump
 
