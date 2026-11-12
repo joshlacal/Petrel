@@ -104,10 +104,19 @@ public final class HardenedIdentityHTTPTransport: IdentityHTTPTransport {
         (directSession, directDelegate) = Self.makeSession(allowsRedirects: false)
     }
 
+    #if DEBUG
+        /// Called at the end of every transport's `deinit`, so a test can wait for transports to
+        /// be released instead of polling.
+        package nonisolated(unsafe) static var deinitHook: (@Sendable () -> Void)?
+    #endif
+
     deinit {
         // URLSession keeps its delegate alive until it is invalidated.
         redirectingSession.finishTasksAndInvalidate()
         directSession.finishTasksAndInvalidate()
+        #if DEBUG
+            Self.deinitHook?()
+        #endif
     }
 
     private static func makeSession(allowsRedirects: Bool) -> (URLSession, HardenedURLSessionDelegate) {
