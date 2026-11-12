@@ -50,8 +50,8 @@ struct ServiceAuthDocumentationTests {
 
     // end doc
 
-    @Test("Mint a token, then authenticate the request that carries it")
-    func mintAndAuthenticate() async throws {
+    @Test("Mint a token with the default lifetime")
+    func mintToken() async throws {
         // doc: "Mint a token"
         let keypair = K256Keypair.generate()
 
@@ -64,6 +64,37 @@ struct ServiceAuthDocumentationTests {
         let authorization = ServiceJWT.bearerAuthorization(token) // "Bearer eyJ…"
         // end doc
         #expect(authorization.hasPrefix("Bearer eyJ"))
+
+        // What the article promises about the token, read without a clock.
+        let inspection = try ServiceJWT.inspect(token)
+        let issuedAt = try #require(inspection.claims.iat)
+        #expect(inspection.claims.exp - issuedAt == Int64(ServiceJWT.defaultLifetime))
+        #expect(inspection.claims.aud == "did:web:feed.example.com#bsky_fg")
+        #expect(inspection.lexiconMethod == "app.bsky.feed.getFeedSkeleton")
+        #expect(inspection.claims.jti?.isEmpty == false)
+    }
+
+    @Test("Authenticate the request that carries a token")
+    func authenticate() async throws {
+        let keypair = K256Keypair.generate()
+        // The article's `FeedGenerator` checks expiry against the wall clock,
+        // so a 60 second token can expire while a loaded CI runner stalls and
+        // the replay below would then fail as JwtExpired instead of BadJwt.
+        // These tokens are the article's, with the longest lifetime the
+        // verifier accepts, so only the check under test can refuse them.
+        // Expiry itself is covered with a pinned clock in
+        // ServiceAuthVerifierTests.
+        func mint(audience: String) async throws -> String {
+            try await ServiceJWT.mint(
+                issuer: "did:plc:abcdefghijklmnopqrstuvwx",
+                audience: audience,
+                lexiconMethod: "app.bsky.feed.getFeedSkeleton",
+                signer: keypair,
+                lifetime: ServiceJWT.maximumLifetime
+            )
+        }
+        let token = try await mint(audience: "did:web:feed.example.com#bsky_fg")
+        let authorization = ServiceJWT.bearerAuthorization(token)
 
         // doc: "Resolve the issuer's key"
         let directory = Directory(keys: ["did:plc:abcdefghijklmnopqrstuvwx#atproto": keypair.publicKey])
@@ -89,12 +120,7 @@ struct ServiceAuthDocumentationTests {
         #expect(anonymous.status == 401)
         #expect(anonymous.body == ["error": "MissingJwt", "message": "missing jwt"])
 
-        let elsewhere = try await ServiceJWT.mint(
-            issuer: "did:plc:abcdefghijklmnopqrstuvwx",
-            audience: "did:web:other.example.com#bsky_fg",
-            lexiconMethod: "app.bsky.feed.getFeedSkeleton",
-            signer: keypair
-        )
+        let elsewhere = try await mint(audience: "did:web:other.example.com#bsky_fg")
         let misdirected = await feedGenerator.getFeedSkeleton(
             authorizationHeader: ServiceJWT.bearerAuthorization(elsewhere)
         )
@@ -148,8 +174,12 @@ struct ServiceAuthDocumentationTests {
         let appView = ServiceAuthVerifier(configuration: configuration, keyResolver: keyResolver)
         // end doc
 
+        // Verify at the token's own iat, so no wall-clock stall can expire it.
+        let issuedAt = try #require(ServiceJWT.inspect(labelerToken).claims.iat)
         let caller = try await appView.verify(
-            token: labelerToken, method: .exactly("com.atproto.label.queryLabels")
+            token: labelerToken,
+            method: .exactly("com.atproto.label.queryLabels"),
+            now: Date(timeIntervalSince1970: TimeInterval(issuedAt))
         )
         #expect(caller.issuer == "did:web:labeler.example.com")
         #expect(caller.keyID == "#atproto_label")

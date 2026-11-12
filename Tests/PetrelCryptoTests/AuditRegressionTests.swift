@@ -88,20 +88,22 @@ struct AuditRegressionTests {
 
     @Test("A service JWT with a high-S signature verifies, as the specification allows")
     func serviceJWTAcceptsHighS() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
         let key = P256.Signing.PrivateKey()
         let token = try ServiceJWT.mint(
             issuer: "did:plc:abcdefghijklmnopqrstuvwx",
             audience: "did:web:api.bsky.app",
             method: "app.bsky.actor.getProfile",
             eventID: "audit-high-s",
-            key: key
+            key: key,
+            now: now
         )
         let parts = token.split(separator: ".").map(String.init)
         let signature = try JWTBase64URL.decode(parts[2])
         let highS = try highSTwinOfP256(signature)
         let highSToken = "\(parts[0]).\(parts[1]).\(JWTBase64URL.encode(highS))"
 
-        let claims = try ServiceJWT.verify(highSToken, publicKey: ATProtoJWTVerificationKey.p256(key.publicKey))
+        let claims = try ServiceJWT.verify(highSToken, publicKey: ATProtoJWTVerificationKey.p256(key.publicKey), now: now)
         #expect(claims.jti == "audit-high-s")
     }
 

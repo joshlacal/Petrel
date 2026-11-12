@@ -373,12 +373,14 @@ final class ServiceJWTTests: XCTestCase {
     // MARK: - Negative Verification Tests: Signature Tampering & Curve Mismatch
 
     func testTamperedSignatureIsRejected() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
         let token = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
             method: "app.bsky.actor.getProfile",
             eventID: "tamper-sig",
-            key: p256Key
+            key: p256Key,
+            now: now
         )
         let parts = token.split(separator: ".")
         var sigData = try JWTBase64URL.decode(String(parts[2]))
@@ -388,7 +390,8 @@ final class ServiceJWTTests: XCTestCase {
         XCTAssertThrowsError(
             try ServiceJWT.verify(
                 tamperedToken,
-                publicKey: ATProtoJWTVerificationKey.p256(p256Key.publicKey)
+                publicKey: ATProtoJWTVerificationKey.p256(p256Key.publicKey),
+                now: now
             )
         ) { error in
             XCTAssertEqual(error as? PetrelCryptoError, .unauthorized("service authentication signature is invalid"))
@@ -396,12 +399,14 @@ final class ServiceJWTTests: XCTestCase {
     }
 
     func testTamperedPayloadIsRejected() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
         let token = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
             method: "app.bsky.actor.getProfile",
             eventID: "tamper-payload",
-            key: p256Key
+            key: p256Key,
+            now: now
         )
         let parts = token.split(separator: ".")
         let tamperedPayload = JWTBase64URL.encode(Data("{\"iss\":\"did:plc:tampered\"}".utf8))
@@ -410,26 +415,30 @@ final class ServiceJWTTests: XCTestCase {
         XCTAssertThrowsError(
             try ServiceJWT.verify(
                 tamperedToken,
-                publicKey: ATProtoJWTVerificationKey.p256(p256Key.publicKey)
+                publicKey: ATProtoJWTVerificationKey.p256(p256Key.publicKey),
+                now: now
             )
         )
     }
 
     func testWrongCurveVerificationIsRejected() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
         let secpKey = K256Keypair.generate()
         let es256kToken = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
             method: "app.bsky.actor.getProfile",
             eventID: "curve-mismatch",
-            key: .k256(secpKey)
+            key: .k256(secpKey),
+            now: now
         )
 
         // Attempt to verify ES256K token against P256 public key
         XCTAssertThrowsError(
             try ServiceJWT.verify(
                 es256kToken,
-                publicKey: ATProtoJWTVerificationKey.p256(p256Key.publicKey)
+                publicKey: ATProtoJWTVerificationKey.p256(p256Key.publicKey),
+                now: now
             )
         ) { error in
             XCTAssertEqual(error as? PetrelCryptoError, .unauthorized("JWT algorithm does not match verification key"))
@@ -440,7 +449,8 @@ final class ServiceJWTTests: XCTestCase {
             audience: audience,
             method: "app.bsky.actor.getProfile",
             eventID: "curve-mismatch-2",
-            key: p256Key
+            key: p256Key,
+            now: now
         )
 
         // Attempt to verify ES256 token against secp256k1 public key
@@ -448,7 +458,8 @@ final class ServiceJWTTests: XCTestCase {
         XCTAssertThrowsError(
             try ServiceJWT.verify(
                 es256Token,
-                publicKey: secpVerifier
+                publicKey: secpVerifier,
+                now: now
             )
         ) { error in
             XCTAssertEqual(error as? PetrelCryptoError, .unauthorized("JWT algorithm or signature is invalid"))
@@ -461,12 +472,14 @@ final class ServiceJWTTests: XCTestCase {
     // service JWTs with `allowMalleableSig: true`. A high-S token is
     // therefore accepted by default and rejected only on request.
     func testHighSSignatureAcceptedByDefaultAndRejectedWhenStrict() throws {
+        let now = Date(timeIntervalSince1970: 1_700_000_000)
         let token = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
             method: "app.bsky.actor.getProfile",
             eventID: "high-s-test",
-            key: p256Key
+            key: p256Key,
+            now: now
         )
         let parts = token.split(separator: ".")
         let canonicalSig = try JWTBase64URL.decode(String(parts[2]))
@@ -475,18 +488,18 @@ final class ServiceJWTTests: XCTestCase {
         let highSToken = "\(parts[0]).\(parts[1]).\(JWTBase64URL.encode(highS))"
         let key = ATProtoJWTVerificationKey.p256(p256Key.publicKey)
 
-        let claims = try ServiceJWT.verify(highSToken, publicKey: key)
+        let claims = try ServiceJWT.verify(highSToken, publicKey: key, now: now)
         XCTAssertEqual(claims.jti, "high-s-test")
-        XCTAssertEqual(try ServiceJWT.verify(highSToken, publicKey: key, signatureOptions: .jwt).jti, "high-s-test")
+        XCTAssertEqual(try ServiceJWT.verify(highSToken, publicKey: key, signatureOptions: .jwt, now: now).jti, "high-s-test")
         XCTAssertEqual(
-            try ServiceJWT.verify(highSToken, didKey: PLCDIDVerificationKey.p256(p256Key.publicKey).didKey).jti,
+            try ServiceJWT.verify(highSToken, didKey: PLCDIDVerificationKey.p256(p256Key.publicKey).didKey, now: now).jti,
             "high-s-test"
         )
 
-        XCTAssertThrowsError(try ServiceJWT.verify(highSToken, publicKey: key, signatureOptions: .strict))
+        XCTAssertThrowsError(try ServiceJWT.verify(highSToken, publicKey: key, signatureOptions: .strict, now: now))
         // The canonical token passes under every policy.
         for options in [ATProtoSignatureVerificationOptions.strict, .jwt, .allowMalleable] {
-            XCTAssertNoThrow(try ServiceJWT.verify(token, publicKey: key, signatureOptions: options))
+            XCTAssertNoThrow(try ServiceJWT.verify(token, publicKey: key, signatureOptions: options, now: now))
         }
     }
 
