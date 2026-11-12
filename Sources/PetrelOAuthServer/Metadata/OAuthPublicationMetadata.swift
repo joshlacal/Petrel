@@ -162,10 +162,13 @@ private enum OAuthPublishedURL {
     /// validation prevents a path-bearing issuer from changing the advertised
     /// endpoint or the confidential-client assertion audience. An explicit
     /// HTTPS default port is also forbidden by the AT OAuth issuer profile.
+    /// A trailing slash is refused too: the issuer is published as given and
+    /// clients compare the `iss` response parameter to it exactly, so the one
+    /// spelling must be the bare origin.
     static func validateIssuer(_ url: URL) throws -> URL {
         let validated = try validate(url, role: "issuer")
         guard let components = URLComponents(url: validated, resolvingAgainstBaseURL: false),
-              (components.path.isEmpty || components.path == "/"),
+              components.path.isEmpty,
               components.port != 443 else {
             throw OAuthServerError.malformed("OAuth issuer URL must be an origin")
         }

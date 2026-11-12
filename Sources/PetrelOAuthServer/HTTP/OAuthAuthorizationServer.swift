@@ -151,10 +151,10 @@ public struct OAuthAuthorizationServer: Sendable {
     }
 
     /// The issuer identifier as it appears in metadata, tokens and the `iss`
-    /// response parameter: the origin with no trailing slash.
+    /// response parameter: exactly the configured origin, which configuration
+    /// validation guarantees has no path, not even `/`.
     public var issuer: String {
-        let text = configuration.issuer.absoluteString
-        return text.hasSuffix("/") ? String(text.dropLast()) : text
+        configuration.issuer.absoluteString
     }
 
     /// Answers one request. Requests for paths or methods the server does not

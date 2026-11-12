@@ -2,8 +2,8 @@ import Foundation
 
 /// Everything that configures an ``OAuthAuthorizationServer``.
 public struct OAuthAuthorizationServerConfiguration: Sendable {
-    /// The issuer identifier: an `https` origin with no path, query, fragment
-    /// or default port. Every endpoint URL, the `iss` response parameter and
+    /// The issuer identifier: an `https` origin with no path (not even a
+    /// trailing `/`), query, fragment or default port. Every endpoint URL, the `iss` response parameter and
     /// every DPoP `htu` are derived from it, never from request headers.
     public var issuer: URL
 

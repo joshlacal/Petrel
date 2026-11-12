@@ -51,12 +51,28 @@ struct OAuthMetadataTests {
     func issuerValidation() throws {
         for bad in [
             "http://auth.example.test", "https://auth.example.test/path", "https://auth.example.test:443",
+            // A trailing slash would be published as is but sent as `iss`
+            // without it, and clients compare the two exactly.
+            "https://auth.example.test/", "http://127.0.0.1:8080/",
             "https://auth.example.test?x=1", "https://user@auth.example.test", "ftp://auth.example.test",
         ] {
             #expect(throws: OAuthServerError.self, "\(bad)") {
                 _ = try OAuthAuthorizationServerConfiguration(
                     issuer: #require(URL(string: bad)), serverSecret: Data(repeating: 1, count: 32)
                 )
+            }
+        }
+        for bad in ["https://auth.example.test/", "https://auth.example.test"] {
+            let url = try #require(URL(string: bad))
+            if bad.hasSuffix("/") {
+                #expect(throws: OAuthServerError.self) { _ = try OAuthAuthorizationServerMetadata(issuer: url) }
+            } else {
+                // What is published is what is sent as `iss`, byte for byte.
+                let server = try OAuthAuthorizationServer(
+                    configuration: OAuthAuthorizationServerConfiguration(issuer: url, serverSecret: Data(repeating: 1, count: 32)),
+                    store: InMemoryOAuthStore(), accounts: TestAccounts(), clients: MutableClientResolver()
+                )
+                #expect(try OAuthAuthorizationServerMetadata(issuer: url).issuer.absoluteString == server.issuer)
             }
         }
         // A loopback development issuer may use http.
