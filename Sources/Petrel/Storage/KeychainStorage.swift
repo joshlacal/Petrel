@@ -78,6 +78,7 @@ private actor AuthContinuityMutationHub {
     struct Scope: Hashable {
         let namespace: String
         let accessGroup: String?
+        let backendIdentifier: String
     }
 
     static let shared = AuthContinuityMutationHub()
@@ -177,11 +178,20 @@ public final class AccountMutationHub: @unchecked Sendable {
         public let namespace: String
         public let accessGroup: String?
         public let did: String
+        let backendIdentifier: String
 
         public init(namespace: String, accessGroup: String? = nil, did: String) {
             self.namespace = namespace
             self.accessGroup = accessGroup
             self.did = did
+            self.backendIdentifier = ""
+        }
+
+        init(namespace: String, accessGroup: String?, did: String, backendIdentifier: String) {
+            self.namespace = namespace
+            self.accessGroup = accessGroup
+            self.did = did
+            self.backendIdentifier = backendIdentifier
         }
     }
 
@@ -308,6 +318,8 @@ private final class GatewaySessionMutationCoordinator: @unchecked Sendable {
 public actor KeychainStorage {
     let namespace: String
     private let accessGroup: String?
+    private let credentialBackend: CredentialStorageBackend
+    nonisolated let keyMutationHub: DPoPKeyMutationHub
     private struct GatewaySessionCacheEntry {
         let session: String
         let generation: UInt64
@@ -328,6 +340,21 @@ public actor KeychainStorage {
     #endif
     /// Observers notified when DPoP key material changes in storage for a DID (or nil for all DIDs).
     public static let dpopKeyMutationHub = DPoPKeyMutationHub()
+    private struct WeakMutationHub {
+        weak var value: DPoPKeyMutationHub?
+    }
+    private static let backendMutationHubs = Mutex<[String: WeakMutationHub]>([:])
+
+    private static func mutationHub(for identifier: String) -> DPoPKeyMutationHub {
+        backendMutationHubs.withLock { hubs in
+            if let hub = hubs[identifier]?.value { return hub }
+            hubs = hubs.filter { $0.value.value != nil }
+            let hub = DPoPKeyMutationHub()
+            hubs[identifier] = WeakMutationHub(value: hub)
+            return hub
+        }
+    }
+
     private struct PendingSessionState {
         var knownGenerations: [String: UInt64] = [:]
     }
@@ -352,19 +379,19 @@ public actor KeychainStorage {
     private let decoder = JSONDecoder()
     private var checkedPendingDIDs: Set<String> = []
     private func scopeKey(for did: String) -> String {
-        "\(namespace)|\(accessGroup ?? "")|\(did)"
+        "\(credentialBackend.configuration.identifier)|\(namespace)|\(accessGroup ?? "")|\(did)"
     }
     /// The mutation gate is shared by every DID in one keychain storage scope.
     private var gatewayMutationScopeKey: String {
-        "\(namespace)|\(accessGroup ?? "")"
+        "\(credentialBackend.configuration.identifier)|\(namespace)|\(accessGroup ?? "")"
     }
 
     public func accountScopeDID(for did: String) -> AccountMutationHub.ScopeDID {
-        AccountMutationHub.ScopeDID(namespace: namespace, accessGroup: accessGroup, did: did)
+        AccountMutationHub.ScopeDID(namespace: namespace, accessGroup: accessGroup, did: did, backendIdentifier: credentialBackend.configuration.identifier)
     }
 
     private var authContinuityScope: AuthContinuityMutationHub.Scope {
-        AuthContinuityMutationHub.Scope(namespace: namespace, accessGroup: accessGroup)
+        AuthContinuityMutationHub.Scope(namespace: namespace, accessGroup: accessGroup, backendIdentifier: credentialBackend.configuration.identifier)
     }
     /// Initializes a new KeychainStorage instance.
     /// - Parameters:
@@ -376,7 +403,31 @@ public actor KeychainStorage {
     public init(namespace: String, accessGroup: String? = nil, accessibility: KeychainAccessibility = .afterFirstUnlockThisDeviceOnly) {
         self.namespace = namespace
         self.accessGroup = accessGroup
+        credentialBackend = CredentialStorageBackend(configuration: .platformDefault)
+        keyMutationHub = Self.dpopKeyMutationHub
         KeychainManager.configureAccessibility(accessibility)
+    }
+
+    /// Selects storage for this instance. File storage does not support Keychain
+    /// access groups and never changes the process-wide platform backend.
+    public init(
+        namespace: String,
+        accessGroup: String? = nil,
+        accessibility: KeychainAccessibility = .afterFirstUnlockThisDeviceOnly,
+        credentialStorage: CredentialStorageConfiguration
+    ) throws {
+        if credentialStorage.backend != nil, accessGroup != nil {
+            throw KeychainError.storageUnavailable("File storage does not support Keychain access groups")
+        }
+        self.namespace = namespace
+        self.accessGroup = accessGroup
+        credentialBackend = CredentialStorageBackend(configuration: credentialStorage)
+        if credentialStorage.backend == nil {
+            keyMutationHub = Self.dpopKeyMutationHub
+            KeychainManager.configureAccessibility(accessibility)
+        } else {
+            keyMutationHub = Self.mutationHub(for: credentialStorage.identifier)
+        }
     }
 
     func setAuthContinuityObserver(
@@ -425,7 +476,7 @@ public actor KeychainStorage {
         let key = makeKey("account", did: did)
         let data = try encoder.encode(account)
         do {
-            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
             try await addToAccountsList(did)
             let commitGen = AccountMutationHub.shared.bumpGeneration(for: scopeDID)
             await AccountMutationHub.shared.notifyMutation(for: scopeDID)
@@ -486,43 +537,43 @@ public actor KeychainStorage {
         }
         do {
             // Step 1: Create backups of existing data if they exist
-            if let existingAccountData = try? KeychainManager.retrieve(
+            if let existingAccountData = try? credentialBackend.retrieve(
                 key: accountKey, namespace: namespace, accessGroup: accessGroup
             ) {
-                try KeychainManager.store(
+                try credentialBackend.store(
                     key: backupAccountKey, value: existingAccountData, namespace: namespace, accessGroup: accessGroup
                 )
                 LogManager.logDebug("Account backup created for DID: \(LogManager.logDID(did))")
             }
 
-            if let existingSessionData = try? KeychainManager.retrieve(
+            if let existingSessionData = try? credentialBackend.retrieve(
                 key: sessionKey, namespace: namespace, accessGroup: accessGroup
             ) {
-                try KeychainManager.store(
+                try credentialBackend.store(
                     key: backupSessionKey, value: existingSessionData, namespace: namespace, accessGroup: accessGroup
                 )
                 LogManager.logDebug("Session backup created for DID: \(LogManager.logDID(did))")
             }
 
             // Step 2: Save both to temporary locations first
-            try KeychainManager.store(key: tempAccountKey, value: accountData, namespace: namespace, accessGroup: accessGroup)
+            try credentialBackend.store(key: tempAccountKey, value: accountData, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("Account saved to temporary location for DID: \(LogManager.logDID(did))")
 
-            try KeychainManager.store(key: tempSessionKey, value: sessionData, namespace: namespace, accessGroup: accessGroup)
+            try credentialBackend.store(key: tempSessionKey, value: sessionData, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("Session saved to temporary location for DID: \(LogManager.logDID(did))")
 
             // Step 3: Atomic move both to final locations
-            try KeychainManager.store(key: accountKey, value: accountData, namespace: namespace, accessGroup: accessGroup)
+            try credentialBackend.store(key: accountKey, value: accountData, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("Account moved to final location for DID: \(LogManager.logDID(did))")
 
-            try KeychainManager.store(key: sessionKey, value: sessionData, namespace: namespace, accessGroup: accessGroup)
+            try credentialBackend.store(key: sessionKey, value: sessionData, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("Session moved to final location for DID: \(LogManager.logDID(did))")
 
             // Step 4: Verify both saves were successful by reading them back
-            let verificationAccountData = try KeychainManager.retrieve(
+            let verificationAccountData = try credentialBackend.retrieve(
                 key: accountKey, namespace: namespace, accessGroup: accessGroup
             )
-            let verificationSessionData = try KeychainManager.retrieve(
+            let verificationSessionData = try credentialBackend.retrieve(
                 key: sessionKey, namespace: namespace, accessGroup: accessGroup
             )
 
@@ -539,10 +590,10 @@ public actor KeychainStorage {
             )
 
             // Step 5: Cleanup temporary and backup files
-            try? KeychainManager.delete(key: tempAccountKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: tempAccountKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
 
             LogManager.logDebug(
                 "Account+session saved atomically and verified for DID: \(LogManager.logDID(did))"
@@ -567,15 +618,15 @@ public actor KeychainStorage {
             )
 
             // Cleanup temporary files in error case
-            try? KeychainManager.delete(key: tempAccountKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: tempAccountKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
             // A backup is only redundant once its contents are back in place; deleting
             // one we failed to restore from destroys the very copy recovery needs.
             if accountRestored {
-                try? KeychainManager.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
+                try? credentialBackend.delete(key: backupAccountKey, namespace: namespace, accessGroup: accessGroup)
             }
             if sessionRestored {
-                try? KeychainManager.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
+                try? credentialBackend.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
             }
             if !accountRestored || !sessionRestored {
                 LogManager.logError(
@@ -600,7 +651,7 @@ public actor KeychainStorage {
     ) -> Bool {
         let backupData: Data
         do {
-            backupData = try KeychainManager.retrieve(
+            backupData = try credentialBackend.retrieve(
                 key: backupKey, namespace: namespace, accessGroup: accessGroup
             )
         } catch {
@@ -612,7 +663,7 @@ public actor KeychainStorage {
         }
 
         do {
-            try KeychainManager.store(
+            try credentialBackend.store(
                 key: primaryKey, value: backupData, namespace: namespace, accessGroup: accessGroup
             )
             LogManager.logDebug("\(label.capitalized) restored from backup for DID: \(LogManager.logDID(did))")
@@ -634,7 +685,7 @@ public actor KeychainStorage {
     public func getAccount(for did: String) async throws -> Account? {
         let key = makeKey("account", did: did)
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            let data = try await credentialBackend.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return try decoder.decode(Account.self, from: data)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
@@ -652,7 +703,7 @@ public actor KeychainStorage {
         AccountMutationHub.shared.bumpGeneration(for: scopeDID)
         let key = makeKey("account", did: did)
         do {
-            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             try await removeFromAccountsList(did)
             gatewaySessionCache.removeValue(forKey: did)
             AccountMutationHub.shared.bumpGeneration(for: scopeDID)
@@ -673,7 +724,7 @@ public actor KeychainStorage {
         let key = makeKey("accountDIDs")
         let data: Data
         do {
-            data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try await credentialBackend.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) { return [] }
             LogManager.logError("KeychainStorage - Failed to read the account DID list: \(error)")
@@ -700,7 +751,7 @@ public actor KeychainStorage {
         let data = did.data(using: .utf8) ?? Data()
         let continuityTicket = await beginAuthContinuityMutation()
         do {
-            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
             await endAuthContinuityMutation(continuityTicket)
         } catch {
             await endAuthContinuityMutation(continuityTicket)
@@ -714,7 +765,7 @@ public actor KeychainStorage {
     public func getCurrentDID() async throws -> String? {
         let key = makeKey("currentDID")
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            let data = try await credentialBackend.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             guard let did = String(data: data, encoding: .utf8) else {
                 LogManager.logError("KeychainStorage - Stored current DID is not valid UTF-8")
                 throw KeychainError.dataFormatError
@@ -736,7 +787,7 @@ public actor KeychainStorage {
         let key = makeKey("currentDID")
         let continuityTicket = await beginAuthContinuityMutation()
         do {
-            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             await endAuthContinuityMutation(continuityTicket)
         } catch {
             await endAuthContinuityMutation(continuityTicket)
@@ -760,7 +811,7 @@ public actor KeychainStorage {
         LogManager.logInfo("KeychainStorage - Saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
         let continuityTicket = await beginAuthContinuityMutation()
         do {
-            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
             await endAuthContinuityMutation(continuityTicket)
         } catch {
             await endAuthContinuityMutation(continuityTicket)
@@ -787,7 +838,7 @@ public actor KeychainStorage {
         let key = makeKey("gatewaySession", did: did)
         LogManager.logDebug("KeychainStorage - Looking for gateway session with key: \(namespace).\(key)")
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            let data = try await credentialBackend.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug("KeychainStorage - Retrieved gateway session for DID: \(did.prefix(20))...")
             guard let session = String(data: data, encoding: .utf8) else {
                 LogManager.logError("KeychainStorage - Stored gateway session is not valid UTF-8 for key \(namespace).\(key)")
@@ -931,7 +982,7 @@ public actor KeychainStorage {
         let key = makeKey("gatewaySession", did: did)
         let continuityTicket = await beginAuthContinuityMutation()
         do {
-            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             await endAuthContinuityMutation(continuityTicket)
         } catch {
             await endAuthContinuityMutation(continuityTicket)
@@ -973,14 +1024,14 @@ public actor KeychainStorage {
     /// Saves raw pending gateway upgrade data for a specific account.
     func savePendingGatewayUpgradeData(_ data: Data, for did: String) async throws {
         let key = makeKey("pendingGatewayUpgrade", did: did)
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves raw pending gateway upgrade data for a specific account.
     func getPendingGatewayUpgradeData(for did: String) async throws -> Data? {
         let key = makeKey("pendingGatewayUpgrade", did: did)
         do {
-            return try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            return try await credentialBackend.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
             throw error
@@ -991,7 +1042,7 @@ public actor KeychainStorage {
     func deletePendingGatewayUpgradeData(for did: String) async throws {
         let key = makeKey("pendingGatewayUpgrade", did: did)
         do {
-            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) { return }
             throw error
@@ -1019,7 +1070,7 @@ public actor KeychainStorage {
     private func readExactCurrentDID() async throws -> String? {
         let key = makeKey("currentDID")
         do {
-            let data = try await KeychainManager.retrieveAsync(
+            let data = try await credentialBackend.retrieveAsync(
                 key: key,
                 namespace: namespace,
                 accessGroup: accessGroup,
@@ -1039,7 +1090,7 @@ public actor KeychainStorage {
     private func readExactPerDIDGatewaySession(for did: String) async throws -> String? {
         let key = makeKey("gatewaySession", did: did)
         do {
-            let data = try await KeychainManager.retrieveAsync(
+            let data = try await credentialBackend.retrieveAsync(
                 key: key,
                 namespace: namespace,
                 accessGroup: accessGroup,
@@ -1087,7 +1138,7 @@ public actor KeychainStorage {
         LogManager.logInfo("KeychainStorage - CAS saving gateway session with key: \(namespace).\(key) for DID: \(did.prefix(20))...")
         let continuityTicket = await beginAuthContinuityMutation()
         do {
-            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
             await endAuthContinuityMutation(continuityTicket)
         } catch {
             await endAuthContinuityMutation(continuityTicket)
@@ -1149,7 +1200,7 @@ public actor KeychainStorage {
             )
             if await persistMigratedGatewaySession(session, for: did) {
                 do {
-                    try await KeychainManager.deleteAsync(
+                    try await credentialBackend.deleteAsync(
                         key: "gatewaySession",
                         namespace: "catbird.gateway",
                         accessGroup: accessGroup
@@ -1176,7 +1227,7 @@ public actor KeychainStorage {
         let data = session.data(using: .utf8) ?? Data()
         let continuityTicket = await beginAuthContinuityMutation()
         do {
-            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
             await endAuthContinuityMutation(continuityTicket)
         } catch {
             await endAuthContinuityMutation(continuityTicket)
@@ -1189,7 +1240,7 @@ public actor KeychainStorage {
     /// - Returns: The raw bytes, or nil only when nothing is stored there.
     private func readGlobalGatewaySession() async throws -> Data? {
         do {
-            return try await KeychainManager.retrieveAsync(
+            return try await credentialBackend.retrieveAsync(
                 key: "gatewaySession",
                 namespace: "catbird.gateway",
                 accessGroup: accessGroup
@@ -1216,7 +1267,7 @@ public actor KeychainStorage {
 
         let key = makeKey("gatewaySession", did: did)
         guard
-            let verification = try? await KeychainManager.retrieveAsync(
+            let verification = try? await credentialBackend.retrieveAsync(
                 key: key, namespace: namespace, accessGroup: accessGroup
             ),
             String(data: verification, encoding: .utf8) == session
@@ -1233,7 +1284,7 @@ public actor KeychainStorage {
     private func getLegacyGatewaySession() async throws -> String? {
         let key = makeKey("gatewaySession")
         do {
-            let data = try await KeychainManager.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            let data = try await credentialBackend.retrieveAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             return String(data: data, encoding: .utf8)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
@@ -1246,7 +1297,7 @@ public actor KeychainStorage {
         let key = makeKey("gatewaySession")
         let continuityTicket = await beginAuthContinuityMutation()
         do {
-            try await KeychainManager.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
+            try await credentialBackend.deleteAsync(key: key, namespace: namespace, accessGroup: accessGroup)
             await endAuthContinuityMutation(continuityTicket)
         } catch {
             await endAuthContinuityMutation(continuityTicket)
@@ -1296,9 +1347,9 @@ public actor KeychainStorage {
         // Enhanced atomic save operation with comprehensive error handling
         do {
             // Step 1: Create backup of existing session if it exists
-            if let existingData = try? KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup) {
+            if let existingData = try? credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup) {
                 do {
-                    try KeychainManager.store(key: backupKey, value: existingData, namespace: namespace, accessGroup: accessGroup)
+                    try credentialBackend.store(key: backupKey, value: existingData, namespace: namespace, accessGroup: accessGroup)
                     LogManager.logDebug("Session backup created for DID: \(LogManager.logDID(did))")
                 } catch {
                     LogManager.logWarning(
@@ -1309,7 +1360,7 @@ public actor KeychainStorage {
 
             // Step 2: Save to temporary location first
             do {
-                try KeychainManager.store(key: tempKey, value: data, namespace: namespace, accessGroup: accessGroup)
+                try credentialBackend.store(key: tempKey, value: data, namespace: namespace, accessGroup: accessGroup)
                 LogManager.logDebug(
                     "Session saved to temporary location for DID: \(LogManager.logDID(did))"
                 )
@@ -1322,7 +1373,7 @@ public actor KeychainStorage {
 
             // Step 3: Atomic move to final location
             do {
-                try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+                try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
                 LogManager.logDebug("Session moved to final location for DID: \(LogManager.logDID(did))")
             } catch {
                 LogManager.logError(
@@ -1333,7 +1384,7 @@ public actor KeychainStorage {
 
             // Step 4: Verify the save was successful by reading it back
             do {
-                let verificationData = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+                let verificationData = try credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
                 let verifiedSession = try decoder.decode(Session.self, from: verificationData)
 
                 // Comprehensive verification that the session has required fields
@@ -1362,8 +1413,8 @@ public actor KeychainStorage {
             }
 
             // Step 5: Cleanup temporary files
-            try? KeychainManager.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
             LogManager.logDebug(
                 "Session saved atomically and verified for DID: \(LogManager.logDID(did))"
             )
@@ -1398,15 +1449,15 @@ public actor KeychainStorage {
         switch error {
         case .temporarySaveFailed:
             // If we can't even save to temp, just cleanup and fail
-            try? KeychainManager.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
 
         case .finalSaveFailed, .verificationFailed, .unexpectedError:
             // For final save or verification failures, attempt recovery from backup
             var restored = false
             var backupData: Data?
             do {
-                backupData = try KeychainManager.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+                backupData = try credentialBackend.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup)
             } catch {
                 if KeychainManager.isItemNotFound(error) {
                     // Nothing was backed up, so nothing needs preserving.
@@ -1420,7 +1471,7 @@ public actor KeychainStorage {
 
             if let backupData {
                 do {
-                    try KeychainManager.store(key: key, value: backupData, namespace: namespace, accessGroup: accessGroup)
+                    try credentialBackend.store(key: key, value: backupData, namespace: namespace, accessGroup: accessGroup)
                     restored = true
                     LogManager.logInfo(
                         "Session restored from backup after save failure for DID: \(LogManager.logDID(did))"
@@ -1433,11 +1484,11 @@ public actor KeychainStorage {
             }
 
             // Always cleanup temporary files in error cases
-            try? KeychainManager.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: tempKey, namespace: namespace, accessGroup: accessGroup)
             // Only drop the backup once its contents are known to be back in place;
             // deleting the copy we just failed to restore from destroys the session.
             if restored {
-                try? KeychainManager.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+                try? credentialBackend.delete(key: backupKey, namespace: namespace, accessGroup: accessGroup)
             } else {
                 LogManager.logError(
                     "Keeping the session backup for DID: \(LogManager.logDID(did)) because the restore did not complete; getSession can still recover from it"
@@ -1542,8 +1593,8 @@ public actor KeychainStorage {
                     )
                     if let data = try? encoder.encode(pending) {
                         do {
-                            try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
-                            try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
+                            try await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+                            try? await credentialBackend.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
                             Self.pendingSessionState.withLock { state in
                                 if let gen = knownGen, state.knownGenerations[pKey] == gen {
                                     state.knownGenerations.removeValue(forKey: pKey)
@@ -1561,7 +1612,7 @@ public actor KeychainStorage {
                     }
                     return pending
                 } else {
-                    try? await KeychainManager.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
+                    try? await credentialBackend.deleteAsync(key: pendingKey, namespace: namespace, accessGroup: accessGroup)
                     Self.pendingSessionState.withLock { state in
                         if let gen = knownGen, state.knownGenerations[pKey] == gen {
                             state.knownGenerations.removeValue(forKey: pKey)
@@ -1615,9 +1666,9 @@ public actor KeychainStorage {
             "Session recovered from \(label) location for DID: \(LogManager.logDID(did))"
         )
         if let data = try? encoder.encode(recovered),
-           (try? await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)) != nil
+           (try? await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)) != nil
         {
-            try? await KeychainManager.deleteAsync(key: sourceKey, namespace: namespace, accessGroup: accessGroup)
+            try? await credentialBackend.deleteAsync(key: sourceKey, namespace: namespace, accessGroup: accessGroup)
         }
         return recovered
     }
@@ -1631,7 +1682,7 @@ public actor KeychainStorage {
         _ copyKey: String, for did: String, bypassCache: Bool = false
     ) async -> (data: Data?, error: Error?) {
         do {
-            let data = try await KeychainManager.retrieveAsync(
+            let data = try await credentialBackend.retrieveAsync(
                 key: copyKey, namespace: namespace, accessGroup: accessGroup, bypassCache: bypassCache
             )
             return (data, nil)
@@ -1664,7 +1715,7 @@ public actor KeychainStorage {
         let key = makeKey("session", did: did)
         let data: Data
         do {
-            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) { return false }
             LogManager.logError(
@@ -1685,7 +1736,7 @@ public actor KeychainStorage {
     public func savePendingSession(_ session: Session, for did: String) async throws {
         let key = makeKey("session.pending", did: did)
         let data = try encoder.encode(session)
-        try await KeychainManager.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try await credentialBackend.storeAsync(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         let pKey = scopeKey(for: did)
         let token = AccountMutationHub.shared.nextEpoch()
         Self.pendingSessionState.withLock { state in
@@ -1700,7 +1751,7 @@ public actor KeychainStorage {
         var failures: [Error] = []
         for suffix in ["session", "session.pending", "session.temp", "session.backup"] {
             do {
-                try KeychainManager.delete(key: makeKey(suffix, did: did), namespace: namespace, accessGroup: accessGroup)
+                try credentialBackend.delete(key: makeKey(suffix, did: did), namespace: namespace, accessGroup: accessGroup)
             } catch {
                 guard KeychainManager.isItemNotFound(error) else {
                     LogManager.logError(
@@ -1732,7 +1783,7 @@ public actor KeychainStorage {
     public func saveSessionBackup(_ session: Session, for did: String) async throws {
         let key = makeKey("session.backup", did: did)
         let data = try encoder.encode(session)
-        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         LogManager.logDebug("KeychainStorage - Saved session backup for DID: \(LogManager.logDID(did))")
     }
 
@@ -1743,7 +1794,7 @@ public actor KeychainStorage {
     public func saveSessionToTemp(_ session: Session, for did: String) async throws {
         let key = makeKey("session.temp", did: did)
         let data = try encoder.encode(session)
-        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         LogManager.logDebug("KeychainStorage - Saved session to temp for DID: \(LogManager.logDID(did))")
     }
 
@@ -1755,7 +1806,7 @@ public actor KeychainStorage {
 
         // Try backup location first
         do {
-            let data = try KeychainManager.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup)
+            let data = try credentialBackend.retrieve(key: backupKey, namespace: namespace, accessGroup: accessGroup)
             let session = try decoder.decode(Session.self, from: data)
             LogManager.logInfo("KeychainStorage - Recovered session from backup for DID: \(LogManager.logDID(did))")
             return session
@@ -1766,7 +1817,7 @@ public actor KeychainStorage {
         // Try temporary location as fallback
         let tempKey = makeKey("session.temp", did: did)
         do {
-            let data = try KeychainManager.retrieve(key: tempKey, namespace: namespace, accessGroup: accessGroup)
+            let data = try credentialBackend.retrieve(key: tempKey, namespace: namespace, accessGroup: accessGroup)
             let session = try decoder.decode(Session.self, from: data)
             LogManager.logInfo("KeychainStorage - Recovered session from temp for DID: \(LogManager.logDID(did))")
             return session
@@ -1781,14 +1832,14 @@ public actor KeychainStorage {
     /// - Parameter did: The DID associated with the session backup to delete
     public func deleteSessionBackup(for did: String) async throws {
         let key = makeKey("session.backup", did: did)
-        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.delete(key: key, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Deletes a temporary session from the keychain.
     /// - Parameter did: The DID associated with the temp session to delete
     public func deleteSessionTemp(for did: String) async throws {
         let key = makeKey("session.temp", did: did)
-        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.delete(key: key, namespace: namespace, accessGroup: accessGroup)
     }
 
     // MARK: - DPoP Key Management
@@ -1798,9 +1849,9 @@ public actor KeychainStorage {
     func saveDPoPKeyRepresentation(_ representation: Data, for did: String) async throws {
         let key = try P256.Signing.PrivateKey(x963Representation: representation)
         let keyTag = makeKey("dpopKey", did: did)
-        Self.dpopKeyMutationHub.bumpGeneration(for: did)
+        keyMutationHub.bumpGeneration(for: did)
         do {
-            try KeychainManager.storeDPoPKeyRepresentation(
+            try credentialBackend.storeDPoPKeyRepresentation(
                 key.x963Representation,
                 keyTag: keyTag,
                 accessGroup: accessGroup
@@ -1812,10 +1863,10 @@ public actor KeychainStorage {
             LogManager.logError(
                 "Failed to save DPoP key to Keychain (error: \(error)). This will likely cause authentication issues."
             )
-            await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+            await keyMutationHub.notifyKeyMutation(for: did)
             throw error
         }
-        await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+        await keyMutationHub.notifyKeyMutation(for: did)
     }
 
 
@@ -1826,7 +1877,7 @@ public actor KeychainStorage {
     func getDPoPKeyRepresentation(for did: String) throws -> Data? {
         let keyTag = makeKey("dpopKey", did: did)
         do {
-            let representation = try KeychainManager.retrieveDPoPKeyRepresentation(
+            let representation = try credentialBackend.retrieveDPoPKeyRepresentation(
                 keyTag: keyTag,
                 accessGroup: accessGroup
             )
@@ -1879,14 +1930,14 @@ public actor KeychainStorage {
 
     public func deleteDPoPKey(for did: String) async throws {
         let keyTag = makeKey("dpopKey", did: did)
-        Self.dpopKeyMutationHub.bumpGeneration(for: did)
+        keyMutationHub.bumpGeneration(for: did)
         do {
-            try KeychainManager.deleteDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
+            try credentialBackend.deleteDPoPKey(keyTag: keyTag, accessGroup: accessGroup)
         } catch {
-            await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+            await keyMutationHub.notifyKeyMutation(for: did)
             throw error
         }
-        await Self.dpopKeyMutationHub.notifyKeyMutation(for: did)
+        await keyMutationHub.notifyKeyMutation(for: did)
     }
 
 
@@ -1901,7 +1952,7 @@ public actor KeychainStorage {
     public func saveDPoPNonces(_ nonces: [String: String], for did: String) async throws {
         let key = makeKey("dpopNonces", did: did)
         let data = try encoder.encode(nonces)
-        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves DPoP nonces from the keychain.
@@ -1915,7 +1966,7 @@ public actor KeychainStorage {
         let key = makeKey("dpopNonces", did: did)
         let data: Data
         do {
-            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
             LogManager.logError(
@@ -1942,7 +1993,7 @@ public actor KeychainStorage {
     {
         let key = makeKey("dpopNoncesByJKT", did: did)
         let data = try encoder.encode(noncesByJKT)
-        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves DPoP nonces scoped by JKT (key thumbprint) from the keychain.
@@ -1955,7 +2006,7 @@ public actor KeychainStorage {
         let key = makeKey("dpopNoncesByJKT", did: did)
         let data: Data
         do {
-            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
             LogManager.logError(
@@ -1980,7 +2031,7 @@ public actor KeychainStorage {
     public func saveOAuthState(_ state: OAuthState) async throws {
         let key = makeKey("oauthState", stateToken: state.stateToken)
         let data = try encoder.encode(state)
-        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves an OAuth state from the keychain.
@@ -1989,7 +2040,7 @@ public actor KeychainStorage {
     public func getOAuthState(for stateToken: String) async throws -> OAuthState? {
         let key = makeKey("oauthState", stateToken: stateToken)
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            let data = try credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
             return try decoder.decode(OAuthState.self, from: data)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
@@ -2002,7 +2053,7 @@ public actor KeychainStorage {
     /// - Parameter stateToken: The state token associated with the OAuth state to delete
     public func deleteOAuthState(for stateToken: String) async throws {
         let key = makeKey("oauthState", stateToken: stateToken)
-        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.delete(key: key, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Atomically consumes an OAuth state token: validates age, deletes state, and returns it.
@@ -2015,7 +2066,7 @@ public actor KeychainStorage {
         let key = makeKey("oauthState", stateToken: token)
         let data: Data
         do {
-            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) {
                 throw KeychainError.itemRetrievalError(status: KeychainManager.itemNotFoundStatus)
@@ -2024,7 +2075,7 @@ public actor KeychainStorage {
         }
 
         // Synchronously delete state before decoding to eliminate actor-reentrancy windows
-        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.delete(key: key, namespace: namespace, accessGroup: accessGroup)
 
         let state = try decoder.decode(OAuthState.self, from: data)
 
@@ -2043,14 +2094,14 @@ public actor KeychainStorage {
     public func savePendingGatewayLogin(_ state: PendingGatewayLoginState, for stateKey: String? = nil) async throws {
         let key = makeKey("pendingGatewayLogin", stateToken: stateKey ?? state.stateToken)
         let data = try encoder.encode(state)
-        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Retrieves a pending gateway login state from the keychain.
     public func getPendingGatewayLogin(for stateToken: String) async throws -> PendingGatewayLoginState? {
         let key = makeKey("pendingGatewayLogin", stateToken: stateToken)
         do {
-            let data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            let data = try credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
             return try decoder.decode(PendingGatewayLoginState.self, from: data)
         } catch {
             if KeychainManager.isItemNotFound(error) { return nil }
@@ -2062,7 +2113,7 @@ public actor KeychainStorage {
     /// Deletes a pending gateway login state from the keychain.
     public func deletePendingGatewayLogin(for stateToken: String) async throws {
         let key = makeKey("pendingGatewayLogin", stateToken: stateToken)
-        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.delete(key: key, namespace: namespace, accessGroup: accessGroup)
     }
 
     /// Atomically consumes a pending gateway login state: validates age, deletes state, and returns it.
@@ -2075,7 +2126,7 @@ public actor KeychainStorage {
         let key = makeKey("pendingGatewayLogin", stateToken: token)
         let data: Data
         do {
-            data = try KeychainManager.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
+            data = try credentialBackend.retrieve(key: key, namespace: namespace, accessGroup: accessGroup)
         } catch {
             if KeychainManager.isItemNotFound(error) {
                 throw KeychainError.itemRetrievalError(status: KeychainManager.itemNotFoundStatus)
@@ -2084,7 +2135,7 @@ public actor KeychainStorage {
         }
 
         // Synchronously delete state before decoding to eliminate actor-reentrancy windows
-        try KeychainManager.delete(key: key, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.delete(key: key, namespace: namespace, accessGroup: accessGroup)
 
         let state = try decoder.decode(PendingGatewayLoginState.self, from: data)
 
@@ -2190,13 +2241,13 @@ public actor KeychainStorage {
         let backupSessionKey = makeKey("session.backup", did: did)
 
         // Try temporary location first
-        if let tempData = try? KeychainManager.retrieve(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup) {
+        if let tempData = try? credentialBackend.retrieve(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup) {
             do {
                 let session = try decoder.decode(Session.self, from: tempData)
                 guard !session.accessToken.isEmpty else { return false }
 
-                try KeychainManager.store(key: sessionKey, value: tempData, namespace: namespace, accessGroup: accessGroup)
-                try? KeychainManager.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
+                try credentialBackend.store(key: sessionKey, value: tempData, namespace: namespace, accessGroup: accessGroup)
+                try? credentialBackend.delete(key: tempSessionKey, namespace: namespace, accessGroup: accessGroup)
 
                 LogManager.logDebug(
                     "Session recovered from temporary location for DID: \(LogManager.logDID(did))"
@@ -2208,13 +2259,13 @@ public actor KeychainStorage {
         }
 
         // Try backup location
-        if let backupData = try? KeychainManager.retrieve(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup) {
+        if let backupData = try? credentialBackend.retrieve(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup) {
             do {
                 let session = try decoder.decode(Session.self, from: backupData)
                 guard !session.accessToken.isEmpty else { return false }
 
-                try KeychainManager.store(key: sessionKey, value: backupData, namespace: namespace, accessGroup: accessGroup)
-                try? KeychainManager.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
+                try credentialBackend.store(key: sessionKey, value: backupData, namespace: namespace, accessGroup: accessGroup)
+                try? credentialBackend.delete(key: backupSessionKey, namespace: namespace, accessGroup: accessGroup)
 
                 LogManager.logDebug(
                     "Session recovered from backup location for DID: \(LogManager.logDID(did))"
@@ -2234,10 +2285,10 @@ public actor KeychainStorage {
 
         for did in accountDIDs {
             // Clean up temporary files
-            try? KeychainManager.delete(key: makeKey("session.temp", did: did), namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: makeKey("account.temp", did: did), namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: makeKey("session.backup", did: did), namespace: namespace, accessGroup: accessGroup)
-            try? KeychainManager.delete(key: makeKey("account.backup", did: did), namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: makeKey("session.temp", did: did), namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: makeKey("account.temp", did: did), namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: makeKey("session.backup", did: did), namespace: namespace, accessGroup: accessGroup)
+            try? credentialBackend.delete(key: makeKey("account.backup", did: did), namespace: namespace, accessGroup: accessGroup)
         }
 
         LogManager.logDebug("Cleaned up temporary keychain files")
@@ -2314,7 +2365,7 @@ public actor KeychainStorage {
         if !dids.contains(did) {
             dids.append(did)
             let data = try encoder.encode(dids)
-            try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+            try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
         }
     }
 
@@ -2340,6 +2391,6 @@ public actor KeychainStorage {
 
         dids.removeAll { $0 == did }
         let data = try encoder.encode(dids)
-        try KeychainManager.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
+        try credentialBackend.store(key: key, value: data, namespace: namespace, accessGroup: accessGroup)
     }
 }

@@ -136,7 +136,7 @@ actor OAuthCore {
         self.clientAuthenticator = clientAuthenticator ?? PublicClientAuthenticator(clientId: oauthConfig.clientId)
 
         // Register synchronously on init so no storage mutation event can be missed
-        self.dpopKeyObserverToken = KeychainStorage.dpopKeyMutationHub.addObserver { [weak self] did in
+        self.dpopKeyObserverToken = storage.keyMutationHub.addObserver { [weak self] did in
             guard let self else { return }
             if let did {
                 await self.clearDPoPKeyCache(for: did)
@@ -148,7 +148,7 @@ actor OAuthCore {
 
     deinit {
         if let token = dpopKeyObserverToken {
-            KeychainStorage.dpopKeyMutationHub.removeObserver(token)
+            storage.keyMutationHub.removeObserver(token)
         }
     }
 
@@ -285,17 +285,17 @@ actor OAuthCore {
             if let cached = dpopMaterialCache[did] {
                 return cached
             }
-            let currentGen = KeychainStorage.dpopKeyMutationHub.generation(for: did)
+            let currentGen = storage.keyMutationHub.generation(for: did)
             if let entry = activeDPoPLoadTasks[did], entry.generation == currentGen {
                 onCoalescedDPoPWaiterAwaited?()
                 do {
                     let material = try await entry.task.value
-                    if KeychainStorage.dpopKeyMutationHub.generation(for: did) == currentGen {
+                    if storage.keyMutationHub.generation(for: did) == currentGen {
                         return material
                     }
                     continue
                 } catch {
-                    if KeychainStorage.dpopKeyMutationHub.generation(for: did) != currentGen {
+                    if storage.keyMutationHub.generation(for: did) != currentGen {
                         generationMismatchRetries += 1
                         if generationMismatchRetries > Self.maxDPoPGenerationMismatchRetries {
                             throw error
@@ -315,7 +315,7 @@ actor OAuthCore {
 
             do {
                 let material = try await loadTask.value
-                if KeychainStorage.dpopKeyMutationHub.generation(for: did) == loadGen {
+                if storage.keyMutationHub.generation(for: did) == loadGen {
                     if activeDPoPLoadTasks[did]?.generation == loadGen {
                         activeDPoPLoadTasks.removeValue(forKey: did)
                     }
@@ -327,7 +327,7 @@ actor OAuthCore {
                 if activeDPoPLoadTasks[did]?.generation == loadGen {
                     activeDPoPLoadTasks.removeValue(forKey: did)
                 }
-                if KeychainStorage.dpopKeyMutationHub.generation(for: did) != loadGen {
+                if storage.keyMutationHub.generation(for: did) != loadGen {
                     generationMismatchRetries += 1
                     if generationMismatchRetries > Self.maxDPoPGenerationMismatchRetries {
                         throw error
