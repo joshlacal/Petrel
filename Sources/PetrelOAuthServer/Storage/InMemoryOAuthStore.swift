@@ -146,6 +146,9 @@ public actor InMemoryOAuthStore: OAuthAuthorizationRequestStore, OAuthSessionSto
         for session in sessions.values where session.subject == subject {
             revoke(session.sessionID, now: now)
         }
+        for (device, accounts) in devices where accounts.contains(where: { $0.subject == subject }) {
+            devices[device] = accounts.filter { $0.subject != subject }
+        }
     }
 
     public func sessions(subject: String, now: Date) -> [OAuthSession] {
@@ -236,6 +239,16 @@ public actor InMemoryOAuthStore: OAuthAuthorizationRequestStore, OAuthSessionSto
 
     public func forgetDeviceAccount(subject: String, deviceDigest: Data, now _: Date) {
         devices[deviceDigest] = (devices[deviceDigest] ?? []).filter { $0.subject != subject }
+    }
+
+    public func moveDeviceAccounts(from old: Data, to new: Data, now _: Date) {
+        guard old != new, let moving = devices.removeValue(forKey: old) else { return }
+        var merged: [String: OAuthDeviceAccount] = [:]
+        for account in (devices[new] ?? []) + moving {
+            if let existing = merged[account.subject], existing.authenticatedAt >= account.authenticatedAt { continue }
+            merged[account.subject] = account
+        }
+        devices[new] = Array(merged.values)
     }
 
     // MARK: Lexicon cache

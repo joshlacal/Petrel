@@ -56,7 +56,8 @@ struct OAuthAuthorizationInterfaceTests {
         #expect(csp.contains("form-action 'self' https://app.example.test"))
         let cookie = try #require(page.headers.values(for: "Set-Cookie").first)
         #expect(cookie.contains("HttpOnly") && cookie.contains("Secure") && cookie.contains("SameSite=Lax"))
-        #expect(cookie.contains("Path=/oauth/authorize"))
+        // A __Host- cookie must have Path=/ (see hostPrefixedCookies).
+        #expect(cookie.hasPrefix("__Host-") && cookie.contains("; Path=/;"))
     }
 
     @Test("approval redirects with 303 to the exact redirect_uri carrying code, state and iss")
@@ -316,5 +317,104 @@ struct OAuthAuthorizationInterfaceTests {
         for scope in ["repo:app.bsky.feed.post", "rpc:app.example.getFeed?aud=did:web:api.example.com%23svc%2A"] {
             #expect(try !sensitive(scope), "\(scope)")
         }
+    }
+
+    private static let deviceCookie = "__Host-oauth-device"
+    private static let flowCookie = "__Host-oauth-flow"
+
+    @Test("a planted device cookie is replaced at sign-in, so whoever planted it cannot select the account")
+    func deviceFixation() async throws {
+        let harness = try TestServer()
+        let planted = String(repeating: "A", count: 43)
+        let victim = TestBrowser(harness)
+        victim.cookies[Self.deviceCookie] = planted
+        let client = try TestClient(harness)
+        _ = try await victim.approve(
+            requestURI: client.pushRequest(), clientID: client.clientID,
+            account: TestAccounts.alice, password: "alice-password"
+        )
+        let issued = try #require(victim.cookies[Self.deviceCookie])
+        #expect(issued != planted)
+
+        let attacker = TestBrowser(harness)
+        attacker.cookies[Self.deviceCookie] = planted
+        let other = try TestClient(harness)
+        let page = await attacker.open(requestURI: try await other.pushRequest(), clientID: other.clientID)
+        #expect(!page.text.contains(TestAccounts.alice.did))
+        let selected = await attacker.submit(Path.selectAccount, [("account", TestAccounts.alice.did)])
+        #expect(selected.status == 400)
+    }
+
+    @Test("browser cookies are __Host- cookies: Secure, Path=/, no Domain; other spellings are ignored")
+    func hostPrefixedCookies() async throws {
+        let harness = try TestServer()
+        let browser = TestBrowser(harness)
+        let client = try TestClient(harness)
+        let opened = await browser.open(requestURI: try await client.pushRequest(), clientID: client.clientID)
+        let signedIn = await browser.submit(
+            Path.signIn, [("identifier", TestAccounts.alice.handle ?? TestAccounts.alice.did), ("password", "alice-password")]
+        )
+        let cookies = opened.headers.values(for: "Set-Cookie") + signedIn.headers.values(for: "Set-Cookie")
+        #expect(cookies.contains { $0.hasPrefix(Self.flowCookie + "=") })
+        #expect(cookies.contains { $0.hasPrefix(Self.deviceCookie + "=") })
+        for cookie in cookies {
+            #expect(cookie.hasPrefix("__Host-"), "\(cookie)")
+            #expect(cookie.contains("; Path=/;") && cookie.contains("; Secure"), "\(cookie)")
+            #expect(!cookie.lowercased().contains("domain="), "\(cookie)")
+        }
+
+        // The remembered device under any other name is not honoured.
+        let device = try #require(browser.cookies[Self.deviceCookie])
+        let renamed = TestBrowser(harness)
+        renamed.cookies["__Secure-oauth-device"] = device
+        let second = try TestClient(harness)
+        let page = await renamed.open(requestURI: try await second.pushRequest(), clientID: second.clientID)
+        #expect(!page.text.contains(TestAccounts.alice.did))
+    }
+
+    @Test("a browser keeps every account it signed in to across device-identifier rotation")
+    func rotationKeepsAccounts() async throws {
+        let harness = try TestServer()
+        let browser = TestBrowser(harness)
+        let first = try TestClient(harness)
+        _ = try await browser.approve(
+            requestURI: first.pushRequest(), clientID: first.clientID,
+            account: TestAccounts.alice, password: "alice-password"
+        )
+        let afterAlice = browser.cookies[Self.deviceCookie]
+        let second = try TestClient(harness)
+        await browser.open(requestURI: try await second.pushRequest(), clientID: second.clientID)
+        await browser.submit(Path.selectAccount, [("account", "")])
+        await browser.submit(Path.signIn, [("identifier", TestAccounts.bob.handle ?? TestAccounts.bob.did), ("password", "bob-password")])
+        #expect(browser.cookies[Self.deviceCookie] != afterAlice)
+
+        let third = try TestClient(harness)
+        let page = await browser.open(requestURI: try await third.pushRequest(), clientID: third.clientID)
+        #expect(page.text.contains("name=\"account\" value=\"\(TestAccounts.alice.did)\""))
+        #expect(page.text.contains("name=\"account\" value=\"\(TestAccounts.bob.did)\""))
+        // The retired identifier remembers nothing.
+        let stale = TestBrowser(harness)
+        stale.cookies[Self.deviceCookie] = afterAlice
+        let fourth = try TestClient(harness)
+        let stalePage = await stale.open(requestURI: try await fourth.pushRequest(), clientID: fourth.clientID)
+        #expect(!stalePage.text.contains(TestAccounts.alice.did))
+    }
+
+    @Test("revoking all of an account's sessions also forgets it on every browser that remembered it")
+    func revokeAllForgetsDevices() async throws {
+        let harness = try TestServer()
+        let browser = TestBrowser(harness)
+        let first = try TestClient(harness)
+        _ = try await browser.approve(
+            requestURI: first.pushRequest(), clientID: first.clientID,
+            account: TestAccounts.alice, password: "alice-password"
+        )
+        try await harness.server.revokeAllSessions(subject: TestAccounts.alice.did)
+
+        let second = try TestClient(harness)
+        let page = await browser.open(requestURI: try await second.pushRequest(), clientID: second.clientID)
+        #expect(!page.text.contains("value=\"\(TestAccounts.alice.did)\""))
+        let selected = await browser.submit(Path.selectAccount, [("account", TestAccounts.alice.did)])
+        #expect(selected.status == 400)
     }
 }

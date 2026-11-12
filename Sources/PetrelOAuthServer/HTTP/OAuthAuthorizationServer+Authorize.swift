@@ -2,8 +2,12 @@ import Foundation
 import PetrelCrypto
 
 extension OAuthAuthorizationServer {
-    private var flowCookieName: String { configuration.secureCookies ? "__Secure-oauth-flow" : "oauth-flow" }
-    private var deviceCookieName: String { configuration.secureCookies ? "__Secure-oauth-device" : "oauth-device" }
+    // `__Host-` cookies must be Secure with Path=/ and no Domain attribute, so
+    // a sibling subdomain cannot set one for this origin (it could set a
+    // `__Secure-` cookie with a parent-domain Domain). Only the exact name is
+    // read, so a cookie without the prefix is ignored.
+    private var flowCookieName: String { configuration.secureCookies ? "__Host-oauth-flow" : "oauth-flow" }
+    private var deviceCookieName: String { configuration.secureCookies ? "__Host-oauth-device" : "oauth-device" }
 
     /// What a form handler has in hand once the flow cookie, CSRF token and
     /// pushed request have all been checked.
@@ -320,18 +324,27 @@ extension OAuthAuthorizationServer {
             }
             active.flow.subject = account.did
             active.flow.pendingSecondFactor = nil
-            var deviceID = active.deviceID
             var response: OAuthHTTPResponse
-            if deviceID == nil { deviceID = random.opaqueValue() }
-            if let deviceID, configuration.deviceSessionLifetime > 0 {
+            if configuration.deviceSessionLifetime > 0 {
+                // A fresh device identifier at every sign-in: one that someone
+                // else planted in this browser before it authenticated (session
+                // fixation) is retired, and what it remembered moves to the
+                // identifier only this browser now holds.
+                let deviceID = random.opaqueValue()
+                let deviceDigest = digest.digest(deviceID, purpose: .device)
+                if let previous = active.deviceID {
+                    try? await store.moveDeviceAccounts(
+                        from: digest.digest(previous, purpose: .device), to: deviceDigest, now: now
+                    )
+                }
                 try? await store.rememberDeviceAccount(
                     OAuthDeviceAccount(subject: account.did, authenticatedAt: now),
-                    deviceDigest: digest.digest(deviceID, purpose: .device),
+                    deviceDigest: deviceDigest,
                     now: now
                 )
                 response = await consentPage(active, account: account, request)
                 response.headers.add("Set-Cookie", setCookie(
-                    deviceCookieName, deviceID, path: Path.authorize,
+                    deviceCookieName, deviceID, path: "/",
                     maxAge: Int(configuration.deviceSessionLifetime)
                 ))
             } else {
@@ -460,7 +473,7 @@ extension OAuthAuthorizationServer {
             ("Cache-Control", "no-store"),
             ("Referrer-Policy", "no-referrer"),
         ])
-        headers.add("Set-Cookie", setCookie(flowCookieName, "", path: Path.authorize, maxAge: 0))
+        headers.add("Set-Cookie", setCookie(flowCookieName, "", path: "/", maxAge: 0))
         return OAuthHTTPResponse(status: 303, headers: headers)
     }
 
@@ -473,7 +486,7 @@ extension OAuthAuthorizationServer {
     ) -> OAuthHTTPResponse {
         var response = html(status, .error(.init(title: title, message: message)), request, flow: nil, redirectURI: nil)
         if clearFlow {
-            response.headers.add("Set-Cookie", setCookie(flowCookieName, "", path: Path.authorize, maxAge: 0))
+            response.headers.add("Set-Cookie", setCookie(flowCookieName, "", path: "/", maxAge: 0))
         }
         return response
     }
@@ -505,7 +518,7 @@ extension OAuthAuthorizationServer {
         ])
         if let flow, let sealed = try? flows.seal(flow) {
             headers.add("Set-Cookie", setCookie(
-                flowCookieName, sealed, path: Path.authorize,
+                flowCookieName, sealed, path: "/",
                 maxAge: max(1, Int(flow.expiresAt.timeIntervalSince(clock.now())))
             ))
         }

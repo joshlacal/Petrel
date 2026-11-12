@@ -101,7 +101,9 @@ public protocol OAuthSessionStore: Sendable {
 
     /// Atomically revokes every session of the account, including a session
     /// whose authorization code has been issued but not yet redeemed (so that
-    /// code can no longer be exchanged). Idempotent.
+    /// code can no longer be exchanged), and forgets the account on every
+    /// device that remembered it, so no browser can select it again without
+    /// signing in. Idempotent.
     func revokeSessions(subject: String, now: Date) async throws
 
     /// The account's active sessions, for a "connected apps" page. A session
@@ -144,6 +146,10 @@ public protocol OAuthDeviceSessionStore: Sendable {
     func rememberDeviceAccount(_ account: OAuthDeviceAccount, deviceDigest: Data, now: Date) async throws
     /// Signs an account out of the device.
     func forgetDeviceAccount(subject: String, deviceDigest: Data, now: Date) async throws
+    /// Atomically moves every account remembered under `old` to `new` and
+    /// forgets `old`, for the device-identifier rotation at each sign-in.
+    /// An account remembered under both keeps the later sign-in.
+    func moveDeviceAccounts(from old: Data, to new: Data, now: Date) async throws
 }
 
 /// The cache of resolved Lexicon documents used for `include:` scopes.
