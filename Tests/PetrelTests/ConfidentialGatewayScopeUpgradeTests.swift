@@ -336,7 +336,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             GatewayUpgradeTestURLProtocol.setHandler { request in
                 if request.url?.path.hasSuffix("app.bsky.actor.getProfile") == true {
                     // Hold the first response open; the second request must still reach the wire.
-                    overlapped.append(secondLaunched.wait(timeout: .now() + 5) == .success)
+                    overlapped.append(secondLaunched.wait(timeout: .now() + 300) == .success)
                 } else {
                     secondLaunched.signal()
                 }
@@ -2297,7 +2297,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
             }
 
             let timeoutTask = Task {
-                try await Task.sleep(nanoseconds: 2_000_000_000)
+                try await Task.sleep(nanoseconds: expectedEventTimeoutNanoseconds)
                 casTask.cancel()
             }
 

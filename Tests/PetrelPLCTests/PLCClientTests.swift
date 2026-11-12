@@ -608,7 +608,7 @@ final class PLCClientTests: XCTestCase {
         MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
+        let transport = try stubbedURLSessionTransport(configuration: configuration)
 
         var streamContinuation: AsyncStream<Data>.Continuation?
         let stream = AsyncStream<Data> { continuation in
@@ -681,7 +681,7 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportSingleCallbackExceedingLimitRejectsWithoutBuffering() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
+        let transport = try stubbedURLSessionTransport(configuration: configuration)
 
         MockPLCHTTPURLProtocol.handler = { request in
             let response = HTTPURLResponse(
@@ -730,7 +730,7 @@ final class PLCClientTests: XCTestCase {
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
+        let transport = try stubbedURLSessionTransport(configuration: configuration)
 
         MockPLCHTTPURLProtocol.handler = { request in
             let response = HTTPURLResponse(
@@ -795,7 +795,7 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportSuccessfulRequest() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
+        let transport = try stubbedURLSessionTransport(configuration: configuration)
 
         let testBody = Data("{\"status\":\"ok\"}".utf8)
         MockPLCHTTPURLProtocol.handler = { request in
@@ -833,7 +833,7 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportDisallowsRedirects() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
+        let transport = try stubbedURLSessionTransport(configuration: configuration)
 
         MockPLCHTTPURLProtocol.handler = { request in
             let response = HTTPURLResponse(
@@ -871,7 +871,7 @@ final class PLCClientTests: XCTestCase {
         MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
+        let transport = try stubbedURLSessionTransport(configuration: configuration)
 
         let cancelGate = CancelGate()
 
@@ -922,7 +922,7 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportRejectsContentLengthExceedingBound() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
+        let transport = try stubbedURLSessionTransport(configuration: configuration)
 
         MockPLCHTTPURLProtocol.handler = { request in
             let response = HTTPURLResponse(

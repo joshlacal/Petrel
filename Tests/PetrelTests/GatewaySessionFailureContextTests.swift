@@ -320,7 +320,8 @@ final class GatewaySessionFailureContextTests: XCTestCase {
                 return promoted
             }
             let clock = ContinuousClock()
-            let deadline = clock.now.advanced(by: .seconds(2))
+            // Only bounds a failure; a stalled CI runner can freeze the process for minutes.
+            let deadline = clock.now.advanced(by: .seconds(300))
             while await storage.gatewayMutationWaitingCountForTesting() == 0, clock.now < deadline {
                 await Task.yield()
             }

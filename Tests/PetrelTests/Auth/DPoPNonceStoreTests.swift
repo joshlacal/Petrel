@@ -569,7 +569,7 @@ struct DPoPNonceStoreTests {
             try await gate.waitUntilHeld()
 
             let second = Task { try await core.getOrCreateDPoPMaterial(for: did) }
-            let enteredCoalescedBranch = try await coalescedWaiterReached.wait(timeoutNanoseconds: 2_000_000_000, onTimeout: {
+            let enteredCoalescedBranch = try await coalescedWaiterReached.wait(onTimeout: {
                 gate.release()
             })
             #expect(enteredCoalescedBranch, "Expected second task to enter coalesced-waiter branch before mutation")

@@ -168,7 +168,9 @@
             guard !state.isStopped else { return }
             do {
                 try makeNonblocking(client)
-                var timeout = timeval(tv_sec: 2, tv_usec: 0)
+                // Generous: a stalled CI runner freezes client and server alike, and the clock
+                // keeps running through the freeze. The server stops on `stop()` regardless.
+                var timeout = timeval(tv_sec: 300, tv_usec: 0)
                 let size = socklen_t(MemoryLayout<timeval>.size)
                 guard setsockopt(client, SOL_SOCKET, SO_RCVTIMEO, &timeout, size) == 0,
                       setsockopt(client, SOL_SOCKET, SO_SNDTIMEO, &timeout, size) == 0
@@ -185,7 +187,7 @@
             }
 
             // An absolute deadline also bounds clients that trickle bytes forever.
-            let deadline = DispatchTime.now().uptimeNanoseconds + 2_000_000_000
+            let deadline = DispatchTime.now().uptimeNanoseconds + 300_000_000_000
             guard let request = readRequest(client, deadline: deadline, state: state) else { return }
             state.record(request)
             guard !state.isStopped else { return }

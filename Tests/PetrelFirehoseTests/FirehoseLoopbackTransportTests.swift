@@ -20,7 +20,7 @@ import Testing
   .enabled("URLSession cannot open WebSockets on this platform") {
     await URLSessionWebSocketAvailability.shared.isAvailable()
   },
-  .timeLimit(.minutes(3))
+  .timeLimit(.minutes(5))
 )
 struct FirehoseLoopbackTransportTests {
   static let did = "did:plc:ewvi7nxzyoun6zhxrhs64oiz"

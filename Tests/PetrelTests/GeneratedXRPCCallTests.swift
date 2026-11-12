@@ -710,8 +710,10 @@ final class GeneratedXRPCCallTests: XCTestCase {
     /// A query is safe to repeat; the delay is the one the server asks for.
     func testQueryIsRetriedOnAServerErrorHonouringRetryAfter() async throws {
         XRPCStubURLProtocol.install(status: 503, body: #"{"error":"NotEnoughResources"}"#, headers: ["Retry-After": "0"])
+        let delays = RecordedRetryDelays()
+        NetworkService.retryDelayObserver = { delays.append($0) }
+        defer { NetworkService.retryDelayObserver = nil }
 
-        let started = Date()
         do {
             _ = try await NetworkService(baseURL: baseURL).xrpcQuery("com.example.widget.getThing")
             XCTFail("a 503 response must throw")
@@ -720,8 +722,9 @@ final class GeneratedXRPCCallTests: XCTestCase {
             XCTAssertEqual(error.retryAfter, 0)
         }
         XCTAssertEqual(XRPCStubURLProtocol.requestCount, 3)
-        // Exponential backoff alone would have waited about six seconds.
-        XCTAssertLessThan(Date().timeIntervalSince(started), 2)
+        // Exponential backoff alone would have waited about 2 s, then 4 s. (Read from the
+        // request loop rather than timed, so a stalled CI runner cannot fail it.)
+        XCTAssertEqual(delays.values, [0, 0])
     }
 
     // MARK: - Helpers
@@ -830,5 +833,22 @@ final class XRPCStubURLProtocol: URLProtocol {
             data.append(buffer, count: count)
         }
         return data
+    }
+}
+
+private final class RecordedRetryDelays: @unchecked Sendable {
+    private let lock = NSLock()
+    private var recorded: [Double] = []
+
+    func append(_ delay: Double) {
+        lock.lock()
+        recorded.append(delay)
+        lock.unlock()
+    }
+
+    var values: [Double] {
+        lock.lock()
+        defer { lock.unlock() }
+        return recorded
     }
 }

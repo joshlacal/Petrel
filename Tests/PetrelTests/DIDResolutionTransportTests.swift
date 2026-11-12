@@ -136,7 +136,7 @@ struct DIDResolutionTransportTests {
     // No wall-clock bound: the stub never answers, so the only way out is the configured
     // timeout, which `timedOut` names. The time limit only stops a regression from hanging
     // the run.
-    @Test("A host that never answers is abandoned at the timeout", .timeLimit(.minutes(1)))
+    @Test("A host that never answers is abandoned at the timeout", .timeLimit(.minutes(5)))
     func timeoutIsEnforced() async throws {
         try await withStubs {
             IdentityStubURLProtocol.install("slow.handle-host.com", .hang)

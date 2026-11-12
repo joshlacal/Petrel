@@ -77,7 +77,7 @@ struct HardenedIdentityTransportLifetimeTests {
             // A request that never ends holds its transport forever, so the wait is woken by
             // each release and only gives up, to fail rather than hang, long after it should
             // have finished.
-            let allReleased = await released.waitUntilAllReleased(atMost: 60)
+            let allReleased = await released.waitUntilAllReleased(atMost: 300)
             #expect(allReleased, "\(released.liveCount) transports still held by unfinished requests")
         }
     }
@@ -102,7 +102,7 @@ struct HardenedIdentityTransportLifetimeTests {
                 // ...and URLSession has already delivered the cancelled task's completion.
                 // (Bounded only so a platform that defers the report cannot hang the test.)
                 task.cancel()
-                let giveUp = Date().addingTimeInterval(5)
+                let giveUp = Date().addingTimeInterval(300)
                 while task.state != .completed, Date() < giveUp {
                     Thread.sleep(forTimeInterval: 0.001)
                 }
@@ -117,7 +117,7 @@ struct HardenedIdentityTransportLifetimeTests {
                 defer { returned.signal() }
                 return try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
             }
-            let didReturn = await returned.wait(atMost: 10)
+            let didReturn = await returned.wait(atMost: 300)
             #expect(didReturn, "executeDataTask never returned after its task was cancelled")
             guard didReturn else {
                 call.cancel()

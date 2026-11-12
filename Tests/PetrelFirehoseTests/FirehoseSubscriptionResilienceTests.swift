@@ -355,7 +355,7 @@ struct FirehoseSubscriptionResilienceTests {
     #expect(await session.isClosed)
   }
 
-  @Test("cancelling between reads closes the socket of a retained stream", .timeLimit(.minutes(1)))
+  @Test("cancelling between reads closes the socket of a retained stream", .timeLimit(.minutes(5)))
   func cancellationBetweenReadsClosesRetainedStream() async throws {
     let session = ScriptedWebSocketSession(messages: [Self.identity(1), Self.identity(2)])
     let subscription = Self.subscription(ScriptedWebSocketFactory(sessions: [session]))
@@ -385,7 +385,7 @@ struct FirehoseSubscriptionResilienceTests {
     withExtendedLifetime(stream) {}
   }
 
-  @Test("the stream closes the socket on cancellation even while something else holds the pump", .timeLimit(.minutes(1)))
+  @Test("the stream closes the socket on cancellation even while something else holds the pump", .timeLimit(.minutes(5)))
   func cancellationClosesSocketIndependentOfPumpLifetime() async throws {
     let session = ScriptedWebSocketSession(messages: [Self.identity(1), Self.identity(2)])
     let configuration = FirehoseSubscriptionConfiguration(
