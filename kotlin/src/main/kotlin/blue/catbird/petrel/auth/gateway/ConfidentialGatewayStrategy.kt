@@ -17,7 +17,7 @@ import io.ktor.http.Url
 import io.ktor.http.URLBuilder
 import io.ktor.http.URLProtocol
 import io.ktor.serialization.kotlinx.json.json
-import io.ktor.utils.io.readRemaining
+import io.ktor.utils.io.readBuffer
 import java.net.SocketTimeoutException
 import java.net.URI
 import java.security.SecureRandom
@@ -743,7 +743,7 @@ class ConfidentialGatewayStrategy(
                 if (declaredLength != null && declaredLength > maxBytes) {
                     throw IllegalArgumentException("Gateway response exceeded size limit")
                 }
-                val packet = response.bodyAsChannel().readRemaining(maxBytes + 1)
+                val packet = response.bodyAsChannel().readBuffer(maxBytes + 1)
                 val bytes = packet.readByteArray()
                 if (bytes.size > maxBytes) {
                     throw IllegalArgumentException("Gateway response exceeded size limit")

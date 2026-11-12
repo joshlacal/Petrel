@@ -3,11 +3,14 @@ pluginManagement {
         gradlePluginPortal()
         mavenCentral()
     }
+    // Used only when this project builds on its own. The Catbird Android app
+    // includes it as a subproject, and its own Kotlin plugin version applies.
+    val kotlinVersion = "2.4.21"
     plugins {
-        kotlin("jvm") version "2.0.21"
-        kotlin("plugin.serialization") version "2.0.21"
-        kotlin("plugin.allopen") version "2.0.21"
-        id("org.jetbrains.kotlin.plugin.compose") version "2.0.21"
+        kotlin("jvm") version kotlinVersion
+        kotlin("plugin.serialization") version kotlinVersion
+        kotlin("plugin.allopen") version kotlinVersion
+        id("org.jetbrains.kotlin.plugin.compose") version kotlinVersion
     }
 }
 

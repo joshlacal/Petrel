@@ -5,7 +5,7 @@ plugins {
     kotlin("plugin.serialization")
     kotlin("plugin.allopen")
     id("org.jetbrains.kotlin.plugin.compose")
-    id("org.jetbrains.kotlinx.benchmark") version "0.4.13"
+    id("org.jetbrains.kotlinx.benchmark") version "0.5.0"
     `maven-publish`
 }
 
@@ -31,34 +31,44 @@ dependencies {
     implementation(kotlin("stdlib"))
 
     // Compose runtime (required for Compose compiler stability metadata)
-    implementation("androidx.compose.runtime:runtime:1.8.3")
+    implementation("androidx.compose.runtime:runtime:1.12.1")
 
     // Kotlin Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.11.0")
 
-    // Kotlin Serialization for JSON and CBOR (DAG-CBOR WebSocket frames)
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
-    implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.7.3")
+    // Kotlin Serialization for JSON and CBOR (DAG-CBOR WebSocket frames).
+    // 1.12+ is built with Kotlin 2.4, which the Catbird Android app's Kotlin
+    // 2.2 compiler cannot read; keep this at the newest 2.3-built release.
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.11.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-serialization-cbor:1.11.0")
 
     // Ktor client for HTTP networking
-    implementation("io.ktor:ktor-client-core:3.0.2")
-    implementation("io.ktor:ktor-client-cio:3.0.2") // CIO engine
-    implementation("io.ktor:ktor-client-content-negotiation:3.0.2")
-    implementation("io.ktor:ktor-serialization-kotlinx-json:3.0.2")
-    implementation("io.ktor:ktor-client-logging:3.0.2")
-    implementation("io.ktor:ktor-client-websockets:3.0.2")
+    implementation("io.ktor:ktor-client-core:3.6.1")
+    implementation("io.ktor:ktor-client-cio:3.6.1") // CIO engine
+    implementation("io.ktor:ktor-client-content-negotiation:3.6.1")
+    implementation("io.ktor:ktor-serialization-kotlinx-json:3.6.1")
+    implementation("io.ktor:ktor-client-logging:3.6.1")
+    implementation("io.ktor:ktor-client-websockets:3.6.1")
 
     // Testing
     testImplementation(kotlin("test"))
-    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
-    testImplementation("io.ktor:ktor-client-mock:3.0.2")
+    testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.11.0")
+    testImplementation("io.ktor:ktor-client-mock:3.6.1")
 
     // Benchmark runtime
-    "benchmarkImplementation"("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.4.13")
+    "benchmarkImplementation"("org.jetbrains.kotlinx:kotlinx-benchmark-runtime:0.5.0")
 }
 
 kotlin {
     jvmToolchain(17)
+    // The Catbird Android app includes this project as a source subproject and
+    // compiles it with its own Kotlin 2.2 plugin. Holding the language and API
+    // level at 2.2 makes this standalone build reject anything that compiler
+    // would not accept.
+    compilerOptions {
+        languageVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+        apiVersion.set(org.jetbrains.kotlin.gradle.dsl.KotlinVersion.KOTLIN_2_2)
+    }
     // Allows benchmarks to access all internal models, functions, and serializers from main
     target.compilations.getByName("benchmark")
         .associateWith(target.compilations.getByName("main"))
