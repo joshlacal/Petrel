@@ -72,14 +72,17 @@ let package = Package(
         .package(url: "https://github.com/valpackett/SwiftCBOR.git", .upToNextMinor(from: "0.6.0")),
         .package(
             url: "https://github.com/apple/swift-async-dns-resolver",
-            .upToNextMinor(from: "0.7.0")
+            .upToNextMinor(from: "0.8.1")
         ),
-        .package(url: "https://github.com/apple/swift-crypto.git", .upToNextMajor(from: "3.0.0")),
-        .package(url: "https://github.com/apple/swift-log.git", .upToNextMajor(from: "1.0.0")),
-        .package(url: "https://github.com/apple/swift-docc-plugin", from: "1.4.5"),
+        // 3.15.1 is the lowest release tested and the version a sibling consumer
+        // (Swan) pins exactly. 5.x declares swift-tools-version 6.2, so the
+        // committed pin is 4.5.2, the newest release the 6.1 floor resolves.
+        .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1" ..< "6.0.0"),
+        .package(url: "https://github.com/apple/swift-log.git", .upToNextMajor(from: "1.15.1")),
+        .package(url: "https://github.com/swiftlang/swift-docc-plugin", from: "1.5.0"),
         // 0.x: every minor may change API, so the range stops at the next
         // minor. Only Sources/PetrelCrypto/K256Backend.swift uses the module.
-        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1.git", .upToNextMinor(from: "0.24.0")),
+        .package(url: "https://github.com/21-DOT-DEV/swift-secp256k1.git", .upToNextMinor(from: "0.25.0")),
         // Pinned to 1.5.7: release tag ships Package.swift with the `libzstd` product.
         .package(url: "https://github.com/facebook/zstd.git", .upToNextMinor(from: "1.5.7")),
     ],

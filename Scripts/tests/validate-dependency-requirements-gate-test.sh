@@ -255,29 +255,29 @@ unbounded_path.write_text(json.dumps(unbounded), encoding="utf-8")
 # The reviewed secp256k1 wrapper must stay inside its bounded range and its
 # reviewed source, and neither an exact pin nor the package it replaced may
 # bypass the generic pre-1.0 review gate.
-k256_range = {"lowerBound": "0.24.0", "upperBound": "0.25.0"}
+k256_range = {"lowerBound": "0.25.0", "upperBound": "0.26.0"}
 k256_not_one_range = {
-    "exact-pin": {"exact": ["0.24.0"]},
+    "exact-pin": {"exact": ["0.25.0"]},
     "branch": {"branch": ["main"]},
     "revision": {"revision": ["bcd6dd8e615ce243eab7097f213c8c4b39305a2e"]},
     "mixed-requirements": {"range": [k256_range], "branch": ["main"]},
     "two-ranges": {
-        "range": [k256_range, {"lowerBound": "0.25.0", "upperBound": "0.26.0"}]
+        "range": [k256_range, {"lowerBound": "0.26.0", "upperBound": "0.27.0"}]
     },
     "empty-ranges": {"range": []},
 }
 k256_wrong_range = {
     "next-minor": {
-        "range": [{"lowerBound": "0.24.0", "upperBound": "0.26.0"}]
+        "range": [{"lowerBound": "0.25.0", "upperBound": "0.27.0"}]
     },
     "older-lower-bound": {
-        "range": [{"lowerBound": "0.23.2", "upperBound": "0.25.0"}]
+        "range": [{"lowerBound": "0.24.0", "upperBound": "0.26.0"}]
     },
     "up-to-next-major": {
-        "range": [{"lowerBound": "0.24.0", "upperBound": "1.0.0"}]
+        "range": [{"lowerBound": "0.25.0", "upperBound": "1.0.0"}]
     },
     "prerelease-lower-bound": {
-        "range": [{"lowerBound": "0.24.0-alpha.1", "upperBound": "0.25.0"}]
+        "range": [{"lowerBound": "0.25.0-alpha.1", "upperBound": "0.26.0"}]
     },
 }
 for group, requirements in (
@@ -331,7 +331,7 @@ unknown_exact["identity"] = "unreviewed-exact-zero"
 unknown_exact["location"] = {
     "remote": [{"urlString": "https://example.invalid/unreviewed-exact-zero.git"}]
 }
-unknown_exact["requirement"] = {"exact": ["0.24.0"]}
+unknown_exact["requirement"] = {"exact": ["0.25.0"]}
 extra_exact["dependencies"].append({"sourceControl": [unknown_exact]})
 (exact_policy_dir / "unreviewed-exact.json").write_text(
     json.dumps(extra_exact), encoding="utf-8"
@@ -397,7 +397,7 @@ for label in next-minor older-lower-bound up-to-next-major \
   expect_semantic_failure \
     "k256-wrong-range-$label" \
     "$EXACT_POLICY_DIR/wrong-range-$label.json" \
-    "swift-secp256k1 requirement must be 0.24.0..<0.25.0"
+    "swift-secp256k1 requirement must be 0.25.0..<0.26.0"
 done
 expect_semantic_failure \
   k256-wrong-url \
