@@ -239,18 +239,28 @@ struct DIDResolutionHandleTests {
         #expect(try await resolver.resolveHandle(handle).didString() == alice)
     }
 
-    @Test("A DNS query that never answers is abandoned at the timeout and HTTPS answers")
+    // No wall-clock bound: under CI load a fixed elapsed limit flakes. The DNS query never
+    // answers on its own, so resolution can only return once the deadline abandons it; the
+    // assertion is that it was cancelled and HTTPS supplied the answer. The time limit only
+    // stops a regression from hanging the run.
+    @Test(
+        "A DNS query that never answers is abandoned at the timeout and HTTPS answers",
+        .timeLimit(.minutes(1))
+    )
     func dnsTimeoutDoesNotBlockResolution() async throws {
         let (http, dns) = fixtures()
-        dns.delay("_atproto.\(handle)", seconds: 30)
+        dns.hang("_atproto.\(handle)")
         http.on("\(handle)/.well-known/atproto-did", body: alice)
         let resolver = IdentityResolver.forTesting(http: http, dns: dns, options: .init(timeout: 0.2))
 
-        let started = Date()
         let did = try await resolver.resolveHandle(handle)
 
         #expect(did.didString() == alice)
-        #expect(Date().timeIntervalSince(started) < 10)
+        #expect(dns.queries == ["_atproto.\(handle)"])
+        #expect(http.requestCount(containing: "\(handle)/.well-known/atproto-did") == 1)
+        // The deadline cancels the abandoned query rather than leaving it running.
+        try await dns.waitUntilCancelled("_atproto.\(handle)")
+        #expect(dns.cancelledQueries == ["_atproto.\(handle)"])
     }
 
     // MARK: Restrictions that apply before any request
