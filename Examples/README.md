@@ -6,7 +6,7 @@ This directory contains executable example scripts and projects demonstrating ho
 
 | Example | Type | Description | Authentication |
 |---|---|---|---|
-| `FirehoseDemo.swift` | Standalone script | Connects to the Bluesky firehose WebSocket and decodes event frames in real time | None required |
+| `FirehoseDemo.swift` | Package executable (`swift run FirehoseDemo`) | Streams the relay firehose, a labeler, or Jetstream with `PetrelFirehose` and `PetrelJetstream` | None required |
 | `SimplePostCLI.swift` | Standalone script | Posts to Bluesky using direct HTTPS XRPC requests via Foundation | App password |
 | `PostCLIDemo/` | Swift Package CLI | Interactive CLI that uses the Petrel SDK to authenticate, post messages, and inspect profiles | App password |
 
@@ -17,15 +17,18 @@ This directory contains executable example scripts and projects demonstrating ho
 
 ## Run the firehose monitor
 
-`FirehoseDemo.swift` subscribes to the unauthenticated firehose stream (`com.atproto.sync.subscribeRepos`) and parses incoming commit events.
+`FirehoseDemo.swift` is an executable target of the Petrel package. It uses the public `PetrelFirehose` and `PetrelJetstream` APIs and needs no account.
 
-To run the script:
+From the package root:
 
 ```bash
-swift Examples/FirehoseDemo.swift
+swift run FirehoseDemo firehose                # relay firehose (com.atproto.sync.subscribeRepos), bsky.network
+swift run FirehoseDemo labels                  # labeler stream (com.atproto.label.subscribeLabels), mod.bsky.app
+swift run FirehoseDemo jetstream               # Jetstream v2, posts only
+swift run FirehoseDemo jetstream wss://jetstream2.us-east.bsky.network/subscribe   # legacy Jetstream API
 ```
 
-To stop the stream, press `Ctrl+C`.
+Each mode takes an optional service URL and `--count N` (default 25 events, then it exits).
 
 ## Run the standalone poster
 

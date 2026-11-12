@@ -50,6 +50,51 @@ enum JetstreamWire {
     }
   }
 
+  /// Decoder for the legacy `/subscribe` API, whose events are bare objects:
+  /// `{"did":…,"time_us":…,"kind":"commit","commit":{…}}`.
+  ///
+  /// That API has no sequence numbers; its cursor is `time_us`. Events are therefore surfaced
+  /// with `seq == timeUS`, so cursor handling is the same for both dialects.
+  static func decodeLegacyFrame(_ data: Data) throws -> JetstreamWireFrame {
+    let root: [String: Any]
+    do {
+      guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+        throw JetstreamWireError.malformedFrame("frame is not a JSON object")
+      }
+      root = obj
+    } catch let error as JetstreamWireError {
+      throw error
+    } catch {
+      throw JetstreamWireError.malformedFrame("invalid JSON: \(error)")
+    }
+
+    guard let did = root["did"] as? String,
+          let timeUS = (root["time_us"] as? NSNumber)?.int64Value,
+          let kind = root["kind"] as? String
+    else { return .skipped }
+
+    switch kind {
+    case "commit":
+      guard let commit = root["commit"] as? [String: Any],
+            let event = decodeCommitBody(commit, seq: timeUS, did: did, timeUS: timeUS)
+      else { return .skipped }
+      return .message(.commit(event))
+    case "identity":
+      return .message(.identity(JetstreamIdentityEvent(
+        seq: timeUS, did: did, timeUS: timeUS,
+        identity: decodeDetail(ComAtprotoSyncSubscribeRepos.Identity.self, root["identity"])
+      )))
+    case "account":
+      return .message(.account(JetstreamAccountEvent(
+        seq: timeUS, did: did, timeUS: timeUS,
+        account: decodeDetail(ComAtprotoSyncSubscribeRepos.Account.self, root["account"])
+      )))
+    default:
+      // Unknown kind: additive change; skip.
+      return .skipped
+    }
+  }
+
   private static func decodePayload(_ payload: [String: Any]) -> JetstreamWireFrame {
     guard let type = payload["$type"] as? String, type.hasPrefix(payloadTypePrefix) else {
       return .skipped
@@ -85,8 +130,14 @@ enum JetstreamWire {
   }
 
   private static func decodeCommit(_ payload: [String: Any]) -> JetstreamCommitEvent? {
-    guard let (seq, did, timeUS) = envelope(payload),
-          let rev = payload["rev"] as? String,
+    guard let (seq, did, timeUS) = envelope(payload) else { return nil }
+    return decodeCommitBody(payload, seq: seq, did: did, timeUS: timeUS)
+  }
+
+  private static func decodeCommitBody(
+    _ payload: [String: Any], seq: Int64, did: String, timeUS: Int64
+  ) -> JetstreamCommitEvent? {
+    guard let rev = payload["rev"] as? String,
           let operationRaw = payload["operation"] as? String,
           let operation = RelayRepoAction(rawValue: operationRaw),
           let collection = payload["collection"] as? String,

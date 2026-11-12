@@ -129,7 +129,7 @@ final class SubscriptionTests: XCTestCase {
     XCTAssertEqual(comp2.queryItems?.first(where: { $0.name == "cursor" })?.value, "101")
   }
 
-  func testErrorFrameYieldsStreamErrorAndReconnectsWithUpdatedCursor() async throws {
+  func testErrorFrameYieldsStreamErrorAndReconnectsWithUpdatedCursorWhenOptedIn() async throws {
     let session1 = FakeWebSocketSession(
       messages: [
         commitFrameJSON(seq: 50),
@@ -147,13 +147,14 @@ final class SubscriptionTests: XCTestCase {
     let factory = FakeWebSocketFactory(sessions: [session1, session2])
     let transport = FakeHTTPTransport()
 
-    let config = JetstreamSubscriptionConfiguration(
+    var config = JetstreamSubscriptionConfiguration(
       url: testURL,
       cursor: 50,
       backoff: fastBackoff,
       sessionFactory: factory,
       httpTransport: transport
     )
+    config.reconnectsOnConsumerTooSlow = true
 
     let subscription = JetstreamSubscription(configuration: config)
     var receivedEvents: [JetstreamSubscriptionEvent] = []
@@ -312,7 +313,8 @@ final class SubscriptionTests: XCTestCase {
       }
       XCTFail("Stream did not throw")
     } catch let error as JetstreamSubscriptionError {
-      XCTAssertEqual(error, .connectionRejected(status: 400, error: nil, message: nil))
+      // A plain-text body (what the legacy API answers with) is kept as the message.
+      XCTAssertEqual(error, .connectionRejected(status: 400, error: nil, message: "Bad Request"))
     }
   }
 
@@ -321,6 +323,7 @@ final class SubscriptionTests: XCTestCase {
     let session = FakeWebSocketSession(messages: [
       commitFrameJSON(seq: 150),
       commitFrameJSON(seq: 151),
+      commitFrameJSON(seq: 152),
     ])
     let factory = FakeWebSocketFactory(sessions: [session])
     let transport = FakeHTTPTransport()
@@ -339,12 +342,14 @@ final class SubscriptionTests: XCTestCase {
 
     for try await _ in subscription.events() {
       count += 1
-      if count == 2 {
+      if count == 3 {
         break
       }
     }
 
-    XCTAssertEqual(count, 2)
+    XCTAssertEqual(count, 3)
+    // 152 was handed out but the consumer stopped before coming back for more, so it does
+    // not count as processed: the saved cursor is the last event known to be handled.
     let finalCursor = await storage.loadCursor()
     XCTAssertEqual(finalCursor, 151)
 

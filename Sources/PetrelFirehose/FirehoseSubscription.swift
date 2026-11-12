@@ -4,6 +4,11 @@ import Foundation
 #endif
 import Petrel
 
+/// Durable storage for the cursor of one event stream.
+///
+/// The cursor is the sequence number of the last event the application has finished
+/// processing. A subscription loads it before every connection attempt and sends it as the
+/// `cursor` query parameter.
 public protocol FirehoseCursorStorage: Sendable {
   func loadCursor() async throws -> Int64?
   func saveCursor(_ cursor: Int64) async throws
@@ -12,6 +17,8 @@ public protocol FirehoseCursorStorage: Sendable {
 public actor InMemoryFirehoseCursorStorage: FirehoseCursorStorage {
   private var cursor: Int64?
 
+  /// - Parameter initialCursor: `nil` starts at the live tip; `0` asks the server for the
+  ///   oldest event it still has.
   public init(initialCursor: Int64? = nil) {
     self.cursor = initialCursor
   }
@@ -29,6 +36,10 @@ public struct FirehoseBackoffConfiguration: Sendable, Equatable {
   public var initialDelay: TimeInterval
   public var maxDelay: TimeInterval
   public var multiplier: Double
+  /// Random spread applied to each delay, as a fraction of it (`0.25` waits between 75% and
+  /// 125% of the computed delay). Keeps a fleet of consumers from reconnecting in lockstep
+  /// after a relay restart. `0` disables jitter.
+  public var jitter: Double = 0.25
 
   public init(
     initialDelay: TimeInterval = 0.5,
@@ -40,130 +51,75 @@ public struct FirehoseBackoffConfiguration: Sendable, Equatable {
     self.multiplier = multiplier
   }
 
+  /// The deterministic exponential schedule, before jitter.
   public func nextDelay(after currentDelay: TimeInterval?) -> TimeInterval {
     guard let currentDelay else { return initialDelay }
     return min(maxDelay, currentDelay * multiplier)
   }
+
+  /// Applies ``jitter`` to a delay produced by ``nextDelay(after:)``.
+  public func jittered(_ delay: TimeInterval) -> TimeInterval {
+    guard jitter > 0, delay > 0 else { return delay }
+    let spread = min(jitter, 1)
+    return delay * Double.random(in: (1 - spread) ... (1 + spread))
+  }
 }
 
 public enum FirehoseSubscriptionEvent: Sendable, Equatable {
+  /// A decoded `#commit`, `#sync`, `#identity`, `#account` or `#info` message.
   case event(RelayEvent)
+  /// The stream skipped from `expected - 1` to `received`. Sequence numbers may legally contain
+  /// gaps, so this is informational: the event with sequence `received` follows, and the
+  /// stream continues. A consumer that needs every event can treat it as a prompt to resync.
   case sequenceGap(expected: Int64, received: Int64)
-}
-
-public protocol FirehoseWebSocketSession: Sendable {
-  func receiveMessage() async throws -> Data
-  func close() async
-}
-
-public protocol FirehoseWebSocketSessionFactory: Sendable {
-  func makeSession(url: URL) async throws -> any FirehoseWebSocketSession
-}
-
-public final class URLSessionFirehoseWebSocketSession: FirehoseWebSocketSession, @unchecked Sendable {
-  private let task: URLSessionWebSocketTask
-  private let delegate: HardenedURLSessionDelegate?
-
-  public init(task: URLSessionWebSocketTask) {
-    self.task = task
-    self.delegate = nil
-    self.task.resume()
-  }
-
-  package init(task: URLSessionWebSocketTask, delegate: HardenedURLSessionDelegate?) {
-    self.task = task
-    self.delegate = delegate
-    self.task.resume()
-  }
-
-  public func receiveMessage() async throws -> Data {
-    do {
-      let message = try await task.receive()
-      switch message {
-      case let .data(data):
-        return data
-      case .string:
-        throw FirehoseSubscriptionError.unsupportedMessageFormat
-      @unknown default:
-        throw FirehoseSubscriptionError.unsupportedMessageFormat
-      }
-    } catch {
-      if let delegate {
-        if delegate.contextManager.isSecurityViolation(for: task) {
-          delegate.contextManager.pruneCompletedTask(task)
-          throw NetworkError.securityViolation
-        }
-        if delegate.contextManager.isLimitExceeded(for: task) {
-          delegate.contextManager.pruneCompletedTask(task)
-          throw NetworkError.responseLimitExceeded("Response limit exceeded")
-        }
-        delegate.contextManager.pruneCompletedTask(task)
-      }
-      throw error
-    }
-  }
-
-  public func close() async {
-    task.cancel(with: .normalClosure, reason: nil)
-  }
-}
-
-/// URLSession is internally thread-safe/reference-safe, but Swift FoundationNetworking 6.1 lacks Sendable annotation on Linux.
-public struct URLSessionFirehoseWebSocketFactory: FirehoseWebSocketSessionFactory, @unchecked Sendable {
-  private let session: URLSession
-  private let delegate: HardenedURLSessionDelegate?
-
-  public init() {
-    let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
-    let config = URLSessionConfiguration.ephemeral
-    self.delegate = delegate
-    self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-  }
-
-  public init(session: URLSession) {
-    self.session = session
-    self.delegate = session.delegate as? HardenedURLSessionDelegate
-  }
-
-  public init(limits: NetworkResponseLimits) {
-    let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: limits)
-    let config = URLSessionConfiguration.ephemeral
-    self.delegate = delegate
-    self.session = URLSession(configuration: config, delegate: delegate, delegateQueue: nil)
-  }
-
-  public func makeSession(url: URL) async throws -> any FirehoseWebSocketSession {
-    if !(try await NetworkService.validateURL(url)) {
-      throw NetworkError.securityViolation
-    }
-    let task = session.webSocketTask(with: url)
-    let host = url.host?.lowercased() ?? ""
-    let isLocal = host == "localhost" || host == "127.0.0.1" || host == "::1"
-    if let delegate {
-      let addresses = try await NetworkService.resolveApprovedAddresses(host: host, isLocal: isLocal)
-      delegate.contextManager.setApprovedAddresses(addresses, for: task)
-    }
-    return URLSessionFirehoseWebSocketSession(task: task, delegate: delegate)
-  }
+  /// A frame that was skipped: unknown `op`, unknown `t` (including the deprecated
+  /// `#handle`, `#migrate` and `#tombstone`), or a payload that did not match its schema.
+  case ignoredFrame(EventStreamIgnoredFrame)
 }
 
 public enum FirehoseSubscriptionError: Error, Sendable, Equatable {
+  /// A WebSocket text message arrived on a binary event stream.
   case unsupportedMessageFormat
   case connectionClosed
+  /// The server sent the same sequence number twice within one connection.
   case duplicateSequence(Int64)
+  /// A sequence number lower than one already seen, or an acknowledgement that would move the
+  /// cursor backwards.
   case cursorRegression(expected: Int64, received: Int64)
+  /// No longer produced: the stream applies backpressure instead of overflowing.
   case resynchronizationRequired
   case storageFailure
+  /// No longer produced: acknowledgements may skip sequence numbers.
   case unacknowledgedSequenceGap
+  /// The server answered the WebSocket upgrade with an HTTP error. `429` and `5xx` other than
+  /// `501` are retried with backoff (honouring `Retry-After`); anything else ends the stream.
+  case upgradeRejected(status: Int, retryAfter: TimeInterval?)
+  /// The platform's `URLSession` cannot open WebSockets (Linux with a libcurl built without
+  /// WebSocket support). Supply a ``FirehoseWebSocketSessionFactory`` of your own.
+  case webSocketTransportUnavailable(String)
+  /// The server sent a message larger than the transport's `maximumMessageSize`.
+  case frameTooLarge
+  /// The transport cannot send messages to the server.
+  case sendingUnsupported
 }
 
 public struct FirehoseSubscriptionConfiguration: Sendable {
+  /// Full subscription URL, for example
+  /// `wss://bsky.network/xrpc/com.atproto.sync.subscribeRepos`.
   public var url: URL
   public var cursorStorage: any FirehoseCursorStorage
   public var backoff: FirehoseBackoffConfiguration
   public var sessionFactory: any FirehoseWebSocketSessionFactory
+  /// Unused. The stream reads from the socket only when the consumer asks for the next
+  /// element, so there is no buffer to bound. Kept for source compatibility.
   public var bufferLimit: Int
+  /// When true, the cursor is saved automatically after the consumer has taken an event and
+  /// comes back for the next one. When false, call
+  /// ``FirehoseSubscription/acknowledge(sequence:)``.
   public var autoAcknowledge: Bool
+  /// Whether to reconnect from the cursor after a `ConsumerTooSlow` error frame instead of
+  /// ending the stream with `EventStreamError.consumerTooSlow`.
+  public var reconnectsOnConsumerTooSlow = false
 
   public init(
     url: URL,
@@ -180,51 +136,32 @@ public struct FirehoseSubscriptionConfiguration: Sendable {
     self.bufferLimit = bufferLimit
     self.autoAcknowledge = autoAcknowledge
   }
-}
 
-private actor FirehoseSubscriptionCoordinator {
-  private let storage: any FirehoseCursorStorage
-  private var lastPersistedCursor: Int64?
-
-  init(storage: any FirehoseCursorStorage) {
-    self.storage = storage
-  }
-
-  func initializeCursor(_ cursor: Int64?) {
-    if lastPersistedCursor == nil {
-      lastPersistedCursor = cursor
-    }
-  }
-
-  func acknowledge(sequence: Int64) async throws {
-    if let last = lastPersistedCursor {
-      guard sequence > last else {
-        throw FirehoseSubscriptionError.cursorRegression(expected: last + 1, received: sequence)
-      }
-      guard sequence == last + 1 else {
-        throw FirehoseSubscriptionError.unacknowledgedSequenceGap
-      }
-    }
-    do {
-      try await storage.saveCursor(sequence)
-      lastPersistedCursor = sequence
-    } catch {
-      throw FirehoseSubscriptionError.storageFailure
-    }
-  }
-
-  func currentCursor() -> Int64? {
-    lastPersistedCursor
+  var pumpConfiguration: EventStreamPumpConfiguration {
+    .init(
+      url: url,
+      cursorStorage: cursorStorage,
+      backoff: backoff,
+      sessionFactory: sessionFactory,
+      autoAcknowledge: autoAcknowledge,
+      reconnectsOnConsumerTooSlow: reconnectsOnConsumerTooSlow
+    )
   }
 }
 
+/// A resilient consumer of `com.atproto.sync.subscribeRepos` (the firehose of a relay or PDS).
+///
+/// The stream reconnects with exponential backoff and resumes from the cursor. It ends by
+/// throwing when continuing would be wrong: an error frame such as `FutureCursor`
+/// (`EventStreamError`), invalid framing or CBOR (``RelayVerifierError``), a
+/// duplicate or decreasing sequence number, or an upgrade response that must not be retried.
 public final class FirehoseSubscription: Sendable {
   public let configuration: FirehoseSubscriptionConfiguration
-  private let coordinator: FirehoseSubscriptionCoordinator
+  private let coordinator: EventStreamCursorCoordinator
 
   public init(configuration: FirehoseSubscriptionConfiguration) {
     self.configuration = configuration
-    self.coordinator = FirehoseSubscriptionCoordinator(storage: configuration.cursorStorage)
+    self.coordinator = EventStreamCursorCoordinator(storage: configuration.cursorStorage)
   }
 
   public convenience init(
@@ -247,6 +184,8 @@ public final class FirehoseSubscription: Sendable {
     )
   }
 
+  /// Persists `sequence` as the cursor. It must be greater than the stored cursor; it does not
+  /// have to be the next integer, because sequence numbers may contain gaps.
   public func acknowledge(sequence: Int64) async throws {
     try await coordinator.acknowledge(sequence: sequence)
   }
@@ -260,150 +199,45 @@ public final class FirehoseSubscription: Sendable {
     await coordinator.currentCursor()
   }
 
+  /// Connects and returns the events as an `AsyncSequence`.
+  ///
+  /// The stream is pull-based: a frame is read from the socket only when the consumer asks for
+  /// the next element, so a slow consumer slows the connection instead of overflowing a
+  /// buffer. Cancelling the consuming task, or dropping the stream, closes the socket.
   public func events() -> AsyncThrowingStream<FirehoseSubscriptionEvent, any Error> {
-    AsyncThrowingStream(bufferingPolicy: .bufferingOldest(configuration.bufferLimit)) { continuation in
-      let runner = FirehoseSubscriptionRunner(configuration: configuration, coordinator: coordinator)
-      let task = Task {
-        await runner.run(continuation: continuation)
-      }
-      continuation.onTermination = { _ in
-        task.cancel()
-        Task {
-          await runner.stop()
-        }
-      }
+    let pump = EventStreamPump<FirehoseSubscriptionEvent>(
+      configuration: configuration.pumpConfiguration,
+      coordinator: coordinator,
+      decode: Self.step(for:),
+      makeGap: { .sequenceGap(expected: $0, received: $1) }
+    )
+    return pump.makeStream()
+  }
+
+  static func step(for data: Data) throws -> EventStreamStep<FirehoseSubscriptionEvent> {
+    // Framing and CBOR failures are hard errors that drop the connection.
+    let parsed = try RelayFrameDecoder.parse(data)
+    let frame: RelayFrame
+    do {
+      frame = try RelayFrameDecoder.decode(parsed, mode: .lenient)
+    } catch let error as RelayVerifierError where parsed.operation == 1 {
+      // One event that does not match its schema must not stall the stream: reconnecting at
+      // the same cursor would replay it forever. Report it and move on.
+      let ignored = EventStreamIgnoredFrame(
+        operation: parsed.operation,
+        type: parsed.type,
+        sequence: parsed.sequence,
+        reason: .undecodablePayload(error.rawValue)
+      )
+      return .deliver(.ignoredFrame(ignored), sequence: parsed.sequence)
     }
-  }
-}
-
-private actor FirehoseSubscriptionRunner {
-  private let configuration: FirehoseSubscriptionConfiguration
-  private let coordinator: FirehoseSubscriptionCoordinator
-  private var activeSession: (any FirehoseWebSocketSession)?
-
-  init(
-    configuration: FirehoseSubscriptionConfiguration,
-    coordinator: FirehoseSubscriptionCoordinator
-  ) {
-    self.configuration = configuration
-    self.coordinator = coordinator
-  }
-
-  func stop() async {
-    await activeSession?.close()
-    activeSession = nil
-  }
-
-  private func setActiveSession(_ session: (any FirehoseWebSocketSession)?) {
-    self.activeSession = session
-  }
-
-  func run(continuation: AsyncThrowingStream<FirehoseSubscriptionEvent, any Error>.Continuation) async {
-    var currentDelay: TimeInterval?
-    var lastDeliveredSequence: Int64?
-
-    while !Task.isCancelled {
-      let cursor: Int64?
-      do {
-        cursor = try await configuration.cursorStorage.loadCursor()
-      } catch {
-        continuation.finish(throwing: FirehoseSubscriptionError.storageFailure)
-        return
-      }
-
-      await coordinator.initializeCursor(cursor)
-      lastDeliveredSequence = cursor
-      let connectURL = Self.urlWithCursor(configuration.url, cursor: cursor)
-
-      do {
-        let session = try await configuration.sessionFactory.makeSession(url: connectURL)
-        setActiveSession(session)
-
-        while !Task.isCancelled {
-          let data = try await session.receiveMessage()
-          currentDelay = nil
-
-          let event = try RelayFrameDecoder.decode(data)
-          if let seq = event.sequence {
-            try FirehoseFrameLimits.validateSequence(seq)
-            if let last = lastDeliveredSequence {
-              if seq == last {
-                await stop()
-                continuation.finish(throwing: FirehoseSubscriptionError.duplicateSequence(seq))
-                return
-              }
-              if seq < last {
-                await stop()
-                continuation.finish(throwing: FirehoseSubscriptionError.cursorRegression(expected: last + 1, received: seq))
-                return
-              }
-              if seq > last + 1 {
-                let gapResult = continuation.yield(.sequenceGap(expected: last + 1, received: seq))
-                await stop()
-                if case .terminated = gapResult {
-                  return
-                }
-                continuation.finish(throwing: FirehoseSubscriptionError.resynchronizationRequired)
-                return
-              }
-            }
-            lastDeliveredSequence = seq
-            if configuration.autoAcknowledge {
-              try await coordinator.acknowledge(sequence: seq)
-            }
-          }
-
-          let eventResult = continuation.yield(.event(event))
-          switch eventResult {
-          case .enqueued:
-            break
-          case .dropped:
-            await stop()
-            continuation.finish(throwing: FirehoseSubscriptionError.resynchronizationRequired)
-            return
-          case .terminated:
-            await stop()
-            return
-          @unknown default:
-            break
-          }
-        }
-      } catch {
-        await stop()
-        if Task.isCancelled { break }
-        switch error {
-        case FirehoseSubscriptionError.connectionClosed:
-          break
-        case is URLError,
-             NetworkError.requestFailed:
-          break
-        case is FirehoseSubscriptionError,
-             is RelayVerifierError,
-             is NetworkError,
-             is DecodingError:
-          continuation.finish(throwing: error)
-          return
-        default:
-          break
-        }
-        let delay = configuration.backoff.nextDelay(after: currentDelay)
-        currentDelay = delay
-        try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
-      }
+    switch frame {
+    case let .event(.error(error)):
+      return .fail(EventStreamError(name: error.error, message: error.message))
+    case let .event(event):
+      return .deliver(.event(event), sequence: event.sequence)
+    case let .ignored(ignored):
+      return .deliver(.ignoredFrame(ignored), sequence: ignored.sequence)
     }
-    await stop()
-    continuation.finish()
-  }
-
-  private static func urlWithCursor(_ baseURL: URL, cursor: Int64?) -> URL {
-    guard let cursor else { return baseURL }
-    guard var components = URLComponents(url: baseURL, resolvingAgainstBaseURL: false) else {
-      return baseURL
-    }
-    var items = components.queryItems ?? []
-    items.removeAll(where: { $0.name == "cursor" })
-    items.append(URLQueryItem(name: "cursor", value: String(cursor)))
-    components.queryItems = items
-    return components.url ?? baseURL
   }
 }

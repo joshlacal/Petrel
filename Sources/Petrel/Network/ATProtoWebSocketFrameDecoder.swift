@@ -1,110 +1,200 @@
 import Foundation
 import SwiftCBOR
 
-public enum ATProtoWebSocketFrameDecoder {
-    public struct DecodedFrame {
-        public let messageType: String
-        public let jsonData: Data
+/// An error frame (`op: -1`) received on an AT Protocol event stream.
+///
+/// The event-stream specification defines the payload as `{error, message?}` and requires the
+/// stream to be closed right after the frame. Well-known error names get their own case so
+/// callers can match on them directly:
+///
+/// ```swift
+/// do {
+///     for try await event in subscription.events() { … }
+/// } catch EventStreamError.futureCursor {
+///     // The stored cursor is ahead of the server's sequence; an operator has to decide.
+/// }
+/// ```
+public enum EventStreamError: Error, Sendable, Equatable {
+    /// `FutureCursor`: the requested cursor is higher than the server's current sequence.
+    case futureCursor(message: String?)
+    /// `ConsumerTooSlow`: the client did not keep up with the stream and was disconnected.
+    case consumerTooSlow(message: String?)
+    /// Any other error name.
+    case other(name: String, message: String?)
 
-        public init(messageType: String, jsonData: Data) {
-            self.messageType = messageType
-            self.jsonData = jsonData
+    /// Classifies an error frame payload by its `error` name.
+    public init(name: String, message: String?) {
+        switch name {
+        case "FutureCursor": self = .futureCursor(message: message)
+        case "ConsumerTooSlow": self = .consumerTooSlow(message: message)
+        default: self = .other(name: name, message: message)
         }
     }
 
-    /// Decode a subscription WebSocket frame containing two DAG-CBOR objects.
-    public static func decodeFrame(_ data: Data, defaultLexicon: String? = nil) throws -> DecodedFrame {
-        var offset = 0
+    /// The wire `error` name, without namespace or `#` prefix.
+    public var name: String {
+        switch self {
+        case .futureCursor: "FutureCursor"
+        case .consumerTooSlow: "ConsumerTooSlow"
+        case let .other(name, _): name
+        }
+    }
 
-        guard offset < data.count else {
-            throw NetworkError.invalidResponse(description: "Empty WebSocket frame")
+    /// The optional human-readable `message` of the error frame.
+    public var message: String? {
+        switch self {
+        case let .futureCursor(message), let .consumerTooSlow(message), let .other(_, message): message
+        }
+    }
+}
+
+public enum ATProtoWebSocketFrameDecoder {
+    /// Hard upper bound for one event-stream WebSocket frame (sync specification: 5 MB).
+    ///
+    /// Transports must be configured to accept messages of at least this size;
+    /// `URLSessionWebSocketTask.maximumMessageSize` defaults to 1 MiB.
+    public static let maximumFrameBytes = 5_000_000
+
+    public struct DecodedFrame: Sendable {
+        public let messageType: String
+        public let jsonData: Data
+        /// The payload's `seq` field when it is present and an integer; `nil` for unsequenced
+        /// messages such as `#info`.
+        public let sequence: Int64?
+
+        public init(messageType: String, jsonData: Data) {
+            self.init(messageType: messageType, jsonData: jsonData, sequence: nil)
         }
 
-        let remainingData = Data(data[offset...])
+        /// Creates a decoded frame that also carries the payload sequence number.
+        public init(messageType: String, jsonData: Data, sequence: Int64?) {
+            self.messageType = messageType
+            self.jsonData = jsonData
+            self.sequence = sequence
+        }
+    }
+
+    /// What one binary event-stream frame contains.
+    public enum Frame: Sendable {
+        /// A regular message (`op: 1`). The payload is re-encoded as lexicon JSON with `$type` set.
+        case message(DecodedFrame)
+        /// An error frame (`op: -1`). The stream must be closed after it.
+        case error(EventStreamError)
+        /// A frame whose header carries an `op` this decoder does not know. The specification says
+        /// clients should ignore such frames instead of failing.
+        case unknownOperation(Int64)
+    }
+
+    /// Decodes a subscription WebSocket frame: two concatenated DAG-CBOR objects, header then payload.
+    ///
+    /// Unknown header fields are ignored. Invalid framing or CBOR throws, and the caller should
+    /// drop the connection. Unknown `op` values are returned as ``Frame/unknownOperation(_:)``
+    /// so the caller can skip the frame.
+    public static func decode(_ data: Data, defaultLexicon: String? = nil) throws -> Frame {
+        guard !data.isEmpty else {
+            throw NetworkError.invalidResponse(description: "Empty WebSocket frame")
+        }
+        guard data.count <= maximumFrameBytes else {
+            throw NetworkError.invalidResponse(description: "WebSocket frame exceeds the 5 MB event stream limit")
+        }
+
         do {
-            try DAGCBOR.decodeCBORPreflight(remainingData, allowTrailingBytes: true)
+            try DAGCBOR.decodeCBORPreflight(data, allowTrailingBytes: true)
         } catch {
             throw NetworkError.invalidResponse(description: "CBOR preflight failed for header: \(error.localizedDescription)")
         }
 
-        guard let headerCBOR = try? CBOR.decode([UInt8](remainingData)) else {
+        guard let headerCBOR = try? CBOR.decode([UInt8](data)) else {
             throw NetworkError.invalidResponse(description: "Invalid header format")
         }
         guard case let .map(headerMap) = headerCBOR else {
             throw NetworkError.invalidResponse(description: "Invalid header format")
         }
 
-        let opKey = CBOR.utf8String("op")
-        let tKey = CBOR.utf8String("t")
-
-        guard let opValue = headerMap[opKey],
-              case let .unsignedInt(op) = opValue
-        else {
+        let operation: Int64
+        switch headerMap[CBOR.utf8String("op")] {
+        case let .unsignedInt(value)? where value <= UInt64(Int64.max):
+            operation = Int64(value)
+        case let .negativeInt(value)? where value <= UInt64(Int64.max):
+            operation = -1 - Int64(value)
+        default:
             throw NetworkError.invalidResponse(description: "Missing or invalid 'op' in header")
         }
 
-        if op == UInt64(bitPattern: -1) {
-            let headerData = headerCBOR.encode()
-            offset += headerData.count
+        // The preflight guarantees canonical DAG-CBOR, so re-encoding reproduces the header length.
+        let payloadData = Data(data.dropFirst(headerCBOR.encode().count))
 
-            let payloadData = Data(data[offset...])
-            do {
-                try DAGCBOR.decodeCBORPreflight(payloadData)
-            } catch {
-                throw NetworkError.invalidResponse(description: "CBOR preflight failed for error payload: \(error.localizedDescription)")
+        switch operation {
+        case -1:
+            let errorPayload = try decodePayload(payloadData, role: "error payload")
+            guard case let .map(errorMap) = errorPayload,
+                  case let .utf8String(errorName)? = errorMap[CBOR.utf8String("error")]
+            else {
+                throw NetworkError.invalidResponse(description: "Error frame without an error name")
             }
-            guard let errorPayload = try? CBOR.decode([UInt8](payloadData)) else {
-                throw NetworkError.invalidResponse(description: "Failed to decode CBOR error payload")
+            var message: String?
+            if case let .utf8String(text)? = errorMap[CBOR.utf8String("message")] {
+                message = text
             }
-            if case let .map(errorMap) = errorPayload,
-               let errorNameCBOR = errorMap[CBOR.utf8String("error")],
-               case let .utf8String(errorName) = errorNameCBOR
-            {
-                throw NetworkError.serverError(code: 400, message: errorName)
+            return .error(EventStreamError(name: errorName, message: message))
+
+        case 1:
+            guard case let .utf8String(messageTypeName)? = headerMap[CBOR.utf8String("t")] else {
+                throw NetworkError.invalidResponse(description: "Missing message type in header")
             }
-            throw NetworkError.invalidResponse(description: "Unknown error frame")
-        }
-        guard op == 1 else {
-            throw NetworkError.invalidResponse(description: "Unknown operation code: \(op)")
-        }
+            let payloadCBOR = try decodePayload(payloadData, role: "payload")
+            guard var jsonObject = try cborToJSONValue(payloadCBOR) as? [String: Any] else {
+                throw NetworkError.invalidResponse(description: "Payload is not a JSON object")
+            }
 
-        guard let tValue = headerMap[tKey],
-              case let .utf8String(messageTypeName) = tValue
-        else {
-            throw NetworkError.invalidResponse(description: "Missing message type in header")
+            var resolvedType = messageTypeName
+            if resolvedType.hasPrefix("#"), let defaultLexicon {
+                resolvedType = defaultLexicon + resolvedType
+            }
+
+            var sequence: Int64?
+            if let seq = jsonObject["seq"] as? Int {
+                sequence = Int64(seq)
+            }
+
+            jsonObject["$type"] = resolvedType
+            let jsonData = try JSONSerialization.data(withJSONObject: jsonObject)
+            return .message(DecodedFrame(messageType: resolvedType, jsonData: jsonData, sequence: sequence))
+
+        default:
+            return .unknownOperation(operation)
         }
+    }
 
-        let headerData = headerCBOR.encode()
-        offset += headerData.count
+    /// Decode a subscription WebSocket frame containing two DAG-CBOR objects.
+    ///
+    /// Error frames (`op: -1`) throw ``EventStreamError``. A frame with an unknown `op` throws
+    /// `NetworkError.invalidResponse` because this method cannot express "skip"; consumers that
+    /// follow the specification's ignore rule call ``decode(_:defaultLexicon:)`` instead.
+    public static func decodeFrame(_ data: Data, defaultLexicon: String? = nil) throws -> DecodedFrame {
+        switch try decode(data, defaultLexicon: defaultLexicon) {
+        case let .message(frame):
+            return frame
+        case let .error(error):
+            throw error
+        case let .unknownOperation(operation):
+            throw NetworkError.invalidResponse(description: "Unknown operation code: \(operation)")
+        }
+    }
 
-        guard offset < data.count else {
+    private static func decodePayload(_ payloadData: Data, role: String) throws -> CBOR {
+        guard !payloadData.isEmpty else {
             throw NetworkError.invalidResponse(description: "Missing payload in WebSocket frame")
         }
-
-        let payloadData = Data(data[offset...])
         do {
             try DAGCBOR.decodeCBORPreflight(payloadData)
         } catch {
-            throw NetworkError.invalidResponse(description: "CBOR preflight failed for payload: \(error.localizedDescription)")
+            throw NetworkError.invalidResponse(description: "CBOR preflight failed for \(role): \(error.localizedDescription)")
         }
-        guard let payloadCBOR = try? CBOR.decode([UInt8](payloadData)) else {
-            throw NetworkError.invalidResponse(description: "Failed to decode CBOR payload")
+        guard let payload = try? CBOR.decode([UInt8](payloadData)) else {
+            throw NetworkError.invalidResponse(description: "Failed to decode CBOR \(role)")
         }
-
-        let jsonValue = try cborToJSONValue(payloadCBOR)
-        guard var jsonObject = jsonValue as? [String: Any] else {
-            throw NetworkError.invalidResponse(description: "Payload is not a JSON object")
-        }
-
-        var resolvedType = messageTypeName
-        if resolvedType.hasPrefix("#"), let defaultLexicon = defaultLexicon {
-            resolvedType = defaultLexicon + resolvedType
-        }
-
-        jsonObject["$type"] = resolvedType
-        let jsonData = try JSONSerialization.data(withJSONObject: jsonObject)
-
-        return DecodedFrame(messageType: resolvedType, jsonData: jsonData)
+        return payload
     }
 
     private static func cborToJSONValue(_ cbor: CBOR) throws -> Any {
@@ -146,10 +236,12 @@ public enum ATProtoWebSocketFrameDecoder {
             return result
         case let .tagged(tag, value):
             if tag.rawValue == 42 {
-                guard case let .byteString(bytes) = value else {
+                // DAG-CBOR cid-link: a byte string holding the multibase identity prefix 0x00
+                // followed by the binary CID.
+                guard case let .byteString(bytes) = value, bytes.first == 0x00 else {
                     throw NetworkError.invalidResponse(description: "Invalid CID encoding")
                 }
-                let cid = try CID(bytes: Data(bytes))
+                let cid = try CID(bytes: Data(bytes.dropFirst()))
                 return ["$link": cid.string]
             }
             return try cborToJSONValue(value)
