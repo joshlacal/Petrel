@@ -107,6 +107,45 @@ struct JetstreamSilentFailureTests {
     #expect(await factory.connectedURLs.count == 1)
   }
 
+  @Test("uncompressed JSON with leading whitespace still decodes")
+  func whitespacePrefixedJSONDecodes() async throws {
+    let padded = Data(" \n".utf8) + JetstreamStreamSemanticsTests.commit(seq: 3)
+    let factory = ScriptedWebSocketFactory(sessions: [ScriptedWebSocketSession(messages: [padded])])
+    let seen = try await Self.collect(JetstreamSubscription(configuration: Self.configuration(factory)), count: 1)
+    #expect(seen == ["event 3"])
+  }
+
+  @Test("an ignored frame whose seq is not a positive integer is reported without moving the cursor")
+  func invalidIgnoredSequenceDoesNotMoveCursor() async throws {
+    let fractional = Self.message(#"{"$type":"network.bsky.jetstream.subscribeEvents#future","seq":1000000.5}"#)
+    let storage = InMemoryFirehoseCursorStorage()
+    let factory = ScriptedWebSocketFactory(sessions: [
+      ScriptedWebSocketSession(messages: [fractional, JetstreamStreamSemanticsTests.commit(seq: 7)]),
+    ])
+    var seen: [String] = []
+    for try await element in JetstreamSubscription(configuration: Self.configuration(factory, storage: storage)).events() {
+      seen.append(Self.describe(element))
+      if seen.count == 2 { break }
+    }
+    // seq 7 is below the truncated 1000000 and must not be dropped as a duplicate.
+    #expect(seen == ["ignored future - unknown", "event 7"])
+    #expect(await storage.loadCursor() == nil)
+  }
+
+  @Test("only positive JSON integers are positions")
+  func positionParsing() throws {
+    let object = try #require(JSONSerialization.jsonObject(with: Data("""
+    {"int":27060984573,"time":1725911162329308,"frac":1000000.5,"zero":0,"neg":-3,"t":true,"f":false,\
+    "s":"5","big":9007199254740993,"one":1}
+    """.utf8)) as? [String: Any])
+    #expect(JetstreamWire.positiveInteger(object["int"]) == 27_060_984_573)
+    #expect(JetstreamWire.positiveInteger(object["time"]) == 1_725_911_162_329_308)
+    #expect(JetstreamWire.positiveInteger(object["one"]) == 1)
+    for key in ["frac", "zero", "neg", "t", "f", "s", "big", "missing"] {
+      #expect(JetstreamWire.positiveInteger(object[key]) == nil, "\(key)")
+    }
+  }
+
   @Test("a known message type with an invalid body is reported, and the cursor moves past it")
   func undecodableKnownTypeIsReported() async throws {
     // A commit without `rkey`.

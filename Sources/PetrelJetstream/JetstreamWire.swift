@@ -71,7 +71,7 @@ enum JetstreamWire {
     }
 
     let kind = root["kind"] as? String
-    let timeUS = (root["time_us"] as? NSNumber)?.int64Value
+    let timeUS = positiveInteger(root["time_us"])
     guard let did = root["did"] as? String, let timeUS, let kind else {
       return .undecodable(type: kind, seq: timeUS, reason: "event without did, time_us or kind")
     }
@@ -102,7 +102,7 @@ enum JetstreamWire {
   }
 
   private static func decodePayload(_ payload: [String: Any]) -> JetstreamWireFrame {
-    let rawSeq = (payload["seq"] as? NSNumber)?.int64Value
+    let rawSeq = positiveInteger(payload["seq"])
     guard let type = payload["$type"] as? String else {
       return .undecodable(type: nil, seq: rawSeq, reason: "payload without $type")
     }
@@ -175,12 +175,27 @@ enum JetstreamWire {
   }
 
   private static func envelope(_ payload: [String: Any]) -> (seq: Int64, did: String, timeUS: Int64)? {
-    guard let seq = (payload["seq"] as? NSNumber)?.int64Value,
+    guard let seq = positiveInteger(payload["seq"]),
           let did = payload["did"] as? String,
           let time = payload["time"] as? String,
           let timeUS = microseconds(fromRFC3339: time)
     else { return nil }
     return (seq, did, timeUS)
+  }
+
+  /// `value` as a sequence number or timestamp: a JSON integer in `1 ... 2^53 - 1`. Fractions,
+  /// booleans, strings and out-of-range numbers give `nil`, so a malformed value can never move
+  /// the cursor (`NSNumber.int64Value` would silently truncate `1000000.5`).
+  static func positiveInteger(_ value: Any?) -> Int64? {
+    guard let value, !String(describing: type(of: value)).contains("Bool"),
+          let number = value as? NSNumber
+    else { return nil }
+    let double = number.doubleValue
+    guard double.isFinite, double >= 1, double <= 9_007_199_254_740_991, double.rounded(.towardZero) == double
+    else { return nil }
+    let integer = number.int64Value
+    guard Double(integer) == double else { return nil }
+    return integer
   }
 
   private static func decodeDetail<T: Decodable>(_ type: T.Type, _ value: Any?) -> T? {

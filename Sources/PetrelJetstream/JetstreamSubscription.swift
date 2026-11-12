@@ -529,7 +529,9 @@ actor JetstreamSubscriptionRunner {
 
     let frameData: Data
     do {
-      if rawData.first == 0x7B {
+      // Every zstd frame starts with its magic number; anything else is treated as JSON and
+      // left to the JSON decoder (which accepts leading whitespace).
+      if !rawData.starts(with: Self.zstdMagic) {
         frameData = rawData
       } else if let decoder = dictionaryDecoder {
         frameData = try decoder.decompress(rawData)
@@ -632,6 +634,9 @@ actor JetstreamSubscriptionRunner {
     }
     pending.append((.ignoredFrame(JetstreamIgnoredFrame(type: type, sequence: sequence, reason: reason)), cursor))
   }
+
+  /// The little-endian zstd frame magic number, `0xFD2FB528`.
+  static let zstdMagic: [UInt8] = [0x28, 0xB5, 0x2F, 0xFD]
 
   /// The message type name used in ``JetstreamIgnoredFrame/type``.
   static func typeName(_ event: JetstreamEvent) -> String {
