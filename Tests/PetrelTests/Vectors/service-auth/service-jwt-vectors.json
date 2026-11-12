@@ -1,0 +1,1702 @@
+{
+  "description": "Service-auth JWT interop vectors. Each token was produced by the TypeScript reference implementation or another JOSE signer, and `ts` records what @atproto/xrpc-server verifyJwt did with it at the pinned clock. `petrel`, where present, documents a deliberate difference.",
+  "generator": {
+    "script": "generate-ts-vectors.mjs",
+    "node": "v22.23.1",
+    "@atproto/xrpc-server": "0.13.11",
+    "@atproto/crypto": "0.5.7",
+    "jose": "6.2.17"
+  },
+  "now": 1700000000,
+  "keys": {
+    "k256": {
+      "curve": "k256",
+      "privateKeyHex": "28ffbd572498cff7fb0885b929581a31ced297cfb495495108e39e15973e3dc7",
+      "didKey": "did:key:zQ3shYSsQH4rrMSfT5URHeKmsaKr5CEyTRex3bewa1qk2sEZ6"
+    },
+    "k256Rotated": {
+      "curve": "k256",
+      "privateKeyHex": "64b2fd5805c091334fa3f517d004e961e09b3ab305c167a13e0355c34d35eb4a",
+      "didKey": "did:key:zQ3shUSSVpq57FgxANMXpn73nHEXX9gSQVmBR325tpFAksABF"
+    },
+    "p256": {
+      "curve": "p256",
+      "privateKeyHex": "56155d058dd5090f9977ef92fc47bc5959d31304dbbf6a0b5f4e4433a134d193",
+      "didKey": "did:key:zDnaehXMbwwLKYv8Q8iWV7GrZGLmJk8Pu8UKvznsZsDnPmCv2"
+    },
+    "p256Rotated": {
+      "curve": "p256",
+      "privateKeyHex": "a42c77f7b3818cb72d3375459e71424d7bd5c470899eb52233dfe01aa03236ab",
+      "didKey": "did:key:zDnaeevZ5w3Q34VjEYraAANKrQZSXppP8rxjymMxd3hvNYX9P"
+    }
+  },
+  "vectors": [
+    {
+      "name": "ts-k256-lxm",
+      "description": "createServiceJwt, 60 s, lxm bound, aud with service fragment",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tI2Jza3lfZmciLCJleHAiOjE3MDAwMDAwNjAsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoiYjA0NTdjZjJhYzRmZjQ5NTJhOTYyNjZjNDlkZDViY2EifQ.T7sqYHjmuwFpm5BMk8Dbniv3XSIOZpRhf-w50LFBUQpgZ7_9N6_XJ34vc6Grh2GI_BlW5lGvldKqthzTmMCkkQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "b0457cf2ac4ff4952a96266c49dd5bca"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-k256-lxm-highS",
+      "description": "the same token with S replaced by n - S; the reference verifies JWTs with allowMalleableSig",
+      "source": "createServiceJwt, signature rewritten to high-S",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tI2Jza3lfZmciLCJleHAiOjE3MDAwMDAwNjAsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoiYjA0NTdjZjJhYzRmZjQ5NTJhOTYyNjZjNDlkZDViY2EifQ.T7sqYHjmuwFpm5BMk8Dbniv3XSIOZpRhf-w50LFBUQqfmEACyFAo2IHQjF5UeJ51vpWGAF2ZCmkVHEG5N3WcsA",
+      "highS": true,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "b0457cf2ac4ff4952a96266c49dd5bca"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-k256-lxm-der",
+      "description": "the same token with the signature re-encoded as ASN.1 DER; not a JWS signature (RFC 7518 3.4)",
+      "source": "createServiceJwt, signature rewritten to DER",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tI2Jza3lfZmciLCJleHAiOjE3MDAwMDAwNjAsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoiYjA0NTdjZjJhYzRmZjQ5NTJhOTYyNjZjNDlkZDViY2EifQ.MEQCIE-7KmB45rsBaZuQTJPA254r910iDmaUYX_sOdCxQVEKAiBgZ7_9N6_XJ34vc6Grh2GI_BlW5lGvldKqthzTmMCkkQ",
+      "highS": null,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "b0457cf2ac4ff4952a96266c49dd5bca"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "petrel": {
+        "ok": false,
+        "error": "BadJwt",
+        "reason": "Petrel requires the 64-byte JWS encoding by default; DER is accepted only with signatureOptions .allowMalleable",
+        "okWith": "allowMalleable"
+      }
+    },
+    {
+      "name": "ts-k256-no-lxm",
+      "description": "createServiceJwt without lxm, bare-DID aud; receiver does not check lxm",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJqdGkiOiJmNjhlZjdiYTA0NWFlYjYyNTViN2RmMjkyZjkwOGQxZiJ9.ESJ-WZxpldpoQWUilUSDo6CMke2RlKrME5UOoEhcPMNvoX7tKb2YpRNe1Jh4Sq2samTkcg3F7DnlLdIoDg3gPA",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": null,
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "jti": "f68ef7ba045aeb6255b7df292f908d1f"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-k256-no-lxm-but-required",
+      "description": "the lxm-less token presented to an endpoint that requires a method binding",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJqdGkiOiJmNjhlZjdiYTA0NWFlYjYyNTViN2RmMjkyZjkwOGQxZiJ9.ESJ-WZxpldpoQWUilUSDo6CMke2RlKrME5UOoEhcPMNvoX7tKb2YpRNe1Jh4Sq2samTkcg3F7DnlLdIoDg3gPA",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtLexiconMethod",
+        "message": "missing jwt lexicon method (\"lxm\"). must match: app.bsky.feed.getFeedSkeleton",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-k256-upload-30min",
+      "description": "what the official app requests for video upload: lxm com.atproto.repo.uploadBlob, 30 minute lifetime",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpwZHMuZXhhbXBsZS5jb20iLCJleHAiOjE3MDAwMDE4MDAsImx4bSI6ImNvbS5hdHByb3RvLnJlcG8udXBsb2FkQmxvYiIsImp0aSI6ImRhOGE3ZGQwYjlhNDg0M2ZiZWFmNDQ4MTZmM2NiMmE4In0.-H7AhRxYWPXX5c9qhl0l_2fBTOLviMUUwYCoymDIpwxEmUAX3C1BVaStL4uWQv7JaSeiRkr59hVvtSpqSUsL4Q",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:pds.example.com",
+        "lxm": "com.atproto.repo.uploadBlob",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:pds.example.com",
+          "exp": 1700001800,
+          "lxm": "com.atproto.repo.uploadBlob",
+          "jti": "da8a7dd0b9a4843fbeaf44816f3cb2a8"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-k256-1h",
+      "description": "the longest lifetime the reference PDS issues from getServiceAuth: one hour",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAzNjAwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6IjM2MWUxMzlmMmNhMzg2YWI0YWI0YmZiNGM0OWUxZDE4In0.crGT0gqUEQOTmEfSxT3a6jBUh_r6VDu42KKtuAaxQMdJ_oqWnaFhRyF43kzG8JQgr7DtICk7ZeUUaSVVF-YtdQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700003600,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "361e139f2ca386ab4ab4bfb4c49e1d18"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-k256-2h",
+      "description": "a two hour token: longer than any reference PDS issues",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDA3MjAwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6ImNmNGQ0Yjg5ZWJjYzE5MGI4MWQ4ZTQ2ZWRmYmIzMzg2In0.zawGt0kXW3gcwQUTTz6lsHDe0oKgZn0xYVDVUgDRpZBKQVdyf5FbnrNDe86PQc6V_D-3hvV2uotDNOXI4Bfddw",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700007200,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "cf4d4b89ebcc190b81d8e46edfbb3386"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "petrel": {
+        "ok": false,
+        "error": "BadJwt",
+        "reason": "exceeds the default one hour lifetime ceiling; accepted when the ceiling is raised",
+        "okWith": "maximumLifetime=3h"
+      }
+    },
+    {
+      "name": "ts-k256-expired",
+      "description": "expired one minute before the pinned clock",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE2OTk5OTk4ODAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNjk5OTk5OTQwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6ImU3NmI3YTBkNWJlYWRlY2Q1ZTRmZTA4ODUxZGFiYzVhIn0.uvD93L4B9QNh6CuLSk5bkjhGCkqtGOK1fXdpuZOknBAl7Z4j8u7BQV0qVE9mh5ZZzry96PgBkSn8nHf2aBYw1A",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "JwtExpired",
+        "message": "jwt expired",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-k256-wrong-audience",
+      "description": "minted for another service",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpvdGhlci5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MCwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24iLCJqdGkiOiJkMTc2YzI4MmExMGViNTJiOGUwNTJlYWI0MDQ3YzZmYiJ9.IE7UeVynzmArspqL11IslmTfFgYg5qZu7AihM50Qw54J3j0fJEyob9z-n2uFbe_jz776GcN0tcWQabH8FwcieA",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtAudience",
+        "message": "jwt audience does not match service did",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-k256-bare-audience-for-fragment-service",
+      "description": "bare-DID aud presented to a service that expects its DID with a service fragment",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6ImQ0NzA0NDBlOGZjOGI3MGIzOTBmMTJkOWUyN2ExZTVkIn0.O60q0mcbjZi5w3SQFPNB6egNDzPR3Fj-XCfki2jOE95axU9X-EP4tJp9fTjvMrN2ew_yWKTUxa8U30zCJd993w",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtAudience",
+        "message": "jwt audience does not match service did",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-k256-wrong-lxm",
+      "description": "minted for another endpoint",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJjb20uYXRwcm90by5yZXBvLmNyZWF0ZVJlY29yZCIsImp0aSI6Ijk3ZTUyMzhjZjJlN2ZkNDEzOTkxNTM3NzAxZjQ2YTI3In0.uJjkAOWFtF1MCVJpp52rH0q-TyMDNz4eKm_Dwyf2SGoiWH7s0I9NowWNX10PyXdy_889GccoxMmXOzw7v5GBkw",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtLexiconMethod",
+        "message": "bad jwt lexicon method (\"lxm\"). must match: app.bsky.feed.getFeedSkeleton",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-k256-rotated-key",
+      "description": "signed with the new key after a rotation; the cached key fails, a forced refresh returns the new one",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6ImVkOTcyZmNjOGY5ZmM5MmUxZDk2MzE2ZGJiNWI2MWEwIn0.WDYKCRE7OY2GQ3Q6pfAfnCwSKsONSJCm4LdhdlngBvMHFsYUBfvpo2tzcXQT9F12PQ-UTbxiRm0AI4ML8S4RQQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256Rotated"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "ed972fcc8f9fc92e1d96316dbb5b61a0"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          },
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-k256-wrong-key",
+      "description": "signed with a key the issuer never published; refresh returns the same key",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6ImVkOTcyZmNjOGY5ZmM5MmUxZDk2MzE2ZGJiNWI2MWEwIn0.WDYKCRE7OY2GQ3Q6pfAfnCwSKsONSJCm4LdhdlngBvMHFsYUBfvpo2tzcXQT9F12PQ-UTbxiRm0AI4ML8S4RQQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtSignature",
+        "message": "jwt signature does not match jwt issuer",
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          },
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-k256-issuer-with-service-fragment",
+      "description": "legacy issuer form did#service (pre Spring 2026), as labelers sent",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4I2F0cHJvdG9fbGFiZWxlciIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MCwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24iLCJqdGkiOiJhOWM4OTk4ZWY5OWMyMTMzMmZjMTg2NTEwNjM4NmRiZCJ9.YkIXfi0anX890--1IVBz9uqmmI2K64N7v2yemgIDqNJHX5Y634mdryExu-Gy2bgTGoIUvVTn-CebHLApFp_XZQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "a9c8998ef99c21332fc1865106386dbd"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-k256-did-web-issuer",
+      "description": "did:web issuer",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDp3ZWI6bGFiZWxlci5leGFtcGxlLmNvbSIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MCwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24iLCJqdGkiOiJmZjNkOThkYTg2YjkyZTJjMGQ3NWJjNTYwZDg0MGE5OSJ9.eQIsmljpoRrLX90L71We2dEOpHUhlUEoUa3qa2hHIpdp-mETjPRrZaM9GQDUHrepZPkStC7tCDgXjkxShZLzrw",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:web:labeler.example.com",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "ff3d98da86b92e2c0d75bc560d840a99"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:web:labeler.example.com",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "openssl-k256-lowS",
+      "description": "signed by node:crypto (OpenSSL), which does not normalize S; this sample is low-S",
+      "source": "node:crypto sign, dsaEncoding ieee-p1363",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.gKJMIp1AiliAGRomTDGKhTsbTTM5uG-vLni2TFJ0h8FYBRcBm2qWirGq-GE-W1Kg7aFxg91C2p7r0DFMmdUX-Q",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "openssl-k256"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "openssl-k256-highS",
+      "description": "signed by node:crypto (OpenSSL), which does not normalize S; this sample is high-S",
+      "source": "node:crypto sign, dsaEncoding ieee-p1363",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.wSZ5XCA-DdbG8TewypOMWnxmAf9Pb_mdESkYh4j8hFjVBJtqA1Yb6gfaOjl_jRK1W1lp9VMfkcynpsxp_BpJlg",
+      "highS": true,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "openssl-k256"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-k256-typ-at-jwt",
+      "description": "header typ at+jwt: a token of another kind, validly signed",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJhdCtqd3QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.Ka5-cJW_CgZKEfP1aGp7E9QFIAKSOU4FM55ngtJxgHNyzTdTciFyl_n-2bRy3QRqtl75WP-hnFuYDQgWcnDpew",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtType",
+        "message": "Invalid jwt type \"at+jwt\"",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-k256-typ-refresh-jwt",
+      "description": "header typ refresh+jwt: a token of another kind, validly signed",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJyZWZyZXNoK2p3dCIsImFsZyI6IkVTMjU2SyJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.ax1ImP0Uyya8P4mlA3_ynBXHI_IAS6mZ0out80bF-uYDRASaaj5V07TDn4DtlXYmavhbhAilEmw3alIqVhhs2A",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtType",
+        "message": "Invalid jwt type \"refresh+jwt\"",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-k256-typ-dpop-jwt",
+      "description": "header typ dpop+jwt: a token of another kind, validly signed",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2SyJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.8tp_tOz3TE4oY5vJwUiynrgBt44FNcpXC5w70R6_LtlMpkIdkAw3K4VoH0cne1cvW_oB9lvWHAEhUlr3zZVT4A",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtType",
+        "message": "Invalid jwt type \"dpop+jwt\"",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-k256-no-typ-no-iat-no-jti",
+      "description": "only the claims the reference verifier requires: iss, aud, exp",
+      "source": "hand-built payload, reference keypair",
+      "token": "eyJhbGciOiJFUzI1NksifQ.eyJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MH0.-NN5VnMp1pRkijOytmlqTod9LGhyoQjSN8EuF06KHLVkCxCPoldKlcvYPEz0hk3FI4yoZKY7VHZzGanbRa-ZFA",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": null,
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-k256-kid-atproto",
+      "description": "kid header naming the default key, as the Spring 2026 specification allows",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksiLCJraWQiOiIjYXRwcm90byJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.85xr9Ethz1CENMMwEH8AzCqG7k12pFvYsUChC8Mca1Vmdn_5P-_cwLr8I4nOEtzjReMKHUNDjrkb-V5wxt586Q",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "openssl-k256"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-k256-kid-other",
+      "description": "kid header naming a key the receiving service does not accept",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksiLCJraWQiOiIjYXRwcm90b19sYWJlbCJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.e2lGFBGwfWKZ7lmUdQd85OBadGyeDhCVlDmtY-46SD9OK99jM8IrbIyO6yNsgys4_IxIbZu6roTxrzvwC7n0jg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "openssl-k256"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "petrel": {
+        "ok": false,
+        "error": "BadJwt",
+        "reason": "the specification says receivers must only accept specific key ids; the reference verifier does not read kid yet",
+        "okWith": "acceptedKeyIDs=#atproto_label"
+      }
+    },
+    {
+      "name": "handbuilt-k256-wrong-alg-for-key",
+      "description": "header alg names the other curve",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.XAkvXfHpetd_Gqw51m6qq6SdeIjtAEd2Bkk6HZwGkd53ndog14ByJCgt-S3bVY-7iaKOAbA58-U3a1tiiS-hxg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtSignature",
+        "message": "could not verify jwt signature",
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-k256-alg-none",
+      "description": "header alg none",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.zmalX_psNb2tTr1oZM9XGYCWuKLb2VbV-WbBq2tUO4wZDFo8kHJCzvr7AiVcPEVnw9-EkO40zITAWkNTEx-SrQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtSignature",
+        "message": "could not verify jwt signature",
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-k256-issuer-not-a-did",
+      "description": "iss is a handle",
+      "source": "hand-built payload, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImFsaWNlLmV4YW1wbGUuY29tIiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtazI1NiJ9.Bv0nj-M8QnkKgV6K7QAkqCCQKCUaQRS9YAOBb5ObjEotHKUZ1A8i6X8Co62giqC5IJZ4wMKX8mpkgvL-wtceFw",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtIss",
+        "message": "jwt iss is not a valid did",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-k256-missing-exp",
+      "description": "no exp claim",
+      "source": "hand-built payload, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoieCJ9.a1kMDDMnmgfrr3djVzM8_O7thY7mjSQidn7o5FVppl1r8ys7Sz3Wu4qHoQlC-ptMngF6sjHW7PPohzypdbtm3Q",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwt",
+        "message": "poorly formatted jwt",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-k256-duplicate-claim",
+      "description": "payload JSON repeats aud; JSON.parse keeps the last value",
+      "source": "hand-built payload, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpvdGhlci5leGFtcGxlLmNvbSIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MCwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24iLCJqdGkiOiJkdXAifQ.n8DDzSzEpnDwboqDxGjZjtL_8zULWF4yPYnZPowibthB_W8BSnkq-DCqxeB4pFFpioMlAcIAIBZQCtYQg81QBA",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "dup"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "petrel": {
+        "ok": false,
+        "error": "BadJwt",
+        "reason": "Petrel rejects JSON with duplicate members instead of picking one"
+      }
+    },
+    {
+      "name": "ts-k256-tampered-issuer",
+      "description": "payload rewritten to another issuer, signature kept",
+      "source": "createServiceJwt, payload rewritten",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6enp6enp6enp6enp6enp6enp6enp6enp6IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tI2Jza3lfZmciLCJleHAiOjE3MDAwMDAwNjAsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoiYjA0NTdjZjJhYzRmZjQ5NTJhOTYyNjZjNDlkZDViY2EifQ.T7sqYHjmuwFpm5BMk8Dbniv3XSIOZpRhf-w50LFBUQpgZ7_9N6_XJ34vc6Grh2GI_BlW5lGvldKqthzTmMCkkQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtSignature",
+        "message": "jwt signature does not match jwt issuer",
+        "keyLookups": [
+          {
+            "iss": "did:plc:zzzzzzzzzzzzzzzzzzzzzzzz",
+            "forceRefresh": false
+          },
+          {
+            "iss": "did:plc:zzzzzzzzzzzzzzzzzzzzzzzz",
+            "forceRefresh": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-lxm",
+      "description": "createServiceJwt, 60 s, lxm bound, aud with service fragment",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tI2Jza3lfZmciLCJleHAiOjE3MDAwMDAwNjAsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoiNGQ1YjhhZWQ3OGJkYmVmZDA2YzM2ZGRmMjI3ZjA3MjQifQ.8qY7369pPwIL1ibFf4eTxqGVNXRanAh6hZN3B3ydo1M6kITkr5YrhZEGT5qcE6gEI35ZTeDK0may4_e9awYk8A",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "4d5b8aed78bdbefd06c36ddf227f0724"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-lxm-highS",
+      "description": "the same token with S replaced by n - S; the reference verifies JWTs with allowMalleableSig",
+      "source": "createServiceJwt, signature rewritten to high-S",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tI2Jza3lfZmciLCJleHAiOjE3MDAwMDAwNjAsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoiNGQ1YjhhZWQ3OGJkYmVmZDA2YzM2ZGRmMjI3ZjA3MjQifQ.8qY7369pPwIL1ibFf4eTxqGVNXRanAh6hZN3B3ydo1PFb3saUGnUe275sGVj7Ff7mWihX8ZMzB5A1dMFkV0AYQ",
+      "highS": true,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "4d5b8aed78bdbefd06c36ddf227f0724"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-lxm-der",
+      "description": "the same token with the signature re-encoded as ASN.1 DER; not a JWS signature (RFC 7518 3.4)",
+      "source": "createServiceJwt, signature rewritten to DER",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tI2Jza3lfZmciLCJleHAiOjE3MDAwMDAwNjAsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoiNGQ1YjhhZWQ3OGJkYmVmZDA2YzM2ZGRmMjI3ZjA3MjQifQ.MEUCIQDypjvfr2k_AgvWJsV_h5PGoZU1dFqcCHqFk3cHfJ2jUwIgOpCE5K-WK4WRBk-anBOoBCN-WU3gytJmsuP3vWsGJPA",
+      "highS": null,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "4d5b8aed78bdbefd06c36ddf227f0724"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "petrel": {
+        "ok": false,
+        "error": "BadJwt",
+        "reason": "Petrel requires the 64-byte JWS encoding by default; DER is accepted only with signatureOptions .allowMalleable",
+        "okWith": "allowMalleable"
+      }
+    },
+    {
+      "name": "ts-p256-no-lxm",
+      "description": "createServiceJwt without lxm, bare-DID aud; receiver does not check lxm",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJqdGkiOiIyZjA2MmI0NmQ1M2VhNmI4NDg0ZjQ0ZWVlYjA3MWFmYyJ9.nlViF_UL9LAdywHFMcUOcdbGP1xq-CQjn8jSo3R9cidnaw2of6qAO_s7wDCRB3RGLrcjqXxqXSVXV1nT4HdgCQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": null,
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "jti": "2f062b46d53ea6b8484f44eeeb071afc"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-no-lxm-but-required",
+      "description": "the lxm-less token presented to an endpoint that requires a method binding",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJqdGkiOiIyZjA2MmI0NmQ1M2VhNmI4NDg0ZjQ0ZWVlYjA3MWFmYyJ9.nlViF_UL9LAdywHFMcUOcdbGP1xq-CQjn8jSo3R9cidnaw2of6qAO_s7wDCRB3RGLrcjqXxqXSVXV1nT4HdgCQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtLexiconMethod",
+        "message": "missing jwt lexicon method (\"lxm\"). must match: app.bsky.feed.getFeedSkeleton",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-p256-upload-30min",
+      "description": "what the official app requests for video upload: lxm com.atproto.repo.uploadBlob, 30 minute lifetime",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpwZHMuZXhhbXBsZS5jb20iLCJleHAiOjE3MDAwMDE4MDAsImx4bSI6ImNvbS5hdHByb3RvLnJlcG8udXBsb2FkQmxvYiIsImp0aSI6ImMwYzBjNGQyNGVkMWRiODE1MjBiYjdjZTY1NGQ5NGJhIn0.2CGMy7AJqKM4CKmRPDnyc32moaf1HPFRXRHq0D6kyo9O6n6n-u3bi-jgMyLp3DzVuUYU2UD9NPlEEElkZairmg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:pds.example.com",
+        "lxm": "com.atproto.repo.uploadBlob",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:pds.example.com",
+          "exp": 1700001800,
+          "lxm": "com.atproto.repo.uploadBlob",
+          "jti": "c0c0c4d24ed1db81520bb7ce654d94ba"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-1h",
+      "description": "the longest lifetime the reference PDS issues from getServiceAuth: one hour",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAzNjAwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6ImQzNjhhZjZmNmM1ZjcwNzU2MDhmNGRhOTlmMTU0NTQ0In0.DFuTslknRhIwpYCjz4TCr777pCaJ4y2tk59YJMuZwEhpu6Rh5rpYwaS6t70aHzBmn2ZtWuJUdifA_0Er6-0i2A",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700003600,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "d368af6f6c5f7075608f4da99f154544"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-2h",
+      "description": "a two hour token: longer than any reference PDS issues",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDA3MjAwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Ijc3NTQ4ZWRkMDRjYjNiMmJkMzYxY2Q3NzZjNTc3MDk4In0.uMoZzw7WttfMcILULz5ceV1zfdraezwIoj0EGE7rZQd5w8WAD2uwTFU1WnHg59atc7kpZJlWRYR4c1v0_mIPiA",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700007200,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "77548edd04cb3b2bd361cd776c577098"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "petrel": {
+        "ok": false,
+        "error": "BadJwt",
+        "reason": "exceeds the default one hour lifetime ceiling; accepted when the ceiling is raised",
+        "okWith": "maximumLifetime=3h"
+      }
+    },
+    {
+      "name": "ts-p256-expired",
+      "description": "expired one minute before the pinned clock",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE2OTk5OTk4ODAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNjk5OTk5OTQwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6IjE2MTA3MjNjOGRkNWQ5NGJiYWUwZjYyMDY5ZTk4YjdlIn0.T7BUpS1cTybwPHWnxC8GQwLmZzYIHwbov1QJjzc0eLIXbPYXYS2T3H0EOur2-RD2ezCJyLw6eFkSwPY1KcKQzg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "JwtExpired",
+        "message": "jwt expired",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-p256-wrong-audience",
+      "description": "minted for another service",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpvdGhlci5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MCwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24iLCJqdGkiOiI2ZDI4M2UwYzliYTMyZjU4ZTU2YmNjYTkxZmY0NGYwNiJ9.jneCPgcrJKg4LVTaZM1I8puDv2MVa3kDVo-sGO3OWf1SjlS3c7fyz74oOWZ_YU1KBX2jkrZu7MX0ch8GIvkXBA",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtAudience",
+        "message": "jwt audience does not match service did",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-p256-bare-audience-for-fragment-service",
+      "description": "bare-DID aud presented to a service that expects its DID with a service fragment",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6IjQ4Y2JmNGI3Yzc0ZDM3NDZiZWUxMDYxZWE0NWM5Y2M1In0.nPApO-K3yctOlHwhMXkMhetL5XPM6sWbtkSuo01ht6hkL8hMsVYWozVXHPRwTHNih6zl7pEVV0zflSWRbINedw",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtAudience",
+        "message": "jwt audience does not match service did",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-p256-wrong-lxm",
+      "description": "minted for another endpoint",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJjb20uYXRwcm90by5yZXBvLmNyZWF0ZVJlY29yZCIsImp0aSI6IjBhZWU4NDlkMGUxYzNjODQzN2E1ZTY3MjFiZTkzNjdmIn0.jVX-23fwXMvAJg96pFDN4vn6UeZQ1O4-zj3BPcIZvfpOmiYaXdJ7JuvZ6M02DhqMJwhRBwWl9RzQluBGj2gCwg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtLexiconMethod",
+        "message": "bad jwt lexicon method (\"lxm\"). must match: app.bsky.feed.getFeedSkeleton",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "ts-p256-rotated-key",
+      "description": "signed with the new key after a rotation; the cached key fails, a forced refresh returns the new one",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6IjNkOGM0N2I2MTE0NGY2ZGVlYmJmYjcyMTFkOTAwMGMyIn0.IWyfqDBf-NWojeYkXFWdQt_db20LOdDjCg552Kln7-QGbFiBemZq6MQLrJARrOqm2i0MjD3i4Hrpcb0CjBOV_Q",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256Rotated"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "3d8c47b61144f6deebbfb7211d9000c2"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          },
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-wrong-key",
+      "description": "signed with a key the issuer never published; refresh returns the same key",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6IjNkOGM0N2I2MTE0NGY2ZGVlYmJmYjcyMTFkOTAwMGMyIn0.IWyfqDBf-NWojeYkXFWdQt_db20LOdDjCg552Kln7-QGbFiBemZq6MQLrJARrOqm2i0MjD3i4Hrpcb0CjBOV_Q",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtSignature",
+        "message": "jwt signature does not match jwt issuer",
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          },
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-issuer-with-service-fragment",
+      "description": "legacy issuer form did#service (pre Spring 2026), as labelers sent",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4I2F0cHJvdG9fbGFiZWxlciIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MCwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24iLCJqdGkiOiI5NTkwODI4MjQ1N2NlNDM0ZThkYTNkZWM2NTljY2E0OSJ9.dnX8NbD7QEuD1vbcRWXw7DoEvbYLWnBAY4zvz9mkLncP3LdVPJpKKZVRu-DRhmUqadqC1l0kyV8jfdeTZmYWqg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "95908282457ce434e8da3dec659cca49"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "ts-p256-did-web-issuer",
+      "description": "did:web issuer",
+      "source": "createServiceJwt",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDp3ZWI6bGFiZWxlci5leGFtcGxlLmNvbSIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MCwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24iLCJqdGkiOiI0OTgwMTdhZDE2NTFkYmU1MWUzYzU5M2YzYWVhZmQwOCJ9.ne5LZrRUJw-t8Olh2nJMvZUfVMQ46ITzyTO6w_YyW_Z675jmxsW5OfL785xygv_0XblDm7XutYrT8sOiV-3KGg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:web:labeler.example.com",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "498017ad1651dbe51e3c593f3aeafd08"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:web:labeler.example.com",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "openssl-p256-lowS",
+      "description": "signed by node:crypto (OpenSSL), which does not normalize S; this sample is low-S",
+      "source": "node:crypto sign, dsaEncoding ieee-p1363",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.nbDk-XM3ETsSn-xMtxFXpbA0NvCFjj4aCNGha5W1Tz8Ky3zemOoiHtUZvjTuLIGFkcmqqecWt1yfQQ8UHgrlSA",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "openssl-p256"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "openssl-p256-highS",
+      "description": "signed by node:crypto (OpenSSL), which does not normalize S; this sample is high-S",
+      "source": "node:crypto sign, dsaEncoding ieee-p1363",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.Jmj2vRgNp5fMsDCN26RqG9UPhoEMDxc58kT41U8L_UnOe5M6Rvzby3who7eh6lxXp0yFxKZOOume85kt21mVZw",
+      "highS": true,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "openssl-p256"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-p256-typ-at-jwt",
+      "description": "header typ at+jwt: a token of another kind, validly signed",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJhdCtqd3QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.o3dcyWkhR5HiMksREuDrMegneKYii_OcYdcEPXXfdd4PDDxyYrHy_rYlvy4UupvOE4ChGt8KwjvlXLs9ULp5_w",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtType",
+        "message": "Invalid jwt type \"at+jwt\"",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-p256-typ-refresh-jwt",
+      "description": "header typ refresh+jwt: a token of another kind, validly signed",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJyZWZyZXNoK2p3dCIsImFsZyI6IkVTMjU2In0.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.HQwSNyJiKIGV0k_0cbriIOgGWGfX9x-9pja1AhdpiVldRvxjr8PDt_Xo0MzjyYFjulr73bAcdvqTdUJWxACVQQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtType",
+        "message": "Invalid jwt type \"refresh+jwt\"",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-p256-typ-dpop-jwt",
+      "description": "header typ dpop+jwt: a token of another kind, validly signed",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJkcG9wK2p3dCIsImFsZyI6IkVTMjU2In0.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.tJi8THblufq4n21uTsbFqFDjHto2jvmHrV62umDJkLQZOro8DLOwi6C42sObyqjZDohr5JcEX7Ob44dSynyLeg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtType",
+        "message": "Invalid jwt type \"dpop+jwt\"",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-p256-no-typ-no-iat-no-jti",
+      "description": "only the claims the reference verifier requires: iss, aud, exp",
+      "source": "hand-built payload, reference keypair",
+      "token": "eyJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MH0.4gK1G6CB8JxK9SFqr0Sh8ZL_QwPceX3IskYG2KC0G1IOITOrd0ok4rePM2L2NYHX2E1Avm-QKY2Mjp-ywe9QYg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": null,
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-p256-kid-atproto",
+      "description": "kid header naming the default key, as the Spring 2026 specification allows",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IiNhdHByb3RvIn0.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.cF5PFJgSquhcLM5KsKWtvyWVY5HKzGLtg6ymEPNEp9w8_hmnmFv-S1RFj8-4gwuuP4JwOBxWc5J3LDwGoxO5lQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "openssl-p256"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-p256-kid-other",
+      "description": "kid header naming a key the receiving service does not accept",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiIsImtpZCI6IiNhdHByb3RvX2xhYmVsIn0.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.ZHP5NI6mZesUeQjBESmoxP66BFCEX0PQcbk8ipL1WXAL2SHrB_nNFRLPgNWYPmZjISjeM-jvKryfpGmy0Vtm2Q",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "openssl-p256"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "petrel": {
+        "ok": false,
+        "error": "BadJwt",
+        "reason": "the specification says receivers must only accept specific key ids; the reference verifier does not read kid yet",
+        "okWith": "acceptedKeyIDs=#atproto_label"
+      }
+    },
+    {
+      "name": "handbuilt-p256-wrong-alg-for-key",
+      "description": "header alg names the other curve",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NksifQ.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.Y3aybwYq3lTAvnjHr9GLdzl_sLWIfdTzeHeX3EJqjW1Qj8reGKRfBbSlFbHLULHf2_fW-5pdpndiIPIfeLLXPg",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtSignature",
+        "message": "could not verify jwt signature",
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-p256-alg-none",
+      "description": "header alg none",
+      "source": "hand-built header, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJub25lIn0.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.W8FwrW6az05bAxzE0R8vQUJlUY6rfjF8jWyslFgh-fMR1ufIKIKpqMbqIWv-_T2iYhf4VCvr_T98g2C0I4zwhQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtSignature",
+        "message": "could not verify jwt signature",
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "handbuilt-p256-issuer-not-a-did",
+      "description": "iss is a handle",
+      "source": "hand-built payload, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImFsaWNlLmV4YW1wbGUuY29tIiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tIiwiZXhwIjoxNzAwMDAwMDYwLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiIsImp0aSI6Im9wZW5zc2wtcDI1NiJ9.nhMS5ya1tN-7TobW91XFK-wgCAOdGLhtEmI4d2FPw0kQ_7GtN7HXAdFyy0J60Xh5ngSYUV5R84AoaaMdnpbvCQ",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtIss",
+        "message": "jwt iss is not a valid did",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-p256-missing-exp",
+      "description": "no exp claim",
+      "source": "hand-built payload, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoieCJ9.EteNdIXBVjrEB2TMgSsL1VELZtmEmSQ15HvTKUwGRPAKEtpiJycfwmsAs9TmgZQd3078pJjsEXPUBQ43FSnh_g",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwt",
+        "message": "poorly formatted jwt",
+        "keyLookups": []
+      }
+    },
+    {
+      "name": "handbuilt-p256-duplicate-claim",
+      "description": "payload JSON repeats aud; JSON.parse keeps the last value",
+      "source": "hand-built payload, reference keypair",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6YWJjZGVmZ2hpamtsbW5vcHFyc3R1dnd4IiwiYXVkIjoiZGlkOndlYjpvdGhlci5leGFtcGxlLmNvbSIsImF1ZCI6ImRpZDp3ZWI6ZmVlZC5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMDA2MCwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24iLCJqdGkiOiJkdXAifQ.EdUbNnROzH-OTtgFrNFmHZjky5uDFwQFOzwLzLamKhFwfTnRojGFh_XPeovS3q0jxlrik-42VuS0tnzvQ-3-3g",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "lxm": "app.bsky.feed.getFeedSkeleton",
+          "jti": "dup"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "petrel": {
+        "ok": false,
+        "error": "BadJwt",
+        "reason": "Petrel rejects JSON with duplicate members instead of picking one"
+      }
+    },
+    {
+      "name": "ts-p256-tampered-issuer",
+      "description": "payload rewritten to another issuer, signature kept",
+      "source": "createServiceJwt, payload rewritten",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJpYXQiOjE3MDAwMDAwMDAsImlzcyI6ImRpZDpwbGM6enp6enp6enp6enp6enp6enp6enp6enp6IiwiYXVkIjoiZGlkOndlYjpmZWVkLmV4YW1wbGUuY29tI2Jza3lfZmciLCJleHAiOjE3MDAwMDAwNjAsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIiwianRpIjoiNGQ1YjhhZWQ3OGJkYmVmZDA2YzM2ZGRmMjI3ZjA3MjQifQ.8qY7369pPwIL1ibFf4eTxqGVNXRanAh6hZN3B3ydo1M6kITkr5YrhZEGT5qcE6gEI35ZTeDK0may4_e9awYk8A",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com#bsky_fg",
+        "lxm": "app.bsky.feed.getFeedSkeleton",
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwtSignature",
+        "message": "jwt signature does not match jwt issuer",
+        "keyLookups": [
+          {
+            "iss": "did:plc:zzzzzzzzzzzzzzzzzzzzzzzz",
+            "forceRefresh": false
+          },
+          {
+            "iss": "did:plc:zzzzzzzzzzzzzzzzzzzzzzzz",
+            "forceRefresh": true
+          }
+        ]
+      }
+    },
+    {
+      "name": "jose-p256-minimal-lowS",
+      "description": "jose SignJWT with only aud, iss and exp, as xrpc-server auth.test.ts \"interoperates with jwts signed by other libraries\"; this sample is low-S",
+      "source": "jose SignJWT (WebCrypto)",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20iLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImV4cCI6MTcwMDAwMDA2MH0.lgTfPBfT3XG3OKy-037v25rABek7KgzX2rUKMltRIYNRqYPWuVjwb6nH8q-U-II3AJugVLfTcww5wzQs5cSmrw",
+      "highS": false,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": null,
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com",
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "exp": 1700000060
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "jose-p256-minimal-highS",
+      "description": "jose SignJWT with only aud, iss and exp, as xrpc-server auth.test.ts \"interoperates with jwts signed by other libraries\"; this sample is high-S",
+      "source": "jose SignJWT (WebCrypto)",
+      "token": "eyJ0eXAiOiJKV1QiLCJhbGciOiJFUzI1NiJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20iLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImV4cCI6MTcwMDAwMDA2MH0.ZN2SztuXDQybc45D2eXoYu77-rM90Vmr0OYQxmwP-_LyofrdYCNLdpjLBf9V_-oUZh4jAuSqc02A4dBwQkGI1Q",
+      "highS": true,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": null,
+        "key": "p256",
+        "refreshedKey": "p256"
+      },
+      "ts": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com",
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "exp": 1700000060
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      }
+    },
+    {
+      "name": "malformed-two-segments",
+      "description": "not a compact JWS",
+      "source": "literal",
+      "token": "eyJhbGciOiJFUzI1NksifQ.eyJpc3MiOiJkaWQ6cGxjOmFiYyJ9",
+      "highS": null,
+      "verifier": {
+        "audience": "did:web:feed.example.com",
+        "lxm": null,
+        "key": "k256",
+        "refreshedKey": "k256"
+      },
+      "ts": {
+        "ok": false,
+        "error": "BadJwt",
+        "message": "poorly formatted jwt",
+        "keyLookups": []
+      }
+    }
+  ]
+}

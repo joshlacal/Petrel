@@ -1,0 +1,387 @@
+{
+  "description": "What the TypeScript reference implementation and independent ECDSA libraries said about the tokens in the input file.",
+  "generator": {
+    "script": "verify-petrel-tokens.mjs",
+    "node": "v22.23.1",
+    "@atproto/xrpc-server": "0.13.11",
+    "@atproto/crypto": "0.5.7",
+    "jose": "6.2.17"
+  },
+  "now": 1700000000,
+  "results": [
+    {
+      "name": "petrel-k256-lxm",
+      "token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6ImZlZDMzMzlkNWUwMzM3ZWNiOGI5OGM0OGQ1ZGY4ODBiIiwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24ifQ.nFhb4cpo606YqJJx2jVcgqrkevShcaUKOVo428cfJfRWO-sI3hY6oeiJ13bttQwJk9sLlheCiV_7cDtgH3lYeg",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "fed3339d5e0337ecb8b98c48d5df880b",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true
+    },
+    {
+      "name": "petrel-k256-no-lxm",
+      "token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20iLCJleHAiOjE3MDAwMDAwNjAsImlhdCI6MTcwMDAwMDAwMCwiaXNzIjoiZGlkOnBsYzphYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3giLCJqdGkiOiJkNWU0MDMzZDE4MDlkNmNkZTlmNzEwNTBlYjMzMmUzYyJ9.5kj0IxklAtERnsRG5j-kgCVfLB4pkTP9HG4jGAty9Rg4INbuOG_ex9c0Bs02L_8iaIm3ZiSRTwupVzEJZiq3Yg",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "d5e4033d1809d6cde9f71050eb332e3c"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true
+    },
+    {
+      "name": "petrel-k256-kid",
+      "token": "eyJhbGciOiJFUzI1NksiLCJraWQiOiIjYXRwcm90byIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6IjQ3YmQ5NzRhMzdlNmNjZjkzMTg4MzFhMjM4YmZjN2M0IiwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24ifQ.iBXiU5bdYGgwfG5pns0hVbvwk0JZ_0zalBkH8PRSv7xjRNx_hRp-KQmvl6VRinWqub7TnKJlmsoXjAEDJ8y-0A",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "47bd974a37e6ccf9318831a238bfc7c4",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true
+    },
+    {
+      "name": "petrel-k256-upload-30min",
+      "token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJkaWQ6d2ViOnBkcy5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMTgwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6IjVmMmIxNDU4NGE0Y2VhNDM2ZDJjNTYyOTk2MDE0MzY3IiwibHhtIjoiY29tLmF0cHJvdG8ucmVwby51cGxvYWRCbG9iIn0.MsJLHEIsopor_DuHO9J2QZcuaZNeOux2XCjp06QqwFB2PecJQHv6yTSpM5YHhJdcIUxWCFJLPhwCyFI5pY_nuw",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:pds.example.com",
+          "exp": 1700001800,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "5f2b14584a4cea436d2c562996014367",
+          "lxm": "com.atproto.repo.uploadBlob"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true
+    },
+    {
+      "name": "petrel-k256-1h",
+      "token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMzYwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6IjZiZWQ0MzYzNTViNWQ4NWE4YjM5MjYxMmZhODQzZjAwIiwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24ifQ.8yh6qToITRkUjeTDZZGORHWV-LUZmtP09aXzUMBqkr4HatG95ZovpSPBNqZd-SVBLoT72Die41z9KswTfsvfIA",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700003600,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "6bed436355b5d85a8b392612fa843f00",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true
+    },
+    {
+      "name": "petrel-k256-legacy-issuer-fragment",
+      "token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCNhdHByb3RvX2xhYmVsZXIiLCJqdGkiOiJiYTNjZjQ4OWZlOTE4ZGJiM2YzYjJjZjM5MzY5MjM3YyIsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIn0.-RT_x-dDwV3A21vM9CZb-RdBZIMqBb6TIzMD3RhT3MpMhHQJVqF4NAxlRVzxXKJnC2SrqHYX6rbCUdvQ2VPgDA",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+          "jti": "ba3cf489fe918dbb3f3b2cf39369237c",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true
+    },
+    {
+      "name": "petrel-k256-did-web-issuer",
+      "token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6d2ViOmxhYmVsZXIuZXhhbXBsZS5jb20iLCJqdGkiOiJhNDZkMjIwZGUyZGE4YjkyMDVjMjVlY2VjMjFlZmVkYSIsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIn0.5Zlnn7x036IkyQAjKWmgtMvrETMX2UsMvcuZWUNBxUNO1TNyNUrzc1yHaCrXiPVMMEFn_yhJaZA1yLoPlywagw",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:web:labeler.example.com",
+          "jti": "a46d220de2da8b9205c25ecec21efeda",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:web:labeler.example.com",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true
+    },
+    {
+      "name": "petrel-k256-event-id-overload",
+      "token": "eyJhbGciOiJFUzI1NksiLCJ0eXAiOiJKV1QifQ.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6ImV2ZW50LTEiLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiJ9.HGYi5YgNU-h6rAqMSdMtXXHcQ6b15wwp5sJG-igjWshU_wJPnEfPH5Rvqcs_4WxbftLOm4UOu1zEQRt9bYQyAQ",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "event-1",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true
+    },
+    {
+      "name": "petrel-p256-lxm",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6IjFhZjMyY2M1NGU3Y2NlMjQ4N2MxOWVhNTk4OGE1NjEyIiwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24ifQ.MviBeSZzfNrb7SerilOFaF11sjEnKLOBfHzIkQ3v2IAfgt9IlIxZNAGZnnTllgEU0RGcffMwlXHm5skc3G2Aug",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "1af32cc54e7cce2487c19ea5988a5612",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true,
+      "jose": true
+    },
+    {
+      "name": "petrel-p256-no-lxm",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20iLCJleHAiOjE3MDAwMDAwNjAsImlhdCI6MTcwMDAwMDAwMCwiaXNzIjoiZGlkOnBsYzphYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3giLCJqdGkiOiI1MmYzY2Y3ZjE5YmJmZTRiODM2Yjc3MGU5MjNiNmVhNyJ9.64rfnzXTqUouiVXlIzIFcO5oYkYe3fRGDXcdS8SuSNBqfarAHDFDCRAgurG1Wj38TQ21RdEPaBcon4ZR0sTxUA",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "52f3cf7f19bbfe4b836b770e923b6ea7"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true,
+      "jose": true
+    },
+    {
+      "name": "petrel-p256-kid",
+      "token": "eyJhbGciOiJFUzI1NiIsImtpZCI6IiNhdHByb3RvIiwidHlwIjoiSldUIn0.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6IjA0ZDk0YTMwZGJhMjI5MjFhNGM5ODhlZTRiOTNhYjcxIiwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24ifQ.b0pRVNrj3v6qr3RDmzObkvVp9L5v7a_qvyKr0KjN-XkcAmaJczOVvqpE1DU4gDQhLlyXfm2UaGcnin6_2ldrsg",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "04d94a30dba22921a4c988ee4b93ab71",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true,
+      "jose": true
+    },
+    {
+      "name": "petrel-p256-upload-30min",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6d2ViOnBkcy5leGFtcGxlLmNvbSIsImV4cCI6MTcwMDAwMTgwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6IjI3NGUzNzMyMzAxNGUyZTQwOGM1ZjZkMzJlYzliNDJmIiwibHhtIjoiY29tLmF0cHJvdG8ucmVwby51cGxvYWRCbG9iIn0.bXkoweSJzElgFBdaIcXjPEW5EcSrumM8Ag2Xn96Qd9dlGjTvD2JQkRuYp5QImfpQDlkoXVsViGQL3mRinp7y3Q",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:pds.example.com",
+          "exp": 1700001800,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "274e37323014e2e408c5f6d32ec9b42f",
+          "lxm": "com.atproto.repo.uploadBlob"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true,
+      "jose": true
+    },
+    {
+      "name": "petrel-p256-1h",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMzYwMCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6IjBkNjU3MTJlNzNhOGJjYjU3MWQzM2EwMjVlYWRmZmQ1IiwibHhtIjoiYXBwLmJza3kuZmVlZC5nZXRGZWVkU2tlbGV0b24ifQ.UPuIdumAdVBRCq3A9_6rHMP655mNgu74E7eCqsLchU8b8CvOJd5zau_gjipTtuaDaMMmb7jHtFEAaVmT4eLeIQ",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700003600,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "0d65712e73a8bcb571d33a025eadffd5",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true,
+      "jose": true
+    },
+    {
+      "name": "petrel-p256-legacy-issuer-fragment",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCNhdHByb3RvX2xhYmVsZXIiLCJqdGkiOiJkMTI3NmI0ZmZjMGJiMjg1OTAxYmY2OTJmNzk2MGFkNiIsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIn0.neO9bywGg9sKzAMUcnSa285VGZ2S3aapy2MQR82Ew5sDS92gecZaWfYXM2tAlaYrferFrHH6nAJ4ScQuXHJRVQ",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+          "jti": "d1276b4ffc0bb285901bf692f7960ad6",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx#atproto_labeler",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true,
+      "jose": true
+    },
+    {
+      "name": "petrel-p256-did-web-issuer",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6d2ViOmxhYmVsZXIuZXhhbXBsZS5jb20iLCJqdGkiOiJmYjEwMTZhN2Q1YmViNmZlMDYxOWFiYmIzNjYyNzgwNiIsImx4bSI6ImFwcC5ic2t5LmZlZWQuZ2V0RmVlZFNrZWxldG9uIn0.aJbY9GfoQreXyQxmdMDg7fezdjcf2DEHUUWf19xjpthhSPfWGfSSs3AAOx6o6bd4t2R6yLH-4v3aFJhxs1C4Cg",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:web:labeler.example.com",
+          "jti": "fb1016a7d5beb6fe0619abbb36627806",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:web:labeler.example.com",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true,
+      "jose": true
+    },
+    {
+      "name": "petrel-p256-event-id-overload",
+      "token": "eyJhbGciOiJFUzI1NiIsInR5cCI6IkpXVCJ9.eyJhdWQiOiJkaWQ6d2ViOmZlZWQuZXhhbXBsZS5jb20jYnNreV9mZyIsImV4cCI6MTcwMDAwMDA2MCwiaWF0IjoxNzAwMDAwMDAwLCJpc3MiOiJkaWQ6cGxjOmFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eCIsImp0aSI6ImV2ZW50LTEiLCJseG0iOiJhcHAuYnNreS5mZWVkLmdldEZlZWRTa2VsZXRvbiJ9.cQCn3l-qIq-1h2Ejr5pMkp8f0WN5xsT76qELTi5ayac1LXwdlFjOK_cWpP_a5DrQmJyio6Z5mQXnzLXCGb8bNg",
+      "verifyJwt": {
+        "ok": true,
+        "payload": {
+          "aud": "did:web:feed.example.com#bsky_fg",
+          "exp": 1700000060,
+          "iat": 1700000000,
+          "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+          "jti": "event-1",
+          "lxm": "app.bsky.feed.getFeedSkeleton"
+        },
+        "keyLookups": [
+          {
+            "iss": "did:plc:abcdefghijklmnopqrstuvwx",
+            "forceRefresh": false
+          }
+        ]
+      },
+      "strictLowS": true,
+      "openssl": true,
+      "jose": true
+    }
+  ]
+}

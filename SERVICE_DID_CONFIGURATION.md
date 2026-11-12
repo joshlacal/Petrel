@@ -79,10 +79,51 @@ try await client.updateServiceDIDsForCurrentAccount(
 )
 ```
 
+## Typed service references and per-endpoint routing
+
+`setServiceDID(_:for:)` takes the header value as a string. `setServiceProxy(_:for:)` takes an `ATProtoServiceReference`, which validates the DID and requires the service identifier a PDS needs to find the endpoint. The prefix may be a namespace or a full NSID, so one endpoint can be routed apart from the rest of its namespace:
+
+```swift
+// Route one endpoint to a labeler, leaving the rest of com.atproto on the PDS
+try await client.setServiceProxy(
+    ATProtoServiceReference(did: "did:web:labeler.example.com", serviceID: "atproto_labeler"),
+    for: "com.atproto.label.queryLabels"
+)
+
+// Ask where an endpoint is routed
+let target = await client.serviceProxy(for: "app.bsky.feed.getTimeline")
+// target?.did == "did:web:api.bsky.app", target?.serviceID == "bsky_appview"
+```
+
+`setReportLabeler(did:)` is different: it sets `atproto-proxy` for every request the client makes until `clearReportLabeler()` is called. Prefer a prefix route when only some endpoints should reach the labeler.
+
+## What the PDS does with the header
+
+When a request carries `atproto-proxy`, the PDS resolves the service DID, finds the service entry with the given identifier, and forwards the request with an inter-service authentication token: a short-lived JWT signed with the account's signing key, whose `aud` is the service and whose `lxm` is the endpoint. The client never sees that token.
+
+To call a service directly instead of through the proxy, request a token yourself:
+
+```swift
+let token = try await client.getServiceAuthToken(
+    audience: ATProtoServiceReference("did:web:video.example.com#video_service"),
+    lexiconMethod: "com.atproto.repo.uploadBlob",
+    lifetime: 30 * 60
+)
+request.setValue(token.authorizationHeaderValue, forHTTPHeaderField: "Authorization")
+```
+
+Minting and verifying these tokens in Swift — for a feed generator, a labeler or any other service — is covered by the *Service Authentication* articles in the `PetrelCrypto` and `Petrel` DocC catalogs (`Sources/PetrelCrypto/PetrelCrypto.docc/ServiceAuth.md`, `Sources/Petrel/Petrel.docc/ServiceAuthentication.md`).
+
 ## Verify configuration
 
 To run the unit tests covering service DID mapping, longest-prefix resolution, and preferences endpoint exclusions:
 
 ```bash
 swift test --filter ServiceDIDMappingTests
+```
+
+To run the tests that check the `atproto-proxy` header and the `getServiceAuth` query on the wire:
+
+```bash
+swift test --filter ServiceAuthClientTests
 ```
