@@ -91,6 +91,19 @@ let package = Package(
       ]
     ),
     .testTarget(
+      name: "PetrelClientInteropTests",
+      dependencies: [
+        "petrel-oauth-server-example",
+        "PetrelCABServerCore",
+        .product(name: "Petrel", package: "Petrel"),
+        .product(name: "PetrelOAuthServer", package: "Petrel"),
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "HummingbirdTesting", package: "hummingbird"),
+        .product(name: "Logging", package: "swift-log"),
+        .product(name: "Crypto", package: "swift-crypto"),
+      ]
+    ),
+    .testTarget(
       name: "PetrelCABServerCoreTests",
       dependencies: [
         "PetrelCABServerCore",
