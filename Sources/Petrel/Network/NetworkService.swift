@@ -949,21 +949,22 @@ public actor NetworkService: NetworkServiceProtocol {
     ///   - value: The header value.
     public func setHeader(name: String, value: String) async {
         LogManager.logSensitiveValue(value, label: "Network Service - Setting header: \(name)", category: .network)
-        headers[name] = value
+        // Header names are case-insensitive: replace any earlier spelling of this name.
+        headers.setHTTPHeader(name, value)
     }
 
-    /// Gets the value of a custom header
+    /// Gets the value of a custom header, matching the name case-insensitively
     /// - Parameter name: Header name
     /// - Returns: Header value if it exists
     func getHeader(name: String) async -> String? {
-        return headers[name]
+        headers.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
     }
 
-    /// Removes a custom header
+    /// Removes a custom header, matching the name case-insensitively
     /// - Parameter name: Header name to remove
     public func removeHeader(name: String) async {
         LogManager.logDebug("Network Service - Removing header: \(name)")
-        headers.removeValue(forKey: name)
+        headers.setHTTPHeader(name, nil)
     }
 
     /// Clears all custom headers

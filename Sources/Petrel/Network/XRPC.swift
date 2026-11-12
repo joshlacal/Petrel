@@ -77,15 +77,17 @@ public struct XRPCCallOptions: Sendable, Equatable {
 
     /// The headers these options put on a request, layered over `base`.
     func requestHeaders(over base: [String: String]?) -> [String: String]? {
+        // Header names are case-insensitive, so each layer replaces any earlier
+        // spelling of the same name instead of sitting next to it.
         var merged = base ?? [:]
-        for (name, value) in headers {
-            merged[name] = value
+        for name in headers.keys.sorted() {
+            merged.setHTTPHeader(name, headers[name])
         }
         if let proxy {
-            merged["atproto-proxy"] = proxy
+            merged.setHTTPHeader("atproto-proxy", proxy)
         }
         if let acceptLabelers {
-            merged["atproto-accept-labelers"] = XRPCLabeler.headerValue(for: acceptLabelers)
+            merged.setHTTPHeader("atproto-accept-labelers", XRPCLabeler.headerValue(for: acceptLabelers))
         }
         return merged.isEmpty ? base : merged
     }
@@ -309,13 +311,15 @@ public extension NetworkService {
 
         // An explicit options argument wins over an enclosing withCallOptions scope.
         var effective = Self.scopedCallOptions ?? XRPCCallOptions()
-        for (name, value) in options.headers {
-            effective.headers[name] = value
+        for name in options.headers.keys.sorted() {
+            effective.headers.setHTTPHeader(name, options.headers[name])
         }
         effective.proxy = options.proxy ?? effective.proxy
         effective.acceptLabelers = options.acceptLabelers ?? effective.acceptLabelers
         effective.service = options.service ?? effective.service
-        if effective.proxy == nil {
+        // A caller's own atproto-proxy header, in any spelling, is routing too;
+        // default routing must not replace it.
+        if effective.proxy == nil, !effective.headers.hasHTTPHeader("atproto-proxy") {
             effective.proxy = await getServiceDID(for: endpoint)
         }
 
@@ -342,6 +346,25 @@ public extension NetworkService {
                 ),
                 body: data
             )
+        }
+    }
+}
+
+extension Dictionary where Key == String, Value == String {
+    /// Whether a header with this name is present, ignoring case.
+    func hasHTTPHeader(_ name: String) -> Bool {
+        keys.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+    }
+
+    /// Sets a header, first removing every entry whose name matches ignoring case,
+    /// so the dictionary never holds two spellings of one header.
+    mutating func setHTTPHeader(_ name: String, _ value: String?) {
+        let matching = keys.filter { $0.caseInsensitiveCompare(name) == .orderedSame }
+        for key in matching {
+            removeValue(forKey: key)
+        }
+        if let value {
+            self[name] = value
         }
     }
 }

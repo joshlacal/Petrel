@@ -458,6 +458,67 @@ final class GeneratedXRPCCallTests: XCTestCase {
         XCTAssertNil(request.value(forHTTPHeaderField: "atproto-accept-labelers"))
     }
 
+    /// Header names are case-insensitive. Layers merged by exact spelling kept both
+    /// `atproto-proxy` and `Atproto-Proxy`, and which one URLRequest ended up sending
+    /// depended on dictionary iteration order.
+    func testCallOptionHeadersReplaceBaseHeadersWhateverTheirCase() {
+        let merged = XRPCCallOptions(headers: ["Atproto-Proxy": "did:web:caller.example#svc"])
+            .requestHeaders(over: ["atproto-proxy": "did:web:default.example#svc", "X-Other": "kept"])
+        XCTAssertEqual(merged, ["Atproto-Proxy": "did:web:caller.example#svc", "X-Other": "kept"])
+
+        let withFields = XRPCCallOptions(
+            headers: ["ATPROTO-PROXY": "did:web:header.example#svc", "Atproto-Accept-Labelers": "did:plc:old"],
+            proxy: "did:web:field.example#svc",
+            acceptLabelers: [XRPCLabeler(did: "did:plc:new")]
+        ).requestHeaders(over: nil)
+        XCTAssertEqual(withFields, ["atproto-proxy": "did:web:field.example#svc", "atproto-accept-labelers": "did:plc:new"])
+    }
+
+    func testCallerProxyHeaderInAnyCaseWinsOverDefaultRouting() async throws {
+        let service = NetworkService(baseURL: baseURL)
+        await service.setServiceDID("did:web:api.example.com#default_appview", for: "com.example")
+        for spelling in ["atproto-proxy", "Atproto-Proxy", "ATPROTO-PROXY"] {
+            XRPCStubURLProtocol.install(status: 200, body: "{}")
+            _ = try await service.xrpcQuery(
+                "com.example.widget.getThing",
+                options: XRPCCallOptions(headers: [spelling: "did:web:other.example.com#widget_view"])
+            )
+            let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "atproto-proxy"), "did:web:other.example.com#widget_view", spelling)
+        }
+    }
+
+    func testServiceWideHeadersAreKeyedCaseInsensitively() async throws {
+        let service = NetworkService(baseURL: baseURL)
+        for attempt in 0 ..< 8 {
+            await service.setHeader(name: "X-Widget-Client", value: "first-\(attempt)")
+            await service.setHeader(name: "x-widget-client", value: "second-\(attempt)")
+            let stored = await service.getHeader(name: "X-WIDGET-CLIENT")
+            XCTAssertEqual(stored, "second-\(attempt)")
+
+            XRPCStubURLProtocol.install(status: 200, body: "{}")
+            _ = try await service.xrpcQuery("com.example.widget.getThing")
+            let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "x-widget-client"), "second-\(attempt)")
+        }
+        await service.removeHeader(name: "X-WIDGET-CLIENT")
+        let removed = await service.getHeader(name: "x-widget-client")
+        XCTAssertNil(removed)
+    }
+
+    func testExplicitOptionHeadersReplaceScopedOnesWhateverTheirCase() async throws {
+        let service = NetworkService(baseURL: baseURL)
+        XRPCStubURLProtocol.install(status: 200, body: "{}")
+        _ = try await NetworkService.withCallOptions(XRPCCallOptions(headers: ["x-widget-trace": "scoped"])) {
+            try await service.xrpcQuery(
+                "com.example.widget.getThing",
+                options: XRPCCallOptions(headers: ["X-Widget-Trace": "explicit"])
+            )
+        }
+        let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "x-widget-trace"), "explicit")
+    }
+
     func testServiceOptionSendsOneCallToAnotherService() async throws {
         XRPCStubURLProtocol.install(status: 200, body: "{}")
 
