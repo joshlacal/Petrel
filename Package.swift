@@ -42,6 +42,10 @@ let package = Package(
             name: "PetrelOAuthScopes",
             targets: ["PetrelOAuthScopes"]
         ),
+        .library(
+            name: "PetrelOAuthServer",
+            targets: ["PetrelOAuthServer"]
+        ),
         .executable(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
@@ -179,6 +183,17 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        .target(
+            name: "PetrelOAuthServer",
+            dependencies: [
+                "PetrelOAuthScopes",
+                "PetrelCrypto",
+                .product(name: "Crypto", package: "swift-crypto"),
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .executableTarget(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
@@ -242,6 +257,14 @@ let package = Package(
             dependencies: ["PetrelOAuthScopes"],
             exclude: ["UpstreamGoldens"],
             resources: [.copy("Fixtures")]
+        ),
+        .testTarget(
+            name: "PetrelOAuthServerTests",
+            dependencies: [
+                "PetrelOAuthServer",
+                "PetrelCrypto",
+                .product(name: "Crypto", package: "swift-crypto"),
+            ]
         ),
         .testTarget(
             name: "PetrelLoadTests",

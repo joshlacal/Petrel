@@ -8,12 +8,19 @@ let package = Package(
     .executable(name: "petrel-cab-server", targets: ["petrel-cab-server"]),
     .executable(name: "petrel-cab-demo", targets: ["petrel-cab-demo"]),
     .library(name: "PetrelCABServerCore", targets: ["PetrelCABServerCore"]),
+    .library(name: "PetrelOAuthServerHummingbird", targets: ["PetrelOAuthServerHummingbird"]),
+    .executable(name: "petrel-oauth-server-example", targets: ["petrel-oauth-server-example"]),
   ],
   dependencies: [
     .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.25.0"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
     .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
     .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
+    // Already in the graph through Hummingbird; named so the pinned transport
+    // can use them directly.
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
+    .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.29.0"),
+    .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
     .package(name: "Petrel", path: ".."),
   ],
   targets: [
@@ -44,6 +51,43 @@ let package = Package(
         .product(name: "Hummingbird", package: "hummingbird"),
       ],
       swiftSettings: [.swiftLanguageMode(.v6)]
+    ),
+    .target(
+      name: "PetrelOAuthServerHummingbird",
+      dependencies: [
+        .product(name: "Hummingbird", package: "hummingbird"),
+        .product(name: "PetrelOAuthServer", package: "Petrel"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOPosix", package: "swift-nio"),
+        .product(name: "NIOHTTP1", package: "swift-nio"),
+        .product(name: "NIOSSL", package: "swift-nio-ssl"),
+      ],
+      swiftSettings: [.swiftLanguageMode(.v6)]
+    ),
+    .executableTarget(
+      name: "petrel-oauth-server-example",
+      dependencies: [
+        "PetrelOAuthServerHummingbird",
+        .product(name: "PetrelOAuthServer", package: "Petrel"),
+        .product(name: "ArgumentParser", package: "swift-argument-parser"),
+        .product(name: "Hummingbird", package: "hummingbird"),
+      ],
+      swiftSettings: [.swiftLanguageMode(.v6)]
+    ),
+    .testTarget(
+      name: "PetrelOAuthServerHummingbirdTests",
+      dependencies: [
+        "PetrelOAuthServerHummingbird",
+        "petrel-oauth-server-example",
+        .product(name: "PetrelOAuthServer", package: "Petrel"),
+        .product(name: "HummingbirdTesting", package: "hummingbird"),
+        .product(name: "NIOCore", package: "swift-nio"),
+        .product(name: "NIOPosix", package: "swift-nio"),
+        .product(name: "NIOHTTP1", package: "swift-nio"),
+        .product(name: "NIOSSL", package: "swift-nio-ssl"),
+        .product(name: "X509", package: "swift-certificates"),
+        .product(name: "Crypto", package: "swift-crypto"),
+      ]
     ),
     .testTarget(
       name: "PetrelCABServerCoreTests",

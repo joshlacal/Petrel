@@ -155,3 +155,20 @@ Check status:
 sudo systemctl status petrel-cab-server
 sudo journalctl -u petrel-cab-server -f
 ```
+
+## OAuth authorization server adapter and example
+
+This package also hosts the Hummingbird side of `PetrelOAuthServer`, the framework-agnostic AT Protocol OAuth authorization server that ships as a product of the root Petrel package. It lives here so that applications depending on Petrel do not resolve Hummingbird and SwiftNIO.
+
+- `PetrelOAuthServerHummingbird` registers every authorization-server endpoint on a Hummingbird router (`OAuthServerHummingbird.addRoutes(to:server:)`) and adapts a Hummingbird request for the resource-server verifier (`OAuthServerHummingbird.authenticate(_:verifier:publicOrigin:)`).
+- `petrel-oauth-server-example` is a complete, runnable server: in-memory stores, one demo account, loopback development clients accepted, and one DPoP-protected XRPC route.
+
+```
+swift run petrel-oauth-server-example --port 8787
+```
+
+The account is `demo.test` with password `petrel-demo`. Any `http://localhost` development client can sign in; discoverable clients are fetched from their `client_id` URL.
+
+`Tests/PetrelOAuthServerHummingbirdTests` drives the example through the whole flow (discovery, pushed authorization request, sign-in, consent, code exchange, a DPoP-protected resource request, refresh, revocation), once through the router and once over a real loopback TCP connection.
+
+The tests in `PetrelCABIntegrationTests` that call deployed services run only when `PETREL_LIVE_NETWORK_TESTS=1`.
