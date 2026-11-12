@@ -1,13 +1,21 @@
 import Foundation
 
 
-
 // lexicon: 1, id: blue.catbird.golden.defs
 
-
-public struct BlueCatbirdGoldenDefs { 
+public struct BlueCatbirdGoldenDefs {
 
     public static let typeIdentifier = "blue.catbird.golden.defs"
+
+
+
+
+
+
+
+
+
+
 
 
 
@@ -61,5 +69,4 @@ public struct Mode: Codable, ATProtocolCodable, ATProtocolValue {
 }
 
 
-                           
 

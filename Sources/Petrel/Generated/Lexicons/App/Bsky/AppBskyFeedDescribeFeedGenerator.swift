@@ -3,37 +3,41 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.feed.describeFeedGenerator
 
+/// Get information about a feed generator, including policies and offered feed URIs. Does not require auth; implemented by Feed Generator services (not App View).
 public enum AppBskyFeedDescribeFeedGenerator {
     public static let typeIdentifier = "app.bsky.feed.describeFeedGenerator"
 
     public struct Feed: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.describeFeedGenerator#feed"
+
         public let uri: ATProtocolURI
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: ATProtocolURI
+            uri: ATProtocolURI,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(uri)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -41,7 +45,7 @@ public enum AppBskyFeedDescribeFeedGenerator {
             if uri != other.uri {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -50,55 +54,68 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
         }
     }
 
     public struct Links: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.describeFeedGenerator#links"
+
         public let privacyPolicy: String?
         public let termsOfService: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            privacyPolicy: String? = nil, termsOfService: String? = nil
+            privacyPolicy: String? = nil,
+            termsOfService: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.privacyPolicy = privacyPolicy
             self.termsOfService = termsOfService
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                privacyPolicy = try container.decodeIfPresent(String.self, forKey: .privacyPolicy)
+                privacyPolicy = try container.decodeIfPresent(String.self, forKey: .privacyPolicy, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'privacyPolicy' — degrading to nil: \(error)")
                 privacyPolicy = nil
             }
             do {
-                termsOfService = try container.decodeIfPresent(String.self, forKey: .termsOfService)
+                termsOfService = try container.decodeIfPresent(String.self, forKey: .termsOfService, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'termsOfService' — degrading to nil: \(error)")
                 termsOfService = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(privacyPolicy, forKey: .privacyPolicy)
             try container.encodeIfPresent(termsOfService, forKey: .termsOfService)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -112,6 +129,7 @@ public enum AppBskyFeedDescribeFeedGenerator {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -122,7 +140,7 @@ public enum AppBskyFeedDescribeFeedGenerator {
             if termsOfService != other.termsOfService {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -131,7 +149,6 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = privacyPolicy {
                 let privacyPolicyValue = try value.toCBORValue()
                 map = map.adding(key: "privacyPolicy", value: privacyPolicyValue)
@@ -140,11 +157,12 @@ public enum AppBskyFeedDescribeFeedGenerator {
                 let termsOfServiceValue = try value.toCBORValue()
                 map = map.adding(key: "termsOfService", value: termsOfServiceValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "privacyPolicy", "termsOfService"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case privacyPolicy
             case termsOfService
         }
@@ -152,38 +170,31 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
     public struct Output: ATProtocolCodable {
         public let did: DID
-
         public let feeds: [Feed]
-
         public let links: Links?
 
-        /// Standard public initializer
         public init(
             did: DID,
-
             feeds: [Feed],
-
             links: Links? = nil
-
         ) {
             self.did = did
-
             self.feeds = feeds
-
             self.links = links
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             did = try container.decode(DID.self, forKey: .did)
-
             feeds = try container.decode([Feed].self, forKey: .feeds)
-
             do {
-                links = try container.decodeIfPresent(Links.self, forKey: .links)
+                links = try container.decodeIfPresent(Links.self, forKey: .links, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
                 links = nil
             }
@@ -191,30 +202,21 @@ public enum AppBskyFeedDescribeFeedGenerator {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(did, forKey: .did)
-
             try container.encode(feeds, forKey: .feeds)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(links, forKey: .links)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
             let feedsValue = try feeds.toCBORValue()
             map = map.adding(key: "feeds", value: feedsValue)
-
             if let value = links {
-                // Encode optional property even if it's an empty array for CBOR
                 let linksValue = try value.toCBORValue()
                 map = map.adding(key: "links", value: linksValue)
             }
-
             return map
         }
 
@@ -231,8 +233,8 @@ public extension ATProtoClient.App.Bsky.Feed {
 
     /// Get information about a feed generator, including policies and offered feed URIs. Does not require auth; implemented by Feed Generator services (not App View).
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func describeFeedGenerator() async throws -> (responseCode: Int, data: AppBskyFeedDescribeFeedGenerator.Output?) {
         let endpoint = "app.bsky.feed.describeFeedGenerator"
 
@@ -249,35 +251,26 @@ public extension ATProtoClient.App.Bsky.Feed {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.feed.describeFeedGenerator")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyFeedDescribeFeedGenerator.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.describeFeedGenerator: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyFeedDescribeFeedGenerator.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

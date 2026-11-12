@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.sync.getRepoStatus
 
+/// Get the hosting status for a repository, on this server. Expected to be implemented by PDS and Relay.
 public enum ComAtprotoSyncGetRepoStatus {
     public static let typeIdentifier = "com.atproto.sync.getRepoStatus"
+
     public struct Parameters: Parametrizable {
         public let did: DID
 
@@ -17,52 +19,46 @@ public enum ComAtprotoSyncGetRepoStatus {
 
     public struct Output: ATProtocolCodable {
         public let did: DID
-
         public let active: Bool
-
+        /// If active=false, this optional field indicates a possible reason for why the account is not active. If active=false and no status is supplied, then the host makes no claim for why the repository is no longer being hosted.
         public let status: String?
-
+        /// Optional field, the current rev of the repo, if active=true
         public let rev: TID?
 
-        /// Standard public initializer
         public init(
             did: DID,
-
             active: Bool,
-
             status: String? = nil,
-
             rev: TID? = nil
-
         ) {
             self.did = did
-
             self.active = active
-
             self.status = status
-
             self.rev = rev
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             did = try container.decode(DID.self, forKey: .did)
-
             active = try container.decode(Bool.self, forKey: .active)
-
             do {
-                status = try container.decodeIfPresent(String.self, forKey: .status)
+                status = try container.decodeIfPresent(String.self, forKey: .status, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
                 status = nil
             }
-
             do {
-                rev = try container.decodeIfPresent(TID.self, forKey: .rev)
+                rev = try container.decodeIfPresent(TID.self, forKey: .rev, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'rev' — degrading to nil: \(error)")
                 rev = nil
             }
@@ -70,39 +66,26 @@ public enum ComAtprotoSyncGetRepoStatus {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(did, forKey: .did)
-
             try container.encode(active, forKey: .active)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(status, forKey: .status)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(rev, forKey: .rev)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
             let activeValue = try active.toCBORValue()
             map = map.adding(key: "active", value: activeValue)
-
             if let value = status {
-                // Encode optional property even if it's an empty array for CBOR
                 let statusValue = try value.toCBORValue()
                 map = map.adding(key: "status", value: statusValue)
             }
-
             if let value = rev {
-                // Encode optional property even if it's an empty array for CBOR
                 let revValue = try value.toCBORValue()
                 map = map.adding(key: "rev", value: revValue)
             }
-
             return map
         }
 
@@ -132,9 +115,8 @@ public extension ATProtoClient.Com.Atproto.Sync {
     /// Get the hosting status for a repository, on this server. Expected to be implemented by PDS and Relay.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoSyncGetRepoStatus.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getRepoStatus(input: ComAtprotoSyncGetRepoStatus.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSyncGetRepoStatus.Output?) {
         let endpoint = "com.atproto.sync.getRepoStatus"
 
@@ -154,41 +136,23 @@ public extension ATProtoClient.Com.Atproto.Sync {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSyncGetRepoStatus.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSyncGetRepoStatus.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.sync.getRepoStatus: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSyncGetRepoStatus.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSyncGetRepoStatus.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

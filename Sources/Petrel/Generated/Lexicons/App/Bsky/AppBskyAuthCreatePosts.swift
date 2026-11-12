@@ -5,4 +5,18 @@ import Foundation
 
 public enum AppBskyAuthCreatePosts {
     public static let typeIdentifier = "app.bsky.authCreatePosts"
+
+    /// The permission set this lexicon declares. Request it as an OAuth scope with
+    /// `permissionSet.includeScope(audience:)`.
+    public static let permissionSet = LexiconPermissionSet(
+        nsid: "app.bsky.authCreatePosts",
+        title: "Create Bluesky Posts",
+        titleLang: [:],
+        detail: "Can not update or delete posts.",
+        detailLang: [:],
+        permissions: [
+            LexiconPermission(resource: "rpc", parameters: ["lxm": ["app.bsky.video.uploadVideo", "app.bsky.video.getJobStatus", "app.bsky.video.getUploadLimits", "app.bsky.video.startUpload", "app.bsky.video.uploadPart", "app.bsky.video.finishUpload", "app.bsky.video.abortUpload", "app.bsky.video.getUploadStatus"]], inheritAud: true),
+            LexiconPermission(resource: "repo", parameters: ["action": ["create"], "collection": ["app.bsky.feed.post", "app.bsky.feed.postgate", "app.bsky.feed.threadgate"]], inheritAud: false),
+        ]
+    )
 }

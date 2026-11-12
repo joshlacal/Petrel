@@ -1,0 +1,194 @@
+{
+  "lexicon": 1,
+  "id": "com.example.widget.defs",
+  "defs": {
+    "gadget": {
+      "type": "object",
+      "description": "An object that uses every field type a third-party Lexicon may.",
+      "required": [
+        "id",
+        "meta",
+        "head"
+      ],
+      "nullable": [
+        "retiredAt",
+        "replacedBy"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "tid"
+        },
+        "meta": {
+          "type": "object",
+          "description": "An inline object.",
+          "required": [
+            "label"
+          ],
+          "properties": {
+            "label": {
+              "type": "string"
+            },
+            "weight": {
+              "type": "integer"
+            },
+            "origin": {
+              "type": "object",
+              "description": "An inline object inside an inline object.",
+              "properties": {
+                "country": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "parts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "sku"
+            ],
+            "properties": {
+              "sku": {
+                "type": "string"
+              },
+              "quantity": {
+                "type": "integer"
+              }
+            }
+          }
+        },
+        "bag": {
+          "type": "object",
+          "description": "An object with no declared properties."
+        },
+        "head": {
+          "type": "cid-link"
+        },
+        "payload": {
+          "type": "bytes"
+        },
+        "picture": {
+          "type": "blob",
+          "accept": [
+            "image/*"
+          ],
+          "maxSize": 1000000
+        },
+        "status": {
+          "type": "ref",
+          "ref": "#status"
+        },
+        "grade": {
+          "type": "ref",
+          "ref": "#grade"
+        },
+        "kind": {
+          "type": "ref",
+          "ref": "com.example.widget.kind"
+        },
+        "retiredAt": {
+          "type": "string",
+          "format": "datetime",
+          "description": "Optional and nullable: absent, null and a value are distinct."
+        },
+        "replacedBy": {
+          "type": "ref",
+          "ref": "#gadgetRef"
+        },
+        "attachment": {
+          "type": "union",
+          "description": "The same record referenced with and without #main.",
+          "refs": [
+            "com.example.widget.note#main",
+            "#gadgetRef"
+          ]
+        },
+        "decision": {
+          "type": "union",
+          "closed": true,
+          "refs": [
+            "#approved",
+            "#rejected"
+          ]
+        },
+        "sizes": {
+          "type": "ref",
+          "ref": "#sizes"
+        },
+        "extra": {
+          "type": "unknown"
+        }
+      }
+    },
+    "gadgetRef": {
+      "type": "object",
+      "required": [
+        "uri"
+      ],
+      "properties": {
+        "uri": {
+          "type": "string",
+          "format": "at-uri"
+        }
+      }
+    },
+    "approved": {
+      "type": "object",
+      "properties": {
+        "by": {
+          "type": "string",
+          "format": "did"
+        }
+      }
+    },
+    "rejected": {
+      "type": "object",
+      "required": [
+        "reason"
+      ],
+      "properties": {
+        "reason": {
+          "type": "string"
+        }
+      }
+    },
+    "status": {
+      "type": "string",
+      "knownValues": [
+        "com.example.widget.defs#statusActive",
+        "com.example.widget.defs#statusRetired"
+      ]
+    },
+    "grade": {
+      "type": "string",
+      "enum": [
+        "a",
+        "b",
+        "c"
+      ]
+    },
+    "sizes": {
+      "type": "array",
+      "description": "A named array definition.",
+      "items": {
+        "type": "integer"
+      },
+      "maxLength": 8
+    },
+    "statusActive": {
+      "type": "token",
+      "description": "The gadget is in service."
+    },
+    "statusRetired": {
+      "type": "token",
+      "description": "The gadget is out of service."
+    },
+    "typeIdentifier": {
+      "type": "token",
+      "description": "A token named like a member every generated container has."
+    }
+  }
+}

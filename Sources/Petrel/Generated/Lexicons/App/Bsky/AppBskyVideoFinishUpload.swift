@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.video.finishUpload
 
+/// Finish an upload. This call is idempotent and safe to retry. On deduplication completedJobId may differ from the input jobId; poll getJobStatus with completedJobId. Probe-based validation failures surface later as JOB_STATE_FAILED from getJobStatus, not as errors from this call.
 public enum AppBskyVideoFinishUpload {
     public static let typeIdentifier = "app.bsky.video.finishUpload"
+
     public struct Input: ATProtocolCodable {
         public let jobId: String
 
-        /// Standard public initializer
-        public init(jobId: String) {
+        public init(
+            jobId: String
+        ) {
             self.jobId = jobId
         }
 
@@ -36,47 +39,36 @@ public enum AppBskyVideoFinishUpload {
     }
 
     public struct Output: ATProtocolCodable {
+        /// The processing job to poll with getJobStatus; on deduplication this may differ from the input jobId.
         public let completedJobId: String
-
         public let jobStatus: AppBskyVideoDefs.JobStatus
 
-        /// Standard public initializer
         public init(
             completedJobId: String,
-
             jobStatus: AppBskyVideoDefs.JobStatus
-
         ) {
             self.completedJobId = completedJobId
-
             self.jobStatus = jobStatus
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             completedJobId = try container.decode(String.self, forKey: .completedJobId)
-
             jobStatus = try container.decode(AppBskyVideoDefs.JobStatus.self, forKey: .jobStatus)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(completedJobId, forKey: .completedJobId)
-
             try container.encode(jobStatus, forKey: .jobStatus)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let completedJobIdValue = try completedJobId.toCBORValue()
             map = map.adding(key: "completedJobId", value: completedJobIdValue)
-
             let jobStatusValue = try jobStatus.toCBORValue()
             map = map.adding(key: "jobStatus", value: jobStatusValue)
-
             return map
         }
 
@@ -116,13 +108,12 @@ public enum AppBskyVideoFinishUpload {
 public extension ATProtoClient.App.Bsky.Video {
     // MARK: - finishUpload
 
-    // Finish an upload. This call is idempotent and safe to retry. On deduplication completedJobId may differ from the input jobId; poll getJobStatus with completedJobId. Probe-based validation failures surface later as JOB_STATE_FAILED from getJobStatus, not as errors from this call.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Finish an upload. This call is idempotent and safe to retry. On deduplication completedJobId may differ from the input jobId; poll getJobStatus with completedJobId. Probe-based validation failures surface later as JOB_STATE_FAILED from getJobStatus, not as errors from this call.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<AppBskyVideoFinishUpload.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func finishUpload(
         input: AppBskyVideoFinishUpload.Input
 
@@ -153,40 +144,23 @@ public extension ATProtoClient.App.Bsky.Video {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyVideoFinishUpload.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyVideoFinishUpload.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.finishUpload: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyVideoFinishUpload.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyVideoFinishUpload.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

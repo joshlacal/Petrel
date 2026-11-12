@@ -3,18 +3,32 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.putRecord
 
+/// Write a record in a permissioned space, creating or updating it as needed. Requires auth, implemented by PDS.
 public enum ComAtprotoSpacePutRecord {
     public static let typeIdentifier = "com.atproto.space.putRecord"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// The DID of the repo to write to (the authenticated member).
         public let repo: DID
+        /// The NSID of the record collection.
         public let collection: NSID
+        /// The Record Key.
         public let rkey: RecordKey
+        /// Can be set to 'false' to skip Lexicon schema validation of record data, 'true' to require it, or leave unset to validate only for known Lexicons.
         public let validate: Bool?
+        /// The record to write.
         public let record: ATProtocolValueContainer
 
-        /// Standard public initializer
-        public init(space: SpaceRef, repo: DID, collection: NSID, rkey: RecordKey, validate: Bool? = nil, record: ATProtocolValueContainer) {
+        public init(
+            space: SpaceRef,
+            repo: DID,
+            collection: NSID,
+            rkey: RecordKey,
+            validate: Bool? = nil,
+            record: ATProtocolValueContainer
+        ) {
             self.space = space
             self.repo = repo
             self.collection = collection
@@ -86,39 +100,33 @@ public enum ComAtprotoSpacePutRecord {
     }
 
     public struct Output: ATProtocolCodable {
+        /// URI of the written record.
         public let uri: ATProtocolURI
-
-        public let cid: CID
-
+        public let cid: CIDString
         public let validationStatus: String?
 
-        /// Standard public initializer
         public init(
             uri: ATProtocolURI,
-
-            cid: CID,
-
+            cid: CIDString,
             validationStatus: String? = nil
-
         ) {
             self.uri = uri
-
             self.cid = cid
-
             self.validationStatus = validationStatus
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
-            cid = try container.decode(CID.self, forKey: .cid)
-
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
-                validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+                validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'validationStatus' — degrading to nil: \(error)")
                 validationStatus = nil
             }
@@ -126,30 +134,21 @@ public enum ComAtprotoSpacePutRecord {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(uri, forKey: .uri)
-
             try container.encode(cid, forKey: .cid)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(validationStatus, forKey: .validationStatus)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
             let cidValue = try cid.toCBORValue()
             map = map.adding(key: "cid", value: cidValue)
-
             if let value = validationStatus {
-                // Encode optional property even if it's an empty array for CBOR
                 let validationStatusValue = try value.toCBORValue()
                 map = map.adding(key: "validationStatus", value: validationStatusValue)
             }
-
             return map
         }
 
@@ -196,13 +195,12 @@ public enum ComAtprotoSpacePutRecord {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - putRecord
 
-    // Write a record in a permissioned space, creating or updating it as needed. Requires auth, implemented by PDS.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Write a record in a permissioned space, creating or updating it as needed. Requires auth, implemented by PDS.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoSpacePutRecord.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func putRecord(
         input: ComAtprotoSpacePutRecord.Input
 
@@ -233,44 +231,23 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpacePutRecord.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSpacePutRecord.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.putRecord: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpacePutRecord.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSpacePutRecord.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

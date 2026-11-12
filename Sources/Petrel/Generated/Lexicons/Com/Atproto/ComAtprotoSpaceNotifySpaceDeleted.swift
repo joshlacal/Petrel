@@ -3,13 +3,17 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.notifySpaceDeleted
 
+/// Notify a syncing service that a space was deleted and its copy should be dropped. Sent by the space authority to registered services, retried until delivered or the registration expires. Requires service auth.
 public enum ComAtprotoSpaceNotifySpaceDeleted {
     public static let typeIdentifier = "com.atproto.space.notifySpaceDeleted"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the deleted space.
         public let space: SpaceRef
 
-        /// Standard public initializer
-        public init(space: SpaceRef) {
+        public init(
+            space: SpaceRef
+        ) {
             self.space = space
         }
 
@@ -60,13 +64,12 @@ public enum ComAtprotoSpaceNotifySpaceDeleted {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - notifySpaceDeleted
 
-    // Notify a syncing service that a space was deleted and its copy should be dropped. Sent by the space authority to registered services, retried until delivered or the registration expires. Requires service auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Notify a syncing service that a space was deleted and its copy should be dropped. Sent by the space authority to registered services, retried until delivered or the registration expires. Requires service auth.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func notifySpaceDeleted(
         input: ComAtprotoSpaceNotifySpaceDeleted.Input
 
@@ -95,10 +98,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
         }
 
         return responseCode

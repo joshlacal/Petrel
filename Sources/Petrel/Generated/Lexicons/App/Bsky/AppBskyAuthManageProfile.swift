@@ -5,4 +5,17 @@ import Foundation
 
 public enum AppBskyAuthManageProfile {
     public static let typeIdentifier = "app.bsky.authManageProfile"
+
+    /// The permission set this lexicon declares. Request it as an OAuth scope with
+    /// `permissionSet.includeScope(audience:)`.
+    public static let permissionSet = LexiconPermissionSet(
+        nsid: "app.bsky.authManageProfile",
+        title: "Manage Bluesky Profile",
+        titleLang: [:],
+        detail: "Update profile data, as well as status and public chat visibility.",
+        detailLang: [:],
+        permissions: [
+            LexiconPermission(resource: "repo", parameters: ["action": ["create", "update", "delete"], "collection": ["app.bsky.actor.link", "app.bsky.actor.profile", "app.bsky.actor.status", "app.bsky.notification.declaration"]], inheritAud: false),
+        ]
+    )
 }

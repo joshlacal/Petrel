@@ -5,4 +5,17 @@ import Foundation
 
 public enum AppBskyAuthDeleteContent {
     public static let typeIdentifier = "app.bsky.authDeleteContent"
+
+    /// The permission set this lexicon declares. Request it as an OAuth scope with
+    /// `permissionSet.includeScope(audience:)`.
+    public static let permissionSet = LexiconPermissionSet(
+        nsid: "app.bsky.authDeleteContent",
+        title: "Delete Bluesky Content",
+        titleLang: [:],
+        detail: "Clean up public account history: posts, reposts, and likes.",
+        detailLang: [:],
+        permissions: [
+            LexiconPermission(resource: "repo", parameters: ["action": ["delete"], "collection": ["app.bsky.feed.like", "app.bsky.feed.post", "app.bsky.feed.postgate", "app.bsky.feed.repost", "app.bsky.feed.threadgate"]], inheritAud: false),
+        ]
+    )
 }

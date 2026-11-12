@@ -3,16 +3,32 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.graph.listitem
 
+/// Record representing an account's inclusion on a specific list. The AppView will ignore duplicate listitem records.
 public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.graph.listitem"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    /// The account which is included on the list.
     public let subject: DID
+    /// Reference (AT-URI) to the list record (app.bsky.graph.list).
     public let list: ATProtocolURI
     public let createdAt: ATProtocolDate
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(subject: DID, list: ATProtocolURI, createdAt: ATProtocolDate) {
+    public init(
+        subject: DID,
+        list: ATProtocolURI,
+        createdAt: ATProtocolDate,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.subject = subject
         self.list = list
         self.createdAt = createdAt
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
@@ -20,6 +36,7 @@ public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
         subject = try container.decode(DID.self, forKey: .subject)
         list = try container.decode(ATProtocolURI.self, forKey: .list)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -28,10 +45,14 @@ public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
         try container.encode(subject, forKey: .subject)
         try container.encode(list, forKey: .list)
         try container.encode(createdAt, forKey: .createdAt)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(subject)
+        hasher.combine(list)
+        hasher.combine(createdAt)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -45,13 +66,11 @@ public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
         if createdAt != other.createdAt {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(subject)
-        hasher.combine(list)
-        hasher.combine(createdAt)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -63,8 +82,10 @@ public struct AppBskyGraphListitem: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "list", value: listValue)
         let createdAtValue = try createdAt.toCBORValue()
         map = map.adding(key: "createdAt", value: createdAtValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "list", "createdAt"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

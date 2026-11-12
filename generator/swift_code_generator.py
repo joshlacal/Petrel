@@ -1,7 +1,14 @@
 import json
+import re
 from typing import Dict, List, Any, Optional
-from utils import convert_to_camel_case, lowercase_first_letter
-from templates import TemplateManager
+from utils import (
+    convert_to_camel_case,
+    lowercase_first_letter,
+    namespace_type_path,
+    normalize_ref,
+    swift_member_name,
+)
+from templates import TemplateManager, sanitize_swift_keyword
 from enum_generator import EnumGenerator
 from type_converter import TypeConverter
 from base_code_generator import BaseCodeGenerator
@@ -13,19 +20,53 @@ from base_code_generator import BaseCodeGenerator
 # QueryParametersTests.EveryLeafParameters.
 QUERY_ENCODABLE_SWIFT_TYPES = frozenset({
     "String", "Int", "Bool",
-    "CID", "ATProtocolDate", "URI", "ATProtocolURI", "SpaceRef", "ATIdentifier",
+    "CID", "CIDString", "ATProtocolDate", "URI", "ATProtocolURI", "SpaceRef", "ATIdentifier",
     "DID", "Handle", "NSID", "TID", "RecordKey", "LanguageCodeContainer",
 })
 
+# Static members every generated lexicon container may declare. A token constant
+# with one of these names gets a `Token` suffix instead of redeclaring the member.
+RESERVED_CONTAINER_MEMBERS = frozenset({
+    "typeIdentifier", "recordKeyType", "permissionSet", "spaceDeclaration",
+    "endpointDescriptor", "knownMessageTypes",
+})
+
+# Name of the property that keeps undeclared wire fields, and its fallbacks for an
+# object whose Lexicon already declares a property with that name.
+EXTRA_FIELDS_NAMES = ("extraFields", "undeclaredFields", "_extraFields")
+
+# Primary definition types: one per lexicon, always named `main`, never a ref target.
+PRIMARY_TYPES = frozenset({"record", "query", "procedure", "subscription", "permission-set"})
+
+
 class SwiftCodeGenerator(BaseCodeGenerator):
-    def __init__(self, lexicon: Dict[str, Any], cycle_detector=None, emit_server_contracts=False, emit_xrpc_error_parsing=False):
+    def __init__(
+        self,
+        lexicon: Dict[str, Any],
+        cycle_detector=None,
+        emit_server_contracts=False,
+        emit_xrpc_error_parsing=False,
+        property_type_overrides: Optional[Dict[str, str]] = None,
+    ):
+        """
+        emit_xrpc_error_parsing is accepted for manifest compatibility and ignored:
+        every generated call now throws the server's `{error, message}` envelope.
+
+        property_type_overrides maps `"<StructName>.<property>"` (for example
+        `"Output.didDoc"`) to a Swift type that replaces the generated one for that
+        property of this lexicon. It comes from the manifest
+        (`swift.property_type_overrides[<nsid>]`).
+        """
         super().__init__(lexicon, cycle_detector)
+        self.property_type_overrides = dict(property_type_overrides or {})
+        self.used_property_type_overrides = set()
+        self.inline_objects = {}
+        self.parameter_properties = []
         self.struct_name = convert_to_camel_case(self.lexicon_id)
         self.conformance = ""
         self.enums = ""
         self.generated_unions = set()
         self.enum_definitions = {}
-        self.is_blob_upload = self.check_if_blob_upload(lexicon)
         self.cycle_detector = cycle_detector
         self.emit_server_contracts = emit_server_contracts
         self.emit_xrpc_error_parsing = emit_xrpc_error_parsing
@@ -49,11 +90,6 @@ class SwiftCodeGenerator(BaseCodeGenerator):
 
     def get_file_extension(self) -> str:
         return '.swift'
-    def check_if_blob_upload(self, lexicon: Dict[str, Any]) -> bool:
-        main_def = lexicon.get('defs', {}).get('main', {})
-        encoding = main_def.get('input', {}).get('encoding', '')
-        return main_def.get('type') == 'procedure' and encoding == '*/*'
-
     def handle_main_def(self):
         main_def = self.defs.get('main', {})
         main_def_type = main_def.get('type')
@@ -136,18 +172,38 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         context_identity=None,
         nullable_fields=None,
         server_input=False,
+        tri_state_nullable=True,
     ):
         nullable_fields = nullable_fields or []
         swift_properties = []
+        used_identifiers = {}
         for name, prop in properties.items():
             swift_type = self.type_converter.determine_swift_type(
                 name, prop, required_fields, current_struct_name,
                 context_identity=context_identity,
             )
+            override_key = f"{current_struct_name}.{name}"
+            if override_key in self.property_type_overrides:
+                swift_type = self.property_type_overrides[override_key]
+                self.used_property_type_overrides.add(override_key)
             description = prop.get('description', '')
             is_wire_optional = name not in required_fields
             is_nullable = name in nullable_fields
             is_optional = is_wire_optional or is_nullable
+            # Optional AND nullable: "absent", `null` and a value are three distinct
+            # wire states (`putRecord.swapRecord: null` means "must not exist").
+            # `T?` can only carry two of them, so the value is wrapped.
+            tri_state = tri_state_nullable and is_wire_optional and is_nullable
+            wrapped_type = swift_type
+            if tri_state:
+                swift_type = f"ATProtoNullable<{swift_type}>"
+
+            ident_bare = swift_member_name(name)
+            while ident_bare in used_identifiers:
+                # Two wire names that camel-case to the same identifier (`a-b`, `aB`).
+                ident_bare += "_"
+            used_identifiers[ident_bare] = name
+            ident = sanitize_swift_keyword(ident_bare)
             strict_decode = prop.get('x-security-strict-decode', False)
             if strict_decode and prop.get('type') != 'ref':
                 raise ValueError(
@@ -176,6 +232,13 @@ class SwiftCodeGenerator(BaseCodeGenerator):
 
             swift_properties.append({
                 'name': name,
+                'ident': ident,
+                'ident_bare': ident_bare,
+                'key': ident,
+                'key_needs_raw_value': ident_bare != name,
+                'var': ident_bare,
+                'tri_state': tri_state,
+                'wrapped_type': wrapped_type,
                 'type': swift_type,
                 'optional': is_optional,
                 'wire_optional': is_wire_optional,
@@ -191,6 +254,84 @@ class SwiftCodeGenerator(BaseCodeGenerator):
                 'strict_type_identifier_literal': strict_type_identifier_literal,
             })
         return swift_properties
+
+    @staticmethod
+    def simple_property(name: str, swift_type: str) -> Dict[str, Any]:
+        """A required property outside any Lexicon schema (the `data` of a binary body)."""
+        return {
+            'name': name, 'ident': name, 'ident_bare': name, 'key': name,
+            'key_needs_raw_value': False, 'var': name, 'tri_state': False,
+            'wrapped_type': swift_type, 'type': swift_type, 'optional': False,
+            'wire_optional': False, 'required_nullable': False, 'nullable': False,
+            'server_input': False, 'description': '', 'boxed': False,
+            'strict_decode': False, 'strict_optional_decode': False,
+            'strict_allowed_keys_literal': None, 'strict_type_identifier_literal': None,
+        }
+
+    @staticmethod
+    def object_context(
+        properties,
+        *,
+        encodes_type: bool,
+        value_semantics: bool,
+        lenient: bool,
+        extra_fields: bool,
+        server_input: bool = False,
+    ) -> Dict[str, Any]:
+        """Rendering switches for templates/objectMembers.jinja (documented there)."""
+        taken = {prop['ident_bare'] for prop in properties}
+        extra_name = next(name for name in EXTRA_FIELDS_NAMES if name not in taken)
+        # Strict mode matters for an optional property in two places: the lenient
+        # catch block, and the null check of a property that is not nullable.
+        uses_strict_flag = any(
+            prop['wire_optional'] and not prop['strict_decode']
+            and (lenient or (not prop['nullable'] and not server_input))
+            for prop in properties
+        )
+        return {
+            'uses_strict_flag': uses_strict_flag,
+            'encodes_type': encodes_type,
+            'value_semantics': value_semantics,
+            'lenient': lenient,
+            'extra_fields': extra_fields,
+            'extra_name': extra_name,
+            'server_input': server_input,
+        }
+
+    def generate_inline_object(self, current_struct_name, name, schema, context_identity=None) -> str:
+        """Nested struct for an object schema written inline in a property.
+
+        An inline object has no name of its own, so it is named after the struct and
+        property that contain it (`ViewMeta` for `view.meta`) and never carries `$type`.
+        """
+        struct_name = f"{convert_to_camel_case(current_struct_name)}{convert_to_camel_case(name)}"
+        identity = (context_identity, current_struct_name, name)
+        existing = self.inline_objects.get(struct_name)
+        if existing is not None:
+            if existing != identity:
+                raise ValueError(
+                    f"{self.lexicon_id}: inline object type name '{struct_name}' is produced by two "
+                    f"different properties ({existing!r} and {identity!r})"
+                )
+            return struct_name
+        self.inline_objects[struct_name] = identity
+        properties = self.generate_properties(
+            schema.get('properties', {}),
+            schema.get('required', []),
+            struct_name,
+            context_identity=("inline-object", identity),
+            nullable_fields=schema.get('nullable', []),
+        )
+        template = self.template_manager.env.get_template('inlineObject.jinja')
+        self.enums += template.render(
+            name=struct_name,
+            description=schema.get('description', ''),
+            properties=properties,
+            ctx=self.object_context(
+                properties, encodes_type=False, value_semantics=True, lenient=True, extra_fields=True,
+            ),
+        ) + "\n\n"
+        return struct_name
 
     def resolve_strict_ref_contract(self, ref: str) -> tuple[List[str], str]:
         nsid, separator, fragment = ref.partition('#')
@@ -237,13 +378,15 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         if not parameters:
             return ""
         properties = self.generate_properties(
-            parameters['properties'],
+            parameters.get('properties', {}),
             parameters.get('required', []),
             "Parameters",
             nullable_fields=parameters.get('nullable', []),
+            tri_state_nullable=False,
         )
         for prop in properties:
             self.check_query_parameter_encodable(prop, parameters['properties'][prop['name']])
+        self.parameter_properties = properties
         return self.template_manager.query_parameters_template.render(properties=properties)
 
     def check_query_parameter_encodable(self, prop: Dict[str, Any], schema: Dict[str, Any]) -> None:
@@ -261,27 +404,27 @@ class SwiftCodeGenerator(BaseCodeGenerator):
     def generate_input_struct(self, input_obj: Optional[Dict[str, Any]]) -> str:
         if not input_obj:
             return ""
-        
-        encoding = input_obj.get('encoding', '')
-        
-        # Handle input with encoding but no schema (like CAR files)
-        if 'schema' not in input_obj:
-            if encoding != '' and encoding != 'application/json':
-                properties = [{"name": "data", "type": "Data", "optional": False}]
-                conformance = ""
-                return self.template_manager.input_struct_template.render(properties=properties, conformance=conformance)
-            else:
-                return ""
-        
-        input_schema = input_obj['schema']
-        conformance = ": ATProtocolCodable" if encoding == "application/json" else ""
 
-        properties = ""
-        if encoding != '' and encoding != 'application/json':
-            properties = [{"name": "data", "type": "Data", "optional": False}]
+        encoding = input_obj.get('encoding', '')
+        is_binary = encoding != '' and encoding != 'application/json'
+        input_schema = input_obj.get('schema')
+
+        if is_binary:
+            # A non-JSON body (CAR file, blob, video) is opaque bytes.
+            properties = [self.simple_property("data", "Data")]
+        elif not isinstance(input_schema, dict):
+            return ""
         elif input_schema.get('type') == 'ref':
+            # The request body IS the referenced object. Wrapping it in a struct
+            # with a `data` property would put `{"data": {...}}` on the wire.
             ref_type = self.type_converter.convert_ref(input_schema['ref'])
-            properties = [{"name": "data", "type": ref_type, "optional": False}]
+            return f"\n    public typealias Input = {ref_type}\n"
+        elif input_schema.get('type') == 'union':
+            # A union body is one of the referenced objects, discriminated by `$type`.
+            self.enum_generator.generate_enum_for_union_def(
+                "InputUnion", input_schema.get('refs', []), closed=input_schema.get('closed', False),
+            )
+            return "\n    public typealias Input = InputUnion\n"
         else:
             properties = self.generate_properties(
                 input_schema.get('properties', {}),
@@ -292,7 +435,17 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             )
             self.input_properties = properties
 
-        return self.template_manager.input_struct_template.render(properties=properties, conformance=conformance)
+        return self.template_manager.input_struct_template.render(
+            properties=properties,
+            ctx=self.object_context(
+                properties,
+                encodes_type=False,
+                value_semantics=False,
+                lenient=False,
+                extra_fields=False,
+                server_input=self.emit_server_contracts and not is_binary,
+            ),
+        )
 
     def generate_output_struct(self, output_obj: Optional[Dict[str, Any]]) -> str:
         if not output_obj:
@@ -318,18 +471,23 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             'type_alias_target': None,
         }
 
+        context['is_binary'] = False
         if output_schema.get('type') == 'ref':
             context['is_type_alias'] = True
             context['type_alias_target'] = self.type_converter.convert_ref(output_schema['ref'])
+        elif output_schema.get('type') == 'union':
+            # A union body is one of the referenced objects, discriminated by `$type`.
+            self.enum_generator.generate_enum_for_union_def(
+                "OutputUnion", output_schema.get('refs', []), closed=output_schema.get('closed', False),
+            )
+            context['is_type_alias'] = True
+            context['type_alias_target'] = "OutputUnion"
         elif encoding == "*/*":
-            context['properties'] = [{"name": "data", "type": "Data", "optional": False}]
+            context['is_binary'] = True
         elif not output_schema or (not output_schema.get('properties') and output_schema.get('type') != 'object'):
             # No schema or schema without properties (binary data case)
             # For encodings like application/vnd.ipld.car, application/jsonl without schema
-            if encoding and encoding != 'application/json':
-                context['properties'] = [{"name": "data", "type": "Data", "optional": False}]
-            else:
-                context['properties'] = []
+            context['is_binary'] = bool(encoding and encoding != 'application/json')
         else:
             context['properties'] = self.generate_properties(
                 output_schema.get('properties', {}),
@@ -337,6 +495,9 @@ class SwiftCodeGenerator(BaseCodeGenerator):
                 "Output",
                 nullable_fields=output_schema.get('nullable', []),
             )
+        context['ctx'] = self.object_context(
+            context['properties'], encodes_type=False, value_semantics=False, lenient=True, extra_fields=False,
+        )
 
         return self.template_manager.output_struct_template.render(**context)
 
@@ -389,14 +550,7 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         variants = []
         
         for ref in refs:
-            # Convert ref to Swift type and case name
-            if ref.startswith('#'):
-                # Local reference
-                ref_name = ref[1:]
-                type_id = f"{self.lexicon_id}#{ref_name}"
-            else:
-                # External reference
-                type_id = ref
+            type_id = normalize_ref(ref, self.lexicon_id)
             type_name = self.type_converter.convert_ref(ref)
             
             # Create a case name from the type
@@ -418,79 +572,66 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         lex_definitions = {}
         for name, def_schema in self.defs.items():
             current_struct_name = convert_to_camel_case(name)
-            
+            def_type = def_schema.get('type', "")
+
             if self.is_union_array(def_schema):
                 refs = def_schema['items']['refs']
-                self.enum_generator.generate_enum_for_union_array(current_struct_name, name, refs)
+                self.enum_generator.generate_enum_for_union_array(
+                    current_struct_name, name, refs, closed=def_schema['items'].get('closed', False),
+                )
                 continue
-            if name != 'main' and def_schema.get('type', "") == "object":
-                conformance = ": ATProtocolCodable, ATProtocolValue"
+            if name == 'main' and def_type in PRIMARY_TYPES | {'object', 'space'}:
+                # Rendered by convert() as the lexicon container itself.
+                continue
+            if def_type == "object":
                 properties = self.generate_properties(
                     def_schema.get('properties', {}), def_schema.get('required', []),
                     current_struct_name, context_identity=("definition", name),
                     nullable_fields=def_schema.get('nullable', []),
                 )
-                
-                sub_structs = {}
-                for key, value in def_schema.items():
-                    if key not in ['properties', 'required', 'type', 'description', 'nullable']:
-                        # Only process if value is a dictionary (sub-object schema)
-                        if isinstance(value, dict) and 'properties' in value:
-                            sub_conformance = ": ATProtocolCodable, ATProtocolValue"
-                            sub_properties = self.generate_properties(
-                                value.get('properties', {}), value.get('required', []),
-                                convert_to_camel_case(key),
-                                context_identity=("definition", name, "sub", key),
-                                nullable_fields=value.get('nullable', []),
-                            )
-                            sub_structs[convert_to_camel_case(key)] = {
-                                'wire_fragment': key,
-                                'properties': sub_properties, 
-                                'conformance': sub_conformance
-                            }
-                
-                swift_name = convert_to_camel_case(name)
-                lex_definitions[swift_name] = {
+                server_input = name in self.server_input_definitions
+                lex_definitions[current_struct_name] = {
                     'wire_fragment': name,
-                    'properties': properties, 
-                    'conformance': conformance,
-                    'sub_structs': sub_structs,
-                    'server_input': name in self.server_input_definitions,
-                }
-            elif def_schema.get('type', '') == "array" and def_schema.get('items', {}).get('type', '') == 'union':
-                union_array_name = convert_to_camel_case(name) + ""
-                refs = def_schema['items'].get('refs', [])
-                self.enum_generator.generate_enum_for_union_array(current_struct_name, union_array_name, refs)
-                properties = [{
-                    'name': lowercase_first_letter(name),
-                    'type': f'[{union_array_name}]',
-                    'optional': False
-                }]
-                lex_definitions[union_array_name] = {
-                    'wire_fragment': name,
+                    'description': def_schema.get('description', ''),
                     'properties': properties,
-                    'conformance': ': ATProtocolCodable, ATProtocolValue',
-                    'sub_structs': {},
-                    'server_input': name in self.server_input_definitions,
+                    'conformance': ": ATProtocolCodable, ATProtocolValue",
+                    # A named object does not write `$type` itself. The Lexicon
+                    # specification says data reached through a plain `ref` should
+                    # not carry it; where it is required (a union variant, a value in
+                    # an `unknown` field) the union enum or the value container adds
+                    # it. Records, which always carry `$type`, write their own.
+                    'ctx': self.object_context(
+                        properties,
+                        encodes_type=False,
+                        value_semantics=True,
+                        lenient=not server_input,
+                        extra_fields=True,
+                        server_input=server_input,
+                    ),
                 }
-            elif def_schema.get('type', "") == "string" and 'enum' in def_schema:
+            elif def_type == "token":
+                self.generate_token_constant(name, def_schema)
+            elif def_type == "string" and 'enum' in def_schema:
                 enum_name = f"Defs{convert_to_camel_case(name)}"
                 identity = ("definition", self.lexicon_id, name)
                 self.enum_generator.generate_closed_string_enum(enum_name, def_schema['enum'], identity)
-            elif def_schema.get('type', "") == "string" and 'knownValues' in def_schema:
+            elif def_type == "string" and 'knownValues' in def_schema:
                 enum_name = f"{convert_to_camel_case(name)}"
                 if enum_name not in self.generated_tokens:
                     known_values = def_schema['knownValues']
                     self.enum_generator.generate_enum_from_known_values(enum_name, known_values, self.token_descriptions)
-            elif def_schema.get('type', "") == "union":
+            elif def_type == "union":
                 # Named top-level union def (e.g. defs#signedTransition).
                 # convert_ref resolves refs to these as the bare CamelCase def
                 # name, so the enum must carry exactly that name.
-                self.enum_generator.generate_enum_for_union_def(name, def_schema.get('refs', []))
-            elif def_schema.get('type', "") in ("string", "bytes") and name != 'main':
-                # Plain named scalar def (no enum/knownValues). Local refs to
-                # bytes defs are inlined to Bytes by convert_ref; the typealias
-                # additionally satisfies cross-lexicon refs (Container.Name).
+                self.enum_generator.generate_enum_for_union_def(
+                    name, def_schema.get('refs', []), closed=def_schema.get('closed', False),
+                )
+            elif def_type in ("string", "bytes", "integer", "boolean", "blob", "cid-link", "unknown", "array"):
+                # Plain named non-object def. Local refs to blob/bytes/cid-link defs
+                # are inlined by convert_ref; the typealias additionally satisfies
+                # cross-lexicon refs (Container.Name) and refs to scalar and array
+                # defs, which have no other Swift type.
                 alias_name = convert_to_camel_case(name)
                 swift_type = self.type_converter.determine_swift_type(
                     name, def_schema, [name], current_struct_name
@@ -501,6 +642,27 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             lex_definitions=lex_definitions,
             lexicon_id=self.lexicon_id
         )
+
+    def generate_token_constant(self, name: str, def_schema: Dict[str, Any]) -> None:
+        """`public static let <name>` holding the token's fully-qualified value.
+
+        A token has no data representation; it is referenced by the string
+        `<nsid>#<name>` (in `knownValues`, for example). The constant gives that
+        string a checked, discoverable name.
+        """
+        member = swift_member_name(name)
+        if member in RESERVED_CONTAINER_MEMBERS or name == 'main':
+            member = f"{member}Token"
+        member = sanitize_swift_keyword(member)
+        value = normalize_ref(f"#{name}", self.lexicon_id)
+        description = def_schema.get('description', '')
+        doc = self.template_manager.env.filters['escapeComment'](description)
+        literal = self.template_manager.env.filters['escapeStringLiteral'](value)
+        if doc:
+            self.enums += f"/// {doc}\n"
+        else:
+            self.enums += f"/// The `{value}` token.\n"
+        self.enums += f'public static let {member} = "{literal}"\n\n'
 
     def generate_record_struct(self):
         if 'record' not in self.main_def:
@@ -513,115 +675,171 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             current_struct_name,
             nullable_fields=record_schema.get('nullable', []),
         )
-        return self.template_manager.record_template.render(struct_name=self.struct_name, properties=properties, conformance=": ATProtocolCodable, ATProtocolValue")
+        return self.template_manager.record_template.render(
+            struct_name=self.struct_name,
+            properties=properties,
+            record_key_literal=json.dumps(self.main_def.get('key', 'any')),
+            ctx=self.object_context(
+                properties, encodes_type=True, value_semantics=True, lenient=True, extra_fields=True,
+            ),
+        )
 
-    def generate_all_enums(self):
-        main_def = self.defs.get("main", {})
-        current_struct_name = self.struct_name
-        properties = main_def.get('properties', {})
+    def generate_permission_set(self) -> str:
+        """`static let permissionSet` describing a `permission-set` lexicon.
 
-        for prop_name, prop_schema in properties.items():
-            if prop_schema.get('type') == 'union':
-                union_name = convert_to_camel_case(prop_name)
-                refs = [self.type_converter.convert_ref(r) for r in prop_schema['refs']]
-                self.enum_generator.generate_enum_for_union(current_struct_name, union_name, refs)
-            elif prop_schema.get('type') == 'array':
-                item_schema = prop_schema.get('items', {})
-                if item_schema.get('type') == 'union':
-                    union_name = f"{current_struct_name}{convert_to_camel_case(prop_name)}Union"
-                    refs = [self.type_converter.convert_ref(r) for r in item_schema['refs']]
-                    self.enum_generator.generate_enum_for_union_array(current_struct_name, prop_name, refs)
+        Unknown resource types are kept as written; the permission specification
+        tells consumers to ignore resources they do not recognise.
+        """
+        def literal(value):
+            return json.dumps(value, ensure_ascii=False) if value is not None else "nil"
+
+        def localized(prefix):
+            entries = {
+                key[len(prefix) + 1:]: value
+                for key, value in sorted(self.main_def.items())
+                if key.startswith(prefix + ":") and isinstance(value, str)
+            }
+            if not entries:
+                return "[:]"
+            return "[" + ", ".join(f"{literal(lang)}: {literal(text)}" for lang, text in entries.items()) + "]"
+
+        permissions = []
+        for permission in self.main_def.get('permissions', []):
+            if not isinstance(permission, dict) or not isinstance(permission.get('resource'), str):
+                continue
+            parameters = {}
+            for key, value in permission.items():
+                if key in ('type', 'resource', 'inheritAud'):
+                    continue
+                if isinstance(value, list):
+                    parameters[key] = [str(item) for item in value]
+                elif isinstance(value, bool):
+                    parameters[key] = ["true" if value else "false"]
+                elif isinstance(value, (str, int)):
+                    parameters[key] = [str(value)]
+            parameter_literal = (
+                "[" + ", ".join(
+                    f"{literal(key)}: [{', '.join(literal(item) for item in values)}]"
+                    for key, values in parameters.items()
+                ) + "]"
+            ) if parameters else "[:]"
+            inherit = "true" if permission.get('inheritAud') is True else "false"
+            permissions.append(
+                f"            LexiconPermission(resource: {literal(permission['resource'])}, "
+                f"parameters: {parameter_literal}, inheritAud: {inherit})"
+            )
+        permissions_literal = ("[\n" + ",\n".join(permissions) + "\n        ]") if permissions else "[]"
+        nsid_literal = literal(self.lexicon_id)
+        return f"""
+    /// The permission set this lexicon declares. Request it as an OAuth scope with
+    /// `permissionSet.includeScope(audience:)`.
+    public static let permissionSet = LexiconPermissionSet(
+        nsid: {nsid_literal},
+        title: {literal(self.main_def.get('title'))},
+        titleLang: {localized('title')},
+        detail: {literal(self.main_def.get('detail'))},
+        detailLang: {localized('detail')},
+        permissions: {permissions_literal}
+    )
+"""
 
     def convert(self) -> str:
         # Security-bearing local output references must fail the generation
         # command instead of being serialized into a traceback-shaped source file.
         self.validate_output_local_refs()
-        try:
-            query_parameters = ""
-            input_struct = ""
-            output_struct = ""
-            errors_enum = ""
-            lex_definitions = ""
-            record_struct = ""
-            main_properties = ""
-            procedure = ""
-            query = ""
-            subscription = ""
-            message_union = ""
-            space_declaration = ""
-            server_contracts = ""
-            conformance = ""
 
-            if 'main' not in self.defs:
-                lex_definitions = self.generate_lex_definitions()
-            else:
-                main_def_type = self.main_def.get('type')
-                if main_def_type == 'object':
-                    lex_definitions = self.generate_lex_definitions()
-                    main_properties = self.template_manager.properties_template.render(
-                        properties=self.generate_properties(
-                            self.main_def.get('properties', {}),
-                            self.main_def.get('required', []),
-                            convert_to_camel_case(self.lexicon_id),
-                            nullable_fields=self.main_def.get('nullable', []),
-                        )
-                    )
-                    conformance = ": ATProtocolCodable, ATProtocolValue"
-                elif main_def_type == 'record':
-                    record_struct = self.generate_record_struct()
-                    lex_definitions = self.generate_lex_definitions()
-                    conformance = ": ATProtocolCodable, ATProtocolValue"
-                elif main_def_type == 'space':
-                    space_declaration = self.generate_space_declaration(self.main_def)
-                elif main_def_type == 'query':
-                    query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
-                    output_struct = self.generate_output_struct(self.main_def.get('output'))
-                    errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
-                    lex_definitions = self.generate_lex_definitions()
-                    query = self.generate_query_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
-                elif main_def_type == 'procedure':
-                    query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
-                    input_struct = self.generate_input_struct(self.main_def.get('input'))
-                    output_struct = self.generate_output_struct(self.main_def.get('output'))
-                    errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
-                    lex_definitions = self.generate_lex_definitions()
-                    procedure = self.generate_procedure_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
-                elif main_def_type == 'subscription':
-                    query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
-                    message_union = self.generate_message_union(self.main_def.get('message'))
-                    errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
-                    lex_definitions = self.generate_lex_definitions()
-                    subscription = self.generate_subscription_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
-                if self.emit_server_contracts and main_def_type in ('query', 'procedure', 'subscription'):
-                    server_contracts = self.generate_server_contracts(main_def_type)
-            self.generate_all_enums()
-            
-            swift_code = self.template_manager.main_template.render(
-                is_blob_upload=self.is_blob_upload,
-                enums=self.enums,
-                lexicon_version=self.lexicon_version, 
-                lexicon_id=self.lexicon_id, 
-                description=self.description, 
-                struct_name=self.struct_name, 
-                query_parameters=query_parameters,
-                input_struct=input_struct,
-                output_struct=output_struct,
-                errors_enum=errors_enum,
-                lex_definitions=lex_definitions,
-                record_struct=record_struct,
-                main_properties=main_properties,  
-                procedure=procedure,
-                query=query,
-                subscription=subscription,
-                message_union=message_union,
-                space_declaration=space_declaration,
-                server_contracts=server_contracts,
-                conformance=conformance
+        query_parameters = ""
+        input_struct = ""
+        output_struct = ""
+        errors_enum = ""
+        record_struct = ""
+        main_properties = ""
+        procedure = ""
+        query = ""
+        subscription = ""
+        message_union = ""
+        space_declaration = ""
+        permission_set = ""
+        server_contracts = ""
+        conformance = ""
+
+        main_def_type = self.main_def.get('type') if 'main' in self.defs else None
+        if main_def_type == 'object':
+            properties = self.generate_properties(
+                self.main_def.get('properties', {}),
+                self.main_def.get('required', []),
+                convert_to_camel_case(self.lexicon_id),
+                nullable_fields=self.main_def.get('nullable', []),
             )
-            
-            return self.post_process_swift_code(swift_code)
-        except Exception:
-            raise
+            main_properties = self.template_manager.properties_template.render(
+                properties=properties,
+                ctx=self.object_context(
+                    properties, encodes_type=False, value_semantics=True, lenient=False, extra_fields=True,
+                ),
+            )
+            conformance = ": ATProtocolCodable, ATProtocolValue"
+        elif main_def_type == 'record':
+            record_struct = self.generate_record_struct()
+            conformance = ": ATProtocolCodable, ATProtocolValue"
+        elif main_def_type == 'space':
+            space_declaration = self.generate_space_declaration(self.main_def)
+        elif main_def_type == 'permission-set':
+            permission_set = self.generate_permission_set()
+        elif main_def_type == 'query':
+            query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
+            output_struct = self.generate_output_struct(self.main_def.get('output'))
+            errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
+            query = self.generate_query_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
+        elif main_def_type == 'procedure':
+            query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
+            input_struct = self.generate_input_struct(self.main_def.get('input'))
+            output_struct = self.generate_output_struct(self.main_def.get('output'))
+            errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
+            procedure = self.generate_procedure_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
+        elif main_def_type == 'subscription':
+            query_parameters = self.generate_query_parameters(self.main_def.get('parameters'))
+            message_union = self.generate_message_union(self.main_def.get('message'))
+            errors_enum = self.generate_errors_enum(self.main_def.get('errors'))
+            subscription = self.generate_subscription_function(lexicon_id=self.lexicon_id, main_def=self.main_def)
+        if self.emit_server_contracts and main_def_type in ('query', 'procedure', 'subscription'):
+            server_contracts = self.generate_server_contracts(main_def_type)
+
+        # Named definitions are generated whatever `main` is (or is not): a lexicon
+        # whose main is a token, string, array or permission set still owns its
+        # sibling defs.
+        lex_definitions = self.generate_lex_definitions()
+
+        unused_overrides = set(self.property_type_overrides) - self.used_property_type_overrides
+        if unused_overrides:
+            raise ValueError(
+                f"{self.lexicon_id}: property_type_overrides entries match no generated property: "
+                f"{sorted(unused_overrides)}"
+            )
+
+        swift_code = self.template_manager.main_template.render(
+            enums=self.enums,
+            lexicon_version=self.lexicon_version,
+            lexicon_id=self.lexicon_id,
+            description=self.description,
+            struct_name=self.struct_name,
+            query_parameters=query_parameters,
+            input_struct=input_struct,
+            output_struct=output_struct,
+            errors_enum=errors_enum,
+            lex_definitions=lex_definitions,
+            record_struct=record_struct,
+            main_properties=main_properties,
+            procedure=procedure,
+            query=query,
+            subscription=subscription,
+            message_union=message_union,
+            space_declaration=space_declaration,
+            permission_set=permission_set,
+            server_contracts=server_contracts,
+            conformance=conformance
+        )
+
+        return self.post_process_swift_code(swift_code)
 
     def generate_space_declaration(self, main_def):
         key_type = main_def.get('key', 'tid')
@@ -674,16 +892,26 @@ class SwiftCodeGenerator(BaseCodeGenerator):
     }}
 '''
 
+    _GLUED_DECLARATION = re.compile(r'(?<=[^\s/])[ \t]*(public (?:indirect )?(?:struct|enum) )')
+
     @staticmethod
     def post_process_swift_code(code: str) -> str:
-        code = code.replace('public struct ', '\npublic struct ')
-        code = code.replace('public enum ', '\npublic enum ')
-        return code.lstrip()
+        # Template whitespace control can leave a type declaration on the same line
+        # as the token before it (`}public enum Error`); give it its own line. A
+        # declaration that already starts a line is left alone, so its `///` block
+        # stays attached (SwiftFormat demotes a detached one to a plain comment).
+        # Blank lines between declarations are SwiftFormat's job.
+        lines = []
+        for line in code.lstrip().split('\n'):
+            if line.lstrip().startswith('//'):
+                lines.append(line)
+            else:
+                lines.append(SwiftCodeGenerator._GLUED_DECLARATION.sub(r'\n\1', line))
+        return '\n'.join(lines)
 
     def generate_query_function(self, lexicon_id, main_def):
         # Split the lexicon ID to determine the namespace
-        template_namespace_parts = lexicon_id.split('.')[:-1]
-        template_namespace_name = '.'.join(convert_to_camel_case(part) for part in template_namespace_parts)
+        template_namespace_name = namespace_type_path(lexicon_id)
         
         # Determine the query name by converting the last part of the lexicon ID to CamelCase
         query_name = convert_to_camel_case(lexicon_id.split('.')[-1])
@@ -695,15 +923,7 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         
         input_parameters = ''
         input_values = ''
-        
-        if has_input:
-            input_params = main_def.get('parameters', {}).get('properties', {})
-            input_parameters = ', '.join([
-                f"{param}: {self.type_converter.determine_swift_type(param, details, main_def.get('parameters', {}).get('required', []), param)}" 
-                for param, details in input_params.items()
-            ])
-            input_values = ', '.join([f"{param}: {param}" for param in input_params.keys()])
-        
+
         # Define the API endpoint
         endpoint = f"{lexicon_id}"
         
@@ -728,8 +948,7 @@ class SwiftCodeGenerator(BaseCodeGenerator):
 
     def generate_procedure_function(self, lexicon_id, main_def):
         # Split the lexicon ID to determine the namespace
-        template_namespace_parts = lexicon_id.split('.')[:-1]
-        template_namespace_name = '.'.join(convert_to_camel_case(part) for part in template_namespace_parts)
+        template_namespace_name = namespace_type_path(lexicon_id)
 
         # Determine the procedure name by converting the last part of the lexicon ID to CamelCase
         procedure_name = convert_to_camel_case(lexicon_id.split('.')[-1])
@@ -787,8 +1006,7 @@ class SwiftCodeGenerator(BaseCodeGenerator):
 
     def generate_subscription_function(self, lexicon_id, main_def):
         # Split the lexicon ID to determine the namespace
-        template_namespace_parts = lexicon_id.split('.')[:-1]
-        template_namespace_name = '.'.join(convert_to_camel_case(part) for part in template_namespace_parts)
+        template_namespace_name = namespace_type_path(lexicon_id)
         
         # Determine the subscription name by converting the last part of the lexicon ID to camelCase
         subscription_name = convert_to_camel_case(lexicon_id.split('.')[-1])
@@ -811,26 +1029,26 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         input_values = ''
         
         if has_parameters:
-            input_params = main_def.get('parameters', {}).get('properties', {})
-            required_params = main_def.get('parameters', {}).get('required', [])
-            
-            # Build parameter list with proper optionality and defaults
+            # The convenience signature repeats the `Parameters` initializer, so it
+            # uses the very types generated for that struct (an inline enum, for one,
+            # is named after `Parameters`, not after the parameter).
             param_list = []
             value_list = []
-            for param, details in input_params.items():
-                swift_type = self.type_converter.determine_swift_type(param, details, required_params, param)
-                is_optional = param not in required_params
-                
-                # Add default value for optional parameters
-                if is_optional:
-                    param_list.append(f"{param}: {swift_type}? = nil")
+            for prop in self.parameter_properties:
+                swift_type = prop['type']
+                leaf = swift_type.strip('[]')
+                if leaf in self.closed_enum_identity_by_name:
+                    # The method lives in an extension outside the lexicon container.
+                    swift_type = swift_type.replace(leaf, f"{self.struct_name}.{leaf}")
+                if prop['optional']:
+                    param_list.append(f"{prop['ident']}: {swift_type}? = nil")
                 else:
-                    param_list.append(f"{param}: {swift_type}")
-                value_list.append(f"{param}: {param}")
-            
+                    param_list.append(f"{prop['ident']}: {swift_type}")
+                value_list.append(f"{prop['ident']}: {prop['ident']}")
+
             input_parameters = ', '.join(param_list)
             input_values = ', '.join(value_list)
-        
+
         # Define the API endpoint
         endpoint = f"{lexicon_id}"
         

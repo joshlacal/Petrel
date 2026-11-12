@@ -22,7 +22,8 @@ object AppBskyFeedGetQuotesDefs {
         val uri: ATProtocolURI,// If supplied, filters to quotes of specific version (by CID) of the post record.        @SerialName("cid")
         val cid: CID? = null,        @SerialName("limit")
         val limit: Int? = null,        @SerialName("cursor")
-        val cursor: String? = null    )
+        val cursor: String? = null,// Ordering of results. 'latest' (default when unset) is newest first; 'top' orders quotes by their like count.        @SerialName("sort")
+        val sort: String? = null    )
 
     @Serializable
     data class AppBskyFeedGetQuotesOutput(

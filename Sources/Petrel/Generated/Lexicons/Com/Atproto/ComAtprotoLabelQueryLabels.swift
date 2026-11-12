@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.label.queryLabels
 
+/// Find labels relevant to the provided AT-URI patterns. Public endpoint for moderation services, though may return different or additional results with auth.
 public enum ComAtprotoLabelQueryLabels {
     public static let typeIdentifier = "com.atproto.label.queryLabels"
+
     public struct Parameters: Parametrizable {
         public let uriPatterns: [String]
         public let sources: [DID]?
@@ -26,56 +28,46 @@ public enum ComAtprotoLabelQueryLabels {
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-
         public let labels: [ComAtprotoLabelDefs.Label]
 
-        /// Standard public initializer
         public init(
             cursor: String? = nil,
-
             labels: [ComAtprotoLabelDefs.Label]
-
         ) {
             self.cursor = cursor
-
             self.labels = labels
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
             labels = try container.decode([ComAtprotoLabelDefs.Label].self, forKey: .labels)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
             try container.encode(labels, forKey: .labels)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
             let labelsValue = try labels.toCBORValue()
             map = map.adding(key: "labels", value: labelsValue)
-
             return map
         }
 
@@ -92,9 +84,8 @@ public extension ATProtoClient.Com.Atproto.Label {
     /// Find labels relevant to the provided AT-URI patterns. Public endpoint for moderation services, though may return different or additional results with auth.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func queryLabels(input: ComAtprotoLabelQueryLabels.Parameters) async throws -> (responseCode: Int, data: ComAtprotoLabelQueryLabels.Output?) {
         let endpoint = "com.atproto.label.queryLabels"
 
@@ -111,35 +102,26 @@ public extension ATProtoClient.Com.Atproto.Label {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.label.queryLabels")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoLabelQueryLabels.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.label.queryLabels: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoLabelQueryLabels.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

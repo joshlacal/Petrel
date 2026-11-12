@@ -3,57 +3,54 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.unspecced.getPostThreadOtherV2
 
+/// (NOTE: this endpoint is under development and WILL change without notice. Don't use it until it is moved out of `unspecced` or your application WILL break) Get additional posts under a thread e.g. replies hidden by threadgate. Based on an anchor post at any depth of the tree, returns top-level replies below that anchor. It does not include ancestors nor the anchor itself. This should be called after exhausting `app.bsky.unspecced.getPostThreadV2`. Does not require auth, but additional metadata and filtering will be applied for authed requests.
 public enum AppBskyUnspeccedGetPostThreadOtherV2 {
     public static let typeIdentifier = "app.bsky.unspecced.getPostThreadOtherV2"
 
     public struct ThreadItem: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.unspecced.getPostThreadOtherV2#threadItem"
+
         public let uri: ATProtocolURI
+        /// The nesting level of this item in the thread. Depth 0 means the anchor item. Items above have negative depths, items below have positive depths.
         public let depth: Int
         public let value: ThreadItemValueUnion
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: ATProtocolURI, depth: Int, value: ThreadItemValueUnion
+            uri: ATProtocolURI,
+            depth: Int,
+            value: ThreadItemValueUnion,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.depth = depth
             self.value = value
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                depth = try container.decode(Int.self, forKey: .depth)
-            } catch {
-                LogManager.logError("Decoding error for required property 'depth': \(error)")
-                throw error
-            }
-            do {
-                value = try container.decode(ThreadItemValueUnion.self, forKey: .value)
-            } catch {
-                LogManager.logError("Decoding error for required property 'value': \(error)")
-                throw error
-            }
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            depth = try container.decode(Int.self, forKey: .depth)
+            value = try container.decode(ThreadItemValueUnion.self, forKey: .value)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encode(depth, forKey: .depth)
             try container.encode(value, forKey: .value)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(uri)
             hasher.combine(depth)
             hasher.combine(value)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -67,7 +64,7 @@ public enum AppBskyUnspeccedGetPostThreadOtherV2 {
             if value != other.value {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -76,18 +73,18 @@ public enum AppBskyUnspeccedGetPostThreadOtherV2 {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let depthValue = try depth.toCBORValue()
             map = map.adding(key: "depth", value: depthValue)
             let valueValue = try value.toCBORValue()
             map = map.adding(key: "value", value: valueValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "depth", "value"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case depth
             case value
@@ -105,34 +102,29 @@ public enum AppBskyUnspeccedGetPostThreadOtherV2 {
     }
 
     public struct Output: ATProtocolCodable {
+        /// A flat list of other thread items. The depth of each item is indicated by the depth property inside the item.
         public let thread: [ThreadItem]
 
-        /// Standard public initializer
         public init(
             thread: [ThreadItem]
-
         ) {
             self.thread = thread
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             thread = try container.decode([ThreadItem].self, forKey: .thread)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(thread, forKey: .thread)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let threadValue = try thread.toCBORValue()
             map = map.adding(key: "thread", value: threadValue)
-
             return map
         }
 
@@ -143,6 +135,8 @@ public enum AppBskyUnspeccedGetPostThreadOtherV2 {
 
     public enum ThreadItemValueUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case appBskyUnspeccedDefsThreadItemPost(AppBskyUnspeccedDefs.ThreadItemPost)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyUnspeccedDefs.ThreadItemPost) {
             self = .appBskyUnspeccedDefsThreadItemPost(value)
@@ -244,9 +238,8 @@ public extension ATProtoClient.App.Bsky.Unspecced {
     /// (NOTE: this endpoint is under development and WILL change without notice. Don't use it until it is moved out of `unspecced` or your application WILL break) Get additional posts under a thread e.g. replies hidden by threadgate. Based on an anchor post at any depth of the tree, returns top-level replies below that anchor. It does not include ancestors nor the anchor itself. This should be called after exhausting `app.bsky.unspecced.getPostThreadV2`. Does not require auth, but additional metadata and filtering will be applied for authed requests.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getPostThreadOtherV2(input: AppBskyUnspeccedGetPostThreadOtherV2.Parameters) async throws -> (responseCode: Int, data: AppBskyUnspeccedGetPostThreadOtherV2.Output?) {
         let endpoint = "app.bsky.unspecced.getPostThreadOtherV2"
 
@@ -263,35 +256,26 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.unspecced.getPostThreadOtherV2")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyUnspeccedGetPostThreadOtherV2.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.unspecced.getPostThreadOtherV2: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyUnspeccedGetPostThreadOtherV2.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

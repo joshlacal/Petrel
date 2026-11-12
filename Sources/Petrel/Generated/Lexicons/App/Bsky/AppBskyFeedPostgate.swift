@@ -3,38 +3,64 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.feed.postgate
 
+/// Record defining interaction rules for a post. The record key (rkey) of the postgate record must match the record key of the post, and that record must be in the same repository.
 public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.feed.postgate"
-    public let createdAt: ATProtocolDate
-    public let post: ATProtocolURI
-    public let detachedEmbeddingUris: [ATProtocolURI]?
-    public let embeddingRules: [AppBskyFeedPostgateEmbeddingRulesUnion]?
 
-    public init(createdAt: ATProtocolDate, post: ATProtocolURI, detachedEmbeddingUris: [ATProtocolURI]? = nil, embeddingRules: [AppBskyFeedPostgateEmbeddingRulesUnion]? = nil) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    public let createdAt: ATProtocolDate
+    /// Reference (AT-URI) to the post record.
+    public let post: ATProtocolURI
+    /// List of AT-URIs embedding this post that the author has detached from.
+    public let detachedEmbeddingUris: [ATProtocolURI]?
+    /// List of rules defining who can embed this post. If value is an empty array or is undefined, no particular rules apply and anyone can embed.
+    public let embeddingRules: [AppBskyFeedPostgateEmbeddingRulesUnion]?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        createdAt: ATProtocolDate,
+        post: ATProtocolURI,
+        detachedEmbeddingUris: [ATProtocolURI]? = nil,
+        embeddingRules: [AppBskyFeedPostgateEmbeddingRulesUnion]? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.createdAt = createdAt
         self.post = post
         self.detachedEmbeddingUris = detachedEmbeddingUris
         self.embeddingRules = embeddingRules
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         post = try container.decode(ATProtocolURI.self, forKey: .post)
         do {
-            detachedEmbeddingUris = try container.decodeIfPresent([ATProtocolURI].self, forKey: .detachedEmbeddingUris)
+            detachedEmbeddingUris = try container.decodeIfPresent([ATProtocolURI].self, forKey: .detachedEmbeddingUris, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'detachedEmbeddingUris' — degrading to nil: \(error)")
             detachedEmbeddingUris = nil
         }
         do {
-            embeddingRules = try container.decodeIfPresent([AppBskyFeedPostgateEmbeddingRulesUnion].self, forKey: .embeddingRules)
+            embeddingRules = try container.decodeIfPresent([AppBskyFeedPostgateEmbeddingRulesUnion].self, forKey: .embeddingRules, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'embeddingRules' — degrading to nil: \(error)")
             embeddingRules = nil
         }
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -44,10 +70,23 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         try container.encode(post, forKey: .post)
         try container.encodeIfPresent(detachedEmbeddingUris, forKey: .detachedEmbeddingUris)
         try container.encodeIfPresent(embeddingRules, forKey: .embeddingRules)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(createdAt)
+        hasher.combine(post)
+        if let value = detachedEmbeddingUris {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        if let value = embeddingRules {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -64,22 +103,11 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         if embeddingRules != other.embeddingRules {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(createdAt)
-        hasher.combine(post)
-        if let value = detachedEmbeddingUris {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
-        if let value = embeddingRules {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -97,8 +125,10 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
             let embeddingRulesValue = try value.toCBORValue()
             map = map.adding(key: "embeddingRules", value: embeddingRulesValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "post", "detachedEmbeddingUris", "embeddingRules"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -108,24 +138,36 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         case embeddingRules
     }
 
+    /// Disables embedding of this post.
     public struct DisableRule: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.feed.postgate#disableRule"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -133,18 +175,19 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
     public enum AppBskyFeedPostgateEmbeddingRulesUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case appBskyFeedPostgateDisableRule(AppBskyFeedPostgate.DisableRule)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyFeedPostgate.DisableRule) {
             self = .appBskyFeedPostgateDisableRule(value)

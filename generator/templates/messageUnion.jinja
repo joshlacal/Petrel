@@ -1,7 +1,15 @@
-public enum Message: Codable, Sendable {
+public enum Message: Codable, Sendable, XRPCSubscriptionMessage {
 {% for variant in variants %}
     case {{ variant.case_name }}({{ variant.type }})
 {% endfor %}
+
+    /// The message types this subscription's Lexicon declares. Frames of any other
+    /// type are skipped by the transport, as the event-stream specification asks.
+    public static let knownMessageTypes: Swift.Set<String> = [
+{% for variant in variants %}
+        "{{ variant.type_id | escapeStringLiteral }}",
+{% endfor %}
+    ]
 
     enum CodingKeys: String, CodingKey {
         case type = "$type"

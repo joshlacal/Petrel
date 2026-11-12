@@ -3,18 +3,37 @@ import Foundation
 
 // lexicon: 1, id: site.standard.theme.basic
 
+/// A simplified theme definition for publications, providing basic color customization for content display across different platforms and applications.
 public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "site.standard.theme.basic"
-    public let accent: SiteStandardThemeBasicAccentUnion
-    public let accentForeground: SiteStandardThemeBasicAccentForegroundUnion
-    public let background: SiteStandardThemeBasicBackgroundUnion
-    public let foreground: SiteStandardThemeBasicForegroundUnion
 
-    public init(accent: SiteStandardThemeBasicAccentUnion, accentForeground: SiteStandardThemeBasicAccentForegroundUnion, background: SiteStandardThemeBasicBackgroundUnion, foreground: SiteStandardThemeBasicForegroundUnion) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    /// Color used for links and button backgrounds.
+    public let accent: SiteStandardThemeBasicAccentUnion
+    /// Color used for button text.
+    public let accentForeground: SiteStandardThemeBasicAccentForegroundUnion
+    /// Color used for content background.
+    public let background: SiteStandardThemeBasicBackgroundUnion
+    /// Color used for content text.
+    public let foreground: SiteStandardThemeBasicForegroundUnion
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        accent: SiteStandardThemeBasicAccentUnion,
+        accentForeground: SiteStandardThemeBasicAccentForegroundUnion,
+        background: SiteStandardThemeBasicBackgroundUnion,
+        foreground: SiteStandardThemeBasicForegroundUnion,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.accent = accent
         self.accentForeground = accentForeground
         self.background = background
         self.foreground = foreground
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
@@ -23,6 +42,7 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
         accentForeground = try container.decode(SiteStandardThemeBasicAccentForegroundUnion.self, forKey: .accentForeground)
         background = try container.decode(SiteStandardThemeBasicBackgroundUnion.self, forKey: .background)
         foreground = try container.decode(SiteStandardThemeBasicForegroundUnion.self, forKey: .foreground)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -32,10 +52,15 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
         try container.encode(accentForeground, forKey: .accentForeground)
         try container.encode(background, forKey: .background)
         try container.encode(foreground, forKey: .foreground)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(accent)
+        hasher.combine(accentForeground)
+        hasher.combine(background)
+        hasher.combine(foreground)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -52,14 +77,11 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
         if foreground != other.foreground {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(accent)
-        hasher.combine(accentForeground)
-        hasher.combine(background)
-        hasher.combine(foreground)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -73,8 +95,10 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "background", value: backgroundValue)
         let foregroundValue = try foreground.toCBORValue()
         map = map.adding(key: "foreground", value: foregroundValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "accent", "accentForeground", "background", "foreground"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -86,6 +110,8 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
     public enum SiteStandardThemeBasicAccentUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case siteStandardThemeColorRgb(SiteStandardThemeColor.Rgb)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: SiteStandardThemeColor.Rgb) {
             self = .siteStandardThemeColorRgb(value)
@@ -182,6 +208,8 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
     public enum SiteStandardThemeBasicAccentForegroundUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case siteStandardThemeColorRgb(SiteStandardThemeColor.Rgb)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: SiteStandardThemeColor.Rgb) {
             self = .siteStandardThemeColorRgb(value)
@@ -278,6 +306,8 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
     public enum SiteStandardThemeBasicBackgroundUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case siteStandardThemeColorRgb(SiteStandardThemeColor.Rgb)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: SiteStandardThemeColor.Rgb) {
             self = .siteStandardThemeColorRgb(value)
@@ -374,6 +404,8 @@ public struct SiteStandardThemeBasic: ATProtocolCodable, ATProtocolValue {
 
     public enum SiteStandardThemeBasicForegroundUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case siteStandardThemeColorRgb(SiteStandardThemeColor.Rgb)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: SiteStandardThemeColor.Rgb) {
             self = .siteStandardThemeColorRgb(value)

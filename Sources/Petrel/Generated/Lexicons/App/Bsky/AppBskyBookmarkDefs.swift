@@ -6,34 +6,39 @@ import Foundation
 public enum AppBskyBookmarkDefs {
     public static let typeIdentifier = "app.bsky.bookmark.defs"
 
+    /// Object used to store bookmark data in stash.
     public struct Bookmark: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.bookmark.defs#bookmark"
+
+        /// A strong ref to the record to be bookmarked. Currently, only `app.bsky.feed.post` records are supported.
         public let subject: ComAtprotoRepoStrongRef
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            subject: ComAtprotoRepoStrongRef
+            subject: ComAtprotoRepoStrongRef,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.subject = subject
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .subject)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subject': \(error)")
-                throw error
-            }
+            subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .subject)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(subject, forKey: .subject)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(subject)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -41,7 +46,7 @@ public enum AppBskyBookmarkDefs {
             if subject != other.subject {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -50,62 +55,65 @@ public enum AppBskyBookmarkDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case subject
         }
     }
 
     public struct BookmarkView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.bookmark.defs#bookmarkView"
+
+        /// A strong ref to the bookmarked record.
         public let subject: ComAtprotoRepoStrongRef
         public let createdAt: ATProtocolDate?
         public let item: BookmarkViewItemUnion
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            subject: ComAtprotoRepoStrongRef, createdAt: ATProtocolDate? = nil, item: BookmarkViewItemUnion
+            subject: ComAtprotoRepoStrongRef,
+            createdAt: ATProtocolDate? = nil,
+            item: BookmarkViewItemUnion,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.subject = subject
             self.createdAt = createdAt
             self.item = item
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .subject)
             do {
-                subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .subject)
+                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'subject': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
                 createdAt = nil
             }
-            do {
-                item = try container.decode(BookmarkViewItemUnion.self, forKey: .item)
-            } catch {
-                LogManager.logError("Decoding error for required property 'item': \(error)")
-                throw error
-            }
+            item = try container.decode(BookmarkViewItemUnion.self, forKey: .item)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(subject, forKey: .subject)
             try container.encodeIfPresent(createdAt, forKey: .createdAt)
             try container.encode(item, forKey: .item)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -116,6 +124,7 @@ public enum AppBskyBookmarkDefs {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(item)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -129,7 +138,7 @@ public enum AppBskyBookmarkDefs {
             if item != other.item {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -138,7 +147,6 @@ public enum AppBskyBookmarkDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
             if let value = createdAt {
@@ -147,11 +155,12 @@ public enum AppBskyBookmarkDefs {
             }
             let itemValue = try item.toCBORValue()
             map = map.adding(key: "item", value: itemValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "createdAt", "item"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case subject
             case createdAt
             case item
@@ -162,6 +171,8 @@ public enum AppBskyBookmarkDefs {
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsPostView(AppBskyFeedDefs.PostView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyFeedDefs.BlockedPost) {
             self = .appBskyFeedDefsBlockedPost(value)

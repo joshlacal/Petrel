@@ -13,6 +13,8 @@ sys.path.insert(0, str(GENERATOR_DIR))
 
 from kotlin_code_generator import KotlinCodeGenerator
 from swift_code_generator import SwiftCodeGenerator
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
+from swift_test_stubs import CONTAINER_STUB
 
 from main import generate_swift_from_lexicons_recursive
 
@@ -258,7 +260,7 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         result = generated_struct(generated, "Result")
 
         self.assertIn(
-            "self.cursor = try container.decodeIfPresent(RecordKey.self, forKey: .cursor)",
+            "self.cursor = try container.decodeIfPresent(RecordKey.self, forKey: .cursor, rejectingNull: strict)",
             result,
         )
         self.assertIn("degrading to nil", result)
@@ -289,10 +291,12 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         ).convert()
 
         self.assertEqual(ordinary, explicit_false)
-        # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
+        # Re-pinned by the sdk-green generator pass (typed XRPC errors on every endpoint,
+        # extraFields, shared object template), and again when the output Content-Type
+        # check moved to value(forHTTPHeaderField:); that line is the only change.
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "7139da5752c79fc9e21913eef3782b608129ca2596568f3eb041a7219dc09290",
+            "c2a24a611bb7ea70c2aa305dd5d3ca3d2e61961f6e44e7735bcc99e531b1f3eb",
         )
 
     def test_server_contract_flag_false_preserves_direct_input_bytes(self):
@@ -303,10 +307,11 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         ).convert()
 
         self.assertEqual(ordinary, explicit_false)
-        # Updated following G1 template hardening (F8 metadata stripping & F27 context escaping)
+        # Re-pinned by the sdk-green generator pass (typed XRPC errors on every endpoint,
+        # extraFields, shared object template).
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "66e6f0b0c4294726a9fee4543bc7197826749c61827838d2fc859c7478cb3720",
+            "41c1edea70f66b15227d2f90100081a8908ab507778cdf7fee1348361ed1ace0",
         )
 
     def test_server_contract_presence_aware_decoders_compile_and_reject_malformed_values(self):
@@ -346,6 +351,7 @@ class PermissionedDataGenerationTests(unittest.TestCase):
             public enum LogManager {{
                 public static func logWarning(_ message: String) {{}}
             }}
+            {CONTAINER_STUB}
             public struct NSID: Codable, Equatable, Hashable {{
                 public let value: String
                 public init(from decoder: Decoder) throws {{
@@ -374,20 +380,6 @@ class PermissionedDataGenerationTests(unittest.TestCase):
                 public func encode(to encoder: Encoder) throws {{
                     var container = encoder.singleValueContainer()
                     try container.encode(value)
-                }}
-                public func toCBORValue() throws -> Any {{ value }}
-            }}
-            public struct ATProtocolValueContainer: ATProtocolValue {{
-                public let value: String
-                public init(from decoder: Decoder) throws {{
-                    value = try decoder.singleValueContainer().decode(String.self)
-                }}
-                public func encode(to encoder: Encoder) throws {{
-                    var container = encoder.singleValueContainer()
-                    try container.encode(value)
-                }}
-                public func isEqual(to other: any ATProtocolValue) -> Bool {{
-                    (other as? Self) == self
                 }}
                 public func toCBORValue() throws -> Any {{ value }}
             }}

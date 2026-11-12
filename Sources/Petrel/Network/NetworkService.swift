@@ -563,6 +563,14 @@ public actor NetworkService: NetworkServiceProtocol {
     /// every request this task sends through a `NetworkService`.
     @TaskLocal static var scopedResponseLimits: NetworkResponseLimits? = nil
 
+    /// Set only by `withCallOptions(_:operation:)` and the untyped XRPC calls: headers,
+    /// proxy target, labelers and service that apply to the requests of one call.
+    @TaskLocal static var scopedCallOptions: XRPCCallOptions? = nil
+
+    /// Set only by `withResponseMetadata(_:)`: receives the status and headers of every
+    /// response a request of this task gets.
+    @TaskLocal static var responseMetadataCollector: XRPCResponseMetadataCollector? = nil
+
     #if DEBUG
         private nonisolated(unsafe) static var networkTestProtocolClasses: [AnyClass]?
         private static let networkTestProtocolClassesLock = NSLock()
@@ -941,21 +949,22 @@ public actor NetworkService: NetworkServiceProtocol {
     ///   - value: The header value.
     public func setHeader(name: String, value: String) async {
         LogManager.logSensitiveValue(value, label: "Network Service - Setting header: \(name)", category: .network)
-        headers[name] = value
+        // Header names are case-insensitive: replace any earlier spelling of this name.
+        headers.setHTTPHeader(name, value)
     }
 
-    /// Gets the value of a custom header
+    /// Gets the value of a custom header, matching the name case-insensitively
     /// - Parameter name: Header name
     /// - Returns: Header value if it exists
     func getHeader(name: String) async -> String? {
-        return headers[name]
+        headers.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
     }
 
-    /// Removes a custom header
+    /// Removes a custom header, matching the name case-insensitively
     /// - Parameter name: Header name to remove
     public func removeHeader(name: String) async {
         LogManager.logDebug("Network Service - Removing header: \(name)")
-        headers.removeValue(forKey: name)
+        headers.setHTTPHeader(name, nil)
     }
 
     /// Clears all custom headers
@@ -1766,17 +1775,21 @@ public actor NetworkService: NetworkServiceProtocol {
                         "Network Service - Server error \(httpResponse.statusCode) for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL"). Retry \(retryCount + 1)/\(maxRetries)."
                     )
                     retryCount += 1
-                    if retryCount >= maxRetries {
+                    // 501 means the endpoint is not implemented: the XRPC specification says
+                    // not to retry. A request that is not a GET may have been processed
+                    // before the gateway failed, so sending it again could apply it twice.
+                    let mayRetry = httpResponse.statusCode != 501 && Self.isSafeToResend(requestToSend)
+                    if retryCount >= maxRetries || !mayRetry {
                         if returnsTerminalHTTPErrorResponses {
                             return (decompressedData, httpResponse)
                         }
                         throw NetworkError.responseError(statusCode: httpResponse.statusCode)
                     }
 
-                    // Enhanced exponential backoff with jitter
+                    // Exponential backoff with jitter, or the delay the server asked for.
                     let baseDelay = min(pow(2.0, Double(retryCount)), 8.0) // Cap at 8 seconds
                     let jitter = Double.random(in: 0.8 ... 1.2) // Add ±20% jitter
-                    let delaySeconds = baseDelay * jitter
+                    let delaySeconds = Self.retryAfterSeconds(in: httpResponse) ?? baseDelay * jitter
 
                     LogManager.logInfo(
                         "Network Service - Waiting \(String(format: "%.1f", delaySeconds))s before retry \(retryCount)/\(maxRetries)"
@@ -1799,8 +1812,12 @@ public actor NetworkService: NetworkServiceProtocol {
                     "Network Service - Network error: \(error.localizedDescription). Retry \(retryCount + 1)/\(maxRetries)."
                 )
                 retryCount += 1
-                if retryCount >= maxRetries {
-                    LogManager.logError("Network Service - Max retries reached for network error.")
+                // A failure to reach the host means nothing was sent, so any request can be
+                // retried. A timeout or a dropped connection may come after the server
+                // processed the request; only a GET is safe to send again then.
+                let neverSent = error.code == .cannotFindHost || error.code == .cannotConnectToHost
+                if retryCount >= maxRetries || !(neverSent || Self.isSafeToResend(currentRequest)) {
+                    LogManager.logError("Network Service - Not retrying after network error.")
                     throw NetworkError.requestFailed // Or map specific URLError codes
                 }
 
@@ -2228,9 +2245,9 @@ public actor NetworkService: NetworkServiceProtocol {
             url = absoluteURL
             components = URLComponents(url: url, resolvingAgainstBaseURL: true)
         } else {
-            // Relative endpoint to base URL
+            // Relative endpoint to base URL, or to the service a per-call option names.
             let xrpcPath = endpoint.starts(with: "/") ? "xrpc\(endpoint)" : "xrpc/\(endpoint)"
-            url = baseURL.appendingPathComponent(xrpcPath)
+            url = (Self.scopedCallOptions?.service ?? baseURL).appendingPathComponent(xrpcPath)
             components = URLComponents(url: url, resolvingAgainstBaseURL: true)
 
             // NOTE: Service DIDs (e.g., app.bsky -> did:web:api.bsky.app#bsky_appview) are
@@ -2242,6 +2259,8 @@ public actor NetworkService: NetworkServiceProtocol {
         // Add query items if provided
         if let queryItems = queryItems, !queryItems.isEmpty {
             components?.queryItems = queryItems
+            let escapedQuery = Self.xrpcQueryEscapingPlus(components?.percentEncodedQuery)
+            components?.percentEncodedQuery = escapedQuery
         }
 
         guard let finalURL = components?.url else {
@@ -2297,6 +2316,35 @@ public actor NetworkService: NetworkServiceProtocol {
         return request
     }
 
+    /// Whether sending `request` a second time cannot change server state: XRPC queries
+    /// (GET) and HEAD requests. Procedures (POST) are not idempotent.
+    static func isSafeToResend(_ request: URLRequest) -> Bool {
+        let method = (request.httpMethod ?? "GET").uppercased()
+        return method == "GET" || method == "HEAD"
+    }
+
+    /// The delay a `Retry-After` header asks for, when it is a number of seconds, capped
+    /// at 30 seconds so a hostile or misconfigured server cannot park a caller.
+    static func retryAfterSeconds(in response: HTTPURLResponse) -> Double? {
+        guard let value = response.value(forHTTPHeaderField: "Retry-After"),
+              let seconds = Double(value.trimmingCharacters(in: .whitespaces)),
+              seconds >= 0
+        else {
+            return nil
+        }
+        return min(seconds, 30)
+    }
+
+    /// Percent-encodes `+` in an already percent-encoded query string.
+    ///
+    /// `URLComponents.queryItems` leaves `+` literal, and servers that parse the
+    /// query as `application/x-www-form-urlencoded` (the reference PDS and AppView
+    /// do, through `URLSearchParams`) read a literal `+` as a space. That corrupts
+    /// `q=c++`, datetimes with a `+00:00` offset and base64 cursors.
+    static func xrpcQueryEscapingPlus(_ percentEncodedQuery: String?) -> String? {
+        percentEncodedQuery?.replacingOccurrences(of: "+", with: "%2B")
+    }
+
     /// Performs a network request (compatibility method)
     /// - Parameters:
     ///   - request: The URLRequest to perform.
@@ -2306,10 +2354,17 @@ public actor NetworkService: NetworkServiceProtocol {
     public func performRequest(_ request: URLRequest, skipTokenRefresh: Bool, additionalHeaders: [String: String]? = nil) async throws -> (
         Data, HTTPURLResponse
     ) {
-        let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: additionalHeaders)
+        // Per-call options apply to the service the call is addressed to, not to any other
+        // host a request of the same task reaches (an OAuth authorization server, say).
+        var headers = additionalHeaders
+        if let options = Self.scopedCallOptions, request.url?.host == (options.service ?? baseURL).host {
+            headers = options.requestHeaders(over: additionalHeaders)
+        }
+        let (data, response) = try await self.request(request, skipTokenRefresh: skipTokenRefresh, additionalHeaders: headers)
         guard let httpResponse = response as? HTTPURLResponse else {
             throw NetworkError.invalidResponse(description: "Response is not an HTTP response")
         }
+        Self.responseMetadataCollector?.record(httpResponse)
         return (data, httpResponse)
     }
 
@@ -2446,7 +2501,7 @@ public actor NetworkService: NetworkServiceProtocol {
     ///   - request: The original URLRequest
     ///   - additionalHeaders: Optional additional headers (e.g., atproto-proxy)
     /// - Returns: PreparedStreamingRequest containing the URLRequest and its authentication lease
-    func prepareStreamingRequest(
+    public func prepareStreamingRequest(
         _ request: URLRequest,
         additionalHeaders: [String: String]? = nil
     ) async throws -> PreparedStreamingRequest {
@@ -2505,33 +2560,56 @@ public actor NetworkService: NetworkServiceProtocol {
         endpoint: String,
         parameters: (any Parametrizable)?
     ) async throws -> AsyncThrowingStream<Message, Error> {
+        // Options from an enclosing `withCallOptions` scope apply here as they do to HTTP
+        // calls: `service` picks the host, `proxy` (or a caller's own atproto-proxy header)
+        // routes through the PDS, and headers and labelers go on the upgrade request.
+        let scoped = Self.scopedCallOptions
+        let scopedProxy = scoped?.proxy ?? scoped?.headers.first {
+            $0.key.caseInsensitiveCompare("atproto-proxy") == .orderedSame
+        }?.value
+
         // Build WebSocket URL
         var urlComponents = URLComponents()
         urlComponents.scheme = "wss"
 
-        // Resolve service DID with strongest signal first (full endpoint),
-        // then fall back to the three-part namespace (e.g., blue.catbird.mls)
-        let fullEndpoint = endpoint
-        let threePartNamespace = endpoint.split(separator: ".").prefix(3).joined(separator: ".")
-
-        var resolvedDID = await getServiceDID(for: fullEndpoint)
-        if resolvedDID == nil {
-            resolvedDID = await getServiceDID(for: String(threePartNamespace))
-        }
-
-        if let did = resolvedDID, let serviceHost = extractHostFromDID(did) {
-            // Prefer connecting directly to the service host for WS
-            urlComponents.host = serviceHost
-        } else {
-            // Fallback to the PDS host (baseURL)
+        var resolvedDID: String?
+        if let service = scoped?.service {
+            urlComponents.scheme = service.scheme?.lowercased() == "http" ? "ws" : "wss"
+            urlComponents.host = service.host
+            urlComponents.port = service.port
+            resolvedDID = scopedProxy
+        } else if let scopedProxy {
+            // An explicit proxy is a request for the PDS to forward the subscription.
             urlComponents.host = baseURL.host
+            resolvedDID = scopedProxy
+        } else {
+            // Resolve service DID with strongest signal first (full endpoint),
+            // then fall back to the three-part namespace (e.g., blue.catbird.mls)
+            let fullEndpoint = endpoint
+            let threePartNamespace = endpoint.split(separator: ".").prefix(3).joined(separator: ".")
+
+            resolvedDID = await getServiceDID(for: fullEndpoint)
+            if resolvedDID == nil {
+                resolvedDID = await getServiceDID(for: String(threePartNamespace))
+            }
+
+            if let did = resolvedDID, let serviceHost = extractHostFromDID(did) {
+                // Prefer connecting directly to the service host for WS
+                urlComponents.host = serviceHost
+            } else {
+                // Fallback to the PDS host (baseURL)
+                urlComponents.host = baseURL.host
+            }
         }
 
-        urlComponents.path = "/xrpc/\(endpoint)"
+        let servicePath = scoped?.service.map { $0.path.hasSuffix("/") ? String($0.path.dropLast()) : $0.path } ?? ""
+        urlComponents.path = "\(servicePath)/xrpc/\(endpoint)"
 
         // Add query parameters if provided
-        if let params = parameters {
+        if let params = parameters, !params.asQueryItems().isEmpty {
             urlComponents.queryItems = params.asQueryItems()
+            let escapedQuery = Self.xrpcQueryEscapingPlus(urlComponents.percentEncodedQuery)
+            urlComponents.percentEncodedQuery = escapedQuery
         }
 
         guard let url = urlComponents.url else {
@@ -2563,6 +2641,13 @@ public actor NetworkService: NetworkServiceProtocol {
             request.setValue(did, forHTTPHeaderField: "atproto-proxy")
             LogManager.logDebug("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
         }
+        // This upgrade request is the scoped call itself, wherever it was routed.
+        // setValue replaces an earlier header whatever its case.
+        if let scoped {
+            for (name, value) in scoped.requestHeaders(over: nil) ?? [:] {
+                request.setValue(value, forHTTPHeaderField: name)
+            }
+        }
         var authCtx: AuthContext? = nil
         defer {
             authCtx?.releaseAuthenticationLease()
@@ -2585,6 +2670,11 @@ public actor NetworkService: NetworkServiceProtocol {
         if let urlSessionTask = webSocketTask as? URLSessionTask {
             sessionDelegate.contextManager.setApprovedAddresses(websocketAddresses, for: urlSessionTask)
         }
+        if let urlSessionWebSocketTask = webSocketTask as? URLSessionWebSocketTask {
+            // URLSession refuses messages above 1 MiB by default; event-stream frames may
+            // be up to 5 MB.
+            urlSessionWebSocketTask.maximumMessageSize = ATProtoWebSocketFrameDecoder.maximumFrameBytes
+        }
         webSocketTask.resume()
 
         // Create bounded async throwing stream with buffer size 1000
@@ -2597,7 +2687,11 @@ public actor NetworkService: NetworkServiceProtocol {
                         switch message {
                         case let .data(data):
                             do {
-                                let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self, endpoint: endpoint)
+                                guard let decodedMessage = try self.decodeSubscriptionFrame(data, as: Message.self, endpoint: endpoint) else {
+                                    // Unknown frame operation or message type: the event-stream
+                                    // specification says clients ignore these.
+                                    continue
+                                }
                                 let yieldResult = continuation.yield(decodedMessage)
                                 switch yieldResult {
                                 case .enqueued:
@@ -2668,13 +2762,33 @@ public actor NetworkService: NetworkServiceProtocol {
             }
         }
     }
-    /// Decode a subscription WebSocket frame containing two DAG-CBOR objects
-    private func decodeSubscriptionFrame<Message: Codable & Sendable>(
+    /// Decode a subscription WebSocket frame containing two DAG-CBOR objects.
+    ///
+    /// Returns `nil` for a frame the consumer must skip, as the event-stream
+    /// specification asks: a header `op` other than `1` (message) or `-1` (error), or a
+    /// message type the `Message` union does not declare. An error frame throws its
+    /// ``EventStreamError``; a malformed frame throws.
+    func decodeSubscriptionFrame<Message: Codable & Sendable>(
         _ data: Data,
         as messageType: Message.Type,
         endpoint: String
-    ) throws -> Message {
-        let decoded = try ATProtoWebSocketFrameDecoder.decodeFrame(data, defaultLexicon: endpoint)
+    ) throws -> Message? {
+        let decoded: ATProtoWebSocketFrameDecoder.DecodedFrame
+        switch try ATProtoWebSocketFrameDecoder.decode(data, defaultLexicon: endpoint) {
+        case let .message(frame):
+            decoded = frame
+        case let .error(error):
+            throw error
+        case let .unknownOperation(operation):
+            LogManager.logDebug("Skipping event-stream frame with unknown operation \(operation) on \(endpoint)")
+            return nil
+        }
+        if let declared = (Message.self as? any XRPCSubscriptionMessage.Type)?.knownMessageTypes,
+           !declared.contains(decoded.messageType)
+        {
+            LogManager.logDebug("Skipping event-stream message of unknown type \(decoded.messageType) on \(endpoint)")
+            return nil
+        }
         do {
             return try jsonDecoder.decode(Message.self, from: decoded.jsonData)
         } catch {

@@ -1,0 +1,38 @@
+{
+  "lexicon": 1,
+  "id": "com.example.widget.uploadThing",
+  "defs": {
+    "main": {
+      "type": "procedure",
+      "description": "A */* body with query parameters.",
+      "parameters": {
+        "type": "params",
+        "required": [
+          "name"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          }
+        }
+      },
+      "input": {
+        "encoding": "*/*"
+      },
+      "output": {
+        "encoding": "application/json",
+        "schema": {
+          "type": "object",
+          "required": [
+            "blob"
+          ],
+          "properties": {
+            "blob": {
+              "type": "blob"
+            }
+          }
+        }
+      }
+    }
+  }
+}

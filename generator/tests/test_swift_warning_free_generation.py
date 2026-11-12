@@ -49,19 +49,13 @@ class SwiftWarningFreeGenerationTests(unittest.TestCase):
         for relative_path in self.nonthrowing_binary_output_lexicons:
             with self.subTest(lexicon=relative_path):
                 generated = self.render(relative_path)
-                success_start = generated.index(
-                    "if (200...299).contains(responseCode)"
-                )
-                success_end = generated.index("} else {", success_start)
-                success_path = generated[success_start:success_end]
+                success_path = generated[
+                    generated.index("guard (200...299).contains(responseCode)"):
+                ]
 
                 self.assertRegex(
                     success_path,
-                    re.compile(
-                        r"let decodedData = \w+\.Output\(data: responseData\)\s*"
-                        r"return \(responseCode, decodedData\)",
-                        re.DOTALL,
-                    ),
+                    r"return \(responseCode, \w+\.Output\(data: responseData\)\)",
                 )
                 self.assertNotIn("do {", success_path)
                 self.assertNotIn("catch {", success_path)
@@ -97,15 +91,20 @@ class SwiftWarningFreeGenerationTests(unittest.TestCase):
     def test_main_object_without_properties_compiles_without_unused_values(self):
         generated = self.render("com/atproto/personalspace/policy.json")
 
-        self.assertIn("_ = try decoder.container(keyedBy: CodingKeys.self)", generated)
+        # No declared properties: the only state is the undeclared wire fields.
+        self.assertIn(
+            "self.extraFields = try ATProtocolValueContainer.decodeExtraFields("
+            "from: decoder, knownKeys: Self.knownFieldKeys)",
+            generated,
+        )
         self.assertIn("_ = encoder.container(keyedBy: CodingKeys.self)", generated)
-        self.assertIn("return other is Self", generated)
+        self.assertIn("let map = OrderedCBORMap()", generated)
+        self.assertIn("return self.extraFields == other.extraFields", generated)
         self.assertIn("private enum CodingKeys: CodingKey {", generated)
         self.assertNotIn("let container =", generated)
         self.assertNotIn("var container =", generated)
-        self.assertNotIn("guard let other", generated)
+        self.assertNotIn("var map =", generated)
         self.assertNotIn("CodingKeys: String, CodingKey", generated)
-
 
 if __name__ == "__main__":
     unittest.main()

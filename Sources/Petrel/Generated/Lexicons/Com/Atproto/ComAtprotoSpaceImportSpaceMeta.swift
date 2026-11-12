@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.importSpaceMeta
 
+/// Import a space from a space meta archive, as served by exportSpaceMeta, during account migration, replacing whatever this host holds for that space. The space must be anchored on the authenticated account's DID. Must come before importing the account's own repo in the space with importRepo. Notification registrations, credential revocations, and deleted space tombstones are not carried over. Requires OAuth with manage=create and manage=update grants for the space, implemented by PDS.
 public enum ComAtprotoSpaceImportSpaceMeta {
     public static let typeIdentifier = "com.atproto.space.importSpaceMeta"
+
     public struct Input: ATProtocolCodable {
         public let data: Data
 
-        /// Standard public initializer
-        public init(data: Data) {
+        public init(
+            data: Data
+        ) {
             self.data = data
         }
 
@@ -73,23 +76,21 @@ public enum ComAtprotoSpaceImportSpaceMeta {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - importSpaceMeta
 
-    // Import a space from a space meta archive, as served by exportSpaceMeta, during account migration, replacing whatever this host holds for that space. The space must be anchored on the authenticated account's DID. Must come before importing the account's own repo in the space with importRepo. Notification registrations, credential revocations, and deleted space tombstones are not carried over. Requires OAuth with manage=create and manage=update grants for the space, implemented by PDS.
-    //
-    // - Parameter data: The binary data to upload
-
+    /// Import a space from a space meta archive, as served by exportSpaceMeta, during account migration, replacing whatever this host holds for that space. The space must be anchored on the authenticated account's DID. Must come before importing the account's own repo in the space with importRepo. Notification registrations, credential revocations, and deleted space tombstones are not carried over. Requires OAuth with manage=create and manage=update grants for the space, implemented by PDS.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - data: The request body bytes
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoSpaceImportSpaceMeta.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func importSpaceMeta(
         data: Data
 
     ) async throws -> Int {
         let endpoint = "com.atproto.space.importSpaceMeta"
 
-        let dataToUpload = data
         let headers: [String: String] = [
             "Content-Type": "application/octet-stream",
-            "Content-Length": "\(dataToUpload.count)",
+            "Content-Length": "\(data.count)",
         ]
 
         let queryItems: [URLQueryItem]? = nil
@@ -98,7 +99,7 @@ public extension ATProtoClient.Com.Atproto.Space {
             endpoint: endpoint,
             method: "POST",
             headers: headers,
-            body: dataToUpload,
+            body: data,
             queryItems: queryItems
         )
 
@@ -108,18 +109,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceImportSpaceMeta.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceImportSpaceMeta.Error.self)
         }
 
         return responseCode

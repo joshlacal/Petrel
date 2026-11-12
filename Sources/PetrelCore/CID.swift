@@ -723,6 +723,11 @@ public class DAGCBOR {
                     throw DAGCBORError.invalidLength
                 }
                 var previousKey: [UInt8]?
+                // Decoders build dictionaries keyed by Swift String, which compares by
+                // canonical equivalence: byte-distinct NFC/NFD keys would collapse into
+                // one entry and silently drop a value.
+                var keyStrings = Set<String>()
+                keyStrings.reserveCapacity(count)
                 for _ in 0 ..< count {
                     guard offset < bytes.count else {
                         throw DAGCBORError.decodingFailed("Unexpected end of CBOR map key")
@@ -752,6 +757,9 @@ public class DAGCBOR {
                         }
                     }
                     previousKey = rawKey
+                    guard keyStrings.insert(String(decoding: bytes[(offset - keyLength) ..< offset], as: UTF8.self)).inserted else {
+                        throw DAGCBORError.decodingFailed("Map keys are canonically equivalent Unicode strings")
+                    }
 
                     // Scan value
                     try scanItem(depth: depth + 1)

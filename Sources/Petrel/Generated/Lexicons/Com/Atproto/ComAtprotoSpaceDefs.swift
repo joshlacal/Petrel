@@ -6,66 +6,58 @@ import Foundation
 public enum ComAtprotoSpaceDefs {
     public static let typeIdentifier = "com.atproto.space.defs"
 
+    /// A commit over the current state of a permissioned repo. Carries no signature: the repo host authenticates it to a syncer with a MAC in the Atproto-Space-Mac response header.
     public struct Commit: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.defs#commit"
+
+        /// Commit format version, currently 1.
         public let ver: Int
+        /// The author DID of the repo.
         public let repo: DID
+        /// Reference to the space.
         public let space: SpaceRef
+        /// Commit revision (TID).
         public let rev: TID
+        /// sha256 digest of the LtHash state (32 bytes).
         public let data: Bytes
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            ver: Int, repo: DID, space: SpaceRef, rev: TID, data: Bytes
+            ver: Int,
+            repo: DID,
+            space: SpaceRef,
+            rev: TID,
+            data: Bytes,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.ver = ver
             self.repo = repo
             self.space = space
             self.rev = rev
             self.data = data
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                ver = try container.decode(Int.self, forKey: .ver)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ver': \(error)")
-                throw error
-            }
-            do {
-                repo = try container.decode(DID.self, forKey: .repo)
-            } catch {
-                LogManager.logError("Decoding error for required property 'repo': \(error)")
-                throw error
-            }
-            do {
-                space = try container.decode(SpaceRef.self, forKey: .space)
-            } catch {
-                LogManager.logError("Decoding error for required property 'space': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(TID.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                data = try container.decode(Bytes.self, forKey: .data)
-            } catch {
-                LogManager.logError("Decoding error for required property 'data': \(error)")
-                throw error
-            }
+            ver = try container.decode(Int.self, forKey: .ver)
+            repo = try container.decode(DID.self, forKey: .repo)
+            space = try container.decode(SpaceRef.self, forKey: .space)
+            rev = try container.decode(TID.self, forKey: .rev)
+            data = try container.decode(Bytes.self, forKey: .data)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(ver, forKey: .ver)
             try container.encode(repo, forKey: .repo)
             try container.encode(space, forKey: .space)
             try container.encode(rev, forKey: .rev)
             try container.encode(data, forKey: .data)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -74,6 +66,7 @@ public enum ComAtprotoSpaceDefs {
             hasher.combine(space)
             hasher.combine(rev)
             hasher.combine(data)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -93,7 +86,7 @@ public enum ComAtprotoSpaceDefs {
             if data != other.data {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -102,7 +95,6 @@ public enum ComAtprotoSpaceDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let verValue = try ver.toCBORValue()
             map = map.adding(key: "ver", value: verValue)
             let repoValue = try repo.toCBORValue()
@@ -113,11 +105,12 @@ public enum ComAtprotoSpaceDefs {
             map = map.adding(key: "rev", value: revValue)
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "ver", "repo", "space", "rev", "data"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case ver
             case repo
             case space

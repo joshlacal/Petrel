@@ -3,24 +3,41 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.notification.listNotifications
 
+/// Enumerate notifications for the requesting account. Requires auth.
 public enum AppBskyNotificationListNotifications {
     public static let typeIdentifier = "app.bsky.notification.listNotifications"
 
     public struct Notification: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.notification.listNotifications#notification"
+
         public let uri: ATProtocolURI
-        public let cid: CID
+        public let cid: CIDString
         public let author: AppBskyActorDefs.ProfileView
+        /// The reason why this notification was delivered - e.g. your post was liked, or you received a new follower.
         public let reason: String
         public let reasonSubject: ATProtocolURI?
         public let record: ATProtocolValueContainer
+        /// The starter pack associated with this notification. Present when the notification is for a follow originating from a starter pack.
         public let starterPack: AppBskyGraphDefs.StarterPackViewBasic?
         public let isRead: Bool
         public let indexedAt: ATProtocolDate
         public let labels: [ComAtprotoLabelDefs.Label]?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: ATProtocolURI, cid: CID, author: AppBskyActorDefs.ProfileView, reason: String, reasonSubject: ATProtocolURI? = nil, record: ATProtocolValueContainer, starterPack: AppBskyGraphDefs.StarterPackViewBasic? = nil, isRead: Bool, indexedAt: ATProtocolDate, labels: [ComAtprotoLabelDefs.Label]? = nil
+            uri: ATProtocolURI,
+            cid: CIDString,
+            author: AppBskyActorDefs.ProfileView,
+            reason: String,
+            reasonSubject: ATProtocolURI? = nil,
+            record: ATProtocolValueContainer,
+            starterPack: AppBskyGraphDefs.StarterPackViewBasic? = nil,
+            isRead: Bool,
+            indexedAt: ATProtocolDate,
+            labels: [ComAtprotoLabelDefs.Label]? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
             self.cid = cid
@@ -32,81 +49,54 @@ public enum AppBskyNotificationListNotifications {
             self.isRead = isRead
             self.indexedAt = indexedAt
             self.labels = labels
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+            cid = try container.decode(CIDString.self, forKey: .cid)
+            author = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .author)
+            reason = try container.decode(String.self, forKey: .reason)
             do {
-                uri = try container.decode(ATProtocolURI.self, forKey: .uri)
+                reasonSubject = try container.decodeIfPresent(ATProtocolURI.self, forKey: .reasonSubject, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                cid = try container.decode(CID.self, forKey: .cid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
-                throw error
-            }
-            do {
-                author = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .author)
-            } catch {
-                LogManager.logError("Decoding error for required property 'author': \(error)")
-                throw error
-            }
-            do {
-                reason = try container.decode(String.self, forKey: .reason)
-            } catch {
-                LogManager.logError("Decoding error for required property 'reason': \(error)")
-                throw error
-            }
-            do {
-                reasonSubject = try container.decodeIfPresent(ATProtocolURI.self, forKey: .reasonSubject)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'reasonSubject' — degrading to nil: \(error)")
                 reasonSubject = nil
             }
+            record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
             do {
-                record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
+                starterPack = try container.decodeIfPresent(AppBskyGraphDefs.StarterPackViewBasic.self, forKey: .starterPack, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'record': \(error)")
-                throw error
-            }
-            do {
-                starterPack = try container.decodeIfPresent(AppBskyGraphDefs.StarterPackViewBasic.self, forKey: .starterPack)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'starterPack' — degrading to nil: \(error)")
                 starterPack = nil
             }
+            isRead = try container.decode(Bool.self, forKey: .isRead)
+            indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
             do {
-                isRead = try container.decode(Bool.self, forKey: .isRead)
+                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'isRead': \(error)")
-                throw error
-            }
-            do {
-                indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'indexedAt': \(error)")
-                throw error
-            }
-            do {
-                labels = try container.decodeIfPresent([ComAtprotoLabelDefs.Label].self, forKey: .labels)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
                 labels = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
             try container.encode(cid, forKey: .cid)
             try container.encode(author, forKey: .author)
@@ -117,6 +107,7 @@ public enum AppBskyNotificationListNotifications {
             try container.encode(isRead, forKey: .isRead)
             try container.encode(indexedAt, forKey: .indexedAt)
             try container.encodeIfPresent(labels, forKey: .labels)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -142,6 +133,7 @@ public enum AppBskyNotificationListNotifications {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -176,7 +168,7 @@ public enum AppBskyNotificationListNotifications {
             if labels != other.labels {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -185,7 +177,6 @@ public enum AppBskyNotificationListNotifications {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
             let cidValue = try cid.toCBORValue()
@@ -212,11 +203,12 @@ public enum AppBskyNotificationListNotifications {
                 let labelsValue = try value.toCBORValue()
                 map = map.adding(key: "labels", value: labelsValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "reason", "reasonSubject", "record", "starterPack", "isRead", "indexedAt", "labels"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
             case cid
             case author
@@ -254,58 +246,54 @@ public enum AppBskyNotificationListNotifications {
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-
         public let notifications: [Notification]
-
+        /// Deprecated: this field is no longer populated.
         public let priority: Bool?
-
         public let seenAt: ATProtocolDate?
 
-        /// Standard public initializer
         public init(
             cursor: String? = nil,
-
             notifications: [Notification],
-
             priority: Bool? = nil,
-
             seenAt: ATProtocolDate? = nil
-
         ) {
             self.cursor = cursor
-
             self.notifications = notifications
-
             self.priority = priority
-
             self.seenAt = seenAt
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
             notifications = try container.decode([Notification].self, forKey: .notifications)
-
             do {
-                priority = try container.decodeIfPresent(Bool.self, forKey: .priority)
+                priority = try container.decodeIfPresent(Bool.self, forKey: .priority, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'priority' — degrading to nil: \(error)")
                 priority = nil
             }
-
             do {
-                seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt)
+                seenAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .seenAt, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'seenAt' — degrading to nil: \(error)")
                 seenAt = nil
             }
@@ -313,43 +301,28 @@ public enum AppBskyNotificationListNotifications {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
             try container.encode(notifications, forKey: .notifications)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(priority, forKey: .priority)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(seenAt, forKey: .seenAt)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
             let notificationsValue = try notifications.toCBORValue()
             map = map.adding(key: "notifications", value: notificationsValue)
-
             if let value = priority {
-                // Encode optional property even if it's an empty array for CBOR
                 let priorityValue = try value.toCBORValue()
                 map = map.adding(key: "priority", value: priorityValue)
             }
-
             if let value = seenAt {
-                // Encode optional property even if it's an empty array for CBOR
                 let seenAtValue = try value.toCBORValue()
                 map = map.adding(key: "seenAt", value: seenAtValue)
             }
-
             return map
         }
 
@@ -368,9 +341,8 @@ public extension ATProtoClient.App.Bsky.Notification {
     /// Enumerate notifications for the requesting account. Requires auth.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func listNotifications(input: AppBskyNotificationListNotifications.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationListNotifications.Output?) {
         let endpoint = "app.bsky.notification.listNotifications"
 
@@ -387,35 +359,26 @@ public extension ATProtoClient.App.Bsky.Notification {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.listNotifications")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyNotificationListNotifications.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.notification.listNotifications: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyNotificationListNotifications.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

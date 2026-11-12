@@ -251,11 +251,16 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
     func testExactScopeDoesNotReplay401NonceOrServerErrors() async throws {
         for status in [401, 500] {
             let fixture = await makeFixture(statusCode: status, headers: ["DPoP-Nonce": "do-not-store"])
-            let result = try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
-                try await fixture.client.com.atproto.server.describeServer()
+            // A non-2xx answer reaches the caller as a thrown XRPC error carrying the
+            // status; what this test pins is that it is thrown after exactly one send.
+            do {
+                _ = try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
+                    try await fixture.client.com.atproto.server.describeServer()
+                }
+                XCTFail("status \(status) must throw")
+            } catch let error as ATProtoXRPCError {
+                XCTAssertEqual(error.statusCode, status)
             }
-
-            assertPerformed(result, responseCode: status)
             let requestCount = await fixture.transport.requests.count
             let refreshCount = await fixture.provider.refreshCount
             let unauthorizedCount = await fixture.provider.unauthorizedCount
@@ -272,11 +277,18 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
             statusCode: 302,
             headers: ["Location": "https://redirect-target.example/xrpc/com.atproto.server.describeServer"]
         )
-        let result = try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
-            try await fixture.client.com.atproto.server.describeServer()
+        do {
+            _ = try await fixture.client.performGeneratedRequestWithExactAuthContinuity(matching: fixture.snapshot) {
+                try await fixture.client.com.atproto.server.describeServer()
+            }
+            XCTFail("an unfollowed redirect must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.statusCode, 302)
+            XCTAssertEqual(
+                error.headers["location"],
+                "https://redirect-target.example/xrpc/com.atproto.server.describeServer"
+            )
         }
-
-        assertPerformed(result, responseCode: 302)
         let requests = await fixture.transport.requests
         XCTAssertEqual(requests.count, 1)
         XCTAssertEqual(requests[0].url?.host, baseURL.host)
@@ -587,7 +599,7 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         let input = try ComAtprotoSpaceGetBlob.Parameters(
             space: SpaceRef(uriString: "at://did:plc:exact/space/com.example.drive/self"),
             repo: DID(didString: "did:plc:exact"),
-            cid: CID.fromDAGCBOR(Data("exact-auth-limit".utf8))
+            cid: CIDString(CID.fromDAGCBOR(Data("exact-auth-limit".utf8)))
         )
 
         do {

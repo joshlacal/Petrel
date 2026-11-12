@@ -3,38 +3,64 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.actor.status
 
+/// A declaration of a Bluesky account status.
 public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.actor.status"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
+
+    /// The status for the account.
     public let status: String
+    /// An optional embed associated with the status.
     public let embed: AppBskyActorStatusEmbedUnion?
+    /// The duration of the status in minutes. Applications can choose to impose minimum and maximum limits.
     public let durationMinutes: Int?
     public let createdAt: ATProtocolDate
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(status: String, embed: AppBskyActorStatusEmbedUnion? = nil, durationMinutes: Int? = nil, createdAt: ATProtocolDate) {
+    public init(
+        status: String,
+        embed: AppBskyActorStatusEmbedUnion? = nil,
+        durationMinutes: Int? = nil,
+        createdAt: ATProtocolDate,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.status = status
         self.embed = embed
         self.durationMinutes = durationMinutes
         self.createdAt = createdAt
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         status = try container.decode(String.self, forKey: .status)
         do {
-            embed = try container.decodeIfPresent(AppBskyActorStatusEmbedUnion.self, forKey: .embed)
+            embed = try container.decodeIfPresent(AppBskyActorStatusEmbedUnion.self, forKey: .embed, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
             embed = nil
         }
         do {
-            durationMinutes = try container.decodeIfPresent(Int.self, forKey: .durationMinutes)
+            durationMinutes = try container.decodeIfPresent(Int.self, forKey: .durationMinutes, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'durationMinutes' — degrading to nil: \(error)")
             durationMinutes = nil
         }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -44,10 +70,23 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(embed, forKey: .embed)
         try container.encodeIfPresent(durationMinutes, forKey: .durationMinutes)
         try container.encode(createdAt, forKey: .createdAt)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(status)
+        if let value = embed {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        if let value = durationMinutes {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        hasher.combine(createdAt)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -64,22 +103,11 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
         if createdAt != other.createdAt {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(status)
-        if let value = embed {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
-        if let value = durationMinutes {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
-        hasher.combine(createdAt)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -97,8 +125,10 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
         }
         let createdAtValue = try createdAt.toCBORValue()
         map = map.adding(key: "createdAt", value: createdAtValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "status", "embed", "durationMinutes", "createdAt"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -110,6 +140,8 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
 
     public enum AppBskyActorStatusEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case appBskyEmbedExternal(AppBskyEmbedExternal)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyEmbedExternal) {
             self = .appBskyEmbedExternal(value)
@@ -203,4 +235,7 @@ public struct AppBskyActorStatus: ATProtocolCodable, ATProtocolValue {
             }
         }
     }
+
+    /// Advertises an account as currently offering live content.
+    public static let live = "app.bsky.actor.status#live"
 }

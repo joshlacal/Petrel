@@ -8,6 +8,7 @@ public enum ComAtprotoServerDefs {
 
     public struct InviteCode: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.server.defs#inviteCode"
+
         public let code: String
         public let available: Int
         public let disabled: Bool
@@ -15,9 +16,19 @@ public enum ComAtprotoServerDefs {
         public let createdBy: String
         public let createdAt: ATProtocolDate
         public let uses: [InviteCodeUse]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            code: String, available: Int, disabled: Bool, forAccount: String, createdBy: String, createdAt: ATProtocolDate, uses: [InviteCodeUse]
+            code: String,
+            available: Int,
+            disabled: Bool,
+            forAccount: String,
+            createdBy: String,
+            createdAt: ATProtocolDate,
+            uses: [InviteCodeUse],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.code = code
             self.available = available
@@ -26,57 +37,23 @@ public enum ComAtprotoServerDefs {
             self.createdBy = createdBy
             self.createdAt = createdAt
             self.uses = uses
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                code = try container.decode(String.self, forKey: .code)
-            } catch {
-                LogManager.logError("Decoding error for required property 'code': \(error)")
-                throw error
-            }
-            do {
-                available = try container.decode(Int.self, forKey: .available)
-            } catch {
-                LogManager.logError("Decoding error for required property 'available': \(error)")
-                throw error
-            }
-            do {
-                disabled = try container.decode(Bool.self, forKey: .disabled)
-            } catch {
-                LogManager.logError("Decoding error for required property 'disabled': \(error)")
-                throw error
-            }
-            do {
-                forAccount = try container.decode(String.self, forKey: .forAccount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'forAccount': \(error)")
-                throw error
-            }
-            do {
-                createdBy = try container.decode(String.self, forKey: .createdBy)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdBy': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                uses = try container.decode([InviteCodeUse].self, forKey: .uses)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uses': \(error)")
-                throw error
-            }
+            code = try container.decode(String.self, forKey: .code)
+            available = try container.decode(Int.self, forKey: .available)
+            disabled = try container.decode(Bool.self, forKey: .disabled)
+            forAccount = try container.decode(String.self, forKey: .forAccount)
+            createdBy = try container.decode(String.self, forKey: .createdBy)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            uses = try container.decode([InviteCodeUse].self, forKey: .uses)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(code, forKey: .code)
             try container.encode(available, forKey: .available)
             try container.encode(disabled, forKey: .disabled)
@@ -84,6 +61,7 @@ public enum ComAtprotoServerDefs {
             try container.encode(createdBy, forKey: .createdBy)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encode(uses, forKey: .uses)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -94,6 +72,7 @@ public enum ComAtprotoServerDefs {
             hasher.combine(createdBy)
             hasher.combine(createdAt)
             hasher.combine(uses)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -119,7 +98,7 @@ public enum ComAtprotoServerDefs {
             if uses != other.uses {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -128,7 +107,6 @@ public enum ComAtprotoServerDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let codeValue = try code.toCBORValue()
             map = map.adding(key: "code", value: codeValue)
             let availableValue = try available.toCBORValue()
@@ -143,11 +121,12 @@ public enum ComAtprotoServerDefs {
             map = map.adding(key: "createdAt", value: createdAtValue)
             let usesValue = try uses.toCBORValue()
             map = map.adding(key: "uses", value: usesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "code", "available", "disabled", "forAccount", "createdBy", "createdAt", "uses"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case code
             case available
             case disabled
@@ -160,42 +139,41 @@ public enum ComAtprotoServerDefs {
 
     public struct InviteCodeUse: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.server.defs#inviteCodeUse"
+
         public let usedBy: DID
         public let usedAt: ATProtocolDate
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            usedBy: DID, usedAt: ATProtocolDate
+            usedBy: DID,
+            usedAt: ATProtocolDate,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.usedBy = usedBy
             self.usedAt = usedAt
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                usedBy = try container.decode(DID.self, forKey: .usedBy)
-            } catch {
-                LogManager.logError("Decoding error for required property 'usedBy': \(error)")
-                throw error
-            }
-            do {
-                usedAt = try container.decode(ATProtocolDate.self, forKey: .usedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'usedAt': \(error)")
-                throw error
-            }
+            usedBy = try container.decode(DID.self, forKey: .usedBy)
+            usedAt = try container.decode(ATProtocolDate.self, forKey: .usedAt)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(usedBy, forKey: .usedBy)
             try container.encode(usedAt, forKey: .usedAt)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(usedBy)
             hasher.combine(usedAt)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -206,7 +184,7 @@ public enum ComAtprotoServerDefs {
             if usedAt != other.usedAt {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -215,16 +193,16 @@ public enum ComAtprotoServerDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let usedByValue = try usedBy.toCBORValue()
             map = map.adding(key: "usedBy", value: usedByValue)
             let usedAtValue = try usedAt.toCBORValue()
             map = map.adding(key: "usedAt", value: usedAtValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "usedBy", "usedAt"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case usedBy
             case usedAt
         }

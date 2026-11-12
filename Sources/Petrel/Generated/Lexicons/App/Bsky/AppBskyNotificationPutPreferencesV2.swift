@@ -3,9 +3,12 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.notification.putPreferencesV2
 
+/// Set notification-related preferences for an account. Requires auth.
 public enum AppBskyNotificationPutPreferencesV2 {
     public static let typeIdentifier = "app.bsky.notification.putPreferencesV2"
+
     public struct Input: ATProtocolCodable {
+        /// Deprecated: use chat.bsky.notification preferences instead. Setting this won't stick and the default values will be returned.
         public let chat: AppBskyNotificationDefs.ChatPreference?
         public let follow: AppBskyNotificationDefs.FilterablePreference?
         public let like: AppBskyNotificationDefs.FilterablePreference?
@@ -20,8 +23,21 @@ public enum AppBskyNotificationPutPreferencesV2 {
         public let unverified: AppBskyNotificationDefs.Preference?
         public let verified: AppBskyNotificationDefs.Preference?
 
-        /// Standard public initializer
-        public init(chat: AppBskyNotificationDefs.ChatPreference? = nil, follow: AppBskyNotificationDefs.FilterablePreference? = nil, like: AppBskyNotificationDefs.FilterablePreference? = nil, likeViaRepost: AppBskyNotificationDefs.FilterablePreference? = nil, mention: AppBskyNotificationDefs.FilterablePreference? = nil, quote: AppBskyNotificationDefs.FilterablePreference? = nil, reply: AppBskyNotificationDefs.FilterablePreference? = nil, repost: AppBskyNotificationDefs.FilterablePreference? = nil, repostViaRepost: AppBskyNotificationDefs.FilterablePreference? = nil, starterpackJoined: AppBskyNotificationDefs.Preference? = nil, subscribedPost: AppBskyNotificationDefs.Preference? = nil, unverified: AppBskyNotificationDefs.Preference? = nil, verified: AppBskyNotificationDefs.Preference? = nil) {
+        public init(
+            chat: AppBskyNotificationDefs.ChatPreference? = nil,
+            follow: AppBskyNotificationDefs.FilterablePreference? = nil,
+            like: AppBskyNotificationDefs.FilterablePreference? = nil,
+            likeViaRepost: AppBskyNotificationDefs.FilterablePreference? = nil,
+            mention: AppBskyNotificationDefs.FilterablePreference? = nil,
+            quote: AppBskyNotificationDefs.FilterablePreference? = nil,
+            reply: AppBskyNotificationDefs.FilterablePreference? = nil,
+            repost: AppBskyNotificationDefs.FilterablePreference? = nil,
+            repostViaRepost: AppBskyNotificationDefs.FilterablePreference? = nil,
+            starterpackJoined: AppBskyNotificationDefs.Preference? = nil,
+            subscribedPost: AppBskyNotificationDefs.Preference? = nil,
+            unverified: AppBskyNotificationDefs.Preference? = nil,
+            verified: AppBskyNotificationDefs.Preference? = nil
+        ) {
             self.chat = chat
             self.follow = follow
             self.like = like
@@ -39,19 +55,20 @@ public enum AppBskyNotificationPutPreferencesV2 {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            chat = try container.decodeIfPresent(AppBskyNotificationDefs.ChatPreference.self, forKey: .chat)
-            follow = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .follow)
-            like = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .like)
-            likeViaRepost = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .likeViaRepost)
-            mention = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .mention)
-            quote = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .quote)
-            reply = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .reply)
-            repost = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .repost)
-            repostViaRepost = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .repostViaRepost)
-            starterpackJoined = try container.decodeIfPresent(AppBskyNotificationDefs.Preference.self, forKey: .starterpackJoined)
-            subscribedPost = try container.decodeIfPresent(AppBskyNotificationDefs.Preference.self, forKey: .subscribedPost)
-            unverified = try container.decodeIfPresent(AppBskyNotificationDefs.Preference.self, forKey: .unverified)
-            verified = try container.decodeIfPresent(AppBskyNotificationDefs.Preference.self, forKey: .verified)
+            let strict = decoder.isATProtoStrictDecoding
+            chat = try container.decodeIfPresent(AppBskyNotificationDefs.ChatPreference.self, forKey: .chat, rejectingNull: strict)
+            follow = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .follow, rejectingNull: strict)
+            like = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .like, rejectingNull: strict)
+            likeViaRepost = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .likeViaRepost, rejectingNull: strict)
+            mention = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .mention, rejectingNull: strict)
+            quote = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .quote, rejectingNull: strict)
+            reply = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .reply, rejectingNull: strict)
+            repost = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .repost, rejectingNull: strict)
+            repostViaRepost = try container.decodeIfPresent(AppBskyNotificationDefs.FilterablePreference.self, forKey: .repostViaRepost, rejectingNull: strict)
+            starterpackJoined = try container.decodeIfPresent(AppBskyNotificationDefs.Preference.self, forKey: .starterpackJoined, rejectingNull: strict)
+            subscribedPost = try container.decodeIfPresent(AppBskyNotificationDefs.Preference.self, forKey: .subscribedPost, rejectingNull: strict)
+            unverified = try container.decodeIfPresent(AppBskyNotificationDefs.Preference.self, forKey: .unverified, rejectingNull: strict)
+            verified = try container.decodeIfPresent(AppBskyNotificationDefs.Preference.self, forKey: .verified, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -148,32 +165,26 @@ public enum AppBskyNotificationPutPreferencesV2 {
     public struct Output: ATProtocolCodable {
         public let preferences: AppBskyNotificationDefs.Preferences
 
-        /// Standard public initializer
         public init(
             preferences: AppBskyNotificationDefs.Preferences
-
         ) {
             self.preferences = preferences
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             preferences = try container.decode(AppBskyNotificationDefs.Preferences.self, forKey: .preferences)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(preferences, forKey: .preferences)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let preferencesValue = try preferences.toCBORValue()
             map = map.adding(key: "preferences", value: preferencesValue)
-
             return map
         }
 
@@ -186,13 +197,12 @@ public enum AppBskyNotificationPutPreferencesV2 {
 public extension ATProtoClient.App.Bsky.Notification {
     // MARK: - putPreferencesV2
 
-    // Set notification-related preferences for an account. Requires auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Set notification-related preferences for an account. Requires auth.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func putPreferencesV2(
         input: AppBskyNotificationPutPreferencesV2.Input
 
@@ -220,34 +230,26 @@ public extension ATProtoClient.App.Bsky.Notification {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.putPreferencesV2")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyNotificationPutPreferencesV2.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.notification.putPreferencesV2: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyNotificationPutPreferencesV2.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

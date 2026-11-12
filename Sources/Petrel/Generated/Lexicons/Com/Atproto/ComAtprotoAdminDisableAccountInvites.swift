@@ -3,22 +3,28 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.admin.disableAccountInvites
 
+/// Disable an account from receiving new invite codes, but does not invalidate existing codes.
 public enum ComAtprotoAdminDisableAccountInvites {
     public static let typeIdentifier = "com.atproto.admin.disableAccountInvites"
+
     public struct Input: ATProtocolCodable {
         public let account: DID
+        /// Optional reason for disabled invites.
         public let note: String?
 
-        /// Standard public initializer
-        public init(account: DID, note: String? = nil) {
+        public init(
+            account: DID,
+            note: String? = nil
+        ) {
             self.account = account
             self.note = note
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             account = try container.decode(DID.self, forKey: .account)
-            note = try container.decodeIfPresent(String.self, forKey: .note)
+            note = try container.decodeIfPresent(String.self, forKey: .note, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -48,13 +54,12 @@ public enum ComAtprotoAdminDisableAccountInvites {
 public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - disableAccountInvites
 
-    // Disable an account from receiving new invite codes, but does not invalidate existing codes.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Disable an account from receiving new invite codes, but does not invalidate existing codes.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func disableAccountInvites(
         input: ComAtprotoAdminDisableAccountInvites.Input
 
@@ -80,7 +85,13 @@ public extension ATProtoClient.Com.Atproto.Admin {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.admin.disableAccountInvites")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

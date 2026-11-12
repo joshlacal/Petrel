@@ -3,81 +3,96 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.feed.getListFeed
 
+/// Get a feed of recent posts from a list (posts and reposts from any actors on the list). Does not require auth.
 public enum AppBskyFeedGetListFeed {
     public static let typeIdentifier = "app.bsky.feed.getListFeed"
+
     public struct Parameters: Parametrizable {
         public let list: ATProtocolURI
         public let limit: Int?
         public let cursor: String?
+        public let since: String?
 
         public init(
             list: ATProtocolURI,
             limit: Int? = nil,
-            cursor: String? = nil
+            cursor: String? = nil,
+            since: String? = nil
         ) {
             self.list = list
             self.limit = limit
             self.cursor = cursor
+            self.since = since
         }
     }
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-
+        /// Cursor identifying the newest item in this page. Pass it as since on a later request to fetch only newer content.
+        public let startCursor: String?
         public let feed: [AppBskyFeedDefs.FeedViewPost]
 
-        /// Standard public initializer
         public init(
             cursor: String? = nil,
-
+            startCursor: String? = nil,
             feed: [AppBskyFeedDefs.FeedViewPost]
-
         ) {
             self.cursor = cursor
-
+            self.startCursor = startCursor
             self.feed = feed
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
+            do {
+                startCursor = try container.decodeIfPresent(String.self, forKey: .startCursor, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'startCursor' — degrading to nil: \(error)")
+                startCursor = nil
+            }
             feed = try container.decode([AppBskyFeedDefs.FeedViewPost].self, forKey: .feed)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
+            try container.encodeIfPresent(startCursor, forKey: .startCursor)
             try container.encode(feed, forKey: .feed)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
+            if let value = startCursor {
+                let startCursorValue = try value.toCBORValue()
+                map = map.adding(key: "startCursor", value: startCursorValue)
+            }
             let feedValue = try feed.toCBORValue()
             map = map.adding(key: "feed", value: feedValue)
-
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case cursor
+            case startCursor
             case feed
         }
     }
@@ -100,9 +115,8 @@ public extension ATProtoClient.App.Bsky.Feed {
     /// Get a feed of recent posts from a list (posts and reposts from any actors on the list). Does not require auth.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<AppBskyFeedGetListFeed.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getListFeed(input: AppBskyFeedGetListFeed.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetListFeed.Output?) {
         let endpoint = "app.bsky.feed.getListFeed"
 
@@ -122,41 +136,23 @@ public extension ATProtoClient.App.Bsky.Feed {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyFeedGetListFeed.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyFeedGetListFeed.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.getListFeed: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyFeedGetListFeed.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyFeedGetListFeed.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.removeWriter
 
+/// Remove an account from a space's writer set, so that listRepos no longer lists it. The account is tracked again if it later writes while still authorized. Idempotent: succeeds whether or not the account was in the writer set. Requires auth as an account that may manage the space.
 public enum ComAtprotoSpaceRemoveWriter {
     public static let typeIdentifier = "com.atproto.space.removeWriter"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// The DID of the writer to remove.
         public let did: DID
 
-        /// Standard public initializer
-        public init(space: SpaceRef, did: DID) {
+        public init(
+            space: SpaceRef,
+            did: DID
+        ) {
             self.space = space
             self.did = did
         }
@@ -79,13 +85,12 @@ public enum ComAtprotoSpaceRemoveWriter {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - removeWriter
 
-    // Remove an account from a space's writer set, so that listRepos no longer lists it. The account is tracked again if it later writes while still authorized. Idempotent: succeeds whether or not the account was in the writer set. Requires auth as an account that may manage the space.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Remove an account from a space's writer set, so that listRepos no longer lists it. The account is tracked again if it later writes while still authorized. Idempotent: succeeds whether or not the account was in the writer set. Requires auth as an account that may manage the space.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoSpaceRemoveWriter.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func removeWriter(
         input: ComAtprotoSpaceRemoveWriter.Input
 
@@ -114,18 +119,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceRemoveWriter.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceRemoveWriter.Error.self)
         }
 
         return responseCode

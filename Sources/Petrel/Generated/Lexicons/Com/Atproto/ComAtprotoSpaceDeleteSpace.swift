@@ -3,13 +3,17 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.deleteSpace
 
+/// Delete a space. Requires auth as the space owner. Deletes the owner's own repo in the space; other members' repos are left in place. Afterwards, reads and writes fail with SpaceNotFound and getSpaceCredential returns SpaceDeleted. Idempotent. Implemented by PDS.
 public enum ComAtprotoSpaceDeleteSpace {
     public static let typeIdentifier = "com.atproto.space.deleteSpace"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space to delete.
         public let space: SpaceRef
 
-        /// Standard public initializer
-        public init(space: SpaceRef) {
+        public init(
+            space: SpaceRef
+        ) {
             self.space = space
         }
 
@@ -72,13 +76,12 @@ public enum ComAtprotoSpaceDeleteSpace {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - deleteSpace
 
-    // Delete a space. Requires auth as the space owner. Deletes the owner's own repo in the space; other members' repos are left in place. Afterwards, reads and writes fail with SpaceNotFound and getSpaceCredential returns SpaceDeleted. Idempotent. Implemented by PDS.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Delete a space. Requires auth as the space owner. Deletes the owner's own repo in the space; other members' repos are left in place. Afterwards, reads and writes fail with SpaceNotFound and getSpaceCredential returns SpaceDeleted. Idempotent. Implemented by PDS.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoSpaceDeleteSpace.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func deleteSpace(
         input: ComAtprotoSpaceDeleteSpace.Input
 
@@ -107,18 +110,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceDeleteSpace.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceDeleteSpace.Error.self)
         }
 
         return responseCode

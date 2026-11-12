@@ -1,3 +1,4 @@
+import re
 import pathlib
 import sys
 import unittest
@@ -49,7 +50,6 @@ class LexiconSourceInjectionTests(unittest.TestCase):
             "prop ${injection}",
             "prop\\(injection)",
             "prop.subprop",
-            "prop-hyphen-in-identifier",
             "",
         ]
         for bad_name in invalid_names:
@@ -268,8 +268,9 @@ class LexiconSourceInjectionTests(unittest.TestCase):
         self.assertNotIn("* tag", sub_rendered)
         self.assertIn('// "multi\n// line\n// tag" -> payload type `Bytes` is', sub_rendered)
 
-    def test_blob_upload_procedure_fails_closed_template_contract(self):
-        """Blob upload procedure must render guard ImageMetadataStripper.stripMetadata with fail-closed throw and preserve opt-out."""
+    def test_wildcard_input_procedure_strips_image_metadata_by_default_and_never_reencodes(self):
+        """A `*/*` upload removes image metadata unless told not to, fails closed, and
+        leaves the bytes of everything else (and the content type of everything) alone."""
         upload_lexicon = {
             "lexicon": 1,
             "id": "com.atproto.repo.uploadBlob",
@@ -290,11 +291,56 @@ class LexiconSourceInjectionTests(unittest.TestCase):
             },
         }
         swift_code = SwiftCodeGenerator(upload_lexicon, self.cycle_detector).convert()
-        self.assertIn("stripMetadata: Bool = true", swift_code)
-        self.assertIn("if stripMetadata {", swift_code)
-        self.assertIn("guard let strippedData = ImageMetadataStripper.stripMetadata(from: dataToUpload) else {", swift_code)
-        self.assertIn("throw NetworkError.metadataStrippingFailed", swift_code)
-        self.assertIn("dataToUpload = strippedData", swift_code)
+        # The privacy default: stripping is on unless the caller turns it off.
+        self.assertRegex(
+            swift_code,
+            r"public func uploadBlob\(\s*data: Data,\s*mimeType: String,\s*stripMetadata: Bool = true\s*\) async throws",
+        )
+        # One stripper call, given the request content type: it passes non-image types
+        # through unchanged and strips images in their own format.
+        self.assertEqual(swift_code.count("ImageMetadataStripper."), 1)
+        self.assertIn(
+            "body = try ImageMetadataStripper.stripMetadata(from: data, mimeType: mimeType)",
+            swift_code,
+        )
+        # Fail closed, with the established error.
+        stripping = swift_code[swift_code.index("if stripMetadata {"):]
+        stripping = stripping[: stripping.index('"Content-Type"')]
+        self.assertRegex(stripping, r"catch \{\s*(//[^\n]*\n\s*)?throw NetworkError\.metadataStrippingFailed\s*\}")
+        # `stripMetadata: false` sends the caller's bytes: the only assignment to the
+        # body is inside the `if stripMetadata` block.
+        self.assertIn("var body = data", swift_code)
+        self.assertEqual(len(re.findall(r"\bbody = ", swift_code)), 2)
+        self.assertRegex(swift_code, r"body: body,")
+        # The content type is the caller's and the length is that of what is sent.
+        self.assertIn('"Content-Type": mimeType', swift_code)
+        self.assertIn('"Content-Length": "\\(body.count)"', swift_code)
+        # No re-encoding or compression path in generated code.
+        for forbidden in (
+            "compressImage",
+            "jpegData",
+            "compressionQuality",
+            "compressionFactor",
+            "UIImage",
+            "NSImage",
+            "import UIKit",
+            "import AppKit",
+        ):
+            self.assertNotIn(forbidden, swift_code)
+
+    def test_fixed_binary_input_procedure_is_not_stripped(self):
+        """Only `*/*` bodies can be images; a declared binary encoding is sent as is."""
+        swift_code = SwiftCodeGenerator(
+            {
+                "lexicon": 1,
+                "id": "com.atproto.repo.importRepo",
+                "defs": {"main": {"type": "procedure", "input": {"encoding": "application/vnd.ipld.car"}}},
+            },
+            self.cycle_detector,
+        ).convert()
+        self.assertNotIn("stripMetadata", swift_code)
+        self.assertNotIn("ImageMetadataStripper", swift_code)
+        self.assertRegex(swift_code, r"body: data,")
 
     def test_string_literal_escaping_in_all_templates_and_contexts(self):
         """String-literal contexts (encodings, knownValues, union refs, @SerialName) must escape quotes, backslashes, and interpolation."""

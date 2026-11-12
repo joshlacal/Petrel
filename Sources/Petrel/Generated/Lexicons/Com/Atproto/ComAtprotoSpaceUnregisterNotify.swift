@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.unregisterNotify
 
+/// Withdraw a write-notification registration made through registerNotify. Called on the space host. Idempotent: succeeds whether or not a matching registration existed. Registrations also lapse on their own at the expiry returned by registerNotify, so this is for explicit withdrawal rather than cleanup. Authenticated with a space credential.
 public enum ComAtprotoSpaceUnregisterNotify {
     public static let typeIdentifier = "com.atproto.space.unregisterNotify"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// Service identifier of the subscriber to remove, as passed to registerNotify.
         public let service: String
 
-        /// Standard public initializer
-        public init(space: SpaceRef, service: String) {
+        public init(
+            space: SpaceRef,
+            service: String
+        ) {
             self.space = space
             self.service = service
         }
@@ -78,13 +84,12 @@ public enum ComAtprotoSpaceUnregisterNotify {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - unregisterNotify
 
-    // Withdraw a write-notification registration made through registerNotify. Called on the space host. Idempotent: succeeds whether or not a matching registration existed. Registrations also lapse on their own at the expiry returned by registerNotify, so this is for explicit withdrawal rather than cleanup. Authenticated with a space credential.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Withdraw a write-notification registration made through registerNotify. Called on the space host. Idempotent: succeeds whether or not a matching registration existed. Registrations also lapse on their own at the expiry returned by registerNotify, so this is for explicit withdrawal rather than cleanup. Authenticated with a space credential.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoSpaceUnregisterNotify.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func unregisterNotify(
         input: ComAtprotoSpaceUnregisterNotify.Input
 
@@ -113,18 +118,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceUnregisterNotify.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceUnregisterNotify.Error.self)
         }
 
         return responseCode

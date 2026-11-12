@@ -3,17 +3,25 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.admin.sendEmail
 
+/// Send email to a user's account email address.
 public enum ComAtprotoAdminSendEmail {
     public static let typeIdentifier = "com.atproto.admin.sendEmail"
+
     public struct Input: ATProtocolCodable {
         public let recipientDid: DID
         public let content: String
         public let subject: String?
         public let senderDid: DID
+        /// Additional comment by the sender that won't be used in the email itself but helpful to provide more context for moderators/reviewers
         public let comment: String?
 
-        /// Standard public initializer
-        public init(recipientDid: DID, content: String, subject: String? = nil, senderDid: DID, comment: String? = nil) {
+        public init(
+            recipientDid: DID,
+            content: String,
+            subject: String? = nil,
+            senderDid: DID,
+            comment: String? = nil
+        ) {
             self.recipientDid = recipientDid
             self.content = content
             self.subject = subject
@@ -23,11 +31,12 @@ public enum ComAtprotoAdminSendEmail {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             recipientDid = try container.decode(DID.self, forKey: .recipientDid)
             content = try container.decode(String.self, forKey: .content)
-            subject = try container.decodeIfPresent(String.self, forKey: .subject)
+            subject = try container.decodeIfPresent(String.self, forKey: .subject, rejectingNull: strict)
             senderDid = try container.decode(DID.self, forKey: .senderDid)
-            comment = try container.decodeIfPresent(String.self, forKey: .comment)
+            comment = try container.decodeIfPresent(String.self, forKey: .comment, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -70,32 +79,26 @@ public enum ComAtprotoAdminSendEmail {
     public struct Output: ATProtocolCodable {
         public let sent: Bool
 
-        /// Standard public initializer
         public init(
             sent: Bool
-
         ) {
             self.sent = sent
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             sent = try container.decode(Bool.self, forKey: .sent)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(sent, forKey: .sent)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let sentValue = try sent.toCBORValue()
             map = map.adding(key: "sent", value: sentValue)
-
             return map
         }
 
@@ -108,13 +111,12 @@ public enum ComAtprotoAdminSendEmail {
 public extension ATProtoClient.Com.Atproto.Admin {
     // MARK: - sendEmail
 
-    // Send email to a user's account email address.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Send email to a user's account email address.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func sendEmail(
         input: ComAtprotoAdminSendEmail.Input
 
@@ -142,34 +144,26 @@ public extension ATProtoClient.Com.Atproto.Admin {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.admin.sendEmail")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoAdminSendEmail.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.admin.sendEmail: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoAdminSendEmail.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

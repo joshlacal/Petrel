@@ -8,42 +8,41 @@ public enum ChatBskyConvoDefs {
 
     public struct ConvoRef: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#convoRef"
+
         public let did: DID
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID, convoId: String
+            did: DID,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            did = try container.decode(DID.self, forKey: .did)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +53,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +62,16 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
             case convoId
         }
@@ -80,52 +79,47 @@ public enum ChatBskyConvoDefs {
 
     public struct MessageRef: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#messageRef"
+
         public let did: DID
         public let convoId: String
         public let messageId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID, convoId: String, messageId: String
+            did: DID,
+            convoId: String,
+            messageId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
             self.convoId = convoId
             self.messageId = messageId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                messageId = try container.decode(String.self, forKey: .messageId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'messageId': \(error)")
-                throw error
-            }
+            did = try container.decode(DID.self, forKey: .did)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            messageId = try container.decode(String.self, forKey: .messageId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(messageId, forKey: .messageId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
             hasher.combine(convoId)
             hasher.combine(messageId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -139,7 +133,7 @@ public enum ChatBskyConvoDefs {
             if messageId != other.messageId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -148,18 +142,18 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageIdValue = try messageId.toCBORValue()
             map = map.adding(key: "messageId", value: messageIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did", "convoId", "messageId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
             case convoId
             case messageId
@@ -168,61 +162,75 @@ public enum ChatBskyConvoDefs {
 
     public struct MessageInput: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#messageInput"
+
         public let text: String
+        /// Annotations of text (mentions, URLs, hashtags, etc)
         public let facets: [AppBskyRichtextFacet]?
         public let embed: MessageInputEmbedUnion?
+        /// If set, the message this message is replying to. The referenced message must be in the same convo.
         public let replyTo: ReplyRef?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            text: String, facets: [AppBskyRichtextFacet]? = nil, embed: MessageInputEmbedUnion? = nil, replyTo: ReplyRef? = nil
+            text: String,
+            facets: [AppBskyRichtextFacet]? = nil,
+            embed: MessageInputEmbedUnion? = nil,
+            replyTo: ReplyRef? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.text = text
             self.facets = facets
             self.embed = embed
             self.replyTo = replyTo
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            text = try container.decode(String.self, forKey: .text)
             do {
-                text = try container.decode(String.self, forKey: .text)
+                facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .facets, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'text': \(error)")
-                throw error
-            }
-            do {
-                facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .facets)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'facets' — degrading to nil: \(error)")
                 facets = nil
             }
             do {
-                embed = try container.decodeIfPresent(MessageInputEmbedUnion.self, forKey: .embed)
+                embed = try container.decodeIfPresent(MessageInputEmbedUnion.self, forKey: .embed, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
                 embed = nil
             }
             do {
-                replyTo = try container.decodeIfPresent(ReplyRef.self, forKey: .replyTo)
+                replyTo = try container.decodeIfPresent(ReplyRef.self, forKey: .replyTo, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'replyTo' — degrading to nil: \(error)")
                 replyTo = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(text, forKey: .text)
             try container.encodeIfPresent(facets, forKey: .facets)
             try container.encodeIfPresent(embed, forKey: .embed)
             try container.encodeIfPresent(replyTo, forKey: .replyTo)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -242,6 +250,7 @@ public enum ChatBskyConvoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -258,7 +267,7 @@ public enum ChatBskyConvoDefs {
             if replyTo != other.replyTo {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -267,7 +276,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let textValue = try text.toCBORValue()
             map = map.adding(key: "text", value: textValue)
             if let value = facets {
@@ -282,11 +290,12 @@ public enum ChatBskyConvoDefs {
                 let replyToValue = try value.toCBORValue()
                 map = map.adding(key: "replyTo", value: replyToValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "text", "facets", "embed", "replyTo"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case text
             case facets
             case embed
@@ -294,34 +303,38 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// A reference to another message within the same convo, used to indicate that a message is a reply to it.
     public struct ReplyRef: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#replyRef"
+
         public let messageId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            messageId: String
+            messageId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.messageId = messageId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                messageId = try container.decode(String.self, forKey: .messageId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'messageId': \(error)")
-                throw error
-            }
+            messageId = try container.decode(String.self, forKey: .messageId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(messageId, forKey: .messageId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(messageId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -329,7 +342,7 @@ public enum ChatBskyConvoDefs {
             if messageId != other.messageId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -338,32 +351,48 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let messageIdValue = try messageId.toCBORValue()
             map = map.adding(key: "messageId", value: messageIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "messageId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case messageId
         }
     }
 
     public struct MessageView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#messageView"
+
         public let id: String
         public let rev: String
         public let text: String
+        /// Annotations of text (mentions, URLs, hashtags, etc)
         public let facets: [AppBskyRichtextFacet]?
         public let embed: MessageViewEmbedUnion?
+        /// Reactions to this message, in ascending order of creation time.
         public let reactions: [ReactionView]?
+        /// If set, the message this message is replying to. The full view of the referenced message is embedded so the client can render it inline. Only a single level is embedded: the embedded message will not itself have a populated 'replyTo' field even if it was also a reply.
         public let replyTo: MessageViewReplyToUnion?
         public let sender: MessageViewSender
         public let sentAt: ATProtocolDate
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            id: String, rev: String, text: String, facets: [AppBskyRichtextFacet]? = nil, embed: MessageViewEmbedUnion? = nil, reactions: [ReactionView]? = nil, replyTo: MessageViewReplyToUnion? = nil, sender: MessageViewSender, sentAt: ATProtocolDate
+            id: String,
+            rev: String,
+            text: String,
+            facets: [AppBskyRichtextFacet]? = nil,
+            embed: MessageViewEmbedUnion? = nil,
+            reactions: [ReactionView]? = nil,
+            replyTo: MessageViewReplyToUnion? = nil,
+            sender: MessageViewSender,
+            sentAt: ATProtocolDate,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.id = id
             self.rev = rev
@@ -374,77 +403,62 @@ public enum ChatBskyConvoDefs {
             self.replyTo = replyTo
             self.sender = sender
             self.sentAt = sentAt
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            id = try container.decode(String.self, forKey: .id)
+            rev = try container.decode(String.self, forKey: .rev)
+            text = try container.decode(String.self, forKey: .text)
             do {
-                id = try container.decode(String.self, forKey: .id)
+                facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .facets, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                text = try container.decode(String.self, forKey: .text)
-            } catch {
-                LogManager.logError("Decoding error for required property 'text': \(error)")
-                throw error
-            }
-            do {
-                facets = try container.decodeIfPresent([AppBskyRichtextFacet].self, forKey: .facets)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'facets' — degrading to nil: \(error)")
                 facets = nil
             }
             do {
-                embed = try container.decodeIfPresent(MessageViewEmbedUnion.self, forKey: .embed)
+                embed = try container.decodeIfPresent(MessageViewEmbedUnion.self, forKey: .embed, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'embed' — degrading to nil: \(error)")
                 embed = nil
             }
             do {
-                reactions = try container.decodeIfPresent([ReactionView].self, forKey: .reactions)
+                reactions = try container.decodeIfPresent([ReactionView].self, forKey: .reactions, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'reactions' — degrading to nil: \(error)")
                 reactions = nil
             }
             do {
-                replyTo = try container.decodeIfPresent(MessageViewReplyToUnion.self, forKey: .replyTo)
+                replyTo = try container.decodeIfPresent(MessageViewReplyToUnion.self, forKey: .replyTo, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'replyTo' — degrading to nil: \(error)")
                 replyTo = nil
             }
-            do {
-                sender = try container.decode(MessageViewSender.self, forKey: .sender)
-            } catch {
-                LogManager.logError("Decoding error for required property 'sender': \(error)")
-                throw error
-            }
-            do {
-                sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'sentAt': \(error)")
-                throw error
-            }
+            sender = try container.decode(MessageViewSender.self, forKey: .sender)
+            sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(id, forKey: .id)
             try container.encode(rev, forKey: .rev)
             try container.encode(text, forKey: .text)
@@ -454,6 +468,7 @@ public enum ChatBskyConvoDefs {
             try container.encodeIfPresent(replyTo, forKey: .replyTo)
             try container.encode(sender, forKey: .sender)
             try container.encode(sentAt, forKey: .sentAt)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -482,6 +497,7 @@ public enum ChatBskyConvoDefs {
             }
             hasher.combine(sender)
             hasher.combine(sentAt)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -513,7 +529,7 @@ public enum ChatBskyConvoDefs {
             if sentAt != other.sentAt {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -522,7 +538,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
             let revValue = try rev.toCBORValue()
@@ -549,11 +564,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "sender", value: senderValue)
             let sentAtValue = try sentAt.toCBORValue()
             map = map.adding(key: "sentAt", value: sentAtValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "rev", "text", "facets", "embed", "reactions", "replyTo", "sender", "sentAt"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case id
             case rev
             case text
@@ -568,32 +584,35 @@ public enum ChatBskyConvoDefs {
 
     public struct SystemMessageReferredUser: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageReferredUser"
+
         public let did: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID
+            did: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
+            did = try container.decode(DID.self, forKey: .did)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -601,7 +620,7 @@ public enum ChatBskyConvoDefs {
             if did != other.did {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -610,69 +629,59 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
         }
     }
 
     public struct SystemMessageView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageView"
+
         public let id: String
         public let rev: String
         public let sentAt: ATProtocolDate
         public let data: SystemMessageViewDataUnion
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            id: String, rev: String, sentAt: ATProtocolDate, data: SystemMessageViewDataUnion
+            id: String,
+            rev: String,
+            sentAt: ATProtocolDate,
+            data: SystemMessageViewDataUnion,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.id = id
             self.rev = rev
             self.sentAt = sentAt
             self.data = data
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                id = try container.decode(String.self, forKey: .id)
-            } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'sentAt': \(error)")
-                throw error
-            }
-            do {
-                data = try container.decode(SystemMessageViewDataUnion.self, forKey: .data)
-            } catch {
-                LogManager.logError("Decoding error for required property 'data': \(error)")
-                throw error
-            }
+            id = try container.decode(String.self, forKey: .id)
+            rev = try container.decode(String.self, forKey: .rev)
+            sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
+            data = try container.decode(SystemMessageViewDataUnion.self, forKey: .data)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(id, forKey: .id)
             try container.encode(rev, forKey: .rev)
             try container.encode(sentAt, forKey: .sentAt)
             try container.encode(data, forKey: .data)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -680,6 +689,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(rev)
             hasher.combine(sentAt)
             hasher.combine(data)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -696,7 +706,7 @@ public enum ChatBskyConvoDefs {
             if data != other.data {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -705,7 +715,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
             let revValue = try rev.toCBORValue()
@@ -714,11 +723,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "sentAt", value: sentAtValue)
             let dataValue = try data.toCBORValue()
             map = map.adding(key: "data", value: dataValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "rev", "sentAt", "data"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case id
             case rev
             case sentAt
@@ -726,54 +736,52 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// System message indicating a user was added to the group convo.
     public struct SystemMessageDataAddMember: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataAddMember"
+
+        /// Current view of the member who was added.
         public let member: SystemMessageReferredUser
+        /// Role the user was added to the group with. The role from 'member' will reflect the current data, not historical.
         public let role: ChatBskyActorDefs.MemberRole
         public let addedBy: SystemMessageReferredUser
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            member: SystemMessageReferredUser, role: ChatBskyActorDefs.MemberRole, addedBy: SystemMessageReferredUser
+            member: SystemMessageReferredUser,
+            role: ChatBskyActorDefs.MemberRole,
+            addedBy: SystemMessageReferredUser,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.member = member
             self.role = role
             self.addedBy = addedBy
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
-            } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
-                throw error
-            }
-            do {
-                role = try container.decode(ChatBskyActorDefs.MemberRole.self, forKey: .role)
-            } catch {
-                LogManager.logError("Decoding error for required property 'role': \(error)")
-                throw error
-            }
-            do {
-                addedBy = try container.decode(SystemMessageReferredUser.self, forKey: .addedBy)
-            } catch {
-                LogManager.logError("Decoding error for required property 'addedBy': \(error)")
-                throw error
-            }
+            member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+            role = try container.decode(ChatBskyActorDefs.MemberRole.self, forKey: .role)
+            addedBy = try container.decode(SystemMessageReferredUser.self, forKey: .addedBy)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(member, forKey: .member)
             try container.encode(role, forKey: .role)
             try container.encode(addedBy, forKey: .addedBy)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(member)
             hasher.combine(role)
             hasher.combine(addedBy)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -787,7 +795,7 @@ public enum ChatBskyConvoDefs {
             if addedBy != other.addedBy {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -796,62 +804,63 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let memberValue = try member.toCBORValue()
             map = map.adding(key: "member", value: memberValue)
             let roleValue = try role.toCBORValue()
             map = map.adding(key: "role", value: roleValue)
             let addedByValue = try addedBy.toCBORValue()
             map = map.adding(key: "addedBy", value: addedByValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "member", "role", "addedBy"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case member
             case role
             case addedBy
         }
     }
 
+    /// System message indicating a user was removed from the group convo.
     public struct SystemMessageDataRemoveMember: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataRemoveMember"
+
+        /// Current view of the member who was removed.
         public let member: SystemMessageReferredUser
         public let removedBy: SystemMessageReferredUser
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            member: SystemMessageReferredUser, removedBy: SystemMessageReferredUser
+            member: SystemMessageReferredUser,
+            removedBy: SystemMessageReferredUser,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.member = member
             self.removedBy = removedBy
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
-            } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
-                throw error
-            }
-            do {
-                removedBy = try container.decode(SystemMessageReferredUser.self, forKey: .removedBy)
-            } catch {
-                LogManager.logError("Decoding error for required property 'removedBy': \(error)")
-                throw error
-            }
+            member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+            removedBy = try container.decode(SystemMessageReferredUser.self, forKey: .removedBy)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(member, forKey: .member)
             try container.encode(removedBy, forKey: .removedBy)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(member)
             hasher.combine(removedBy)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -862,7 +871,7 @@ public enum ChatBskyConvoDefs {
             if removedBy != other.removedBy {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -871,65 +880,71 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let memberValue = try member.toCBORValue()
             map = map.adding(key: "member", value: memberValue)
             let removedByValue = try removedBy.toCBORValue()
             map = map.adding(key: "removedBy", value: removedByValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "member", "removedBy"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case member
             case removedBy
         }
     }
 
+    /// System message indicating a user joined the group convo via join link.
     public struct SystemMessageDataMemberJoin: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataMemberJoin"
+
+        /// Current view of the member who joined.
         public let member: SystemMessageReferredUser
+        /// Role the user was added to the group with. The role from 'member' will reflect the current data, not historical.
         public let role: ChatBskyActorDefs.MemberRole
+        /// If join link was configured to require approval, this will be set to who approved the request. Undefined if approval was not required.
         public let approvedBy: SystemMessageReferredUser?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            member: SystemMessageReferredUser, role: ChatBskyActorDefs.MemberRole, approvedBy: SystemMessageReferredUser? = nil
+            member: SystemMessageReferredUser,
+            role: ChatBskyActorDefs.MemberRole,
+            approvedBy: SystemMessageReferredUser? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.member = member
             self.role = role
             self.approvedBy = approvedBy
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+            role = try container.decode(ChatBskyActorDefs.MemberRole.self, forKey: .role)
             do {
-                member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+                approvedBy = try container.decodeIfPresent(SystemMessageReferredUser.self, forKey: .approvedBy, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
-                throw error
-            }
-            do {
-                role = try container.decode(ChatBskyActorDefs.MemberRole.self, forKey: .role)
-            } catch {
-                LogManager.logError("Decoding error for required property 'role': \(error)")
-                throw error
-            }
-            do {
-                approvedBy = try container.decodeIfPresent(SystemMessageReferredUser.self, forKey: .approvedBy)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'approvedBy' — degrading to nil: \(error)")
                 approvedBy = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(member, forKey: .member)
             try container.encode(role, forKey: .role)
             try container.encodeIfPresent(approvedBy, forKey: .approvedBy)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -940,6 +955,7 @@ public enum ChatBskyConvoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -953,7 +969,7 @@ public enum ChatBskyConvoDefs {
             if approvedBy != other.approvedBy {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -962,7 +978,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let memberValue = try member.toCBORValue()
             map = map.adding(key: "member", value: memberValue)
             let roleValue = try role.toCBORValue()
@@ -971,45 +986,51 @@ public enum ChatBskyConvoDefs {
                 let approvedByValue = try value.toCBORValue()
                 map = map.adding(key: "approvedBy", value: approvedByValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "member", "role", "approvedBy"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case member
             case role
             case approvedBy
         }
     }
 
+    /// System message indicating a user voluntarily left the group convo.
     public struct SystemMessageDataMemberLeave: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataMemberLeave"
+
+        /// Current view of the member who left the group.
         public let member: SystemMessageReferredUser
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            member: SystemMessageReferredUser
+            member: SystemMessageReferredUser,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.member = member
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
-            } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
-                throw error
-            }
+            member = try container.decode(SystemMessageReferredUser.self, forKey: .member)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(member, forKey: .member)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(member)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1017,7 +1038,7 @@ public enum ChatBskyConvoDefs {
             if member != other.member {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1026,46 +1047,51 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let memberValue = try member.toCBORValue()
             map = map.adding(key: "member", value: memberValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "member"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case member
         }
     }
 
+    /// System message indicating the group convo was locked.
     public struct SystemMessageDataLockConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataLockConvo"
+
+        /// Current view of the member who locked the group.
         public let lockedBy: SystemMessageReferredUser
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            lockedBy: SystemMessageReferredUser
+            lockedBy: SystemMessageReferredUser,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.lockedBy = lockedBy
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                lockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .lockedBy)
-            } catch {
-                LogManager.logError("Decoding error for required property 'lockedBy': \(error)")
-                throw error
-            }
+            lockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .lockedBy)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(lockedBy, forKey: .lockedBy)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(lockedBy)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1073,7 +1099,7 @@ public enum ChatBskyConvoDefs {
             if lockedBy != other.lockedBy {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1082,46 +1108,51 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let lockedByValue = try lockedBy.toCBORValue()
             map = map.adding(key: "lockedBy", value: lockedByValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "lockedBy"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case lockedBy
         }
     }
 
+    /// System message indicating the group convo was unlocked.
     public struct SystemMessageDataUnlockConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataUnlockConvo"
+
+        /// Current view of the member who unlocked the group.
         public let unlockedBy: SystemMessageReferredUser
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            unlockedBy: SystemMessageReferredUser
+            unlockedBy: SystemMessageReferredUser,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.unlockedBy = unlockedBy
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                unlockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .unlockedBy)
-            } catch {
-                LogManager.logError("Decoding error for required property 'unlockedBy': \(error)")
-                throw error
-            }
+            unlockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .unlockedBy)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(unlockedBy, forKey: .unlockedBy)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(unlockedBy)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1129,7 +1160,7 @@ public enum ChatBskyConvoDefs {
             if unlockedBy != other.unlockedBy {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1138,46 +1169,51 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let unlockedByValue = try unlockedBy.toCBORValue()
             map = map.adding(key: "unlockedBy", value: unlockedByValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "unlockedBy"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case unlockedBy
         }
     }
 
+    /// System message indicating the group convo was locked permanently.
     public struct SystemMessageDataLockConvoPermanently: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataLockConvoPermanently"
+
+        /// Current view of the member who locked the group.
         public let lockedBy: SystemMessageReferredUser
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            lockedBy: SystemMessageReferredUser
+            lockedBy: SystemMessageReferredUser,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.lockedBy = lockedBy
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                lockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .lockedBy)
-            } catch {
-                LogManager.logError("Decoding error for required property 'lockedBy': \(error)")
-                throw error
-            }
+            lockedBy = try container.decode(SystemMessageReferredUser.self, forKey: .lockedBy)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(lockedBy, forKey: .lockedBy)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(lockedBy)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1185,7 +1221,7 @@ public enum ChatBskyConvoDefs {
             if lockedBy != other.lockedBy {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1194,55 +1230,71 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let lockedByValue = try lockedBy.toCBORValue()
             map = map.adding(key: "lockedBy", value: lockedByValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "lockedBy"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case lockedBy
         }
     }
 
+    /// System message indicating the group info was edited.
     public struct SystemMessageDataEditGroup: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataEditGroup"
+
+        /// Group name that was replaced.
         public let oldName: String?
+        /// Group name that replaced the old.
         public let newName: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            oldName: String? = nil, newName: String? = nil
+            oldName: String? = nil,
+            newName: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.oldName = oldName
             self.newName = newName
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                oldName = try container.decodeIfPresent(String.self, forKey: .oldName)
+                oldName = try container.decodeIfPresent(String.self, forKey: .oldName, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'oldName' — degrading to nil: \(error)")
                 oldName = nil
             }
             do {
-                newName = try container.decodeIfPresent(String.self, forKey: .newName)
+                newName = try container.decodeIfPresent(String.self, forKey: .newName, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'newName' — degrading to nil: \(error)")
                 newName = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(oldName, forKey: .oldName)
             try container.encodeIfPresent(newName, forKey: .newName)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1256,6 +1308,7 @@ public enum ChatBskyConvoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1266,7 +1319,7 @@ public enum ChatBskyConvoDefs {
             if newName != other.newName {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1275,7 +1328,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = oldName {
                 let oldNameValue = try value.toCBORValue()
                 map = map.adding(key: "oldName", value: oldNameValue)
@@ -1284,34 +1336,47 @@ public enum ChatBskyConvoDefs {
                 let newNameValue = try value.toCBORValue()
                 map = map.adding(key: "newName", value: newNameValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "oldName", "newName"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case oldName
             case newName
         }
     }
 
+    /// System message indicating the group join link was created.
     public struct SystemMessageDataCreateJoinLink: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataCreateJoinLink"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1319,34 +1384,45 @@ public enum ChatBskyConvoDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// System message indicating the group join link was edited.
     public struct SystemMessageDataEditJoinLink: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataEditJoinLink"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1354,34 +1430,45 @@ public enum ChatBskyConvoDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// System message indicating the group join link was enabled.
     public struct SystemMessageDataEnableJoinLink: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataEnableJoinLink"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1389,34 +1476,45 @@ public enum ChatBskyConvoDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
+    /// System message indicating the group join link was disabled.
     public struct SystemMessageDataDisableJoinLink: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#systemMessageDataDisableJoinLink"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1424,67 +1522,56 @@ public enum ChatBskyConvoDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
     public struct DeletedMessageView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#deletedMessageView"
+
         public let id: String
         public let rev: String
         public let sender: MessageViewSender
         public let sentAt: ATProtocolDate
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            id: String, rev: String, sender: MessageViewSender, sentAt: ATProtocolDate
+            id: String,
+            rev: String,
+            sender: MessageViewSender,
+            sentAt: ATProtocolDate,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.id = id
             self.rev = rev
             self.sender = sender
             self.sentAt = sentAt
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                id = try container.decode(String.self, forKey: .id)
-            } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                sender = try container.decode(MessageViewSender.self, forKey: .sender)
-            } catch {
-                LogManager.logError("Decoding error for required property 'sender': \(error)")
-                throw error
-            }
-            do {
-                sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'sentAt': \(error)")
-                throw error
-            }
+            id = try container.decode(String.self, forKey: .id)
+            rev = try container.decode(String.self, forKey: .rev)
+            sender = try container.decode(MessageViewSender.self, forKey: .sender)
+            sentAt = try container.decode(ATProtocolDate.self, forKey: .sentAt)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(id, forKey: .id)
             try container.encode(rev, forKey: .rev)
             try container.encode(sender, forKey: .sender)
             try container.encode(sentAt, forKey: .sentAt)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1492,6 +1579,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(rev)
             hasher.combine(sender)
             hasher.combine(sentAt)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1508,7 +1596,7 @@ public enum ChatBskyConvoDefs {
             if sentAt != other.sentAt {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1517,7 +1605,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
             let revValue = try rev.toCBORValue()
@@ -1526,11 +1613,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "sender", value: senderValue)
             let sentAtValue = try sentAt.toCBORValue()
             map = map.adding(key: "sentAt", value: sentAtValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "rev", "sender", "sentAt"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case id
             case rev
             case sender
@@ -1538,24 +1626,36 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Placeholder embedded in place of a reply's parent message when that parent was sent before the viewer joined the group convo. The viewer has no access to that history, so no message data is carried.
     public struct MessageBeforeUserJoinedGroupView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#messageBeforeUserJoinedGroupView"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1563,44 +1663,46 @@ public enum ChatBskyConvoDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
     public struct MessageViewSender: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#messageViewSender"
+
         public let did: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID
+            did: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
+            did = try container.decode(DID.self, forKey: .did)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1608,7 +1710,7 @@ public enum ChatBskyConvoDefs {
             if did != other.did {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1617,66 +1719,61 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
         }
     }
 
     public struct ReactionView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#reactionView"
+
         public let value: String
         public let sender: ReactionViewSender
         public let createdAt: ATProtocolDate
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            value: String, sender: ReactionViewSender, createdAt: ATProtocolDate
+            value: String,
+            sender: ReactionViewSender,
+            createdAt: ATProtocolDate,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.value = value
             self.sender = sender
             self.createdAt = createdAt
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                value = try container.decode(String.self, forKey: .value)
-            } catch {
-                LogManager.logError("Decoding error for required property 'value': \(error)")
-                throw error
-            }
-            do {
-                sender = try container.decode(ReactionViewSender.self, forKey: .sender)
-            } catch {
-                LogManager.logError("Decoding error for required property 'sender': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
+            value = try container.decode(String.self, forKey: .value)
+            sender = try container.decode(ReactionViewSender.self, forKey: .sender)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(value, forKey: .value)
             try container.encode(sender, forKey: .sender)
             try container.encode(createdAt, forKey: .createdAt)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(value)
             hasher.combine(sender)
             hasher.combine(createdAt)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1690,7 +1787,7 @@ public enum ChatBskyConvoDefs {
             if createdAt != other.createdAt {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1699,18 +1796,18 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let valueValue = try value.toCBORValue()
             map = map.adding(key: "value", value: valueValue)
             let senderValue = try sender.toCBORValue()
             map = map.adding(key: "sender", value: senderValue)
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "value", "sender", "createdAt"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case value
             case sender
             case createdAt
@@ -1719,32 +1816,35 @@ public enum ChatBskyConvoDefs {
 
     public struct ReactionViewSender: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#reactionViewSender"
+
         public let did: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID
+            did: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
+            did = try container.decode(DID.self, forKey: .did)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1752,7 +1852,7 @@ public enum ChatBskyConvoDefs {
             if did != other.did {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1761,56 +1861,55 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
         }
     }
 
     public struct MessageAndReactionView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#messageAndReactionView"
+
         public let message: MessageView
         public let reaction: ReactionView
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            message: MessageView, reaction: ReactionView
+            message: MessageView,
+            reaction: ReactionView,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.message = message
             self.reaction = reaction
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                message = try container.decode(MessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                reaction = try container.decode(ReactionView.self, forKey: .reaction)
-            } catch {
-                LogManager.logError("Decoding error for required property 'reaction': \(error)")
-                throw error
-            }
+            message = try container.decode(MessageView.self, forKey: .message)
+            reaction = try container.decode(ReactionView.self, forKey: .reaction)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(message, forKey: .message)
             try container.encode(reaction, forKey: .reaction)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(message)
             hasher.combine(reaction)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1821,7 +1920,7 @@ public enum ChatBskyConvoDefs {
             if reaction != other.reaction {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1830,16 +1929,16 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
             let reactionValue = try reaction.toCBORValue()
             map = map.adding(key: "reaction", value: reactionValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "message", "reaction"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case message
             case reaction
         }
@@ -1847,18 +1946,34 @@ public enum ChatBskyConvoDefs {
 
     public struct ConvoView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#convoView"
+
         public let id: String
         public let rev: String
+        /// Members of this conversation. For direct convos, it will be an immutable list of the 2 members. For group convos, it will a list of important members (the first few members, the viewer, the member who added the viewer, the member who sent the last message, the member who sent the last reaction), but will not contain the full list of members. Use chat.bsky.convo.getConvoMembers to list all members.
         public let members: [ChatBskyActorDefs.ProfileViewBasic]
         public let lastMessage: ConvoViewLastMessageUnion?
         public let lastReaction: ConvoViewLastReactionUnion?
         public let muted: Bool
+        /// Convo status for the viewer member (not the convo itself).
         public let status: ConvoStatus?
         public let unreadCount: Int
+        /// Union field that has data specific to different kinds of convos.
         public let kind: ConvoViewKindUnion?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            id: String, rev: String, members: [ChatBskyActorDefs.ProfileViewBasic], lastMessage: ConvoViewLastMessageUnion? = nil, lastReaction: ConvoViewLastReactionUnion? = nil, muted: Bool, status: ConvoStatus? = nil, unreadCount: Int, kind: ConvoViewKindUnion? = nil
+            id: String,
+            rev: String,
+            members: [ChatBskyActorDefs.ProfileViewBasic],
+            lastMessage: ConvoViewLastMessageUnion? = nil,
+            lastReaction: ConvoViewLastReactionUnion? = nil,
+            muted: Bool,
+            status: ConvoStatus? = nil,
+            unreadCount: Int,
+            kind: ConvoViewKindUnion? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.id = id
             self.rev = rev
@@ -1869,77 +1984,62 @@ public enum ChatBskyConvoDefs {
             self.status = status
             self.unreadCount = unreadCount
             self.kind = kind
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            id = try container.decode(String.self, forKey: .id)
+            rev = try container.decode(String.self, forKey: .rev)
+            members = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .members)
             do {
-                id = try container.decode(String.self, forKey: .id)
+                lastMessage = try container.decodeIfPresent(ConvoViewLastMessageUnion.self, forKey: .lastMessage, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'id': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                members = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .members)
-            } catch {
-                LogManager.logError("Decoding error for required property 'members': \(error)")
-                throw error
-            }
-            do {
-                lastMessage = try container.decodeIfPresent(ConvoViewLastMessageUnion.self, forKey: .lastMessage)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'lastMessage' — degrading to nil: \(error)")
                 lastMessage = nil
             }
             do {
-                lastReaction = try container.decodeIfPresent(ConvoViewLastReactionUnion.self, forKey: .lastReaction)
+                lastReaction = try container.decodeIfPresent(ConvoViewLastReactionUnion.self, forKey: .lastReaction, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'lastReaction' — degrading to nil: \(error)")
                 lastReaction = nil
             }
+            muted = try container.decode(Bool.self, forKey: .muted)
             do {
-                muted = try container.decode(Bool.self, forKey: .muted)
+                status = try container.decodeIfPresent(ConvoStatus.self, forKey: .status, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'muted': \(error)")
-                throw error
-            }
-            do {
-                status = try container.decodeIfPresent(ConvoStatus.self, forKey: .status)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
                 status = nil
             }
+            unreadCount = try container.decode(Int.self, forKey: .unreadCount)
             do {
-                unreadCount = try container.decode(Int.self, forKey: .unreadCount)
+                kind = try container.decodeIfPresent(ConvoViewKindUnion.self, forKey: .kind, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'unreadCount': \(error)")
-                throw error
-            }
-            do {
-                kind = try container.decodeIfPresent(ConvoViewKindUnion.self, forKey: .kind)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'kind' — degrading to nil: \(error)")
                 kind = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(id, forKey: .id)
             try container.encode(rev, forKey: .rev)
             try container.encode(members, forKey: .members)
@@ -1949,6 +2049,7 @@ public enum ChatBskyConvoDefs {
             try container.encodeIfPresent(status, forKey: .status)
             try container.encode(unreadCount, forKey: .unreadCount)
             try container.encodeIfPresent(kind, forKey: .kind)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1977,6 +2078,7 @@ public enum ChatBskyConvoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2008,7 +2110,7 @@ public enum ChatBskyConvoDefs {
             if kind != other.kind {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2017,7 +2119,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let idValue = try id.toCBORValue()
             map = map.adding(key: "id", value: idValue)
             let revValue = try rev.toCBORValue()
@@ -2044,11 +2145,12 @@ public enum ChatBskyConvoDefs {
                 let kindValue = try value.toCBORValue()
                 map = map.adding(key: "kind", value: kindValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "rev", "members", "lastMessage", "lastReaction", "muted", "status", "unreadCount", "kind"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case id
             case rev
             case members
@@ -2064,21 +2166,32 @@ public enum ChatBskyConvoDefs {
     public struct DirectConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#directConvo"
 
-        public init() {}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.extraFields = extraFields
+        }
 
         public init(from decoder: Decoder) throws {
-            _ = decoder
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
-        public func hash(into hasher: inout Hasher) {}
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(extraFields)
+        }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
-            return other is Self
+            guard let other = other as? Self else { return false }
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2086,30 +2199,49 @@ public enum ChatBskyConvoDefs {
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            return map
+            let map = OrderedCBORMap()
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-        }
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"]
+
+        private enum CodingKeys: CodingKey {}
     }
 
     public struct GroupConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#groupConvo"
+
         public let createdAt: ATProtocolDate
         public let joinLink: ChatBskyGroupDefs.JoinLinkView?
+        /// The total number of pending join requests for the group conversation. Only present for the owner. Capped at 21.
         public let joinRequestCount: Int?
+        /// The lock status of the conversation.
         public let lockStatus: ConvoLockStatus
+        /// Whether the lock status is being forced by a moderation override (account inactivation or convo takedown) rather than the owner's own setting.
         public let lockStatusModerationOverride: Bool
+        /// The total number of members in the group conversation.
         public let memberCount: Int
+        /// The maximum number of members allowed in the group conversation.
         public let memberLimit: Int
+        /// The display name of the group conversation.
         public let name: String
+        /// The number of unread join requests for the group conversation. Only present for the owner.
         public let unreadJoinRequestCount: Int?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            createdAt: ATProtocolDate, joinLink: ChatBskyGroupDefs.JoinLinkView? = nil, joinRequestCount: Int? = nil, lockStatus: ConvoLockStatus, lockStatusModerationOverride: Bool, memberCount: Int, memberLimit: Int, name: String, unreadJoinRequestCount: Int? = nil
+            createdAt: ATProtocolDate,
+            joinLink: ChatBskyGroupDefs.JoinLinkView? = nil,
+            joinRequestCount: Int? = nil,
+            lockStatus: ConvoLockStatus,
+            lockStatusModerationOverride: Bool,
+            memberCount: Int,
+            memberLimit: Int,
+            name: String,
+            unreadJoinRequestCount: Int? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.createdAt = createdAt
             self.joinLink = joinLink
@@ -2120,75 +2252,53 @@ public enum ChatBskyConvoDefs {
             self.memberLimit = memberLimit
             self.name = name
             self.unreadJoinRequestCount = unreadJoinRequestCount
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+                joinLink = try container.decodeIfPresent(ChatBskyGroupDefs.JoinLinkView.self, forKey: .joinLink, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                joinLink = try container.decodeIfPresent(ChatBskyGroupDefs.JoinLinkView.self, forKey: .joinLink)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'joinLink' — degrading to nil: \(error)")
                 joinLink = nil
             }
             do {
-                joinRequestCount = try container.decodeIfPresent(Int.self, forKey: .joinRequestCount)
+                joinRequestCount = try container.decodeIfPresent(Int.self, forKey: .joinRequestCount, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'joinRequestCount' — degrading to nil: \(error)")
                 joinRequestCount = nil
             }
+            lockStatus = try container.decode(ConvoLockStatus.self, forKey: .lockStatus)
+            lockStatusModerationOverride = try container.decode(Bool.self, forKey: .lockStatusModerationOverride)
+            memberCount = try container.decode(Int.self, forKey: .memberCount)
+            memberLimit = try container.decode(Int.self, forKey: .memberLimit)
+            name = try container.decode(String.self, forKey: .name)
             do {
-                lockStatus = try container.decode(ConvoLockStatus.self, forKey: .lockStatus)
+                unreadJoinRequestCount = try container.decodeIfPresent(Int.self, forKey: .unreadJoinRequestCount, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'lockStatus': \(error)")
-                throw error
-            }
-            do {
-                lockStatusModerationOverride = try container.decode(Bool.self, forKey: .lockStatusModerationOverride)
-            } catch {
-                LogManager.logError("Decoding error for required property 'lockStatusModerationOverride': \(error)")
-                throw error
-            }
-            do {
-                memberCount = try container.decode(Int.self, forKey: .memberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'memberCount': \(error)")
-                throw error
-            }
-            do {
-                memberLimit = try container.decode(Int.self, forKey: .memberLimit)
-            } catch {
-                LogManager.logError("Decoding error for required property 'memberLimit': \(error)")
-                throw error
-            }
-            do {
-                name = try container.decode(String.self, forKey: .name)
-            } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
-                throw error
-            }
-            do {
-                unreadJoinRequestCount = try container.decodeIfPresent(Int.self, forKey: .unreadJoinRequestCount)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'unreadJoinRequestCount' — degrading to nil: \(error)")
                 unreadJoinRequestCount = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encodeIfPresent(joinLink, forKey: .joinLink)
             try container.encodeIfPresent(joinRequestCount, forKey: .joinRequestCount)
@@ -2198,6 +2308,7 @@ public enum ChatBskyConvoDefs {
             try container.encode(memberLimit, forKey: .memberLimit)
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(unreadJoinRequestCount, forKey: .unreadJoinRequestCount)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2222,6 +2333,7 @@ public enum ChatBskyConvoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2253,7 +2365,7 @@ public enum ChatBskyConvoDefs {
             if unreadJoinRequestCount != other.unreadJoinRequestCount {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2262,7 +2374,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let createdAtValue = try createdAt.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
             if let value = joinLink {
@@ -2287,11 +2398,12 @@ public enum ChatBskyConvoDefs {
                 let unreadJoinRequestCountValue = try value.toCBORValue()
                 map = map.adding(key: "unreadJoinRequestCount", value: unreadJoinRequestCountValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "joinLink", "joinRequestCount", "lockStatus", "lockStatusModerationOverride", "memberCount", "memberLimit", "name", "unreadJoinRequestCount"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case createdAt
             case joinLink
             case joinRequestCount
@@ -2304,44 +2416,44 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a convo containing the viewer was started. Can be direct or group. When a member is added to a group convo, they also get this event.
     public struct LogBeginConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logBeginConvo"
+
         public let rev: String
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String
+            rev: String,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2352,7 +2464,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2361,59 +2473,59 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
         }
     }
 
+    /// Event indicating the viewer accepted a convo, and it can be moved out of the request inbox. Can be direct or group.
     public struct LogAcceptConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logAcceptConvo"
+
         public let rev: String
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String
+            rev: String,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2424,7 +2536,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2433,59 +2545,59 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
         }
     }
 
+    /// Event indicating the viewer left a convo. Can be direct or group.
     public struct LogLeaveConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logLeaveConvo"
+
         public let rev: String
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String
+            rev: String,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2496,7 +2608,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2505,59 +2617,59 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
         }
     }
 
+    /// Event indicating the viewer muted a convo. Can be direct or group.
     public struct LogMuteConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logMuteConvo"
+
         public let rev: String
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String
+            rev: String,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2568,7 +2680,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2577,59 +2689,59 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
         }
     }
 
+    /// Event indicating the viewer unmuted a convo. Can be direct or group.
     public struct LogUnmuteConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logUnmuteConvo"
+
         public let rev: String
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String
+            rev: String,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2640,7 +2752,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2649,74 +2761,74 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
         }
     }
 
+    /// Event indicating a user-originated message was created. Is not emitted for system messages.
     public struct LogCreateMessage: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logCreateMessage"
+
         public let rev: String
         public let convoId: String
         public let message: LogCreateMessageMessageUnion
+        /// Profiles referred to in the message view. This isn't required for compatibility, because it was added later, but should generally be present.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: LogCreateMessageMessageUnion, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil
+            rev: String,
+            convoId: String,
+            message: LogCreateMessageMessageUnion,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(LogCreateMessageMessageUnion.self, forKey: .message)
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(LogCreateMessageMessageUnion.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'relatedProfiles' — degrading to nil: \(error)")
                 relatedProfiles = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encodeIfPresent(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2728,6 +2840,7 @@ public enum ChatBskyConvoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2744,7 +2857,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2753,7 +2866,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -2764,11 +2876,12 @@ public enum ChatBskyConvoDefs {
                 let relatedProfilesValue = try value.toCBORValue()
                 map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -2776,54 +2889,50 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a user-originated message was deleted. Is not emitted for system messages.
     public struct LogDeleteMessage: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logDeleteMessage"
+
         public let rev: String
         public let convoId: String
         public let message: LogDeleteMessageMessageUnion
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: LogDeleteMessageMessageUnion
+            rev: String,
+            convoId: String,
+            message: LogDeleteMessageMessageUnion,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(LogDeleteMessageMessageUnion.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(LogDeleteMessageMessageUnion.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2837,7 +2946,7 @@ public enum ChatBskyConvoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2846,72 +2955,68 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
         }
     }
 
+    /// DEPRECATED: use logReadConvo instead. Event indicating a convo was read up to a certain message.
     public struct LogReadMessage: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logReadMessage"
+
         public let rev: String
         public let convoId: String
         public let message: LogReadMessageMessageUnion
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: LogReadMessageMessageUnion
+            rev: String,
+            convoId: String,
+            message: LogReadMessageMessageUnion,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(LogReadMessageMessageUnion.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(LogReadMessageMessageUnion.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2925,7 +3030,7 @@ public enum ChatBskyConvoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2934,86 +3039,82 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
         }
     }
 
+    /// Event indicating a reaction was added to a message.
     public struct LogAddReaction: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logAddReaction"
+
         public let rev: String
         public let convoId: String
         public let message: LogAddReactionMessageUnion
         public let reaction: ReactionView
+        /// Profiles referred in the message and reaction views. This isn't required for compatibility, because it was added later, but should generally be present.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: LogAddReactionMessageUnion, reaction: ReactionView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil
+            rev: String,
+            convoId: String,
+            message: LogAddReactionMessageUnion,
+            reaction: ReactionView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.reaction = reaction
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(LogAddReactionMessageUnion.self, forKey: .message)
+            reaction = try container.decode(ReactionView.self, forKey: .reaction)
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(LogAddReactionMessageUnion.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                reaction = try container.decode(ReactionView.self, forKey: .reaction)
-            } catch {
-                LogManager.logError("Decoding error for required property 'reaction': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'relatedProfiles' — degrading to nil: \(error)")
                 relatedProfiles = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(reaction, forKey: .reaction)
             try container.encodeIfPresent(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3026,6 +3127,7 @@ public enum ChatBskyConvoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3045,7 +3147,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3054,7 +3156,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -3067,11 +3168,12 @@ public enum ChatBskyConvoDefs {
                 let relatedProfilesValue = try value.toCBORValue()
                 map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "reaction", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -3080,68 +3182,64 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a reaction was removed from a message.
     public struct LogRemoveReaction: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logRemoveReaction"
+
         public let rev: String
         public let convoId: String
         public let message: LogRemoveReactionMessageUnion
         public let reaction: ReactionView
+        /// Profiles referred in the message and reaction views. This isn't required for compatibility, because it was added later, but should generally be present.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: LogRemoveReactionMessageUnion, reaction: ReactionView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil
+            rev: String,
+            convoId: String,
+            message: LogRemoveReactionMessageUnion,
+            reaction: ReactionView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.reaction = reaction
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(LogRemoveReactionMessageUnion.self, forKey: .message)
+            reaction = try container.decode(ReactionView.self, forKey: .reaction)
             do {
-                rev = try container.decode(String.self, forKey: .rev)
+                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(LogRemoveReactionMessageUnion.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                reaction = try container.decode(ReactionView.self, forKey: .reaction)
-            } catch {
-                LogManager.logError("Decoding error for required property 'reaction': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'relatedProfiles' — degrading to nil: \(error)")
                 relatedProfiles = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(reaction, forKey: .reaction)
             try container.encodeIfPresent(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3154,6 +3252,7 @@ public enum ChatBskyConvoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3173,7 +3272,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3182,7 +3281,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -3195,11 +3293,12 @@ public enum ChatBskyConvoDefs {
                 let relatedProfilesValue = try value.toCBORValue()
                 map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "reaction", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -3208,54 +3307,50 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a convo was read up to a certain message.
     public struct LogReadConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logReadConvo"
+
         public let rev: String
         public let convoId: String
         public let message: LogReadConvoMessageUnion
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: LogReadConvoMessageUnion
+            rev: String,
+            convoId: String,
+            message: LogReadConvoMessageUnion,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(LogReadConvoMessageUnion.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(LogReadConvoMessageUnion.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3269,7 +3364,7 @@ public enum ChatBskyConvoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3278,75 +3373,68 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
         }
     }
 
+    /// Event indicating a member was added to a group convo. The member who was added gets a logBeginConvo (to create the convo) but also a logAddMember (to show the system message as the first message the user sees).
     public struct LogAddMember: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logAddMember"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataAddMember
         public let message: SystemMessageView
+        /// Profiles referred in the system message.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3354,6 +3442,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(convoId)
             hasher.combine(message)
             hasher.combine(relatedProfiles)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3370,7 +3459,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3379,7 +3468,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -3388,11 +3476,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
             map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -3400,57 +3489,50 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a member was removed from a group convo. The member who was removed gets a logLeaveConvo (to leave the convo) but not a logRemoveMember (because they already left, so can't see the system message).
     public struct LogRemoveMember: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logRemoveMember"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataRemoveMember
         public let message: SystemMessageView
+        /// Profiles referred in the system message.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3458,6 +3540,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(convoId)
             hasher.combine(message)
             hasher.combine(relatedProfiles)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3474,7 +3557,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3483,7 +3566,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -3492,11 +3574,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
             map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -3504,57 +3587,50 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a member joined a group convo via join link. The member who was added gets a logBeginConvo (to create the convo) but also a logMemberJoin (to show the system message as the first message the user sees).
     public struct LogMemberJoin: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logMemberJoin"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataMemberJoin
         public let message: SystemMessageView
+        /// Profiles referred in the system message.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3562,6 +3638,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(convoId)
             hasher.combine(message)
             hasher.combine(relatedProfiles)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3578,7 +3655,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3587,7 +3664,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -3596,11 +3672,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
             map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -3608,57 +3685,50 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a member voluntarily left a group convo. The member who was removed gets a logLeaveConvo (to leave the convo) but not a logMemberLeave (because they already left, so can't see the system message).
     public struct LogMemberLeave: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logMemberLeave"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataMemberLeave
         public let message: SystemMessageView
+        /// Profiles referred in the system message.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3666,6 +3736,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(convoId)
             hasher.combine(message)
             hasher.combine(relatedProfiles)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3682,7 +3753,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3691,7 +3762,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -3700,11 +3770,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
             map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -3712,57 +3783,50 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a group convo was locked.
     public struct LogLockConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logLockConvo"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataLockConvo
         public let message: SystemMessageView
+        /// Profiles referred in the system message.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3770,6 +3834,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(convoId)
             hasher.combine(message)
             hasher.combine(relatedProfiles)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3786,7 +3851,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3795,7 +3860,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -3804,11 +3868,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
             map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -3816,57 +3881,50 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a group convo was unlocked.
     public struct LogUnlockConvo: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logUnlockConvo"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataUnlockConvo
         public let message: SystemMessageView
+        /// Profiles referred in the system message.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3874,6 +3932,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(convoId)
             hasher.combine(message)
             hasher.combine(relatedProfiles)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3890,7 +3949,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -3899,7 +3958,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -3908,11 +3966,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
             map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -3920,57 +3979,50 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating a group convo was locked permanently.
     public struct LogLockConvoPermanently: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logLockConvoPermanently"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataLockConvoPermanently
         public let message: SystemMessageView
+        /// Profiles referred in the system message.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView, relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
             self.relatedProfiles = relatedProfiles
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
-            do {
-                relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
-            } catch {
-                LogManager.logError("Decoding error for required property 'relatedProfiles': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            relatedProfiles = try container.decode([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
             try container.encode(relatedProfiles, forKey: .relatedProfiles)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -3978,6 +4030,7 @@ public enum ChatBskyConvoDefs {
             hasher.combine(convoId)
             hasher.combine(message)
             hasher.combine(relatedProfiles)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -3994,7 +4047,7 @@ public enum ChatBskyConvoDefs {
             if relatedProfiles != other.relatedProfiles {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4003,7 +4056,6 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
@@ -4012,11 +4064,12 @@ public enum ChatBskyConvoDefs {
             map = map.adding(key: "message", value: messageValue)
             let relatedProfilesValue = try relatedProfiles.toCBORValue()
             map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message", "relatedProfiles"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
@@ -4024,54 +4077,51 @@ public enum ChatBskyConvoDefs {
         }
     }
 
+    /// Event indicating info about group convo was edited.
     public struct LogEditGroup: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logEditGroup"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataEditGroup
         public let message: SystemMessageView
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4085,7 +4135,7 @@ public enum ChatBskyConvoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4094,72 +4144,69 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
         }
     }
 
+    /// Event indicating a join link was created for a group convo.
     public struct LogCreateJoinLink: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logCreateJoinLink"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataCreateJoinLink
         public let message: SystemMessageView
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4173,7 +4220,7 @@ public enum ChatBskyConvoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4182,72 +4229,69 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
         }
     }
 
+    /// Event indicating a settings about a join link for a group convo were edited.
     public struct LogEditJoinLink: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logEditJoinLink"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataEditJoinLink
         public let message: SystemMessageView
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4261,7 +4305,7 @@ public enum ChatBskyConvoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4270,72 +4314,69 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
         }
     }
 
+    /// Event indicating a join link was enabled for a group convo.
     public struct LogEnableJoinLink: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logEnableJoinLink"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataEnableJoinLink
         public let message: SystemMessageView
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4349,7 +4390,7 @@ public enum ChatBskyConvoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4358,72 +4399,69 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
         }
     }
 
+    /// Event indicating a join link was disabled for a group convo.
     public struct LogDisableJoinLink: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logDisableJoinLink"
+
         public let rev: String
         public let convoId: String
+        /// A system message with data of type #systemMessageDataDisableJoinLink
         public let message: SystemMessageView
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, message: SystemMessageView
+            rev: String,
+            convoId: String,
+            message: SystemMessageView,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decode(SystemMessageView.self, forKey: .message)
-            } catch {
-                LogManager.logError("Decoding error for required property 'message': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            message = try container.decode(SystemMessageView.self, forKey: .message)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(message)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4437,7 +4475,7 @@ public enum ChatBskyConvoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4446,72 +4484,69 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let messageValue = try message.toCBORValue()
             map = map.adding(key: "message", value: messageValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case message
         }
     }
 
+    /// Event indicating a join request was made to a group the viewer owns. Only the owner gets this.
     public struct LogIncomingJoinRequest: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logIncomingJoinRequest"
+
         public let rev: String
         public let convoId: String
+        /// Prospective member who requested to join.
         public let member: ChatBskyActorDefs.ProfileViewBasic
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, member: ChatBskyActorDefs.ProfileViewBasic
+            rev: String,
+            convoId: String,
+            member: ChatBskyActorDefs.ProfileViewBasic,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.member = member
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
-            } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(member, forKey: .member)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(member)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4525,7 +4560,7 @@ public enum ChatBskyConvoDefs {
             if member != other.member {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4534,72 +4569,69 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
             map = map.adding(key: "member", value: memberValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "member"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case member
         }
     }
 
+    /// Event indicating a join request was approved by the viewer. Only the owner gets this. The approved member gets a logBeginConvo.
     public struct LogApproveJoinRequest: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logApproveJoinRequest"
+
         public let rev: String
         public let convoId: String
+        /// Prospective member who requested to join.
         public let member: ChatBskyActorDefs.ProfileViewBasic
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, member: ChatBskyActorDefs.ProfileViewBasic
+            rev: String,
+            convoId: String,
+            member: ChatBskyActorDefs.ProfileViewBasic,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.member = member
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
-            } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(member, forKey: .member)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(member)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4613,7 +4645,7 @@ public enum ChatBskyConvoDefs {
             if member != other.member {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4622,72 +4654,69 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
             map = map.adding(key: "member", value: memberValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "member"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case member
         }
     }
 
+    /// Event indicating a join request was rejected by the viewer. Only the owner gets this.
     public struct LogRejectJoinRequest: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logRejectJoinRequest"
+
         public let rev: String
         public let convoId: String
+        /// Prospective member who requested to join.
         public let member: ChatBskyActorDefs.ProfileViewBasic
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, member: ChatBskyActorDefs.ProfileViewBasic
+            rev: String,
+            convoId: String,
+            member: ChatBskyActorDefs.ProfileViewBasic,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.member = member
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
-            } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(member, forKey: .member)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(member)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4701,7 +4730,7 @@ public enum ChatBskyConvoDefs {
             if member != other.member {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4710,62 +4739,62 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
             map = map.adding(key: "member", value: memberValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "member"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case member
         }
     }
 
+    /// Event indicating a join request was made by the requester. Only requester actor gets this.
     public struct LogOutgoingJoinRequest: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logOutgoingJoinRequest"
+
         public let rev: String
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String
+            rev: String,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4776,7 +4805,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4785,69 +4814,66 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
         }
     }
 
+    /// Event indicating a prospective member withdrew their join request. Only the owner gets this.
     public struct LogWithdrawIncomingJoinRequest: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logWithdrawIncomingJoinRequest"
+
         public let rev: String
         public let convoId: String
+        /// Prospective member who withdrew their join request.
         public let member: ChatBskyActorDefs.ProfileViewBasic
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String, member: ChatBskyActorDefs.ProfileViewBasic
+            rev: String,
+            convoId: String,
+            member: ChatBskyActorDefs.ProfileViewBasic,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
             self.member = member
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
-            } catch {
-                LogManager.logError("Decoding error for required property 'member': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            member = try container.decode(ChatBskyActorDefs.ProfileViewBasic.self, forKey: .member)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(member, forKey: .member)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
             hasher.combine(member)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4861,7 +4887,7 @@ public enum ChatBskyConvoDefs {
             if member != other.member {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4870,62 +4896,62 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let memberValue = try member.toCBORValue()
             map = map.adding(key: "member", value: memberValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId", "member"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
             case member
         }
     }
 
+    /// Event indicating the viewer withdrew their own join request. Only requester actor gets this.
     public struct LogWithdrawOutgoingJoinRequest: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logWithdrawOutgoingJoinRequest"
+
         public let rev: String
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String
+            rev: String,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -4936,7 +4962,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -4945,59 +4971,59 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
         }
     }
 
+    /// Event indicating the group owner marked join requests as read. Only the owner gets this.
     public struct LogReadJoinRequests: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.convo.defs#logReadJoinRequests"
+
         public let rev: String
         public let convoId: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            rev: String, convoId: String
+            rev: String,
+            convoId: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.rev = rev
             self.convoId = convoId
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(rev, forKey: .rev)
             try container.encode(convoId, forKey: .convoId)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(rev)
             hasher.combine(convoId)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -5008,7 +5034,7 @@ public enum ChatBskyConvoDefs {
             if convoId != other.convoId {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -5017,16 +5043,16 @@ public enum ChatBskyConvoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "convoId"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case rev
             case convoId
         }
@@ -5167,6 +5193,8 @@ public enum ChatBskyConvoDefs {
     public enum MessageInputEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case appBskyEmbedRecord(AppBskyEmbedRecord)
         case chatBskyEmbedJoinLink(ChatBskyEmbedJoinLink)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyEmbedRecord) {
             self = .appBskyEmbedRecord(value)
@@ -5299,6 +5327,8 @@ public enum ChatBskyConvoDefs {
     public indirect enum MessageViewEmbedUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case appBskyEmbedRecordView(AppBskyEmbedRecord.View)
         case chatBskyEmbedJoinLinkView(ChatBskyEmbedJoinLink.View)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyEmbedRecord.View) {
             self = .appBskyEmbedRecordView(value)
@@ -5432,6 +5462,8 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case chatBskyConvoDefsMessageBeforeUserJoinedGroupView(ChatBskyConvoDefs.MessageBeforeUserJoinedGroupView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -5609,6 +5641,8 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsSystemMessageDataEditJoinLink(ChatBskyConvoDefs.SystemMessageDataEditJoinLink)
         case chatBskyConvoDefsSystemMessageDataEnableJoinLink(ChatBskyConvoDefs.SystemMessageDataEnableJoinLink)
         case chatBskyConvoDefsSystemMessageDataDisableJoinLink(ChatBskyConvoDefs.SystemMessageDataDisableJoinLink)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.SystemMessageDataAddMember) {
             self = .chatBskyConvoDefsSystemMessageDataAddMember(value)
@@ -6092,6 +6126,8 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case chatBskyConvoDefsSystemMessageView(ChatBskyConvoDefs.SystemMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -6258,6 +6294,8 @@ public enum ChatBskyConvoDefs {
 
     public indirect enum ConvoViewLastReactionUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case chatBskyConvoDefsMessageAndReactionView(ChatBskyConvoDefs.MessageAndReactionView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageAndReactionView) {
             self = .chatBskyConvoDefsMessageAndReactionView(value)
@@ -6355,6 +6393,8 @@ public enum ChatBskyConvoDefs {
     public enum ConvoViewKindUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case chatBskyConvoDefsDirectConvo(ChatBskyConvoDefs.DirectConvo)
         case chatBskyConvoDefsGroupConvo(ChatBskyConvoDefs.GroupConvo)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.DirectConvo) {
             self = .chatBskyConvoDefsDirectConvo(value)
@@ -6487,6 +6527,8 @@ public enum ChatBskyConvoDefs {
     public indirect enum LogCreateMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -6619,6 +6661,8 @@ public enum ChatBskyConvoDefs {
     public indirect enum LogDeleteMessageMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -6752,6 +6796,8 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case chatBskyConvoDefsSystemMessageView(ChatBskyConvoDefs.SystemMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -6919,6 +6965,8 @@ public enum ChatBskyConvoDefs {
     public indirect enum LogAddReactionMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -7051,6 +7099,8 @@ public enum ChatBskyConvoDefs {
     public indirect enum LogRemoveReactionMessageUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -7184,6 +7234,8 @@ public enum ChatBskyConvoDefs {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case chatBskyConvoDefsSystemMessageView(ChatBskyConvoDefs.SystemMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)

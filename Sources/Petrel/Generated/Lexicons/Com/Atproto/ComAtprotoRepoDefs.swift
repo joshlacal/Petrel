@@ -8,42 +8,41 @@ public enum ComAtprotoRepoDefs {
 
     public struct CommitMeta: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.repo.defs#commitMeta"
-        public let cid: CID
+
+        public let cid: CIDString
         public let rev: TID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            cid: CID, rev: TID
+            cid: CIDString,
+            rev: TID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.cid = cid
             self.rev = rev
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                cid = try container.decode(CID.self, forKey: .cid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(TID.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
+            cid = try container.decode(CIDString.self, forKey: .cid)
+            rev = try container.decode(TID.self, forKey: .rev)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(cid, forKey: .cid)
             try container.encode(rev, forKey: .rev)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(cid)
             hasher.combine(rev)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -54,7 +53,7 @@ public enum ComAtprotoRepoDefs {
             if rev != other.rev {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -63,16 +62,16 @@ public enum ComAtprotoRepoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let cidValue = try cid.toCBORValue()
             map = map.adding(key: "cid", value: cidValue)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "cid", "rev"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case cid
             case rev
         }

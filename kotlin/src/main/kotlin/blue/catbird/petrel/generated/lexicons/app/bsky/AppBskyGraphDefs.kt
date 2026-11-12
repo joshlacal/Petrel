@@ -66,7 +66,8 @@ enum class AppBskyGraphDefsListPurpose {
     data class AppBskyGraphDefsListItemView(
         @SerialName("uri")
         val uri: ATProtocolURI,        @SerialName("subject")
-        val subject: AppBskyActorDefsProfileView    ) {
+        val subject: AppBskyActorDefsProfileView,/** Set to true when the subject has opted out of appearing in the reference list. Only set when the viewer owns the list. */        @SerialName("subjectOptedOut")
+        val subjectOptedOut: Boolean? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsListItemView"
         }
@@ -112,7 +113,8 @@ enum class AppBskyGraphDefsListPurpose {
     data class AppBskyGraphDefsListViewerState(
         @SerialName("muted")
         val muted: Boolean? = null,        @SerialName("blocked")
-        val blocked: ATProtocolURI? = null    ) {
+        val blocked: ATProtocolURI? = null,/** The authenticated viewer's app.bsky.graph.referencelistoptout record URI for this reference list. Only set for reference lists. A client can delete this record to undo the opt-out. */        @SerialName("referenceListOptOut")
+        val referenceListOptOut: ATProtocolURI? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = "#appBskyGraphDefsListViewerState"
         }

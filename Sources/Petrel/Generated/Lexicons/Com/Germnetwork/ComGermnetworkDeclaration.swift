@@ -3,47 +3,79 @@ import Foundation
 
 // lexicon: 1, id: com.germnetwork.declaration
 
+/// A declaration of a Germ Network account
 public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.germnetwork.declaration"
-    public let version: String
-    public let currentKey: Bytes
-    public let messageMe: MessageMe?
-    public let keyPackage: Bytes?
-    public let continuityProofs: [Bytes]?
 
-    public init(version: String, currentKey: Bytes, messageMe: MessageMe? = nil, keyPackage: Bytes? = nil, continuityProofs: [Bytes]? = nil) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
+
+    /// Semver version number, without pre-release or build information, for the format of opaque content
+    public let version: String
+    /// Opaque value, an ed25519 public key prefixed with a byte enum
+    public let currentKey: Bytes
+    /// Controls who can message this account
+    public let messageMe: MessageMe?
+    /// Opaque value, contains MLS KeyPackage(s), and other signature data, and is signed by the currentKey
+    public let keyPackage: Bytes?
+    /// Array of opaque values to allow for key rolling
+    public let continuityProofs: [Bytes]?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        version: String,
+        currentKey: Bytes,
+        messageMe: MessageMe? = nil,
+        keyPackage: Bytes? = nil,
+        continuityProofs: [Bytes]? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.version = version
         self.currentKey = currentKey
         self.messageMe = messageMe
         self.keyPackage = keyPackage
         self.continuityProofs = continuityProofs
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         version = try container.decode(String.self, forKey: .version)
         currentKey = try container.decode(Bytes.self, forKey: .currentKey)
         do {
-            messageMe = try container.decodeIfPresent(MessageMe.self, forKey: .messageMe)
+            messageMe = try container.decodeIfPresent(MessageMe.self, forKey: .messageMe, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'messageMe' — degrading to nil: \(error)")
             messageMe = nil
         }
         do {
-            keyPackage = try container.decodeIfPresent(Bytes.self, forKey: .keyPackage)
+            keyPackage = try container.decodeIfPresent(Bytes.self, forKey: .keyPackage, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'keyPackage' — degrading to nil: \(error)")
             keyPackage = nil
         }
         do {
-            continuityProofs = try container.decodeIfPresent([Bytes].self, forKey: .continuityProofs)
+            continuityProofs = try container.decodeIfPresent([Bytes].self, forKey: .continuityProofs, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'continuityProofs' — degrading to nil: \(error)")
             continuityProofs = nil
         }
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -54,30 +86,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(messageMe, forKey: .messageMe)
         try container.encodeIfPresent(keyPackage, forKey: .keyPackage)
         try container.encodeIfPresent(continuityProofs, forKey: .continuityProofs)
-    }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-        if version != other.version {
-            return false
-        }
-        if currentKey != other.currentKey {
-            return false
-        }
-        if messageMe != other.messageMe {
-            return false
-        }
-        if keyPackage != other.keyPackage {
-            return false
-        }
-        if continuityProofs != other.continuityProofs {
-            return false
-        }
-        return true
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -98,6 +107,31 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?)
         }
+        hasher.combine(extraFields)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if version != other.version {
+            return false
+        }
+        if currentKey != other.currentKey {
+            return false
+        }
+        if messageMe != other.messageMe {
+            return false
+        }
+        if keyPackage != other.keyPackage {
+            return false
+        }
+        if continuityProofs != other.continuityProofs {
+            return false
+        }
+        return extraFields == other.extraFields
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -119,8 +153,10 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
             let continuityProofsValue = try value.toCBORValue()
             map = map.adding(key: "continuityProofs", value: continuityProofsValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "version", "currentKey", "messageMe", "keyPackage", "continuityProofs"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -133,42 +169,43 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
 
     public struct MessageMe: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.germnetwork.declaration#messageMe"
+
+        /// A URL to present to an account that does not have its own com.germnetwork.declaration record, must have an empty fragment component, where the app should fill in the fragment component with the DIDs of the two accounts who wish to message each other
         public let messageMeUrl: URI
+        /// The policy of who can message the account, this value is included in the keyPackage, but is duplicated here to allow applications to decide if they should show a 'Message on Germ' button to the viewer.
         public let showButtonTo: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            messageMeUrl: URI, showButtonTo: String
+            messageMeUrl: URI,
+            showButtonTo: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.messageMeUrl = messageMeUrl
             self.showButtonTo = showButtonTo
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                messageMeUrl = try container.decode(URI.self, forKey: .messageMeUrl)
-            } catch {
-                LogManager.logError("Decoding error for required property 'messageMeUrl': \(error)")
-                throw error
-            }
-            do {
-                showButtonTo = try container.decode(String.self, forKey: .showButtonTo)
-            } catch {
-                LogManager.logError("Decoding error for required property 'showButtonTo': \(error)")
-                throw error
-            }
+            messageMeUrl = try container.decode(URI.self, forKey: .messageMeUrl)
+            showButtonTo = try container.decode(String.self, forKey: .showButtonTo)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(messageMeUrl, forKey: .messageMeUrl)
             try container.encode(showButtonTo, forKey: .showButtonTo)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(messageMeUrl)
             hasher.combine(showButtonTo)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -179,7 +216,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
             if showButtonTo != other.showButtonTo {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -188,16 +225,16 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let messageMeUrlValue = try messageMeUrl.toCBORValue()
             map = map.adding(key: "messageMeUrl", value: messageMeUrlValue)
             let showButtonToValue = try showButtonTo.toCBORValue()
             map = map.adding(key: "showButtonTo", value: showButtonToValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "messageMeUrl", "showButtonTo"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case messageMeUrl
             case showButtonTo
         }

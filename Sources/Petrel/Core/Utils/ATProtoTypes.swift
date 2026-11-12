@@ -832,23 +832,53 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
         self.cid = cid
     }
 
+    /// Creates a blob reference in the current format: `{"$type": "blob", ref, mimeType, size}`.
+    public init(ref: ATProtoLink, mimeType: String, size: Int) {
+        self.init(type: "blob", ref: ref, mimeType: mimeType, size: size, cid: nil)
+    }
+
+    /// Whether this value was read from the deprecated `{"cid": ..., "mimeType": ...}` form.
+    ///
+    /// The data-model specification asks implementations to keep such a blob in the regular
+    /// representation with a negative `size`, and to check that when re-serializing: a
+    /// legacy blob is written back exactly as it was read, never as a `$type: blob` object
+    /// with a made-up size.
+    public var isLegacy: Bool {
+        size < 0
+    }
+
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
 
         // Check if this is the legacy format (has cid but no $type)
         if container.contains(.cid), !container.contains(.type) {
             // Legacy blob format: { "cid": "...", "mimeType": "..." }
-            type = "blob" // Default type for legacy blobs
+            type = "blob"
             ref = nil // Legacy format doesn't have ref
             mimeType = try container.decode(String.self, forKey: .mimeType)
-            size = 0 // Legacy format doesn't include size, use 0 as placeholder
+            size = -1 // The legacy marker; the legacy format carries no size.
             cid = try container.decode(String.self, forKey: .cid)
         } else {
             // Modern blob format: { "$type": "blob", "ref": {...}, "mimeType": "...", "size": ... }
             type = try container.decode(String.self, forKey: .type)
-            ref = try container.decodeIfPresent(ATProtoLink.self, forKey: .ref)
+            guard type == "blob" else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .type, in: container, debugDescription: "A blob must have $type \"blob\""
+                )
+            }
+            ref = try container.decode(ATProtoLink.self, forKey: .ref)
             mimeType = try container.decode(String.self, forKey: .mimeType)
+            guard !mimeType.isEmpty else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .mimeType, in: container, debugDescription: "A blob's mimeType must not be empty"
+                )
+            }
             size = try container.decode(Int.self, forKey: .size)
+            guard size >= 0 else {
+                throw DecodingError.dataCorruptedError(
+                    forKey: .size, in: container, debugDescription: "A blob's size must not be negative"
+                )
+            }
             cid = try container.decodeIfPresent(String.self, forKey: .cid)
         }
     }
@@ -856,7 +886,18 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
 
-        // Always encode in modern format when writing
+        if isLegacy, let cid {
+            // Written back exactly as read.
+            try container.encode(cid, forKey: .cid)
+            try container.encode(mimeType, forKey: .mimeType)
+            return
+        }
+        guard size >= 0 else {
+            throw EncodingError.invalidValue(
+                size,
+                EncodingError.Context(codingPath: encoder.codingPath, debugDescription: "A blob's size must not be negative")
+            )
+        }
         try container.encode(type, forKey: .type)
         try container.encodeIfPresent(ref, forKey: .ref)
         try container.encode(mimeType, forKey: .mimeType)
@@ -879,6 +920,15 @@ public struct Blob: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
 
     public func toCBORValue() throws -> Any {
         var map = OrderedCBORMap()
+        if isLegacy, let cid {
+            // Written back exactly as read.
+            map.append(key: "cid", value: cid)
+            map.append(key: "mimeType", value: mimeType)
+            return map
+        }
+        guard size >= 0 else {
+            throw DAGCBORError.encodingFailed("A blob's size must not be negative")
+        }
         map.append(key: "$type", value: type) // Assuming 'type' holds the lexicon identifier like "blob"
 
         if let refLink = ref {
@@ -926,7 +976,7 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
             throw DecodingError.dataCorruptedError(
                 forKey: .data,
                 in: container,
-                debugDescription: "String is not canonical RFC 4648 base64"
+                debugDescription: "String is not RFC 4648 base64"
             )
         }
         self.data = data
@@ -947,6 +997,9 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
             return nil
         }
 
+        // Bits of the last character that do not complete a byte are ignored, as RFC 4648
+        // §3.5 permits and every other atproto implementation does: the official interop
+        // vector `lexicon/record-data-valid.json` carries `"$bytes": "123"`.
         let remainder = payload.count % 4
         let canonicalPaddingCount: Int
         switch remainder {
@@ -954,10 +1007,8 @@ public struct Bytes: Codable, ATProtocolCodable, Hashable, Equatable, Sendable {
             canonicalPaddingCount = 0
         case 2:
             canonicalPaddingCount = 2
-            guard let last = sextets.last, last & 0x0F == 0 else { return nil }
         case 3:
             canonicalPaddingCount = 1
-            guard let last = sextets.last, last & 0x03 == 0 else { return nil }
         default:
             return nil
         }

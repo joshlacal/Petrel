@@ -38,9 +38,10 @@ struct EventStreamFrameDecoderTests {
       Issue.record("expected a commit, got \(message)")
       return
     }
-    #expect(commit.commit == Self.cid)
-    #expect(commit.prevData == Self.cid)
-    #expect(commit.ops.first?.cid == Self.cid)
+    // cid-link fields are ATProtoLink ({"$link"} / CBOR tag 42), which wraps the CID.
+    #expect(commit.commit.cid == Self.cid)
+    #expect(commit.prevData?.cid == Self.cid)
+    #expect(commit.ops.first?.cid?.cid == Self.cid)
     #expect(commit.ops.first?.prev == nil)
     #expect(commit.repo.description == Self.did)
     let expectedBlocks = Data([1, 2, 3] as [UInt8])

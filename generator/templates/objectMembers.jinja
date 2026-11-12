@@ -1,0 +1,292 @@
+{#-
+  Members of one generated Lexicon object struct: stored properties, the memberwise
+  initializer, Codable, DAG-CBOR and (optionally) value semantics.
+
+  Every object-shaped struct the generator emits goes through this macro, so the wire
+  rules live in one place:
+
+    ctx.encodes_type     the struct writes its own `$type` (records and named defs)
+    ctx.value_semantics  emit hash / isEqual / == (ATProtocolValue conformers)
+    ctx.lenient          a wire-optional property that fails to decode becomes nil,
+                         unless the decoder runs in strict mode
+    ctx.uses_strict_flag the decoder's strict mode is read (once) into `strict`
+    ctx.server_input     reject an explicit null for an optional, non-nullable property
+    ctx.extra_fields     keep wire fields the Lexicon does not declare and re-emit them
+
+  Property fields come from SwiftCodeGenerator.generate_properties:
+    name   wire name            ident  Swift identifier (keyword-escaped)
+    key    CodingKeys case      var    local variable stem
+    type   Swift type           optional / wire_optional / required_nullable / nullable
+    tri_state  optional AND nullable: absent, null and value are three wire states
+    boxed  stored through IndirectBox to break a reference cycle
+-#}
+{%- macro storage(prop) -%}
+{%- if prop.boxed -%}_{{ prop.ident_bare }}{%- else -%}{{ prop.ident }}{%- endif -%}
+{%- endmacro -%}
+
+{%- macro assign(prop, expression, optional_expression=false) -%}
+{%- if prop.boxed -%}
+{%- if optional_expression -%}
+self._{{ prop.ident_bare }} = ({{ expression }}).map { IndirectBox($0) }
+{%- else -%}
+self._{{ prop.ident_bare }} = IndirectBox({{ expression }})
+{%- endif -%}
+{%- else -%}
+self.{{ prop.ident }} = {{ expression }}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro assign_nil(prop) -%}
+self.{{ storage(prop) }} = nil
+{%- endmacro -%}
+
+{%- macro read(prop, receiver='self') -%}
+{%- if prop.boxed -%}{{ receiver }}._{{ prop.ident_bare }}{% if prop.optional %}?{% endif %}.value{%- else -%}{{ receiver }}.{{ prop.ident }}{%- endif -%}
+{%- endmacro -%}
+
+{%- macro strict_reference(prop) -%}
+try Self.decodeStrictReference({{ prop.type }}.self, from: container, forKey: .{{ prop.key }}, allowedKeys: [{{ prop.strict_allowed_keys_literal }}], expectedTypeIdentifier: {{ prop.strict_type_identifier_literal }})
+{%- endmacro -%}
+
+{%- macro null_guard(prop) -%}
+guard try !container.decodeNil(forKey: .{{ prop.key }}) else {
+    throw DecodingError.valueNotFound(
+        {{ prop.type }}.self,
+        DecodingError.Context(
+            codingPath: container.codingPath,
+            debugDescription: "Property '{{ prop.name | escapeStringLiteral }}' must not be null"
+        )
+    )
+}
+{%- endmacro -%}
+
+{%- macro decode_value(prop, ctx) -%}
+{%- if prop.tri_state -%}
+if container.contains(.{{ prop.key }}) {
+    if try container.decodeNil(forKey: .{{ prop.key }}) {
+        {{ assign(prop, prop.type ~ '.null') }}
+    } else {
+        {{ assign(prop, prop.type ~ '.value(try container.decode(' ~ prop.wrapped_type ~ '.self, forKey: .' ~ prop.key ~ '))') }}
+    }
+} else {
+    {{ assign_nil(prop) }}
+}
+{%- elif ctx.server_input and prop.wire_optional and not prop.nullable -%}
+if container.contains(.{{ prop.key }}) {
+    {{ null_guard(prop) }}
+    {% if prop.strict_decode -%}
+    {{ assign(prop, strict_reference(prop)) }}
+    {%- else -%}
+    {{ assign(prop, 'try container.decode(' ~ prop.type ~ '.self, forKey: .' ~ prop.key ~ ')') }}
+    {%- endif %}
+} else {
+    {{ assign_nil(prop) }}
+}
+{%- elif prop.strict_decode and prop.optional -%}
+if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ prop.key }}) {
+    {{ assign(prop, strict_reference(prop)) }}
+} else {
+    {{ assign_nil(prop) }}
+}
+{%- elif prop.strict_decode -%}
+{{ assign(prop, strict_reference(prop)) }}
+{%- elif prop.wire_optional and not prop.nullable -%}
+{{ assign(prop, 'try container.decodeIfPresent(' ~ prop.type ~ '.self, forKey: .' ~ prop.key ~ ', rejectingNull: strict)', true) }}
+{%- elif prop.optional -%}
+{{ assign(prop, 'try container.decodeIfPresent(' ~ prop.type ~ '.self, forKey: .' ~ prop.key ~ ')', true) }}
+{%- else -%}
+{{ assign(prop, 'try container.decode(' ~ prop.type ~ '.self, forKey: .' ~ prop.key ~ ')') }}
+{%- endif -%}
+{%- endmacro -%}
+
+{%- macro object_members(properties, ctx) %}
+        {%- for prop in properties %}
+        {%- if prop.boxed %}
+        private let _{{ prop.ident_bare }}: IndirectBox<{{ prop.type }}>{% if prop.optional %}?{% endif %}
+        {%- if prop.description %}
+        /// {{ prop.description | escapeComment }}
+        {%- endif %}
+        public var {{ prop.ident }}: {{ prop.type }}{% if prop.optional %}?{% endif %} {
+            _{{ prop.ident_bare }}{% if prop.optional %}?{% endif %}.value
+        }
+        {%- else %}
+        {%- if prop.description %}
+        /// {{ prop.description | escapeComment }}
+        {%- endif %}
+        public let {{ prop.ident }}: {{ prop.type }}{% if prop.optional %}?{% endif %}
+        {%- endif %}
+        {%- endfor %}
+        {%- if ctx.extra_fields %}
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let {{ ctx.extra_name }}: [String: ATProtocolValueContainer]
+        {%- endif %}
+
+        public init(
+            {%- for prop in properties %}
+            {{ prop.ident }}: {{ prop.type }}{% if prop.optional %}?{% if prop.wire_optional %} = nil{% endif %}{% endif %}{% if not loop.last or ctx.extra_fields %},{% endif %}
+            {%- endfor %}
+            {%- if ctx.extra_fields %}
+            {{ ctx.extra_name }}: [String: ATProtocolValueContainer] = [:]
+            {%- endif %}
+        ) {
+            {%- for prop in properties %}
+            {{ assign(prop, prop.ident, prop.optional) }}
+            {%- endfor %}
+            {%- if ctx.extra_fields %}
+            self.{{ ctx.extra_name }} = {{ ctx.extra_name }}
+            {%- endif %}
+        }
+
+        public init(from decoder: Decoder) throws {
+            {%- if properties %}
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            {%- if ctx.uses_strict_flag %}
+            let strict = decoder.isATProtoStrictDecoding
+            {%- endif %}
+            {%- elif not ctx.extra_fields %}
+            _ = try decoder.container(keyedBy: CodingKeys.self)
+            {%- endif %}
+            {%- for prop in properties %}
+            {%- if prop.required_nullable %}
+            guard container.contains(.{{ prop.key }}) else {
+                throw DecodingError.keyNotFound(
+                    CodingKeys.{{ prop.key }},
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Missing required property '{{ prop.name | escapeStringLiteral }}'"
+                    )
+                )
+            }
+            {%- endif %}
+            {%- if ctx.lenient and prop.wire_optional and not prop.strict_decode %}
+            do {
+                {{ decode_value(prop, ctx) }}
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property '{{ prop.name | escapeStringLiteral }}' — degrading to nil: \(error)")
+                {{ assign_nil(prop) }}
+            }
+            {%- else %}
+            {{ decode_value(prop, ctx) }}
+            {%- endif %}
+            {%- endfor %}
+            {%- if ctx.extra_fields %}
+            self.{{ ctx.extra_name }} = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            {%- endif %}
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            {%- if properties or ctx.encodes_type %}
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            {%- else %}
+            _ = encoder.container(keyedBy: CodingKeys.self)
+            {%- endif %}
+            {%- if ctx.encodes_type %}
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            {%- endif %}
+            {%- for prop in properties %}
+            {%- if prop.required_nullable %}
+            try container.encode({{ read(prop) }}, forKey: .{{ prop.key }})
+            {%- elif prop.optional %}
+            try container.encodeIfPresent({{ read(prop) }}, forKey: .{{ prop.key }})
+            {%- else %}
+            try container.encode({{ read(prop) }}, forKey: .{{ prop.key }})
+            {%- endif %}
+            {%- endfor %}
+            {%- if ctx.extra_fields %}
+            try ATProtocolValueContainer.encodeExtraFields({{ ctx.extra_name }}, to: encoder)
+            {%- endif %}
+        }
+        {%- if ctx.value_semantics %}
+
+        public func hash(into hasher: inout Hasher) {
+            {%- for prop in properties %}
+            {%- if prop.optional %}
+            if let value = {{ read(prop) }} {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            {%- else %}
+            hasher.combine({{ read(prop) }})
+            {%- endif %}
+            {%- endfor %}
+            {%- if ctx.extra_fields %}
+            hasher.combine({{ ctx.extra_name }})
+            {%- endif %}
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            {%- if properties or ctx.extra_fields %}
+            guard let other = other as? Self else { return false }
+            {%- for prop in properties %}
+            if {{ read(prop) }} != {{ read(prop, 'other') }} {
+                return false
+            }
+            {%- endfor %}
+            return {% if ctx.extra_fields %}self.{{ ctx.extra_name }} == other.{{ ctx.extra_name }}{% else %}true{% endif %}
+            {%- else %}
+            return other is Self
+            {%- endif %}
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+        {%- endif %}
+
+        public func toCBORValue() throws -> Any {
+            {%- if properties or ctx.encodes_type %}
+            var map = OrderedCBORMap()
+            {%- else %}
+            let map = OrderedCBORMap()
+            {%- endif %}
+            {%- if ctx.encodes_type %}
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            {%- endif %}
+            {%- for prop in properties %}
+            {%- if prop.required_nullable %}
+            if let value = {{ read(prop) }} {
+                let {{ prop.var }}Value = try value.toCBORValue()
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ prop.var }}Value)
+            } else {
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: NSNull())
+            }
+            {%- elif prop.optional %}
+            if let value = {{ read(prop) }} {
+                let {{ prop.var }}Value = try value.toCBORValue()
+                map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ prop.var }}Value)
+            }
+            {%- else %}
+            let {{ prop.var }}Value = try {{ read(prop) }}.toCBORValue()
+            map = map.adding(key: "{{ prop.name | escapeStringLiteral }}", value: {{ prop.var }}Value)
+            {%- endif %}
+            {%- endfor %}
+            {%- if ctx.extra_fields %}
+            return try ATProtocolValueContainer.addingExtraFields({{ ctx.extra_name }}, to: map)
+            {%- else %}
+            return map
+            {%- endif %}
+        }
+        {%- if properties | selectattr('strict_decode') | list %}
+
+        {% include 'strictRefDecoding.jinja' %}
+        {%- endif %}
+        {%- if ctx.extra_fields %}
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type"{% for prop in properties %}, "{{ prop.name | escapeStringLiteral }}"{% endfor %}]
+        {%- endif %}
+
+        private enum CodingKeys: {% if properties or ctx.encodes_type %}String, {% endif %}CodingKey {
+            {%- if ctx.encodes_type %}
+            case typeIdentifier = "$type"
+            {%- endif %}
+            {%- for prop in properties %}
+            case {{ prop.key }}{% if prop.key_needs_raw_value %} = "{{ prop.name | escapeStringLiteral }}"{% endif %}
+            {%- endfor %}
+        }
+{%- endmacro %}

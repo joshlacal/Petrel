@@ -5,13 +5,17 @@ import Foundation
 
 public enum ChatBskyModerationUpdateActorAccess {
     public static let typeIdentifier = "chat.bsky.moderation.updateActorAccess"
+
     public struct Input: ATProtocolCodable {
         public let actor: DID
         public let allowAccess: Bool
         public let ref: String?
 
-        /// Standard public initializer
-        public init(actor: DID, allowAccess: Bool, ref: String? = nil) {
+        public init(
+            actor: DID,
+            allowAccess: Bool,
+            ref: String? = nil
+        ) {
             self.actor = actor
             self.allowAccess = allowAccess
             self.ref = ref
@@ -19,9 +23,10 @@ public enum ChatBskyModerationUpdateActorAccess {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             actor = try container.decode(DID.self, forKey: .actor)
             allowAccess = try container.decode(Bool.self, forKey: .allowAccess)
-            ref = try container.decodeIfPresent(String.self, forKey: .ref)
+            ref = try container.decodeIfPresent(String.self, forKey: .ref, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -55,13 +60,12 @@ public enum ChatBskyModerationUpdateActorAccess {
 public extension ATProtoClient.Chat.Bsky.Moderation {
     // MARK: - updateActorAccess
 
-    //
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Calls `chat.bsky.moderation.updateActorAccess`.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func updateActorAccess(
         input: ChatBskyModerationUpdateActorAccess.Input
 
@@ -87,7 +91,13 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "chat.bsky.moderation.updateActorAccess")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

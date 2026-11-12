@@ -3,20 +3,35 @@ import Foundation
 
 // lexicon: 1, id: site.standard.graph.recommend
 
+/// Record declaring a recommendation of a document.
 public struct SiteStandardGraphRecommend: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "site.standard.graph.recommend"
-    public let createdAt: ATProtocolDate
-    public let document: ATProtocolURI
 
-    public init(createdAt: ATProtocolDate, document: ATProtocolURI) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
+    public let createdAt: ATProtocolDate
+    /// AT-URI reference to the document record being recommended (ex: at://did:plc:abc123/site.standard.document/xyz789).
+    public let document: ATProtocolURI
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        createdAt: ATProtocolDate,
+        document: ATProtocolURI,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.createdAt = createdAt
         self.document = document
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         document = try container.decode(ATProtocolURI.self, forKey: .document)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -24,10 +39,13 @@ public struct SiteStandardGraphRecommend: ATProtocolCodable, ATProtocolValue {
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encode(document, forKey: .document)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(createdAt)
+        hasher.combine(document)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -38,12 +56,11 @@ public struct SiteStandardGraphRecommend: ATProtocolCodable, ATProtocolValue {
         if document != other.document {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(createdAt)
-        hasher.combine(document)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -53,8 +70,10 @@ public struct SiteStandardGraphRecommend: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "createdAt", value: createdAtValue)
         let documentValue = try document.toCBORValue()
         map = map.adding(key: "document", value: documentValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "document"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

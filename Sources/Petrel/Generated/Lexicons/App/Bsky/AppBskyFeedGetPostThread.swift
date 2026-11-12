@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.feed.getPostThread
 
+/// Get posts in a thread. Does not require auth, but additional metadata and filtering will be applied for authed requests.
 public enum AppBskyFeedGetPostThread {
     public static let typeIdentifier = "app.bsky.feed.getPostThread"
+
     public struct Parameters: Parametrizable {
         public let uri: ATProtocolURI
         public let depth: Int?
@@ -23,30 +25,27 @@ public enum AppBskyFeedGetPostThread {
 
     public struct Output: ATProtocolCodable {
         public let thread: OutputThreadUnion
-
         public let threadgate: AppBskyFeedDefs.ThreadgateView?
 
-        /// Standard public initializer
         public init(
             thread: OutputThreadUnion,
-
             threadgate: AppBskyFeedDefs.ThreadgateView? = nil
-
         ) {
             self.thread = thread
-
             self.threadgate = threadgate
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             thread = try container.decode(OutputThreadUnion.self, forKey: .thread)
-
             do {
-                threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate)
+                threadgate = try container.decodeIfPresent(AppBskyFeedDefs.ThreadgateView.self, forKey: .threadgate, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'threadgate' — degrading to nil: \(error)")
                 threadgate = nil
             }
@@ -54,25 +53,18 @@ public enum AppBskyFeedGetPostThread {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(thread, forKey: .thread)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(threadgate, forKey: .threadgate)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let threadValue = try thread.toCBORValue()
             map = map.adding(key: "thread", value: threadValue)
-
             if let value = threadgate {
-                // Encode optional property even if it's an empty array for CBOR
                 let threadgateValue = try value.toCBORValue()
                 map = map.adding(key: "threadgate", value: threadgateValue)
             }
-
             return map
         }
 
@@ -97,6 +89,8 @@ public enum AppBskyFeedGetPostThread {
         case appBskyFeedDefsThreadViewPost(AppBskyFeedDefs.ThreadViewPost)
         case appBskyFeedDefsNotFoundPost(AppBskyFeedDefs.NotFoundPost)
         case appBskyFeedDefsBlockedPost(AppBskyFeedDefs.BlockedPost)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyFeedDefs.ThreadViewPost) {
             self = .appBskyFeedDefsThreadViewPost(value)
@@ -268,9 +262,8 @@ public extension ATProtoClient.App.Bsky.Feed {
     /// Get posts in a thread. Does not require auth, but additional metadata and filtering will be applied for authed requests.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<AppBskyFeedGetPostThread.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getPostThread(input: AppBskyFeedGetPostThread.Parameters) async throws -> (responseCode: Int, data: AppBskyFeedGetPostThread.Output?) {
         let endpoint = "app.bsky.feed.getPostThread"
 
@@ -290,41 +283,23 @@ public extension ATProtoClient.App.Bsky.Feed {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyFeedGetPostThread.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyFeedGetPostThread.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.feed.getPostThread: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyFeedGetPostThread.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyFeedGetPostThread.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

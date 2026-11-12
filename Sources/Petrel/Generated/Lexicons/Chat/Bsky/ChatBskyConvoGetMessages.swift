@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.convo.getMessages
 
+/// Returns a page of messages from a conversation.
 public enum ChatBskyConvoGetMessages {
     public static let typeIdentifier = "chat.bsky.convo.getMessages"
+
     public struct Parameters: Parametrizable {
         public let convoId: String
         public let limit: Int?
@@ -23,44 +25,41 @@ public enum ChatBskyConvoGetMessages {
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-
         public let messages: [OutputMessagesUnion]
-
+        /// Set of all members who authored or reacted to the returned messages. Members referred to by system messages are also included.
         public let relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]?
 
-        /// Standard public initializer
         public init(
             cursor: String? = nil,
-
             messages: [OutputMessagesUnion],
-
             relatedProfiles: [ChatBskyActorDefs.ProfileViewBasic]? = nil
-
         ) {
             self.cursor = cursor
-
             self.messages = messages
-
             self.relatedProfiles = relatedProfiles
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
             messages = try container.decode([OutputMessagesUnion].self, forKey: .messages)
-
             do {
-                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles)
+                relatedProfiles = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .relatedProfiles, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'relatedProfiles' — degrading to nil: \(error)")
                 relatedProfiles = nil
             }
@@ -68,34 +67,23 @@ public enum ChatBskyConvoGetMessages {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
             try container.encode(messages, forKey: .messages)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(relatedProfiles, forKey: .relatedProfiles)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
             let messagesValue = try messages.toCBORValue()
             map = map.adding(key: "messages", value: messagesValue)
-
             if let value = relatedProfiles {
-                // Encode optional property even if it's an empty array for CBOR
                 let relatedProfilesValue = try value.toCBORValue()
                 map = map.adding(key: "relatedProfiles", value: relatedProfilesValue)
             }
-
             return map
         }
 
@@ -121,6 +109,8 @@ public enum ChatBskyConvoGetMessages {
         case chatBskyConvoDefsMessageView(ChatBskyConvoDefs.MessageView)
         case chatBskyConvoDefsDeletedMessageView(ChatBskyConvoDefs.DeletedMessageView)
         case chatBskyConvoDefsSystemMessageView(ChatBskyConvoDefs.SystemMessageView)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ChatBskyConvoDefs.MessageView) {
             self = .chatBskyConvoDefsMessageView(value)
@@ -292,9 +282,8 @@ public extension ATProtoClient.Chat.Bsky.Convo {
     /// Returns a page of messages from a conversation.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ChatBskyConvoGetMessages.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getMessages(input: ChatBskyConvoGetMessages.Parameters) async throws -> (responseCode: Int, data: ChatBskyConvoGetMessages.Output?) {
         let endpoint = "chat.bsky.convo.getMessages"
 
@@ -314,41 +303,23 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ChatBskyConvoGetMessages.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyConvoGetMessages.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.convo.getMessages: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ChatBskyConvoGetMessages.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyConvoGetMessages.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

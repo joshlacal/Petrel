@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.draft.updateDraft
 
+/// Updates a draft using private storage (stash). If the draft ID points to a non-existing ID, the update will be silently ignored. This is done because updates don't enforce draft limit, so it accepts all writes, but will ignore invalid ones. Requires authentication.
 public enum AppBskyDraftUpdateDraft {
     public static let typeIdentifier = "app.bsky.draft.updateDraft"
+
     public struct Input: ATProtocolCodable {
         public let draft: AppBskyDraftDefs.DraftWithId
 
-        /// Standard public initializer
-        public init(draft: AppBskyDraftDefs.DraftWithId) {
+        public init(
+            draft: AppBskyDraftDefs.DraftWithId
+        ) {
             self.draft = draft
         }
 
@@ -39,13 +42,12 @@ public enum AppBskyDraftUpdateDraft {
 public extension ATProtoClient.App.Bsky.Draft {
     // MARK: - updateDraft
 
-    // Updates a draft using private storage (stash). If the draft ID points to a non-existing ID, the update will be silently ignored. This is done because updates don't enforce draft limit, so it accepts all writes, but will ignore invalid ones. Requires authentication.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Updates a draft using private storage (stash). If the draft ID points to a non-existing ID, the update will be silently ignored. This is done because updates don't enforce draft limit, so it accepts all writes, but will ignore invalid ones. Requires authentication.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func updateDraft(
         input: AppBskyDraftUpdateDraft.Input
 
@@ -71,7 +73,13 @@ public extension ATProtoClient.App.Bsky.Draft {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.draft.updateDraft")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

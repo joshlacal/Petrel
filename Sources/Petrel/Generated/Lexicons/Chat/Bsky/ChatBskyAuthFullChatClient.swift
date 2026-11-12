@@ -5,4 +5,18 @@ import Foundation
 
 public enum ChatBskyAuthFullChatClient {
     public static let typeIdentifier = "chat.bsky.authFullChatClient"
+
+    /// The permission set this lexicon declares. Request it as an OAuth scope with
+    /// `permissionSet.includeScope(audience:)`.
+    public static let permissionSet = LexiconPermissionSet(
+        nsid: "chat.bsky.authFullChatClient",
+        title: "Full Chat Client (All Conversations)",
+        titleLang: [:],
+        detail: "Control of all chat conversations and configuration management.",
+        detailLang: [:],
+        permissions: [
+            LexiconPermission(resource: "rpc", parameters: ["lxm": ["chat.bsky.actor.deleteAccount", "chat.bsky.actor.exportAccountData", "chat.bsky.actor.getStatus", "chat.bsky.convo.acceptConvo", "chat.bsky.convo.addReaction", "chat.bsky.convo.deleteMessageForSelf", "chat.bsky.convo.getConvo", "chat.bsky.convo.getConvoAvailability", "chat.bsky.convo.getConvoForMembers", "chat.bsky.convo.getConvoMembers", "chat.bsky.convo.getLog", "chat.bsky.convo.getMessages", "chat.bsky.convo.getUnreadCounts", "chat.bsky.convo.leaveConvo", "chat.bsky.convo.listConvoRequests", "chat.bsky.convo.listConvos", "chat.bsky.convo.lockConvo", "chat.bsky.convo.muteConvo", "chat.bsky.convo.removeReaction", "chat.bsky.convo.sendMessage", "chat.bsky.convo.sendMessageBatch", "chat.bsky.convo.unlockConvo", "chat.bsky.convo.unmuteConvo", "chat.bsky.convo.updateAllRead", "chat.bsky.convo.updateRead", "chat.bsky.group.addMembers", "chat.bsky.group.approveJoinRequest", "chat.bsky.group.createGroup", "chat.bsky.group.createJoinLink", "chat.bsky.group.disableJoinLink", "chat.bsky.group.editGroup", "chat.bsky.group.editJoinLink", "chat.bsky.group.enableJoinLink", "chat.bsky.group.getJoinLinkPreviews", "chat.bsky.group.listJoinRequests", "chat.bsky.group.listMutualGroups", "chat.bsky.group.rejectJoinRequest", "chat.bsky.group.removeMembers", "chat.bsky.group.requestJoin", "chat.bsky.group.updateJoinRequestsRead", "chat.bsky.group.withdrawJoinRequest", "chat.bsky.notification.getPreferences", "chat.bsky.notification.putPreferences"]], inheritAud: true),
+            LexiconPermission(resource: "repo", parameters: ["action": ["create", "update", "delete"], "collection": ["chat.bsky.actor.declaration"]], inheritAud: false),
+        ]
+    )
 }

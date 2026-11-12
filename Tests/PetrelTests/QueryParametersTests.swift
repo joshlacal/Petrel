@@ -70,7 +70,7 @@ struct QueryParametersTests {
     func getBlobQueryParameters() throws {
         let parameters = try ComAtprotoSyncGetBlob.Parameters(
             did: DID(didString: "did:plc:asdf123"),
-            cid: CID.parse(Self.cidString)
+            cid: CIDString(cidString: Self.cidString)
         )
 
         #expect(parameters.asQueryItems() == [
@@ -85,22 +85,22 @@ struct QueryParametersTests {
         let did = try DID(didString: "did:plc:asdf123")
         let uri = try ATProtocolURI(uriString: "at://did:plc:asdf123/app.bsky.feed.post/3jzfcijpj2z2a")
         let cases: [(endpoint: String, name: String, items: [URLQueryItem])] = try [
-            ("com.atproto.sync.getBlob", "cid", ComAtprotoSyncGetBlob.Parameters(did: did, cid: cid).asQueryItems()),
+            ("com.atproto.sync.getBlob", "cid", ComAtprotoSyncGetBlob.Parameters(did: did, cid: CIDString(cid)).asQueryItems()),
             ("com.atproto.space.getBlob", "cid", ComAtprotoSpaceGetBlob.Parameters(
                 space: SpaceRef(uriString: "at://did:plc:asdf123/space/com.example.group/default"),
                 repo: did,
-                cid: cid
+                cid: CIDString(cid)
             ).asQueryItems()),
             ("com.atproto.repo.getRecord", "cid", ComAtprotoRepoGetRecord.Parameters(
                 repo: ATIdentifier(string: "did:plc:asdf123"),
                 collection: NSID(nsidString: "app.bsky.feed.post"),
                 rkey: RecordKey(keyString: "3jzfcijpj2z2a"),
-                cid: cid
+                cid: CIDString(cid)
             ).asQueryItems()),
-            ("app.bsky.feed.getLikes", "cid", AppBskyFeedGetLikes.Parameters(uri: uri, cid: cid).asQueryItems()),
-            ("app.bsky.feed.getQuotes", "cid", AppBskyFeedGetQuotes.Parameters(uri: uri, cid: cid).asQueryItems()),
-            ("app.bsky.feed.getRepostedBy", "cid", AppBskyFeedGetRepostedBy.Parameters(uri: uri, cid: cid).asQueryItems()),
-            ("com.atproto.admin.getSubjectStatus", "blob", ComAtprotoAdminGetSubjectStatus.Parameters(blob: cid).asQueryItems()),
+            ("app.bsky.feed.getLikes", "cid", AppBskyFeedGetLikes.Parameters(uri: uri, cid: CIDString(cid)).asQueryItems()),
+            ("app.bsky.feed.getQuotes", "cid", AppBskyFeedGetQuotes.Parameters(uri: uri, cid: CIDString(cid)).asQueryItems()),
+            ("app.bsky.feed.getRepostedBy", "cid", AppBskyFeedGetRepostedBy.Parameters(uri: uri, cid: CIDString(cid)).asQueryItems()),
+            ("com.atproto.admin.getSubjectStatus", "blob", ComAtprotoAdminGetSubjectStatus.Parameters(blob: CIDString(cid)).asQueryItems()),
         ]
 
         for (endpoint, name, items) in cases {
@@ -132,6 +132,7 @@ struct QueryParametersTests {
         let int: Int
         let bool: Bool
         let cid: CID
+        let cidString: CIDString
         let datetime: ATProtocolDate
         let uri: URI
         let atUri: ATProtocolURI
@@ -153,6 +154,7 @@ struct QueryParametersTests {
             int: 25,
             bool: false,
             cid: CID.parse(Self.cidString),
+            cidString: CIDString(cidString: Self.cidString),
             datetime: #require(ATProtocolDate(iso8601String: "2026-10-01T12:34:56.789Z")),
             uri: URI(uriString: "https://example.com/page"),
             atUri: ATProtocolURI(uriString: "at://did:plc:asdf123/app.bsky.feed.post/3jzfcijpj2z2a"),
@@ -172,6 +174,7 @@ struct QueryParametersTests {
             URLQueryItem(name: "int", value: "25"),
             URLQueryItem(name: "bool", value: "false"),
             URLQueryItem(name: "cid", value: Self.cidString),
+            URLQueryItem(name: "cidString", value: Self.cidString),
             URLQueryItem(name: "datetime", value: "2026-10-01T12:34:56.789Z"),
             URLQueryItem(name: "uri", value: "https://example.com/page"),
             URLQueryItem(name: "atUri", value: "at://did:plc:asdf123/app.bsky.feed.post/3jzfcijpj2z2a"),

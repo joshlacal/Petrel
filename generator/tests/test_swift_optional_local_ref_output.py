@@ -51,7 +51,7 @@ class SwiftOptionalLocalRefOutputTests(unittest.TestCase):
             generated,
         )
         self.assertNotIn("property 'receipt' — degrading to nil", generated)
-        self.assertIn("encodeIfPresent(receipt, forKey: .receipt)", generated)
+        self.assertIn("encodeIfPresent(self.receipt, forKey: .receipt)", generated)
         self.assertIn("case receipt", generated)
 
     def test_required_security_strict_ref_uses_property_scoped_strict_decode(self):

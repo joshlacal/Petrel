@@ -15,22 +15,34 @@ import Foundation
 actor RequestDeduplicator {
     // MARK: - Types
 
-    /// Key for identifying unique requests (only idempotent exact GET/HEAD, partitioned by auth identity)
+    /// Key for identifying unique requests (only idempotent exact GET/HEAD, partitioned by
+    /// auth identity and by request headers)
     struct RequestKey: Hashable, Sendable {
         let authIdentity: String?
         let method: String
         let url: String
+        /// The request's headers as sorted `name:value` pairs, names lowercased. Requests that
+        /// differ in a header the service answers by (`atproto-proxy`,
+        /// `atproto-accept-labelers`, any caller header) are different requests.
+        let headers: [String]
+
+        /// Headers that differ between otherwise identical requests without changing the
+        /// answer: per-request credentials (identity is `authIdentity`) and request ids.
+        static let ignoredHeaderNames: Set<String> = [
+            "authorization", "dpop", "x-catbird-request-id",
+        ]
 
         init?(from request: URLRequest, authIdentity: String? = nil) {
             guard let httpMethod = request.httpMethod else { return nil }
             self.init(
                 method: httpMethod,
                 url: request.url?.absoluteString ?? "",
-                authIdentity: authIdentity ?? request.value(forHTTPHeaderField: "Authorization")
+                authIdentity: authIdentity ?? request.value(forHTTPHeaderField: "Authorization"),
+                headers: request.allHTTPHeaderFields ?? [:]
             )
         }
 
-        init?(method: String, url: String, authIdentity: String? = nil) {
+        init?(method: String, url: String, authIdentity: String? = nil, headers: [String: String] = [:]) {
             guard method == "GET" || method == "HEAD" else {
                 return nil
             }
@@ -40,6 +52,10 @@ actor RequestDeduplicator {
             self.authIdentity = authIdentity
             self.method = method
             self.url = url
+            self.headers = headers.compactMap { name, value in
+                let name = name.lowercased()
+                return Self.ignoredHeaderNames.contains(name) ? nil : "\(name):\(value)"
+            }.sorted()
         }
     }
 

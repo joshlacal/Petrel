@@ -3,15 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.deleteAccount
 
+/// Delete an actor's account with a token and password. Can only be called after requesting a deletion token. Requires auth.
 public enum ComAtprotoServerDeleteAccount {
     public static let typeIdentifier = "com.atproto.server.deleteAccount"
+
     public struct Input: ATProtocolCodable {
         public let did: DID
         public let password: String
         public let token: String
 
-        /// Standard public initializer
-        public init(did: DID, password: String, token: String) {
+        public init(
+            did: DID,
+            password: String,
+            token: String
+        ) {
             self.did = did
             self.password = password
             self.token = token
@@ -65,13 +70,12 @@ public enum ComAtprotoServerDeleteAccount {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - deleteAccount
 
-    // Delete an actor's account with a token and password. Can only be called after requesting a deletion token. Requires auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Delete an actor's account with a token and password. Can only be called after requesting a deletion token. Requires auth.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoServerDeleteAccount.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func deleteAccount(
         input: ComAtprotoServerDeleteAccount.Input
 
@@ -100,14 +104,8 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoServerDeleteAccount.Error.self
-            ) {
-                throw atprotoError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoServerDeleteAccount.Error.self)
         }
 
         return responseCode

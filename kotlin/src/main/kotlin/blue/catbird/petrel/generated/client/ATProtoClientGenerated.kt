@@ -71,88 +71,7 @@ class ATProtoClient(val networkService: NetworkService) {
 
         inner class Bsky {
             val client: ATProtoClient get() = this@ATProtoClient
-            val authCreatePosts: AuthCreatePosts = AuthCreatePosts()
-
-            @Deprecated("Renamed", ReplaceWith("authCreatePosts"))
-            val authcreateposts: AuthCreatePosts get() = authCreatePosts
-
-            inner class AuthCreatePosts {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authDeleteContent: AuthDeleteContent = AuthDeleteContent()
-
-            @Deprecated("Renamed", ReplaceWith("authDeleteContent"))
-            val authdeletecontent: AuthDeleteContent get() = authDeleteContent
-
-            inner class AuthDeleteContent {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authFullApp: AuthFullApp = AuthFullApp()
-
-            @Deprecated("Renamed", ReplaceWith("authFullApp"))
-            val authfullapp: AuthFullApp get() = authFullApp
-
-            inner class AuthFullApp {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authManageFeedDeclarations: AuthManageFeedDeclarations = AuthManageFeedDeclarations()
-
-            @Deprecated("Renamed", ReplaceWith("authManageFeedDeclarations"))
-            val authmanagefeeddeclarations: AuthManageFeedDeclarations get() = authManageFeedDeclarations
-
-            inner class AuthManageFeedDeclarations {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authManageLabelerService: AuthManageLabelerService = AuthManageLabelerService()
-
-            @Deprecated("Renamed", ReplaceWith("authManageLabelerService"))
-            val authmanagelabelerservice: AuthManageLabelerService get() = authManageLabelerService
-
-            inner class AuthManageLabelerService {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authManageModeration: AuthManageModeration = AuthManageModeration()
-
-            @Deprecated("Renamed", ReplaceWith("authManageModeration"))
-            val authmanagemoderation: AuthManageModeration get() = authManageModeration
-
-            inner class AuthManageModeration {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authManageNotifications: AuthManageNotifications = AuthManageNotifications()
-
-            @Deprecated("Renamed", ReplaceWith("authManageNotifications"))
-            val authmanagenotifications: AuthManageNotifications get() = authManageNotifications
-
-            inner class AuthManageNotifications {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authManageProfile: AuthManageProfile = AuthManageProfile()
-
-            @Deprecated("Renamed", ReplaceWith("authManageProfile"))
-            val authmanageprofile: AuthManageProfile get() = authManageProfile
-
-            inner class AuthManageProfile {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val authViewAll: AuthViewAll = AuthViewAll()
-
-            @Deprecated("Renamed", ReplaceWith("authViewAll"))
-            val authviewall: AuthViewAll get() = authViewAll
-
-            inner class AuthViewAll {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val actor: Actor = Actor()
+            val `actor`: Actor = Actor()
 
             inner class Actor {
                 val client: ATProtoClient get() = this@ATProtoClient
@@ -242,16 +161,7 @@ class ATProtoClient(val networkService: NetworkService) {
 
         inner class Bsky {
             val client: ATProtoClient get() = this@ATProtoClient
-            val authFullChatClient: AuthFullChatClient = AuthFullChatClient()
-
-            @Deprecated("Renamed", ReplaceWith("authFullChatClient"))
-            val authfullchatclient: AuthFullChatClient get() = authFullChatClient
-
-            inner class AuthFullChatClient {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val actor: Actor = Actor()
+            val `actor`: Actor = Actor()
 
             inner class Actor {
                 val client: ATProtoClient get() = this@ATProtoClient
@@ -383,9 +293,21 @@ class ATProtoClient(val networkService: NetworkService) {
 
         inner class Germnetwork {
             val client: ATProtoClient get() = this@ATProtoClient
-            val declaration: Declaration = Declaration()
+        }
 
-            inner class Declaration {
+    }
+
+    val network: Network = Network()
+
+    inner class Network {
+        val client: ATProtoClient get() = this@ATProtoClient
+        val bsky: Bsky = Bsky()
+
+        inner class Bsky {
+            val client: ATProtoClient get() = this@ATProtoClient
+            val jetstream: Jetstream = Jetstream()
+
+            inner class Jetstream {
                 val client: ATProtoClient get() = this@ATProtoClient
             }
 
@@ -401,18 +323,6 @@ class ATProtoClient(val networkService: NetworkService) {
 
         inner class Standard {
             val client: ATProtoClient get() = this@ATProtoClient
-            val document: Document = Document()
-
-            inner class Document {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
-            val publication: Publication = Publication()
-
-            inner class Publication {
-                val client: ATProtoClient get() = this@ATProtoClient
-            }
-
             val graph: Graph = Graph()
 
             inner class Graph {

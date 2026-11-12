@@ -1,0 +1,5 @@
+{%- from 'objectMembers.jinja' import object_members -%}
+{% if description %}/// {{ description | escapeComment }}
+{% endif %}public struct {{ name }}: ATProtocolCodable, ATProtocolValue {
+{{ object_members(properties, ctx) }}
+}

@@ -87,13 +87,14 @@ object AppBskyActorProfileLabelsUnionSerializer : kotlinx.serialization.KSeriali
         @SerialName("displayName")
         val displayName: String? = null,/** Free-form profile description text. */        @SerialName("description")
         val description: String? = null,/** Free-form pronouns text. */        @SerialName("pronouns")
-        val pronouns: String? = null,        @SerialName("website")
+        val pronouns: String? = null,/** Deprecated: use links instead. */        @SerialName("website")
         val website: URI? = null,/** Small image to be displayed next to posts from account. AKA, 'profile picture' */        @SerialName("avatar")
         val avatar: Blob? = null,/** Larger horizontal image to display behind profile view. */        @SerialName("banner")
         val banner: Blob? = null,/** Self-label values, specific to the Bluesky application, on the overall account. */        @SerialName("labels")
         val labels: AppBskyActorProfileLabelsUnion? = null,        @SerialName("joinedViaStarterPack")
         val joinedViaStarterPack: ComAtprotoRepoStrongRef? = null,        @SerialName("pinnedPost")
-        val pinnedPost: ComAtprotoRepoStrongRef? = null,        @SerialName("createdAt")
+        val pinnedPost: ComAtprotoRepoStrongRef? = null,/** Links shown on the profile, in display order. Each ref points to an app.bsky.actor.link record in this repo. */        @SerialName("links")
+        val links: List<ComAtprotoRepoStrongRef>? = null,        @SerialName("createdAt")
         val createdAt: ATProtocolDate? = null    ) {
         companion object {
             const val TYPE_IDENTIFIER = ""

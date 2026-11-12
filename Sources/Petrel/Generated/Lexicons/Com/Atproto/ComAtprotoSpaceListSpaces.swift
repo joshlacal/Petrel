@@ -3,37 +3,42 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.listSpaces
 
+/// List the spaces the authenticated user holds a repo in (i.e. spaces the user has written data to) or is the authority of, optionally filtered by type and/or authority DID. Note this is not 'spaces I'm a member of' — a member's PDS only tracks spaces its user has written to. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceListSpaces {
     public static let typeIdentifier = "com.atproto.space.listSpaces"
 
     public struct SpaceView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.listSpaces#spaceView"
+
+        /// URI of the space.
         public let uri: SpaceRef
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: SpaceRef
+            uri: SpaceRef,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                uri = try container.decode(SpaceRef.self, forKey: .uri)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
+            uri = try container.decode(SpaceRef.self, forKey: .uri)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(uri)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -41,7 +46,7 @@ public enum ComAtprotoSpaceListSpaces {
             if uri != other.uri {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -50,14 +55,14 @@ public enum ComAtprotoSpaceListSpaces {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
         }
     }
@@ -83,56 +88,46 @@ public enum ComAtprotoSpaceListSpaces {
 
     public struct Output: ATProtocolCodable {
         public let cursor: String?
-
         public let spaces: [SpaceView]
 
-        /// Standard public initializer
         public init(
             cursor: String? = nil,
-
             spaces: [SpaceView]
-
         ) {
             self.cursor = cursor
-
             self.spaces = spaces
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                cursor = try container.decodeIfPresent(String.self, forKey: .cursor)
+                cursor = try container.decodeIfPresent(String.self, forKey: .cursor, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cursor' — degrading to nil: \(error)")
                 cursor = nil
             }
-
             spaces = try container.decode([SpaceView].self, forKey: .spaces)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(cursor, forKey: .cursor)
-
             try container.encode(spaces, forKey: .spaces)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             if let value = cursor {
-                // Encode optional property even if it's an empty array for CBOR
                 let cursorValue = try value.toCBORValue()
                 map = map.adding(key: "cursor", value: cursorValue)
             }
-
             let spacesValue = try spaces.toCBORValue()
             map = map.adding(key: "spaces", value: spacesValue)
-
             return map
         }
 
@@ -170,9 +165,8 @@ public extension ATProtoClient.Com.Atproto.Space {
     /// List the spaces the authenticated user holds a repo in (i.e. spaces the user has written data to) or is the authority of, optionally filtered by type and/or authority DID. Note this is not 'spaces I'm a member of' — a member's PDS only tracks spaces its user has written to. Requires auth, implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func listSpaces(input: ComAtprotoSpaceListSpaces.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSpaceListSpaces.Output?) {
         let endpoint = "com.atproto.space.listSpaces"
 
@@ -192,36 +186,23 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSpaceListSpaces.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.listSpaces: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSpaceListSpaces.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -414,7 +414,9 @@ object AppBskyEmbedRecordViewRecordEmbedsUnionSerializer : kotlinx.serialization
         val replyCount: Int? = null,        @SerialName("repostCount")
         val repostCount: Int? = null,        @SerialName("likeCount")
         val likeCount: Int? = null,        @SerialName("quoteCount")
-        val quoteCount: Int? = null,        @SerialName("embeds")
+        val quoteCount: Int? = null,/** The 1-indexed position of this post within the contiguous OP thread. Only present when this post is part of the OP thread. */        @SerialName("opThreadPostIndex")
+        val opThreadPostIndex: Int? = null,/** The total number of posts in the contiguous OP thread that this post belongs to. Only present when this post is part of the OP thread. */        @SerialName("opThreadPostCount")
+        val opThreadPostCount: Int? = null,        @SerialName("embeds")
         val embeds: List<AppBskyEmbedRecordViewRecordEmbedsUnion>? = null,        @SerialName("indexedAt")
         val indexedAt: ATProtocolDate    ) {
         companion object {

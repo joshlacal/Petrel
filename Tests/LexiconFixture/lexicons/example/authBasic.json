@@ -1,0 +1,41 @@
+{
+  "lexicon": 1,
+  "id": "com.example.authBasic",
+  "defs": {
+    "main": {
+      "type": "permission-set",
+      "title": "Widget access",
+      "title:es": "Acceso a widgets",
+      "detail": "Read and write widget notes.",
+      "detail:es": "Leer y escribir notas de widgets.",
+      "permissions": [
+        {
+          "type": "permission",
+          "resource": "repo",
+          "collection": [
+            "com.example.widget.note"
+          ],
+          "action": [
+            "create",
+            "update"
+          ]
+        },
+        {
+          "type": "permission",
+          "resource": "rpc",
+          "lxm": [
+            "com.example.widget.uploadThing"
+          ],
+          "inheritAud": true
+        },
+        {
+          "type": "permission",
+          "resource": "hologram",
+          "beam": [
+            "wide"
+          ]
+        }
+      ]
+    }
+  }
+}

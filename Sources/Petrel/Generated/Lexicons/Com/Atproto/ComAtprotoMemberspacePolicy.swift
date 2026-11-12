@@ -3,29 +3,49 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.memberspace.policy
 
+/// Space policy that governs access via a member list maintained by the space host, managed with putMember and removeMember.
 public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.memberspace.policy"
-    public let publicRead: Bool?
-    public let publicWrite: Bool?
-    public let allowedApps: [String]?
-    public let publishPolicy: Bool?
-    public let publishMembers: Bool?
 
-    public init(publicRead: Bool? = nil, publicWrite: Bool? = nil, allowedApps: [String]? = nil, publishPolicy: Bool? = nil, publishMembers: Bool? = nil) {
+    /// If true, the authority issues a space credential to anyone, with or without a delegation token. Otherwise, only to members whose entry has read set.
+    public let publicRead: Bool?
+    /// If true, the authority tracks and forwards notifications for any user's writes. Otherwise, only for members whose entry has write set.
+    public let publicWrite: Bool?
+    /// If set, the authority mints a credential only for these apps, evaluated against the attested client_id. When omitted, any app may read the space and no client attestation is required. Does not apply to writes.
+    public let allowedApps: [String]?
+    /// Publish the policy to readers as a com.atproto.space.policy record in the authority's repo in the space.
+    public let publishPolicy: Bool?
+    /// Publish the member list to readers as com.atproto.memberspace.member records in the authority's repo in the space.
+    public let publishMembers: Bool?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        publicRead: Bool? = nil,
+        publicWrite: Bool? = nil,
+        allowedApps: [String]? = nil,
+        publishPolicy: Bool? = nil,
+        publishMembers: Bool? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.publicRead = publicRead
         self.publicWrite = publicWrite
         self.allowedApps = allowedApps
         self.publishPolicy = publishPolicy
         self.publishMembers = publishMembers
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
-        publicRead = try container.decodeIfPresent(Bool.self, forKey: .publicRead)
-        publicWrite = try container.decodeIfPresent(Bool.self, forKey: .publicWrite)
-        allowedApps = try container.decodeIfPresent([String].self, forKey: .allowedApps)
-        publishPolicy = try container.decodeIfPresent(Bool.self, forKey: .publishPolicy)
-        publishMembers = try container.decodeIfPresent(Bool.self, forKey: .publishMembers)
+        let strict = decoder.isATProtoStrictDecoding
+        publicRead = try container.decodeIfPresent(Bool.self, forKey: .publicRead, rejectingNull: strict)
+        publicWrite = try container.decodeIfPresent(Bool.self, forKey: .publicWrite, rejectingNull: strict)
+        allowedApps = try container.decodeIfPresent([String].self, forKey: .allowedApps, rejectingNull: strict)
+        publishPolicy = try container.decodeIfPresent(Bool.self, forKey: .publishPolicy, rejectingNull: strict)
+        publishMembers = try container.decodeIfPresent(Bool.self, forKey: .publishMembers, rejectingNull: strict)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -35,6 +55,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(allowedApps, forKey: .allowedApps)
         try container.encodeIfPresent(publishPolicy, forKey: .publishPolicy)
         try container.encodeIfPresent(publishMembers, forKey: .publishMembers)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -63,6 +84,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?)
         }
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -82,7 +104,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
         if publishMembers != other.publishMembers {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -111,8 +133,10 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
             let publishMembersValue = try value.toCBORValue()
             map = map.adding(key: "publishMembers", value: publishMembersValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "publicRead", "publicWrite", "allowedApps", "publishPolicy", "publishMembers"]
 
     private enum CodingKeys: String, CodingKey {
         case publicRead

@@ -3,20 +3,36 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.memberspace.member
 
+/// An entry in the member list of a space governed by the memberspace policy, published to readers when the policy's publishMembers is set. Keyed by the member's DID. Written by the space authority's PDS to the authority's own repo in the space, and kept in sync with the member list. Only authoritative in the authority's repo.
 public struct ComAtprotoMemberspaceMember: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.memberspace.member"
-    public let read: Bool
-    public let write: Bool
 
-    public init(read: Bool, write: Bool) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "any")
+
+    /// Whether the member may read when the policy's publicRead is not set.
+    public let read: Bool
+    /// Whether the member's writes are tracked when the policy's publicWrite is not set.
+    public let write: Bool
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        read: Bool,
+        write: Bool,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.read = read
         self.write = write
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         read = try container.decode(Bool.self, forKey: .read)
         write = try container.decode(Bool.self, forKey: .write)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -24,10 +40,13 @@ public struct ComAtprotoMemberspaceMember: ATProtocolCodable, ATProtocolValue {
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(read, forKey: .read)
         try container.encode(write, forKey: .write)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(read)
+        hasher.combine(write)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -38,12 +57,11 @@ public struct ComAtprotoMemberspaceMember: ATProtocolCodable, ATProtocolValue {
         if write != other.write {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(read)
-        hasher.combine(write)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -53,8 +71,10 @@ public struct ComAtprotoMemberspaceMember: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "read", value: readValue)
         let writeValue = try write.toCBORValue()
         map = map.adding(key: "write", value: writeValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "read", "write"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

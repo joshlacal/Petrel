@@ -3,31 +3,44 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.richtext.facet
 
+/// Annotation of a sub-string within rich text.
 public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.richtext.facet"
+
     public let index: ByteSlice
     public let features: [AppBskyRichtextFacetFeaturesUnion]
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(index: ByteSlice, features: [AppBskyRichtextFacetFeaturesUnion]) {
+    public init(
+        index: ByteSlice,
+        features: [AppBskyRichtextFacetFeaturesUnion],
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.index = index
         self.features = features
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         index = try container.decode(ByteSlice.self, forKey: .index)
         features = try container.decode([AppBskyRichtextFacetFeaturesUnion].self, forKey: .features)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(index, forKey: .index)
         try container.encode(features, forKey: .features)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(index)
         hasher.combine(features)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -38,7 +51,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         if features != other.features {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -51,42 +64,48 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "index", value: indexValue)
         let featuresValue = try features.toCBORValue()
         map = map.adding(key: "features", value: featuresValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "index", "features"]
 
     private enum CodingKeys: String, CodingKey {
         case index
         case features
     }
 
+    /// Facet feature for mention of another account. The text is usually a handle, including a '@' prefix, but the facet reference is a DID.
     public struct Mention: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.richtext.facet#mention"
+
         public let did: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            did: DID
+            did: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.did = did
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
+            did = try container.decode(DID.self, forKey: .did)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(did, forKey: .did)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(did)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -94,7 +113,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             if did != other.did {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -103,46 +122,50 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "did"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case did
         }
     }
 
+    /// Facet feature for a URL. The text URL may have been simplified or truncated, but the facet reference should be a complete URL.
     public struct Link: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.richtext.facet#link"
+
         public let uri: URI
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            uri: URI
+            uri: URI,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.uri = uri
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                uri = try container.decode(URI.self, forKey: .uri)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
+            uri = try container.decode(URI.self, forKey: .uri)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(uri, forKey: .uri)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(uri)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -150,7 +173,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             if uri != other.uri {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -159,46 +182,50 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case uri
         }
     }
 
+    /// Facet feature for a hashtag. The text usually includes a '#' prefix, but the facet reference should not (except in the case of 'double hash tags').
     public struct Tag: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.richtext.facet#tag"
+
         public let tag: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            tag: String
+            tag: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.tag = tag
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                tag = try container.decode(String.self, forKey: .tag)
-            } catch {
-                LogManager.logError("Decoding error for required property 'tag': \(error)")
-                throw error
-            }
+            tag = try container.decode(String.self, forKey: .tag)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(tag, forKey: .tag)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(tag)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -206,7 +233,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             if tag != other.tag {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -215,56 +242,56 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let tagValue = try tag.toCBORValue()
             map = map.adding(key: "tag", value: tagValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "tag"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case tag
         }
     }
 
+    /// Specifies the sub-string range a facet feature applies to. Start index is inclusive, end index is exclusive. Indices are zero-indexed, counting bytes of the UTF-8 encoded text. NOTE: some languages, like Javascript, use UTF-16 or Unicode codepoints for string slice indexing; in these languages, convert to byte arrays before working with facets.
     public struct ByteSlice: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.richtext.facet#byteSlice"
+
         public let byteStart: Int
         public let byteEnd: Int
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            byteStart: Int, byteEnd: Int
+            byteStart: Int,
+            byteEnd: Int,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.byteStart = byteStart
             self.byteEnd = byteEnd
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                byteStart = try container.decode(Int.self, forKey: .byteStart)
-            } catch {
-                LogManager.logError("Decoding error for required property 'byteStart': \(error)")
-                throw error
-            }
-            do {
-                byteEnd = try container.decode(Int.self, forKey: .byteEnd)
-            } catch {
-                LogManager.logError("Decoding error for required property 'byteEnd': \(error)")
-                throw error
-            }
+            byteStart = try container.decode(Int.self, forKey: .byteStart)
+            byteEnd = try container.decode(Int.self, forKey: .byteEnd)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(byteStart, forKey: .byteStart)
             try container.encode(byteEnd, forKey: .byteEnd)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(byteStart)
             hasher.combine(byteEnd)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -275,7 +302,7 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
             if byteEnd != other.byteEnd {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -284,16 +311,16 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let byteStartValue = try byteStart.toCBORValue()
             map = map.adding(key: "byteStart", value: byteStartValue)
             let byteEndValue = try byteEnd.toCBORValue()
             map = map.adding(key: "byteEnd", value: byteEndValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "byteStart", "byteEnd"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case byteStart
             case byteEnd
         }
@@ -303,6 +330,8 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
         case appBskyRichtextFacetMention(AppBskyRichtextFacet.Mention)
         case appBskyRichtextFacetLink(AppBskyRichtextFacet.Link)
         case appBskyRichtextFacetTag(AppBskyRichtextFacet.Tag)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: AppBskyRichtextFacet.Mention) {
             self = .appBskyRichtextFacetMention(value)
@@ -446,221 +475,6 @@ public struct AppBskyRichtextFacet: ATProtocolCodable, ATProtocolValue {
                 return map
             case let .appBskyRichtextFacetTag(value):
                 map = map.adding(key: "$type", value: "app.bsky.richtext.facet#tag")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .unexpected(container):
-                return try container.toCBORValue()
-            }
-        }
-    }
-
-    // Union Array Type
-
-    public struct Features: Codable, ATProtocolCodable, ATProtocolValue {
-        public let items: [FeaturesForUnionArray]
-
-        public init(items: [FeaturesForUnionArray]) {
-            self.items = items
-        }
-
-        public init(from decoder: Decoder) throws {
-            var container = try decoder.unkeyedContainer()
-            var items = [FeaturesForUnionArray]()
-            while !container.isAtEnd {
-                let item = try container.decode(FeaturesForUnionArray.self)
-                items.append(item)
-            }
-            self.items = items
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            // Encode the array regardless of whether it's empty
-            var container = encoder.unkeyedContainer()
-            for item in items {
-                try container.encode(item)
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Features else { return false }
-
-            if items != other.items {
-                return false
-            }
-
-            return true
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            // For union arrays, we need to encode each item while preserving its order
-            var itemsArray = [Any]()
-
-            for item in items {
-                let itemValue = try item.toCBORValue()
-                itemsArray.append(itemValue)
-            }
-
-            return itemsArray
-        }
-    }
-
-    public enum FeaturesForUnionArray: Codable, ATProtocolCodable, ATProtocolValue {
-        case mention(Mention)
-        case link(Link)
-        case tag(Tag)
-        case unexpected(ATProtocolValueContainer)
-        public init(_ value: Mention) {
-            self = .mention(value)
-        }
-
-        public init(_ value: Link) {
-            self = .link(value)
-        }
-
-        public init(_ value: Tag) {
-            self = .tag(value)
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            let typeValue = try container.decode(String.self, forKey: .type)
-
-            switch typeValue {
-            case "Mention":
-                let value = try Mention(from: decoder)
-                self = .mention(value)
-            case "Link":
-                let value = try Link(from: decoder)
-                self = .link(value)
-            case "Tag":
-                let value = try Tag(from: decoder)
-                self = .tag(value)
-            default:
-                let unknownValue = try ATProtocolValueContainer(from: decoder)
-                self = .unexpected(unknownValue)
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-
-            switch self {
-            case let .mention(value):
-                try container.encode("Mention", forKey: .type)
-                try value.encode(to: encoder)
-            case let .link(value):
-                try container.encode("Link", forKey: .type)
-                try value.encode(to: encoder)
-            case let .tag(value):
-                try container.encode("Tag", forKey: .type)
-                try value.encode(to: encoder)
-            case let .unexpected(ATProtocolValueContainer):
-                try ATProtocolValueContainer.encode(to: encoder)
-            }
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            switch self {
-            case let .mention(value):
-                hasher.combine("Mention")
-                hasher.combine(value)
-            case let .link(value):
-                hasher.combine("Link")
-                hasher.combine(value)
-            case let .tag(value):
-                hasher.combine("Tag")
-                hasher.combine(value)
-            case let .unexpected(ATProtocolValueContainer):
-                hasher.combine("unexpected")
-                hasher.combine(ATProtocolValueContainer)
-            }
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let otherValue = other as? FeaturesForUnionArray else { return false }
-
-            switch (self, otherValue) {
-            case let (
-                .mention(selfValue),
-                .mention(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .link(selfValue),
-                .link(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (
-                .tag(selfValue),
-                .tag(otherValue)
-            ):
-                return selfValue == otherValue
-            case let (.unexpected(selfValue), .unexpected(otherValue)):
-                return selfValue.isEqual(to: otherValue)
-            default:
-                return false
-            }
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case type = "$type"
-        }
-
-        /// DAGCBOR encoding with field ordering
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-
-            switch self {
-            case let .mention(value):
-                map = map.adding(key: "$type", value: "Mention")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .link(value):
-                map = map.adding(key: "$type", value: "Link")
-
-                let valueDict = try value.toCBORValue()
-
-                // If the value is already an OrderedCBORMap, merge its entries
-                if let orderedMap = valueDict as? OrderedCBORMap {
-                    for (key, value) in orderedMap.entries where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                } else if let dict = valueDict as? [String: Any] {
-                    // Otherwise add each key-value pair from the dictionary
-                    for (key, value) in dict where key != "$type" {
-                        map = map.adding(key: key, value: value)
-                    }
-                }
-                return map
-            case let .tag(value):
-                map = map.adding(key: "$type", value: "Tag")
 
                 let valueDict = try value.toCBORValue()
 

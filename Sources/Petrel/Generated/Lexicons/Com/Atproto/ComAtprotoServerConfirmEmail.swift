@@ -3,14 +3,18 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.confirmEmail
 
+/// Confirm an email using a token from com.atproto.server.requestEmailConfirmation.
 public enum ComAtprotoServerConfirmEmail {
     public static let typeIdentifier = "com.atproto.server.confirmEmail"
+
     public struct Input: ATProtocolCodable {
         public let email: String
         public let token: String
 
-        /// Standard public initializer
-        public init(email: String, token: String) {
+        public init(
+            email: String,
+            token: String
+        ) {
             self.email = email
             self.token = token
         }
@@ -60,13 +64,12 @@ public enum ComAtprotoServerConfirmEmail {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - confirmEmail
 
-    // Confirm an email using a token from com.atproto.server.requestEmailConfirmation.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Confirm an email using a token from com.atproto.server.requestEmailConfirmation.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoServerConfirmEmail.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func confirmEmail(
         input: ComAtprotoServerConfirmEmail.Input
 
@@ -95,14 +98,8 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoServerConfirmEmail.Error.self
-            ) {
-                throw atprotoError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoServerConfirmEmail.Error.self)
         }
 
         return responseCode

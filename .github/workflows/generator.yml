@@ -75,5 +75,5 @@ jobs:
           set -euo pipefail
           Scripts/regenerate-generated.sh
           Scripts/regenerate-generated.sh
-          git diff --exit-code -- Sources/Petrel/Generated
-          test -z "$(git status --porcelain --untracked-files=all -- Sources/Petrel/Generated)"
+          git diff --exit-code -- Sources/Petrel/Generated Sources/PetrelLexicon/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated
+          test -z "$(git status --porcelain --untracked-files=all -- Sources/Petrel/Generated Sources/PetrelLexicon/Generated Sources/PetrelOzone/Generated Tests/LexiconFixture/Generated)"

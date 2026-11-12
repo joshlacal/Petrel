@@ -3,14 +3,18 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.group.addMembers
 
+/// Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
 public enum ChatBskyGroupAddMembers {
     public static let typeIdentifier = "chat.bsky.group.addMembers"
+
     public struct Input: ATProtocolCodable {
         public let convoId: String
         public let members: [DID]
 
-        /// Standard public initializer
-        public init(convoId: String, members: [DID]) {
+        public init(
+            convoId: String,
+            members: [DID]
+        ) {
             self.convoId = convoId
             self.members = members
         }
@@ -44,30 +48,27 @@ public enum ChatBskyGroupAddMembers {
 
     public struct Output: ATProtocolCodable {
         public let convo: ChatBskyConvoDefs.ConvoView
-
         public let addedMembers: [ChatBskyActorDefs.ProfileViewBasic]?
 
-        /// Standard public initializer
         public init(
             convo: ChatBskyConvoDefs.ConvoView,
-
             addedMembers: [ChatBskyActorDefs.ProfileViewBasic]? = nil
-
         ) {
             self.convo = convo
-
             self.addedMembers = addedMembers
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             convo = try container.decode(ChatBskyConvoDefs.ConvoView.self, forKey: .convo)
-
             do {
-                addedMembers = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .addedMembers)
+                addedMembers = try container.decodeIfPresent([ChatBskyActorDefs.ProfileViewBasic].self, forKey: .addedMembers, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'addedMembers' — degrading to nil: \(error)")
                 addedMembers = nil
             }
@@ -75,25 +76,18 @@ public enum ChatBskyGroupAddMembers {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(convo, forKey: .convo)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(addedMembers, forKey: .addedMembers)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let convoValue = try convo.toCBORValue()
             map = map.adding(key: "convo", value: convoValue)
-
             if let value = addedMembers {
-                // Encode optional property even if it's an empty array for CBOR
                 let addedMembersValue = try value.toCBORValue()
                 map = map.adding(key: "addedMembers", value: addedMembersValue)
             }
-
             return map
         }
 
@@ -127,13 +121,12 @@ public enum ChatBskyGroupAddMembers {
 public extension ATProtoClient.Chat.Bsky.Group {
     // MARK: - addMembers
 
-    // Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Adds members to a group. The members are added in 'request' status, so they have to accept it. This creates convo memberships.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ChatBskyGroupAddMembers.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func addMembers(
         input: ChatBskyGroupAddMembers.Input
 
@@ -164,40 +157,23 @@ public extension ATProtoClient.Chat.Bsky.Group {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ChatBskyGroupAddMembers.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ChatBskyGroupAddMembers.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for chat.bsky.group.addMembers: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ChatBskyGroupAddMembers.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ChatBskyGroupAddMembers.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

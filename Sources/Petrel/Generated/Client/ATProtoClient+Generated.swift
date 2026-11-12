@@ -858,151 +858,7 @@ public actor ATProtoClient {
                 self.networkService = networkService
             }
 
-            public var authCreatePosts: AuthCreatePosts {
-                AuthCreatePosts(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authCreatePosts")
-            public var authcreateposts: AuthCreatePosts {
-                authCreatePosts
-            }
-
-            public struct AuthCreatePosts: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var authDeleteContent: AuthDeleteContent {
-                AuthDeleteContent(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authDeleteContent")
-            public var authdeletecontent: AuthDeleteContent {
-                authDeleteContent
-            }
-
-            public struct AuthDeleteContent: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var authFullApp: AuthFullApp {
-                AuthFullApp(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authFullApp")
-            public var authfullapp: AuthFullApp {
-                authFullApp
-            }
-
-            public struct AuthFullApp: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var authManageFeedDeclarations: AuthManageFeedDeclarations {
-                AuthManageFeedDeclarations(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authManageFeedDeclarations")
-            public var authmanagefeeddeclarations: AuthManageFeedDeclarations {
-                authManageFeedDeclarations
-            }
-
-            public struct AuthManageFeedDeclarations: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var authManageLabelerService: AuthManageLabelerService {
-                AuthManageLabelerService(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authManageLabelerService")
-            public var authmanagelabelerservice: AuthManageLabelerService {
-                authManageLabelerService
-            }
-
-            public struct AuthManageLabelerService: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var authManageModeration: AuthManageModeration {
-                AuthManageModeration(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authManageModeration")
-            public var authmanagemoderation: AuthManageModeration {
-                authManageModeration
-            }
-
-            public struct AuthManageModeration: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var authManageNotifications: AuthManageNotifications {
-                AuthManageNotifications(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authManageNotifications")
-            public var authmanagenotifications: AuthManageNotifications {
-                authManageNotifications
-            }
-
-            public struct AuthManageNotifications: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var authManageProfile: AuthManageProfile {
-                AuthManageProfile(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authManageProfile")
-            public var authmanageprofile: AuthManageProfile {
-                authManageProfile
-            }
-
-            public struct AuthManageProfile: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var authViewAll: AuthViewAll {
-                AuthViewAll(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authViewAll")
-            public var authviewall: AuthViewAll {
-                authViewAll
-            }
-
-            public struct AuthViewAll: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var actor: Actor {
+            public var `actor`: Actor {
                 Actor(networkService: networkService)
             }
 
@@ -1167,23 +1023,7 @@ public actor ATProtoClient {
                 self.networkService = networkService
             }
 
-            public var authFullChatClient: AuthFullChatClient {
-                AuthFullChatClient(networkService: networkService)
-            }
-
-            @available(*, deprecated, renamed: "authFullChatClient")
-            public var authfullchatclient: AuthFullChatClient {
-                authFullChatClient
-            }
-
-            public struct AuthFullChatClient: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var actor: Actor {
+            public var `actor`: Actor {
                 Actor(networkService: networkService)
             }
 
@@ -1424,12 +1264,34 @@ public actor ATProtoClient {
             public init(networkService: NetworkService) {
                 self.networkService = networkService
             }
+        }
+    }
 
-            public var declaration: Declaration {
-                Declaration(networkService: networkService)
+    public var network: Network {
+        Network(networkService: networkService)
+    }
+
+    public struct Network: Sendable {
+        public let networkService: NetworkService
+        public init(networkService: NetworkService) {
+            self.networkService = networkService
+        }
+
+        public var bsky: Bsky {
+            Bsky(networkService: networkService)
+        }
+
+        public struct Bsky: Sendable {
+            public let networkService: NetworkService
+            public init(networkService: NetworkService) {
+                self.networkService = networkService
             }
 
-            public struct Declaration: Sendable {
+            public var jetstream: Jetstream {
+                Jetstream(networkService: networkService)
+            }
+
+            public struct Jetstream: Sendable {
                 public let networkService: NetworkService
                 public init(networkService: NetworkService) {
                     self.networkService = networkService
@@ -1456,28 +1318,6 @@ public actor ATProtoClient {
             public let networkService: NetworkService
             public init(networkService: NetworkService) {
                 self.networkService = networkService
-            }
-
-            public var document: Document {
-                Document(networkService: networkService)
-            }
-
-            public struct Document: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
-            }
-
-            public var publication: Publication {
-                Publication(networkService: networkService)
-            }
-
-            public struct Publication: Sendable {
-                public let networkService: NetworkService
-                public init(networkService: NetworkService) {
-                    self.networkService = networkService
-                }
             }
 
             public var graph: Graph {

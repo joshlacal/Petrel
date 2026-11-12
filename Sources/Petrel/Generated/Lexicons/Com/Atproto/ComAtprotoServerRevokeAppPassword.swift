@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.revokeAppPassword
 
+/// Revoke an App Password by name.
 public enum ComAtprotoServerRevokeAppPassword {
     public static let typeIdentifier = "com.atproto.server.revokeAppPassword"
+
     public struct Input: ATProtocolCodable {
         public let name: String
 
-        /// Standard public initializer
-        public init(name: String) {
+        public init(
+            name: String
+        ) {
             self.name = name
         }
 
@@ -39,13 +42,12 @@ public enum ComAtprotoServerRevokeAppPassword {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - revokeAppPassword
 
-    // Revoke an App Password by name.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Revoke an App Password by name.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func revokeAppPassword(
         input: ComAtprotoServerRevokeAppPassword.Input
 
@@ -71,7 +73,13 @@ public extension ATProtoClient.Com.Atproto.Server {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.revokeAppPassword")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

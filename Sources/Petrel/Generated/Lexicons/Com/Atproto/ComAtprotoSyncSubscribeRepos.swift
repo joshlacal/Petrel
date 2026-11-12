@@ -3,26 +3,54 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.sync.subscribeRepos
 
+/// Repository event stream, aka Firehose endpoint. Outputs repo commits with diff data, and identity update events, for all repositories on the current server. See the atproto specifications for details around stream sequencing, repo versioning, CAR diff format, and more. Public and does not require auth; implemented by PDS and Relay.
 public enum ComAtprotoSyncSubscribeRepos {
     public static let typeIdentifier = "com.atproto.sync.subscribeRepos"
 
+    /// Represents an update of repository state. Note that empty commits are allowed, which include no repo data changes, but an update to rev and signature.
     public struct Commit: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.sync.subscribeRepos#commit"
+
+        /// The stream sequence number of this message.
         public let seq: Int
+        /// DEPRECATED -- unused
         public let rebase: Bool
+        /// DEPRECATED -- replaced by #sync event and data limits. Indicates that this commit contained too many ops, or data size was too large. Consumers will need to make a separate request to get missing data.
         public let tooBig: Bool
+        /// The repo this event comes from. Note that all other message types name this field 'did'.
         public let repo: DID
-        public let commit: CID
+        /// Repo commit object CID.
+        public let commit: ATProtoLink
+        /// The rev of the emitted commit. Note that this information is also in the commit object included in blocks, unless this is a tooBig event.
         public let rev: TID
+        /// The rev of the last emitted commit from this repo (if any).
         public let since: TID?
+        /// CAR file containing relevant blocks, as a diff since the previous repo state. The commit must be included as a block, and the commit block CID must be the first entry in the CAR header 'roots' list.
         public let blocks: Bytes
         public let ops: [RepoOp]
-        public let blobs: [CID]
-        public let prevData: CID?
+        public let blobs: [ATProtoLink]
+        /// The root CID of the MST tree for the previous commit from this repo (indicated by the 'since' revision field in this message). Corresponds to the 'data' field in the repo commit object. NOTE: this field is effectively required for the 'inductive' version of firehose.
+        public let prevData: ATProtoLink?
+        /// Timestamp of when this message was originally broadcast.
         public let time: ATProtocolDate
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            seq: Int, rebase: Bool, tooBig: Bool, repo: DID, commit: CID, rev: TID, since: TID?, blocks: Bytes, ops: [RepoOp], blobs: [CID], prevData: CID? = nil, time: ATProtocolDate
+            seq: Int,
+            rebase: Bool,
+            tooBig: Bool,
+            repo: DID,
+            commit: ATProtoLink,
+            rev: TID,
+            since: TID?,
+            blocks: Bytes,
+            ops: [RepoOp],
+            blobs: [ATProtoLink],
+            prevData: ATProtoLink? = nil,
+            time: ATProtocolDate,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.seq = seq
             self.rebase = rebase
@@ -36,98 +64,47 @@ public enum ComAtprotoSyncSubscribeRepos {
             self.blobs = blobs
             self.prevData = prevData
             self.time = time
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                seq = try container.decode(Int.self, forKey: .seq)
-            } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
-                throw error
-            }
-            do {
-                rebase = try container.decode(Bool.self, forKey: .rebase)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rebase': \(error)")
-                throw error
-            }
-            do {
-                tooBig = try container.decode(Bool.self, forKey: .tooBig)
-            } catch {
-                LogManager.logError("Decoding error for required property 'tooBig': \(error)")
-                throw error
-            }
-            do {
-                repo = try container.decode(DID.self, forKey: .repo)
-            } catch {
-                LogManager.logError("Decoding error for required property 'repo': \(error)")
-                throw error
-            }
-            do {
-                commit = try container.decode(CID.self, forKey: .commit)
-            } catch {
-                LogManager.logError("Decoding error for required property 'commit': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(TID.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                guard container.contains(.since) else {
-                    throw DecodingError.keyNotFound(
-                        CodingKeys.since,
-                        DecodingError.Context(
-                            codingPath: container.codingPath,
-                            debugDescription: "Missing required property 'since'"
-                        )
+            let strict = decoder.isATProtoStrictDecoding
+            seq = try container.decode(Int.self, forKey: .seq)
+            rebase = try container.decode(Bool.self, forKey: .rebase)
+            tooBig = try container.decode(Bool.self, forKey: .tooBig)
+            repo = try container.decode(DID.self, forKey: .repo)
+            commit = try container.decode(ATProtoLink.self, forKey: .commit)
+            rev = try container.decode(TID.self, forKey: .rev)
+            guard container.contains(.since) else {
+                throw DecodingError.keyNotFound(
+                    CodingKeys.since,
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Missing required property 'since'"
                     )
-                }
-                since = try container.decodeIfPresent(TID.self, forKey: .since)
-            } catch {
-                LogManager.logError("Decoding error for required property 'since': \(error)")
-                throw error
+                )
             }
+            since = try container.decodeIfPresent(TID.self, forKey: .since)
+            blocks = try container.decode(Bytes.self, forKey: .blocks)
+            ops = try container.decode([RepoOp].self, forKey: .ops)
+            blobs = try container.decode([ATProtoLink].self, forKey: .blobs)
             do {
-                blocks = try container.decode(Bytes.self, forKey: .blocks)
+                prevData = try container.decodeIfPresent(ATProtoLink.self, forKey: .prevData, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'blocks': \(error)")
-                throw error
-            }
-            do {
-                ops = try container.decode([RepoOp].self, forKey: .ops)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ops': \(error)")
-                throw error
-            }
-            do {
-                blobs = try container.decode([CID].self, forKey: .blobs)
-            } catch {
-                LogManager.logError("Decoding error for required property 'blobs': \(error)")
-                throw error
-            }
-            do {
-                prevData = try container.decodeIfPresent(CID.self, forKey: .prevData)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'prevData' — degrading to nil: \(error)")
                 prevData = nil
             }
-            do {
-                time = try container.decode(ATProtocolDate.self, forKey: .time)
-            } catch {
-                LogManager.logError("Decoding error for required property 'time': \(error)")
-                throw error
-            }
+            time = try container.decode(ATProtocolDate.self, forKey: .time)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(seq, forKey: .seq)
             try container.encode(rebase, forKey: .rebase)
             try container.encode(tooBig, forKey: .tooBig)
@@ -140,6 +117,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             try container.encode(blobs, forKey: .blobs)
             try container.encodeIfPresent(prevData, forKey: .prevData)
             try container.encode(time, forKey: .time)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -163,6 +141,7 @@ public enum ComAtprotoSyncSubscribeRepos {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(time)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -203,7 +182,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             if time != other.time {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -212,7 +191,6 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
             map = map.adding(key: "seq", value: seqValue)
             let rebaseValue = try rebase.toCBORValue()
@@ -243,11 +221,12 @@ public enum ComAtprotoSyncSubscribeRepos {
             }
             let timeValue = try time.toCBORValue()
             map = map.adding(key: "time", value: timeValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "rebase", "tooBig", "repo", "commit", "rev", "since", "blocks", "ops", "blobs", "prevData", "time"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case seq
             case rebase
             case tooBig
@@ -263,66 +242,58 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
     }
 
+    /// Updates the repo to a new state, without necessarily including that state on the firehose. Used to recover from broken commit streams, data loss incidents, or in situations where upstream host does not know recent state of the repository.
     public struct Sync: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.sync.subscribeRepos#sync"
+
+        /// The stream sequence number of this message.
         public let seq: Int
+        /// The account this repo event corresponds to. Must match that in the commit object.
         public let did: DID
+        /// CAR file containing the commit, as a block. The CAR header must include the commit block CID as the first 'root'.
         public let blocks: Bytes
+        /// The rev of the commit. This value must match that in the commit object.
         public let rev: String
+        /// Timestamp of when this message was originally broadcast.
         public let time: ATProtocolDate
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            seq: Int, did: DID, blocks: Bytes, rev: String, time: ATProtocolDate
+            seq: Int,
+            did: DID,
+            blocks: Bytes,
+            rev: String,
+            time: ATProtocolDate,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.seq = seq
             self.did = did
             self.blocks = blocks
             self.rev = rev
             self.time = time
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                seq = try container.decode(Int.self, forKey: .seq)
-            } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
-                throw error
-            }
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                blocks = try container.decode(Bytes.self, forKey: .blocks)
-            } catch {
-                LogManager.logError("Decoding error for required property 'blocks': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                time = try container.decode(ATProtocolDate.self, forKey: .time)
-            } catch {
-                LogManager.logError("Decoding error for required property 'time': \(error)")
-                throw error
-            }
+            seq = try container.decode(Int.self, forKey: .seq)
+            did = try container.decode(DID.self, forKey: .did)
+            blocks = try container.decode(Bytes.self, forKey: .blocks)
+            rev = try container.decode(String.self, forKey: .rev)
+            time = try container.decode(ATProtocolDate.self, forKey: .time)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(seq, forKey: .seq)
             try container.encode(did, forKey: .did)
             try container.encode(blocks, forKey: .blocks)
             try container.encode(rev, forKey: .rev)
             try container.encode(time, forKey: .time)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -331,6 +302,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             hasher.combine(blocks)
             hasher.combine(rev)
             hasher.combine(time)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -350,7 +322,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             if time != other.time {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -359,7 +331,6 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
             map = map.adding(key: "seq", value: seqValue)
             let didValue = try did.toCBORValue()
@@ -370,11 +341,12 @@ public enum ComAtprotoSyncSubscribeRepos {
             map = map.adding(key: "rev", value: revValue)
             let timeValue = try time.toCBORValue()
             map = map.adding(key: "time", value: timeValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "did", "blocks", "rev", "time"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case seq
             case did
             case blocks
@@ -383,59 +355,59 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
     }
 
+    /// Represents a change to an account's identity. Could be an updated handle, signing key, or pds hosting endpoint. Serves as a prod to all downstream services to refresh their identity cache.
     public struct Identity: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.sync.subscribeRepos#identity"
+
         public let seq: Int
         public let did: DID
         public let time: ATProtocolDate
+        /// The current handle for the account, or 'handle.invalid' if validation fails. This field is optional, might have been validated or passed-through from an upstream source. Semantics and behaviors for PDS vs Relay may evolve in the future; see atproto specs for more details.
         public let handle: Handle?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            seq: Int, did: DID, time: ATProtocolDate, handle: Handle? = nil
+            seq: Int,
+            did: DID,
+            time: ATProtocolDate,
+            handle: Handle? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.seq = seq
             self.did = did
             self.time = time
             self.handle = handle
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            seq = try container.decode(Int.self, forKey: .seq)
+            did = try container.decode(DID.self, forKey: .did)
+            time = try container.decode(ATProtocolDate.self, forKey: .time)
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                handle = try container.decodeIfPresent(Handle.self, forKey: .handle, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
-                throw error
-            }
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                time = try container.decode(ATProtocolDate.self, forKey: .time)
-            } catch {
-                LogManager.logError("Decoding error for required property 'time': \(error)")
-                throw error
-            }
-            do {
-                handle = try container.decodeIfPresent(Handle.self, forKey: .handle)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'handle' — degrading to nil: \(error)")
                 handle = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(seq, forKey: .seq)
             try container.encode(did, forKey: .did)
             try container.encode(time, forKey: .time)
             try container.encodeIfPresent(handle, forKey: .handle)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -447,6 +419,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -463,7 +436,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             if handle != other.handle {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -472,7 +445,6 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
             map = map.adding(key: "seq", value: seqValue)
             let didValue = try did.toCBORValue()
@@ -483,11 +455,12 @@ public enum ComAtprotoSyncSubscribeRepos {
                 let handleValue = try value.toCBORValue()
                 map = map.adding(key: "handle", value: handleValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "did", "time", "handle"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case seq
             case did
             case time
@@ -495,68 +468,65 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
     }
 
+    /// Represents a change to an account's status on a host (eg, PDS or Relay). The semantics of this event are that the status is at the host which emitted the event, not necessarily that at the currently active PDS. Eg, a Relay takedown would emit a takedown with active=false, even if the PDS is still active.
     public struct Account: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.sync.subscribeRepos#account"
+
         public let seq: Int
         public let did: DID
         public let time: ATProtocolDate
+        /// Indicates that the account has a repository which can be fetched from the host that emitted this event.
         public let active: Bool
+        /// If active=false, this optional field indicates a reason for why the account is not active.
         public let status: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            seq: Int, did: DID, time: ATProtocolDate, active: Bool, status: String? = nil
+            seq: Int,
+            did: DID,
+            time: ATProtocolDate,
+            active: Bool,
+            status: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.seq = seq
             self.did = did
             self.time = time
             self.active = active
             self.status = status
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            seq = try container.decode(Int.self, forKey: .seq)
+            did = try container.decode(DID.self, forKey: .did)
+            time = try container.decode(ATProtocolDate.self, forKey: .time)
+            active = try container.decode(Bool.self, forKey: .active)
             do {
-                seq = try container.decode(Int.self, forKey: .seq)
+                status = try container.decodeIfPresent(String.self, forKey: .status, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'seq': \(error)")
-                throw error
-            }
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                time = try container.decode(ATProtocolDate.self, forKey: .time)
-            } catch {
-                LogManager.logError("Decoding error for required property 'time': \(error)")
-                throw error
-            }
-            do {
-                active = try container.decode(Bool.self, forKey: .active)
-            } catch {
-                LogManager.logError("Decoding error for required property 'active': \(error)")
-                throw error
-            }
-            do {
-                status = try container.decodeIfPresent(String.self, forKey: .status)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
                 status = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(seq, forKey: .seq)
             try container.encode(did, forKey: .did)
             try container.encode(time, forKey: .time)
             try container.encode(active, forKey: .active)
             try container.encodeIfPresent(status, forKey: .status)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -569,6 +539,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -588,7 +559,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             if status != other.status {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -597,7 +568,6 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let seqValue = try seq.toCBORValue()
             map = map.adding(key: "seq", value: seqValue)
             let didValue = try did.toCBORValue()
@@ -610,11 +580,12 @@ public enum ComAtprotoSyncSubscribeRepos {
                 let statusValue = try value.toCBORValue()
                 map = map.adding(key: "status", value: statusValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "did", "time", "active", "status"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case seq
             case did
             case time
@@ -625,39 +596,45 @@ public enum ComAtprotoSyncSubscribeRepos {
 
     public struct Info: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.sync.subscribeRepos#info"
+
         public let name: String
         public let message: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            name: String, message: String? = nil
+            name: String,
+            message: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.name = name
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            name = try container.decode(String.self, forKey: .name)
             do {
-                name = try container.decode(String.self, forKey: .name)
+                message = try container.decodeIfPresent(String.self, forKey: .message, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
-                throw error
-            }
-            do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
                 message = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -667,6 +644,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -677,7 +655,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -686,85 +664,86 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let nameValue = try name.toCBORValue()
             map = map.adding(key: "name", value: nameValue)
             if let value = message {
                 let messageValue = try value.toCBORValue()
                 map = map.adding(key: "message", value: messageValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case name
             case message
         }
     }
 
+    /// A repo operation, ie a mutation of a single record.
     public struct RepoOp: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.sync.subscribeRepos#repoOp"
+
         public let action: String
         public let path: String
-        public let cid: CID?
-        public let prev: CID?
+        /// For creates and updates, the new record CID. For deletions, null.
+        public let cid: ATProtoLink?
+        /// For updates and deletes, the previous record CID (required for inductive firehose). For creations, field should not be defined.
+        public let prev: ATProtoLink?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            action: String, path: String, cid: CID?, prev: CID? = nil
+            action: String,
+            path: String,
+            cid: ATProtoLink?,
+            prev: ATProtoLink? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.action = action
             self.path = path
             self.cid = cid
             self.prev = prev
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                action = try container.decode(String.self, forKey: .action)
-            } catch {
-                LogManager.logError("Decoding error for required property 'action': \(error)")
-                throw error
-            }
-            do {
-                path = try container.decode(String.self, forKey: .path)
-            } catch {
-                LogManager.logError("Decoding error for required property 'path': \(error)")
-                throw error
-            }
-            do {
-                guard container.contains(.cid) else {
-                    throw DecodingError.keyNotFound(
-                        CodingKeys.cid,
-                        DecodingError.Context(
-                            codingPath: container.codingPath,
-                            debugDescription: "Missing required property 'cid'"
-                        )
+            let strict = decoder.isATProtoStrictDecoding
+            action = try container.decode(String.self, forKey: .action)
+            path = try container.decode(String.self, forKey: .path)
+            guard container.contains(.cid) else {
+                throw DecodingError.keyNotFound(
+                    CodingKeys.cid,
+                    DecodingError.Context(
+                        codingPath: container.codingPath,
+                        debugDescription: "Missing required property 'cid'"
                     )
-                }
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
-                throw error
+                )
             }
+            cid = try container.decodeIfPresent(ATProtoLink.self, forKey: .cid)
             do {
-                prev = try container.decodeIfPresent(CID.self, forKey: .prev)
+                prev = try container.decodeIfPresent(ATProtoLink.self, forKey: .prev, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'prev' — degrading to nil: \(error)")
                 prev = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(action, forKey: .action)
             try container.encode(path, forKey: .path)
             try container.encode(cid, forKey: .cid)
             try container.encodeIfPresent(prev, forKey: .prev)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -780,6 +759,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -796,7 +776,7 @@ public enum ComAtprotoSyncSubscribeRepos {
             if prev != other.prev {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -805,7 +785,6 @@ public enum ComAtprotoSyncSubscribeRepos {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actionValue = try action.toCBORValue()
             map = map.adding(key: "action", value: actionValue)
             let pathValue = try path.toCBORValue()
@@ -820,11 +799,12 @@ public enum ComAtprotoSyncSubscribeRepos {
                 let prevValue = try value.toCBORValue()
                 map = map.adding(key: "prev", value: prevValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "action", "path", "cid", "prev"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case action
             case path
             case cid
@@ -842,7 +822,7 @@ public enum ComAtprotoSyncSubscribeRepos {
         }
     }
 
-    public enum Message: Codable, Sendable {
+    public enum Message: Codable, Sendable, XRPCSubscriptionMessage {
         case commit(Commit)
 
         case sync(Sync)
@@ -852,6 +832,20 @@ public enum ComAtprotoSyncSubscribeRepos {
         case account(Account)
 
         case info(Info)
+
+        /// The message types this subscription's Lexicon declares. Frames of any other
+        /// type are skipped by the transport, as the event-stream specification asks.
+        public static let knownMessageTypes: Swift.Set<String> = [
+            "com.atproto.sync.subscribeRepos#commit",
+
+            "com.atproto.sync.subscribeRepos#sync",
+
+            "com.atproto.sync.subscribeRepos#identity",
+
+            "com.atproto.sync.subscribeRepos#account",
+
+            "com.atproto.sync.subscribeRepos#info",
+        ]
 
         enum CodingKeys: String, CodingKey {
             case type = "$type"

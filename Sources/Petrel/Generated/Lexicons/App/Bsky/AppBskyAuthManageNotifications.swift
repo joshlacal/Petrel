@@ -5,4 +5,17 @@ import Foundation
 
 public enum AppBskyAuthManageNotifications {
     public static let typeIdentifier = "app.bsky.authManageNotifications"
+
+    /// The permission set this lexicon declares. Request it as an OAuth scope with
+    /// `permissionSet.includeScope(audience:)`.
+    public static let permissionSet = LexiconPermissionSet(
+        nsid: "app.bsky.authManageNotifications",
+        title: "Manage Bluesky Notifications",
+        titleLang: [:],
+        detail: "View and configure notifications for the Bluesky app.",
+        detailLang: [:],
+        permissions: [
+            LexiconPermission(resource: "rpc", parameters: ["lxm": ["app.bsky.notification.getPreferences", "app.bsky.notification.getGroupedNotifications", "app.bsky.notification.getUnreadCount", "app.bsky.notification.listActivitySubscriptions", "app.bsky.notification.listNotifications", "app.bsky.notification.putActivitySubscription", "app.bsky.notification.putPreferences", "app.bsky.notification.putPreferencesV2", "app.bsky.notification.registerPush", "app.bsky.notification.unregisterPush", "app.bsky.notification.updateSeen"]], inheritAud: true),
+        ]
+    )
 }

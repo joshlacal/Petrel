@@ -3,38 +3,33 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.requestEmailUpdate
 
+/// Request a token in order to update email.
 public enum ComAtprotoServerRequestEmailUpdate {
     public static let typeIdentifier = "com.atproto.server.requestEmailUpdate"
 
     public struct Output: ATProtocolCodable {
         public let tokenRequired: Bool
 
-        /// Standard public initializer
         public init(
             tokenRequired: Bool
-
         ) {
             self.tokenRequired = tokenRequired
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             tokenRequired = try container.decode(Bool.self, forKey: .tokenRequired)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(tokenRequired, forKey: .tokenRequired)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let tokenRequiredValue = try tokenRequired.toCBORValue()
             map = map.adding(key: "tokenRequired", value: tokenRequiredValue)
-
             return map
         }
 
@@ -49,8 +44,8 @@ public extension ATProtoClient.Com.Atproto.Server {
 
     /// Request a token in order to update email.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func requestEmailUpdate(
     ) async throws -> (responseCode: Int, data: ComAtprotoServerRequestEmailUpdate.Output?) {
         let endpoint = "com.atproto.server.requestEmailUpdate"
@@ -74,34 +69,26 @@ public extension ATProtoClient.Com.Atproto.Server {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.requestEmailUpdate")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoServerRequestEmailUpdate.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.requestEmailUpdate: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoServerRequestEmailUpdate.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

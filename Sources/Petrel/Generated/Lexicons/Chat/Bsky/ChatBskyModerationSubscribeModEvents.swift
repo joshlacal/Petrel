@@ -3,20 +3,34 @@ import Foundation
 
 // lexicon: 1, id: chat.bsky.moderation.subscribeModEvents
 
+/// Subscribe to stream of chat events targeted to moderation. Private endpoint.
 public enum ChatBskyModerationSubscribeModEvents {
     public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents"
 
+    /// Fired when the first message was sent on a convo.
     public struct EventConvoFirstMessage: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage"
+
         public let convoId: String
         public let createdAt: ATProtocolDate
         public let messageId: String?
+        /// The list of DIDs message recipients. Does not include the sender, which is in the `user` field
         public let recipients: [DID]
         public let rev: String
+        /// The DID of the message author.
         public let user: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            convoId: String, createdAt: ATProtocolDate, messageId: String? = nil, recipients: [DID], rev: String, user: DID
+            convoId: String,
+            createdAt: ATProtocolDate,
+            messageId: String? = nil,
+            recipients: [DID],
+            rev: String,
+            user: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.convoId = convoId
             self.createdAt = createdAt
@@ -24,59 +38,39 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.recipients = recipients
             self.rev = rev
             self.user = user
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             do {
-                convoId = try container.decode(String.self, forKey: .convoId)
+                messageId = try container.decodeIfPresent(String.self, forKey: .messageId, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                messageId = try container.decodeIfPresent(String.self, forKey: .messageId)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'messageId' — degrading to nil: \(error)")
                 messageId = nil
             }
-            do {
-                recipients = try container.decode([DID].self, forKey: .recipients)
-            } catch {
-                LogManager.logError("Decoding error for required property 'recipients': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                user = try container.decode(DID.self, forKey: .user)
-            } catch {
-                LogManager.logError("Decoding error for required property 'user': \(error)")
-                throw error
-            }
+            recipients = try container.decode([DID].self, forKey: .recipients)
+            rev = try container.decode(String.self, forKey: .rev)
+            user = try container.decode(DID.self, forKey: .user)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(convoId, forKey: .convoId)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encodeIfPresent(messageId, forKey: .messageId)
             try container.encode(recipients, forKey: .recipients)
             try container.encode(rev, forKey: .rev)
             try container.encode(user, forKey: .user)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -90,6 +84,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(recipients)
             hasher.combine(rev)
             hasher.combine(user)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -112,7 +107,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if user != other.user {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -121,7 +116,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let convoIdValue = try convoId.toCBORValue()
             map = map.adding(key: "convoId", value: convoIdValue)
             let createdAtValue = try createdAt.toCBORValue()
@@ -136,11 +130,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "rev", value: revValue)
             let userValue = try user.toCBORValue()
             map = map.adding(key: "user", value: userValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "convoId", "createdAt", "messageId", "recipients", "rev", "user"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case convoId
             case createdAt
             case messageId
@@ -150,20 +145,40 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fire when a group chat is created.
     public struct EventGroupChatCreated: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated"
+
+        /// The DID of the actor performing the action. For this event, same as ownerDid.
         public let actorDid: DID
+        /// When the group was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event.
         public let groupMemberCount: Int
+        /// The name set at creation time.
         public let groupName: String
+        /// DIDs of everyone added at creation time.
         public let initialMemberDids: [DID]
+        /// The DID of the group chat owner.
         public let ownerDid: DID
         public let rev: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, initialMemberDids: [DID], ownerDid: DID, rev: String
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int,
+            groupName: String,
+            initialMemberDids: [DID],
+            ownerDid: DID,
+            rev: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -174,69 +189,25 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.initialMemberDids = initialMemberDids
             self.ownerDid = ownerDid
             self.rev = rev
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
-                throw error
-            }
-            do {
-                groupName = try container.decode(String.self, forKey: .groupName)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupName': \(error)")
-                throw error
-            }
-            do {
-                initialMemberDids = try container.decode([DID].self, forKey: .initialMemberDids)
-            } catch {
-                LogManager.logError("Decoding error for required property 'initialMemberDids': \(error)")
-                throw error
-            }
-            do {
-                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            groupName = try container.decode(String.self, forKey: .groupName)
+            initialMemberDids = try container.decode([DID].self, forKey: .initialMemberDids)
+            ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            rev = try container.decode(String.self, forKey: .rev)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -246,6 +217,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(initialMemberDids, forKey: .initialMemberDids)
             try container.encode(ownerDid, forKey: .ownerDid)
             try container.encode(rev, forKey: .rev)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -258,6 +230,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(initialMemberDids)
             hasher.combine(ownerDid)
             hasher.combine(rev)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -289,7 +262,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if rev != other.rev {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -298,7 +271,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -317,11 +289,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "ownerDid", value: ownerDidValue)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "initialMemberDids", "ownerDid", "rev"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -334,22 +307,45 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a member is added to a group chat. Note that members are added in the 'request' state.
     public struct EventGroupChatMemberAdded: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded"
+
+        /// The DID of the actor performing the action. For this event, same as ownerDid.
         public let actorDid: DID
+        /// When the group was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event.
         public let groupMemberCount: Int
         public let groupName: String
+        /// The DID of the group chat owner.
         public let ownerDid: DID
+        /// The number of members who have not yet accepted the convo.
         public let requestMembersCount: Int
         public let rev: String
+        /// The DID of the member who was added.
         public let subjectDid: DID
+        /// Whether the added member follows the group owner.
         public let subjectFollowsOwner: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, ownerDid: DID, requestMembersCount: Int, rev: String, subjectDid: DID, subjectFollowsOwner: Bool
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int,
+            groupName: String,
+            ownerDid: DID,
+            requestMembersCount: Int,
+            rev: String,
+            subjectDid: DID,
+            subjectFollowsOwner: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -362,81 +358,27 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.rev = rev
             self.subjectDid = subjectDid
             self.subjectFollowsOwner = subjectFollowsOwner
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
-                throw error
-            }
-            do {
-                groupName = try container.decode(String.self, forKey: .groupName)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupName': \(error)")
-                throw error
-            }
-            do {
-                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
-                throw error
-            }
-            do {
-                requestMembersCount = try container.decode(Int.self, forKey: .requestMembersCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'requestMembersCount': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                subjectDid = try container.decode(DID.self, forKey: .subjectDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subjectDid': \(error)")
-                throw error
-            }
-            do {
-                subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subjectFollowsOwner': \(error)")
-                throw error
-            }
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            groupName = try container.decode(String.self, forKey: .groupName)
+            ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            requestMembersCount = try container.decode(Int.self, forKey: .requestMembersCount)
+            rev = try container.decode(String.self, forKey: .rev)
+            subjectDid = try container.decode(DID.self, forKey: .subjectDid)
+            subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -448,6 +390,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(rev, forKey: .rev)
             try container.encode(subjectDid, forKey: .subjectDid)
             try container.encode(subjectFollowsOwner, forKey: .subjectFollowsOwner)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -462,6 +405,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(rev)
             hasher.combine(subjectDid)
             hasher.combine(subjectFollowsOwner)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -499,7 +443,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if subjectFollowsOwner != other.subjectFollowsOwner {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -508,7 +452,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -531,11 +474,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "subjectDid", value: subjectDidValue)
             let subjectFollowsOwnerValue = try subjectFollowsOwner.toCBORValue()
             map = map.adding(key: "subjectFollowsOwner", value: subjectFollowsOwnerValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "ownerDid", "requestMembersCount", "rev", "subjectDid", "subjectFollowsOwner"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -550,21 +494,42 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a member joins a group chat via an join link that does not require approval.
     public struct EventGroupChatMemberJoined: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined"
+
+        /// The DID of the person joining.
         public let actorDid: DID
+        /// When the group was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event.
         public let groupMemberCount: Int
         public let groupName: String
+        /// The code of the join link used to join.
         public let joinLinkCode: String
+        /// The DID of the group chat owner.
         public let ownerDid: DID
         public let rev: String
+        /// Whether the joining member follows the group owner.
         public let subjectFollowsOwner: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, joinLinkCode: String, ownerDid: DID, rev: String, subjectFollowsOwner: Bool
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int,
+            groupName: String,
+            joinLinkCode: String,
+            ownerDid: DID,
+            rev: String,
+            subjectFollowsOwner: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -576,75 +541,26 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.ownerDid = ownerDid
             self.rev = rev
             self.subjectFollowsOwner = subjectFollowsOwner
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
-                throw error
-            }
-            do {
-                groupName = try container.decode(String.self, forKey: .groupName)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupName': \(error)")
-                throw error
-            }
-            do {
-                joinLinkCode = try container.decode(String.self, forKey: .joinLinkCode)
-            } catch {
-                LogManager.logError("Decoding error for required property 'joinLinkCode': \(error)")
-                throw error
-            }
-            do {
-                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subjectFollowsOwner': \(error)")
-                throw error
-            }
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            groupName = try container.decode(String.self, forKey: .groupName)
+            joinLinkCode = try container.decode(String.self, forKey: .joinLinkCode)
+            ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            rev = try container.decode(String.self, forKey: .rev)
+            subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -655,6 +571,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(ownerDid, forKey: .ownerDid)
             try container.encode(rev, forKey: .rev)
             try container.encode(subjectFollowsOwner, forKey: .subjectFollowsOwner)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -668,6 +585,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(ownerDid)
             hasher.combine(rev)
             hasher.combine(subjectFollowsOwner)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -702,7 +620,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if subjectFollowsOwner != other.subjectFollowsOwner {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -711,7 +629,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -732,11 +649,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "rev", value: revValue)
             let subjectFollowsOwnerValue = try subjectFollowsOwner.toCBORValue()
             map = map.adding(key: "subjectFollowsOwner", value: subjectFollowsOwnerValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "joinLinkCode", "ownerDid", "rev", "subjectFollowsOwner"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -750,21 +668,42 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a user requests to join a group chat via an join link that requires approval.
     public struct EventGroupChatJoinRequest: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest"
+
+        /// The DID of the person requesting to join.
         public let actorDid: DID
+        /// When the group was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event.
         public let groupMemberCount: Int
         public let groupName: String
+        /// The code of the join link used to request joining.
         public let joinLinkCode: String
+        /// The DID of the group chat owner.
         public let ownerDid: DID
         public let rev: String
+        /// Whether the requesting member follows the group owner.
         public let subjectFollowsOwner: Bool
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, joinLinkCode: String, ownerDid: DID, rev: String, subjectFollowsOwner: Bool
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int,
+            groupName: String,
+            joinLinkCode: String,
+            ownerDid: DID,
+            rev: String,
+            subjectFollowsOwner: Bool,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -776,75 +715,26 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.ownerDid = ownerDid
             self.rev = rev
             self.subjectFollowsOwner = subjectFollowsOwner
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
-                throw error
-            }
-            do {
-                groupName = try container.decode(String.self, forKey: .groupName)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupName': \(error)")
-                throw error
-            }
-            do {
-                joinLinkCode = try container.decode(String.self, forKey: .joinLinkCode)
-            } catch {
-                LogManager.logError("Decoding error for required property 'joinLinkCode': \(error)")
-                throw error
-            }
-            do {
-                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subjectFollowsOwner': \(error)")
-                throw error
-            }
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            groupName = try container.decode(String.self, forKey: .groupName)
+            joinLinkCode = try container.decode(String.self, forKey: .joinLinkCode)
+            ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            rev = try container.decode(String.self, forKey: .rev)
+            subjectFollowsOwner = try container.decode(Bool.self, forKey: .subjectFollowsOwner)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -855,6 +745,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(ownerDid, forKey: .ownerDid)
             try container.encode(rev, forKey: .rev)
             try container.encode(subjectFollowsOwner, forKey: .subjectFollowsOwner)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -868,6 +759,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(ownerDid)
             hasher.combine(rev)
             hasher.combine(subjectFollowsOwner)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -902,7 +794,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if subjectFollowsOwner != other.subjectFollowsOwner {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -911,7 +803,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -932,11 +823,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "rev", value: revValue)
             let subjectFollowsOwnerValue = try subjectFollowsOwner.toCBORValue()
             map = map.adding(key: "subjectFollowsOwner", value: subjectFollowsOwnerValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "joinLinkCode", "ownerDid", "rev", "subjectFollowsOwner"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -950,20 +842,39 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a join request is approved by the group owner.
     public struct EventGroupChatJoinRequestApproved: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved"
+
+        /// The DID of the owner approving the request.
         public let actorDid: DID
+        /// When the group was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event.
         public let groupMemberCount: Int
         public let groupName: String
+        /// The DID of the group chat owner.
         public let ownerDid: DID
         public let rev: String
+        /// The DID of the member whose request was approved.
         public let subjectDid: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, ownerDid: DID, rev: String, subjectDid: DID
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int,
+            groupName: String,
+            ownerDid: DID,
+            rev: String,
+            subjectDid: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -974,69 +885,25 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.ownerDid = ownerDid
             self.rev = rev
             self.subjectDid = subjectDid
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
-                throw error
-            }
-            do {
-                groupName = try container.decode(String.self, forKey: .groupName)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupName': \(error)")
-                throw error
-            }
-            do {
-                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                subjectDid = try container.decode(DID.self, forKey: .subjectDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subjectDid': \(error)")
-                throw error
-            }
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            groupName = try container.decode(String.self, forKey: .groupName)
+            ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            rev = try container.decode(String.self, forKey: .rev)
+            subjectDid = try container.decode(DID.self, forKey: .subjectDid)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -1046,6 +913,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(ownerDid, forKey: .ownerDid)
             try container.encode(rev, forKey: .rev)
             try container.encode(subjectDid, forKey: .subjectDid)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1058,6 +926,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(ownerDid)
             hasher.combine(rev)
             hasher.combine(subjectDid)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1089,7 +958,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if subjectDid != other.subjectDid {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1098,7 +967,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -1117,11 +985,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "rev", value: revValue)
             let subjectDidValue = try subjectDid.toCBORValue()
             map = map.adding(key: "subjectDid", value: subjectDidValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "ownerDid", "rev", "subjectDid"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -1134,20 +1003,39 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a join request is rejected by the group owner.
     public struct EventGroupChatJoinRequestRejected: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected"
+
+        /// The DID of the owner rejecting the request.
         public let actorDid: DID
+        /// When the group was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event.
         public let groupMemberCount: Int
         public let groupName: String
+        /// The DID of the group chat owner.
         public let ownerDid: DID
         public let rev: String
+        /// The DID of the member whose request was rejected.
         public let subjectDid: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, ownerDid: DID, rev: String, subjectDid: DID
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int,
+            groupName: String,
+            ownerDid: DID,
+            rev: String,
+            subjectDid: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -1158,69 +1046,25 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.ownerDid = ownerDid
             self.rev = rev
             self.subjectDid = subjectDid
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
-                throw error
-            }
-            do {
-                groupName = try container.decode(String.self, forKey: .groupName)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupName': \(error)")
-                throw error
-            }
-            do {
-                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                subjectDid = try container.decode(DID.self, forKey: .subjectDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subjectDid': \(error)")
-                throw error
-            }
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            groupName = try container.decode(String.self, forKey: .groupName)
+            ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            rev = try container.decode(String.self, forKey: .rev)
+            subjectDid = try container.decode(DID.self, forKey: .subjectDid)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -1230,6 +1074,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(ownerDid, forKey: .ownerDid)
             try container.encode(rev, forKey: .rev)
             try container.encode(subjectDid, forKey: .subjectDid)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1242,6 +1087,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(ownerDid)
             hasher.combine(rev)
             hasher.combine(subjectDid)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1273,7 +1119,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if subjectDid != other.subjectDid {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1282,7 +1128,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -1301,11 +1146,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "rev", value: revValue)
             let subjectDidValue = try subjectDid.toCBORValue()
             map = map.adding(key: "subjectDid", value: subjectDidValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "ownerDid", "rev", "subjectDid"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -1318,20 +1164,40 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a user accepts a chat convo, either explicitly or by sending a message.
     public struct EventChatAccepted: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventChatAccepted"
+
+        /// The DID of the person accepting the convo.
         public let actorDid: DID
+        /// When the convo was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event. Only present for group convos.
         public let groupMemberCount: Int?
+        /// The name of the group chat. Only present for group convos.
         public let groupName: String?
+        /// How the convo was accepted.
         public let method: String
+        /// The DID of the group chat owner. Only present for group convos.
         public let ownerDid: DID?
         public let rev: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int? = nil, groupName: String? = nil, method: String, ownerDid: DID? = nil, rev: String
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int? = nil,
+            groupName: String? = nil,
+            method: String,
+            ownerDid: DID? = nil,
+            rev: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -1342,75 +1208,53 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.method = method
             self.ownerDid = ownerDid
             self.rev = rev
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
+                groupMemberCount = try container.decodeIfPresent(Int.self, forKey: .groupMemberCount, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decodeIfPresent(Int.self, forKey: .groupMemberCount)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'groupMemberCount' — degrading to nil: \(error)")
                 groupMemberCount = nil
             }
             do {
-                groupName = try container.decodeIfPresent(String.self, forKey: .groupName)
+                groupName = try container.decodeIfPresent(String.self, forKey: .groupName, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'groupName' — degrading to nil: \(error)")
                 groupName = nil
             }
+            method = try container.decode(String.self, forKey: .method)
             do {
-                method = try container.decode(String.self, forKey: .method)
+                ownerDid = try container.decodeIfPresent(DID.self, forKey: .ownerDid, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'method': \(error)")
-                throw error
-            }
-            do {
-                ownerDid = try container.decodeIfPresent(DID.self, forKey: .ownerDid)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'ownerDid' — degrading to nil: \(error)")
                 ownerDid = nil
             }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
+            rev = try container.decode(String.self, forKey: .rev)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -1420,6 +1264,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(method, forKey: .method)
             try container.encodeIfPresent(ownerDid, forKey: .ownerDid)
             try container.encode(rev, forKey: .rev)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1444,6 +1289,7 @@ public enum ChatBskyModerationSubscribeModEvents {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(rev)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1475,7 +1321,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if rev != other.rev {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1484,7 +1330,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -1509,11 +1354,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             }
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "method", "ownerDid", "rev"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -1526,21 +1372,42 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a member leaves or is removed from a group chat.
     public struct EventGroupChatMemberLeft: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft"
+
+        /// The DID of the actor. For voluntary: the person leaving. For kicked: the owner.
         public let actorDid: DID
+        /// When the group was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event.
         public let groupMemberCount: Int
         public let groupName: String
+        /// How the member left.
         public let leaveMethod: String
+        /// The DID of the group chat owner.
         public let ownerDid: DID
         public let rev: String
+        /// The DID of the member who left or was removed.
         public let subjectDid: DID
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, leaveMethod: String, ownerDid: DID, rev: String, subjectDid: DID
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int,
+            groupName: String,
+            leaveMethod: String,
+            ownerDid: DID,
+            rev: String,
+            subjectDid: DID,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -1552,75 +1419,26 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.ownerDid = ownerDid
             self.rev = rev
             self.subjectDid = subjectDid
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
-                throw error
-            }
-            do {
-                groupName = try container.decode(String.self, forKey: .groupName)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupName': \(error)")
-                throw error
-            }
-            do {
-                leaveMethod = try container.decode(String.self, forKey: .leaveMethod)
-            } catch {
-                LogManager.logError("Decoding error for required property 'leaveMethod': \(error)")
-                throw error
-            }
-            do {
-                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                subjectDid = try container.decode(DID.self, forKey: .subjectDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'subjectDid': \(error)")
-                throw error
-            }
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            groupName = try container.decode(String.self, forKey: .groupName)
+            leaveMethod = try container.decode(String.self, forKey: .leaveMethod)
+            ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            rev = try container.decode(String.self, forKey: .rev)
+            subjectDid = try container.decode(DID.self, forKey: .subjectDid)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -1631,6 +1449,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(ownerDid, forKey: .ownerDid)
             try container.encode(rev, forKey: .rev)
             try container.encode(subjectDid, forKey: .subjectDid)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1644,6 +1463,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(ownerDid)
             hasher.combine(rev)
             hasher.combine(subjectDid)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1678,7 +1498,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if subjectDid != other.subjectDid {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1687,7 +1507,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -1708,11 +1527,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "rev", value: revValue)
             let subjectDidValue = try subjectDid.toCBORValue()
             map = map.adding(key: "subjectDid", value: subjectDidValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "leaveMethod", "ownerDid", "rev", "subjectDid"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -1726,26 +1546,58 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a group chat's metadata or status changes.
     public struct EventGroupChatUpdated: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated"
+
+        /// The DID of the actor performing the action (the owner).
         public let actorDid: DID
+        /// When the group was originally created.
         public let convoCreatedAt: ATProtocolDate
         public let convoId: String
         public let createdAt: ATProtocolDate
+        /// Current member count at the time of the event.
         public let groupMemberCount: Int
+        /// Current group name.
         public let groupName: String
+        /// The code of the join link. Only present when updateType is join-link-related.
         public let joinLinkCode: String?
+        /// Whether the join link is restricted to followers of the owner. Only present when updateType is join-link-related.
         public let joinLinkFollowersOnly: Bool?
+        /// Whether the join link requires owner approval to join. Only present when updateType is join-link-related.
         public let joinLinkRequiresApproval: Bool?
+        /// Why the group was locked. Only present when updateType is 'locked'.
         public let lockReason: String?
+        /// The new group name. Only present when updateType is 'name_changed'.
         public let newName: String?
+        /// The previous group name. Only present when updateType is 'name_changed'.
         public let oldName: String?
+        /// The DID of the group chat owner.
         public let ownerDid: DID
         public let rev: String
+        /// What changed.
         public let updateType: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, convoCreatedAt: ATProtocolDate, convoId: String, createdAt: ATProtocolDate, groupMemberCount: Int, groupName: String, joinLinkCode: String? = nil, joinLinkFollowersOnly: Bool? = nil, joinLinkRequiresApproval: Bool? = nil, lockReason: String? = nil, newName: String? = nil, oldName: String? = nil, ownerDid: DID, rev: String, updateType: String
+            actorDid: DID,
+            convoCreatedAt: ATProtocolDate,
+            convoId: String,
+            createdAt: ATProtocolDate,
+            groupMemberCount: Int,
+            groupName: String,
+            joinLinkCode: String? = nil,
+            joinLinkFollowersOnly: Bool? = nil,
+            joinLinkRequiresApproval: Bool? = nil,
+            lockReason: String? = nil,
+            newName: String? = nil,
+            oldName: String? = nil,
+            ownerDid: DID,
+            rev: String,
+            updateType: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.convoCreatedAt = convoCreatedAt
@@ -1762,117 +1614,86 @@ public enum ChatBskyModerationSubscribeModEvents {
             self.ownerDid = ownerDid
             self.rev = rev
             self.updateType = updateType
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
+            convoId = try container.decode(String.self, forKey: .convoId)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
+            groupName = try container.decode(String.self, forKey: .groupName)
             do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
+                joinLinkCode = try container.decodeIfPresent(String.self, forKey: .joinLinkCode, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                convoCreatedAt = try container.decode(ATProtocolDate.self, forKey: .convoCreatedAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoCreatedAt': \(error)")
-                throw error
-            }
-            do {
-                convoId = try container.decode(String.self, forKey: .convoId)
-            } catch {
-                LogManager.logError("Decoding error for required property 'convoId': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                groupMemberCount = try container.decode(Int.self, forKey: .groupMemberCount)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupMemberCount': \(error)")
-                throw error
-            }
-            do {
-                groupName = try container.decode(String.self, forKey: .groupName)
-            } catch {
-                LogManager.logError("Decoding error for required property 'groupName': \(error)")
-                throw error
-            }
-            do {
-                joinLinkCode = try container.decodeIfPresent(String.self, forKey: .joinLinkCode)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'joinLinkCode' — degrading to nil: \(error)")
                 joinLinkCode = nil
             }
             do {
-                joinLinkFollowersOnly = try container.decodeIfPresent(Bool.self, forKey: .joinLinkFollowersOnly)
+                joinLinkFollowersOnly = try container.decodeIfPresent(Bool.self, forKey: .joinLinkFollowersOnly, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'joinLinkFollowersOnly' — degrading to nil: \(error)")
                 joinLinkFollowersOnly = nil
             }
             do {
-                joinLinkRequiresApproval = try container.decodeIfPresent(Bool.self, forKey: .joinLinkRequiresApproval)
+                joinLinkRequiresApproval = try container.decodeIfPresent(Bool.self, forKey: .joinLinkRequiresApproval, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'joinLinkRequiresApproval' — degrading to nil: \(error)")
                 joinLinkRequiresApproval = nil
             }
             do {
-                lockReason = try container.decodeIfPresent(String.self, forKey: .lockReason)
+                lockReason = try container.decodeIfPresent(String.self, forKey: .lockReason, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'lockReason' — degrading to nil: \(error)")
                 lockReason = nil
             }
             do {
-                newName = try container.decodeIfPresent(String.self, forKey: .newName)
+                newName = try container.decodeIfPresent(String.self, forKey: .newName, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'newName' — degrading to nil: \(error)")
                 newName = nil
             }
             do {
-                oldName = try container.decodeIfPresent(String.self, forKey: .oldName)
+                oldName = try container.decodeIfPresent(String.self, forKey: .oldName, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'oldName' — degrading to nil: \(error)")
                 oldName = nil
             }
-            do {
-                ownerDid = try container.decode(DID.self, forKey: .ownerDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'ownerDid': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
-            do {
-                updateType = try container.decode(String.self, forKey: .updateType)
-            } catch {
-                LogManager.logError("Decoding error for required property 'updateType': \(error)")
-                throw error
-            }
+            ownerDid = try container.decode(DID.self, forKey: .ownerDid)
+            rev = try container.decode(String.self, forKey: .rev)
+            updateType = try container.decode(String.self, forKey: .updateType)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(convoCreatedAt, forKey: .convoCreatedAt)
             try container.encode(convoId, forKey: .convoId)
@@ -1888,6 +1709,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             try container.encode(ownerDid, forKey: .ownerDid)
             try container.encode(rev, forKey: .rev)
             try container.encode(updateType, forKey: .updateType)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1930,6 +1752,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(ownerDid)
             hasher.combine(rev)
             hasher.combine(updateType)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -1979,7 +1802,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if updateType != other.updateType {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -1988,7 +1811,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let convoCreatedAtValue = try convoCreatedAt.toCBORValue()
@@ -2031,11 +1853,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "rev", value: revValue)
             let updateTypeValue = try updateType.toCBORValue()
             map = map.adding(key: "updateType", value: updateTypeValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "convoCreatedAt", "convoId", "createdAt", "groupMemberCount", "groupName", "joinLinkCode", "joinLinkFollowersOnly", "joinLinkRequiresApproval", "lockReason", "newName", "oldName", "ownerDid", "rev", "updateType"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case convoCreatedAt
             case convoId
@@ -2054,57 +1877,50 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
+    /// Fired when a user exceeds a rate limit.
     public struct EventRateLimitExceeded: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded"
+
+        /// The DID of the user who hit the rate limit.
         public let actorDid: DID
         public let createdAt: ATProtocolDate
+        /// The NSID of the endpoint that was rate limited.
         public let endpoint: String
         public let rev: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            actorDid: DID, createdAt: ATProtocolDate, endpoint: String, rev: String
+            actorDid: DID,
+            createdAt: ATProtocolDate,
+            endpoint: String,
+            rev: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.actorDid = actorDid
             self.createdAt = createdAt
             self.endpoint = endpoint
             self.rev = rev
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                actorDid = try container.decode(DID.self, forKey: .actorDid)
-            } catch {
-                LogManager.logError("Decoding error for required property 'actorDid': \(error)")
-                throw error
-            }
-            do {
-                createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
-            } catch {
-                LogManager.logError("Decoding error for required property 'createdAt': \(error)")
-                throw error
-            }
-            do {
-                endpoint = try container.decode(String.self, forKey: .endpoint)
-            } catch {
-                LogManager.logError("Decoding error for required property 'endpoint': \(error)")
-                throw error
-            }
-            do {
-                rev = try container.decode(String.self, forKey: .rev)
-            } catch {
-                LogManager.logError("Decoding error for required property 'rev': \(error)")
-                throw error
-            }
+            actorDid = try container.decode(DID.self, forKey: .actorDid)
+            createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
+            endpoint = try container.decode(String.self, forKey: .endpoint)
+            rev = try container.decode(String.self, forKey: .rev)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(actorDid, forKey: .actorDid)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encode(endpoint, forKey: .endpoint)
             try container.encode(rev, forKey: .rev)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -2112,6 +1928,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             hasher.combine(createdAt)
             hasher.combine(endpoint)
             hasher.combine(rev)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -2128,7 +1945,7 @@ public enum ChatBskyModerationSubscribeModEvents {
             if rev != other.rev {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -2137,7 +1954,6 @@ public enum ChatBskyModerationSubscribeModEvents {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let actorDidValue = try actorDid.toCBORValue()
             map = map.adding(key: "actorDid", value: actorDidValue)
             let createdAtValue = try createdAt.toCBORValue()
@@ -2146,11 +1962,12 @@ public enum ChatBskyModerationSubscribeModEvents {
             map = map.adding(key: "endpoint", value: endpointValue)
             let revValue = try rev.toCBORValue()
             map = map.adding(key: "rev", value: revValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "actorDid", "createdAt", "endpoint", "rev"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case actorDid
             case createdAt
             case endpoint
@@ -2168,7 +1985,7 @@ public enum ChatBskyModerationSubscribeModEvents {
         }
     }
 
-    public enum Message: Codable, Sendable {
+    public enum Message: Codable, Sendable, XRPCSubscriptionMessage {
         case eventConvoFirstMessage(EventConvoFirstMessage)
 
         case eventGroupChatCreated(EventGroupChatCreated)
@@ -2190,6 +2007,32 @@ public enum ChatBskyModerationSubscribeModEvents {
         case eventGroupChatUpdated(EventGroupChatUpdated)
 
         case eventRateLimitExceeded(EventRateLimitExceeded)
+
+        /// The message types this subscription's Lexicon declares. Frames of any other
+        /// type are skipped by the transport, as the event-stream specification asks.
+        public static let knownMessageTypes: Swift.Set<String> = [
+            "chat.bsky.moderation.subscribeModEvents#eventConvoFirstMessage",
+
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatCreated",
+
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberAdded",
+
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberJoined",
+
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequest",
+
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestApproved",
+
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatJoinRequestRejected",
+
+            "chat.bsky.moderation.subscribeModEvents#eventChatAccepted",
+
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatMemberLeft",
+
+            "chat.bsky.moderation.subscribeModEvents#eventGroupChatUpdated",
+
+            "chat.bsky.moderation.subscribeModEvents#eventRateLimitExceeded",
+        ]
 
         enum CodingKeys: String, CodingKey {
             case type = "$type"

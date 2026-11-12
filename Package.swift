@@ -50,9 +50,22 @@ let package = Package(
             name: "PetrelOAuthServer",
             targets: ["PetrelOAuthServer"]
         ),
+        .library(
+            name: "PetrelOzone",
+            targets: ["PetrelOzone"]
+        ),
+        .library(
+            name: "PetrelLexicon",
+            targets: ["PetrelLexicon"]
+        ),
         .executable(
             name: "PetrelLoad",
             targets: ["PetrelLoad"]
+        ),
+        // `swift package petrel-lexgen`: generate Swift types from your own lexicons.
+        .plugin(
+            name: "PetrelLexgen",
+            targets: ["PetrelLexgen"]
         ),
     ],
     dependencies: [
@@ -208,6 +221,25 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        // The tools.ozone lexicons, generated as an overlay on Petrel
+        // (generator/manifests/petrel-ozone.json).
+        .target(
+            name: "PetrelOzone",
+            dependencies: ["Petrel"],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .target(
+            name: "PetrelLexicon",
+            dependencies: [
+                "Petrel",
+                "PetrelCore",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .executableTarget(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
@@ -222,6 +254,24 @@ let package = Package(
             swiftSettings: [
                 .swiftLanguageMode(.v6),
             ]
+        ),
+        .plugin(
+            name: "PetrelLexgen",
+            capability: .command(
+                intent: .custom(
+                    verb: "petrel-lexgen",
+                    description: "Generate Swift types and XRPC calls from Lexicon JSON files"
+                ),
+                permissions: [
+                    .writeToPackageDirectory(
+                        reason: "Writes the generated Swift sources into the output directory the manifest names"
+                    ),
+                    .allowNetworkConnections(
+                        scope: .all(ports: [443]),
+                        reason: "Installs the generator's Python dependencies from PyPI on first use"
+                    ),
+                ]
+            )
         ),
         .testTarget(
             name: "PetrelTests",
@@ -282,8 +332,30 @@ let package = Package(
             ]
         ),
         .testTarget(
+            name: "PetrelLexiconTests",
+            dependencies: ["PetrelLexicon", "Petrel", "PetrelCore"],
+            resources: [.copy("Vectors")]
+        ),
+        .testTarget(
             name: "PetrelLoadTests",
             dependencies: ["PetrelLoad"]
+        ),
+        // A module generated from third-party lexicons with the overlay manifest in
+        // Tests/LexiconFixture/lexgen.json. It is not a product: it exists so that every
+        // build and test run compiles generator output for lexicons Petrel does not ship.
+        // Its test target also covers PetrelOzone, the overlay module that is a product.
+        .target(
+            name: "PetrelLexiconFixture",
+            dependencies: ["Petrel"],
+            path: "Tests/LexiconFixture/Generated",
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
+        .testTarget(
+            name: "PetrelLexiconFixtureTests",
+            dependencies: ["PetrelLexiconFixture", "PetrelOzone", "Petrel"],
+            resources: [.copy("Vectors")]
         ),
     ]
 )

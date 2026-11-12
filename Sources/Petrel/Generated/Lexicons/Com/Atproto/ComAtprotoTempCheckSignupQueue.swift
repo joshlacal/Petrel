@@ -3,49 +3,46 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.temp.checkSignupQueue
 
+/// Check accounts location in signup queue.
 public enum ComAtprotoTempCheckSignupQueue {
     public static let typeIdentifier = "com.atproto.temp.checkSignupQueue"
 
     public struct Output: ATProtocolCodable {
         public let activated: Bool
-
         public let placeInQueue: Int?
-
         public let estimatedTimeMs: Int?
 
-        /// Standard public initializer
         public init(
             activated: Bool,
-
             placeInQueue: Int? = nil,
-
             estimatedTimeMs: Int? = nil
-
         ) {
             self.activated = activated
-
             self.placeInQueue = placeInQueue
-
             self.estimatedTimeMs = estimatedTimeMs
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             activated = try container.decode(Bool.self, forKey: .activated)
-
             do {
-                placeInQueue = try container.decodeIfPresent(Int.self, forKey: .placeInQueue)
+                placeInQueue = try container.decodeIfPresent(Int.self, forKey: .placeInQueue, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'placeInQueue' — degrading to nil: \(error)")
                 placeInQueue = nil
             }
-
             do {
-                estimatedTimeMs = try container.decodeIfPresent(Int.self, forKey: .estimatedTimeMs)
+                estimatedTimeMs = try container.decodeIfPresent(Int.self, forKey: .estimatedTimeMs, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'estimatedTimeMs' — degrading to nil: \(error)")
                 estimatedTimeMs = nil
             }
@@ -53,34 +50,23 @@ public enum ComAtprotoTempCheckSignupQueue {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(activated, forKey: .activated)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(placeInQueue, forKey: .placeInQueue)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(estimatedTimeMs, forKey: .estimatedTimeMs)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let activatedValue = try activated.toCBORValue()
             map = map.adding(key: "activated", value: activatedValue)
-
             if let value = placeInQueue {
-                // Encode optional property even if it's an empty array for CBOR
                 let placeInQueueValue = try value.toCBORValue()
                 map = map.adding(key: "placeInQueue", value: placeInQueueValue)
             }
-
             if let value = estimatedTimeMs {
-                // Encode optional property even if it's an empty array for CBOR
                 let estimatedTimeMsValue = try value.toCBORValue()
                 map = map.adding(key: "estimatedTimeMs", value: estimatedTimeMsValue)
             }
-
             return map
         }
 
@@ -97,8 +83,8 @@ public extension ATProtoClient.Com.Atproto.Temp {
 
     /// Check accounts location in signup queue.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func checkSignupQueue() async throws -> (responseCode: Int, data: ComAtprotoTempCheckSignupQueue.Output?) {
         let endpoint = "com.atproto.temp.checkSignupQueue"
 
@@ -115,35 +101,26 @@ public extension ATProtoClient.Com.Atproto.Temp {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.temp.checkSignupQueue")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoTempCheckSignupQueue.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.temp.checkSignupQueue: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoTempCheckSignupQueue.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

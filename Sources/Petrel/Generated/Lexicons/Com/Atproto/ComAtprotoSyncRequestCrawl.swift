@@ -3,13 +3,17 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.sync.requestCrawl
 
+/// Request a service to persistently crawl hosted repos. Expected use is new PDS instances declaring their existence to Relays. Does not require auth.
 public enum ComAtprotoSyncRequestCrawl {
     public static let typeIdentifier = "com.atproto.sync.requestCrawl"
+
     public struct Input: ATProtocolCodable {
+        /// Hostname of the current service (eg, PDS) that is requesting to be crawled.
         public let hostname: String
 
-        /// Standard public initializer
-        public init(hostname: String) {
+        public init(
+            hostname: String
+        ) {
             self.hostname = hostname
         }
 
@@ -50,13 +54,12 @@ public enum ComAtprotoSyncRequestCrawl {
 public extension ATProtoClient.Com.Atproto.Sync {
     // MARK: - requestCrawl
 
-    // Request a service to persistently crawl hosted repos. Expected use is new PDS instances declaring their existence to Relays. Does not require auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Request a service to persistently crawl hosted repos. Expected use is new PDS instances declaring their existence to Relays. Does not require auth.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoSyncRequestCrawl.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func requestCrawl(
         input: ComAtprotoSyncRequestCrawl.Input
 
@@ -85,14 +88,8 @@ public extension ATProtoClient.Com.Atproto.Sync {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSyncRequestCrawl.Error.self
-            ) {
-                throw atprotoError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSyncRequestCrawl.Error.self)
         }
 
         return responseCode

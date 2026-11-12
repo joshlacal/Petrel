@@ -8,17 +8,32 @@ public enum AppBskyVideoDefs {
 
     public struct JobStatus: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.video.defs#jobStatus"
+
         public let jobId: String
         public let did: DID
+        /// The state of the video processing job. All values not listed as a known value indicate that the job is in process.
         public let state: String
+        /// Progress within the current processing state.
         public let progress: Int?
         public let blob: Blob?
         public let error: String?
+        /// A machine-readable code for why the video processing job failed.
         public let failureCode: String?
         public let message: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            jobId: String, did: DID, state: String, progress: Int? = nil, blob: Blob? = nil, error: String? = nil, failureCode: String? = nil, message: String? = nil
+            jobId: String,
+            did: DID,
+            state: String,
+            progress: Int? = nil,
+            blob: Blob? = nil,
+            error: String? = nil,
+            failureCode: String? = nil,
+            message: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.jobId = jobId
             self.did = did
@@ -28,73 +43,70 @@ public enum AppBskyVideoDefs {
             self.error = error
             self.failureCode = failureCode
             self.message = message
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            jobId = try container.decode(String.self, forKey: .jobId)
+            did = try container.decode(DID.self, forKey: .did)
+            state = try container.decode(String.self, forKey: .state)
             do {
-                jobId = try container.decode(String.self, forKey: .jobId)
+                progress = try container.decodeIfPresent(Int.self, forKey: .progress, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'jobId': \(error)")
-                throw error
-            }
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                state = try container.decode(String.self, forKey: .state)
-            } catch {
-                LogManager.logError("Decoding error for required property 'state': \(error)")
-                throw error
-            }
-            do {
-                progress = try container.decodeIfPresent(Int.self, forKey: .progress)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'progress' — degrading to nil: \(error)")
                 progress = nil
             }
             do {
-                blob = try container.decodeIfPresent(Blob.self, forKey: .blob)
+                blob = try container.decodeIfPresent(Blob.self, forKey: .blob, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'blob' — degrading to nil: \(error)")
                 blob = nil
             }
             do {
-                error = try container.decodeIfPresent(String.self, forKey: .error)
+                error = try container.decodeIfPresent(String.self, forKey: .error, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'error' — degrading to nil: \(error)")
                 self.error = nil
             }
             do {
-                failureCode = try container.decodeIfPresent(String.self, forKey: .failureCode)
+                failureCode = try container.decodeIfPresent(String.self, forKey: .failureCode, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'failureCode' — degrading to nil: \(error)")
                 failureCode = nil
             }
             do {
-                message = try container.decodeIfPresent(String.self, forKey: .message)
+                message = try container.decodeIfPresent(String.self, forKey: .message, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
                 message = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(jobId, forKey: .jobId)
             try container.encode(did, forKey: .did)
             try container.encode(state, forKey: .state)
@@ -103,6 +115,7 @@ public enum AppBskyVideoDefs {
             try container.encodeIfPresent(error, forKey: .error)
             try container.encodeIfPresent(failureCode, forKey: .failureCode)
             try container.encodeIfPresent(message, forKey: .message)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -134,6 +147,7 @@ public enum AppBskyVideoDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -162,7 +176,7 @@ public enum AppBskyVideoDefs {
             if message != other.message {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -171,7 +185,6 @@ public enum AppBskyVideoDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let jobIdValue = try jobId.toCBORValue()
             map = map.adding(key: "jobId", value: jobIdValue)
             let didValue = try did.toCBORValue()
@@ -198,11 +211,12 @@ public enum AppBskyVideoDefs {
                 let messageValue = try value.toCBORValue()
                 map = map.adding(key: "message", value: messageValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "jobId", "did", "state", "progress", "blob", "error", "failureCode", "message"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case jobId
             case did
             case state

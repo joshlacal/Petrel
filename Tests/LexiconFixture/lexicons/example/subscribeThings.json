@@ -1,0 +1,59 @@
+{
+  "lexicon": 1,
+  "id": "com.example.widget.subscribeThings",
+  "defs": {
+    "main": {
+      "type": "subscription",
+      "description": "An event stream.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "cursor": {
+            "type": "integer"
+          }
+        }
+      },
+      "message": {
+        "schema": {
+          "type": "union",
+          "refs": [
+            "#created",
+            "#deleted"
+          ]
+        }
+      },
+      "errors": [
+        {
+          "name": "FutureCursor"
+        }
+      ]
+    },
+    "created": {
+      "type": "object",
+      "required": [
+        "seq",
+        "gadget"
+      ],
+      "properties": {
+        "seq": {
+          "type": "integer"
+        },
+        "gadget": {
+          "type": "ref",
+          "ref": "com.example.widget.defs#gadgetRef"
+        }
+      }
+    },
+    "deleted": {
+      "type": "object",
+      "required": [
+        "seq"
+      ],
+      "properties": {
+        "seq": {
+          "type": "integer"
+        }
+      }
+    }
+  }
+}

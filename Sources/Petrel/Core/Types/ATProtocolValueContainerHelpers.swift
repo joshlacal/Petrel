@@ -846,3 +846,133 @@ public struct ATProtocolValueContainerDecoder: Decoder {
         }
     }
 }
+
+// MARK: - Undeclared fields
+
+/// A coding key for any string, used to read and write fields a Lexicon does not declare.
+private struct UndeclaredFieldKey: CodingKey {
+    let stringValue: String
+    let intValue: Int? = nil
+
+    init(_ stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(stringValue: String) {
+        self.stringValue = stringValue
+    }
+
+    init?(intValue _: Int) {
+        nil
+    }
+}
+
+public extension ATProtocolValueContainer {
+    /// Reads the fields of the object being decoded that are not in `knownKeys`.
+    ///
+    /// Generated object and record types call this from `init(from:)` and keep the result
+    /// in `extraFields`. The Lexicon specification allows data to carry fields a schema
+    /// does not declare (a newer revision of the Lexicon, or an extension) and asks
+    /// implementations not to drop them when they write the data back.
+    ///
+    /// - Parameters:
+    ///   - decoder: The decoder positioned at the object.
+    ///   - knownKeys: The wire names the type decodes itself, plus `$type`.
+    static func decodeExtraFields(
+        from decoder: Decoder,
+        knownKeys: Set<String>
+    ) throws -> [String: ATProtocolValueContainer] {
+        let container = try decoder.container(keyedBy: UndeclaredFieldKey.self)
+        var fields: [String: ATProtocolValueContainer] = [:]
+        for key in container.allKeys where !knownKeys.contains(key.stringValue) {
+            fields[key.stringValue] = try container.decode(ATProtocolValueContainer.self, forKey: key)
+        }
+        return fields
+    }
+
+    /// Writes undeclared fields next to the fields the type encoded itself.
+    static func encodeExtraFields(
+        _ fields: [String: ATProtocolValueContainer],
+        to encoder: Encoder
+    ) throws {
+        guard !fields.isEmpty else { return }
+        var container = encoder.container(keyedBy: UndeclaredFieldKey.self)
+        for (name, value) in fields.sorted(by: { $0.key < $1.key }) {
+            try container.encode(value, forKey: UndeclaredFieldKey(name))
+        }
+    }
+
+    /// Adds undeclared fields to the DAG-CBOR map of an object. The canonical key order
+    /// is applied when the map is encoded.
+    static func addingExtraFields(
+        _ fields: [String: ATProtocolValueContainer],
+        to map: OrderedCBORMap
+    ) throws -> OrderedCBORMap {
+        guard !fields.isEmpty else { return map }
+        var result = map
+        for (name, value) in fields.sorted(by: { $0.key < $1.key }) {
+            result = try result.adding(key: name, value: value.toCBORValue())
+        }
+        return result
+    }
+}
+
+// MARK: - Strict decoding
+
+public extension CodingUserInfoKey {
+    /// Set to `true` in a decoder's `userInfo` to make generated types reject malformed
+    /// optional fields instead of dropping them. See ``ATProtoDecoding``.
+    static var atprotoStrictDecoding: CodingUserInfoKey {
+        // The raw value is a non-empty literal, so the failable initializer cannot fail.
+        CodingUserInfoKey(rawValue: "blue.catbird.petrel.atprotoStrictDecoding")!
+    }
+}
+
+public extension Decoder {
+    /// Whether this decoder was configured for strict Lexicon decoding.
+    var isATProtoStrictDecoding: Bool {
+        userInfo[.atprotoStrictDecoding] as? Bool ?? false
+    }
+}
+
+public extension KeyedDecodingContainer {
+    /// `decodeIfPresent`, except that an explicit `null` is an error when `rejectingNull`
+    /// is true.
+    ///
+    /// Generated types use it for optional properties that are not nullable. Lexicon
+    /// distinguishes "absent" from `null`, and only a property listed in `nullable` may be
+    /// `null`; strict decoders enforce that, the default treats the two alike.
+    func decodeIfPresent<T: Decodable>(_ type: T.Type, forKey key: Key, rejectingNull: Bool) throws -> T? {
+        if rejectingNull, contains(key), try decodeNil(forKey: key) {
+            throw DecodingError.valueNotFound(
+                type,
+                DecodingError.Context(
+                    codingPath: codingPath + [key],
+                    debugDescription: "Property '\(key.stringValue)' is not nullable and must not be null"
+                )
+            )
+        }
+        return try decodeIfPresent(type, forKey: key)
+    }
+}
+
+/// Decoding entry points for generated Lexicon types.
+///
+/// By default a generated record, object or response tolerates two kinds of invalid data:
+/// an *optional* property whose value does not match the schema is dropped (and logged),
+/// and an explicit `null` for an optional property that is not nullable is read as
+/// absent. One malformed field in a feed therefore does not make the whole response
+/// undecodable. The Lexicon specification is stricter — data that fails validation is
+/// invalid as a whole — and ``strictJSONDecoder()`` applies that rule:
+///
+/// ```swift
+/// let post = try ATProtoDecoding.strictJSONDecoder().decode(AppBskyFeedPost.self, from: data)
+/// ```
+public enum ATProtoDecoding {
+    /// A `JSONDecoder` that fails on any property that does not match its Lexicon schema.
+    public static func strictJSONDecoder() -> JSONDecoder {
+        let decoder = JSONDecoder()
+        decoder.userInfo[.atprotoStrictDecoding] = true
+        return decoder
+    }
+}

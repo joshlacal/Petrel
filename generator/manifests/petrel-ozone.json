@@ -1,0 +1,14 @@
+{
+  "$comment": "Generation manifest for the PetrelOzone product: the tools.ozone moderation-service lexicons, generated as an overlay on the core Petrel module. Paths are relative to the repo root (the directory run.py is invoked from).",
+  "package": {
+    "kind": "overlay",
+    "name": "PetrelOzone"
+  },
+  "lexicons": {
+    "emit": ["generator/lexicons/tools"],
+    "reference": ["petrel:core"]
+  },
+  "swift": {
+    "output": "Sources/PetrelOzone/Generated"
+  }
+}

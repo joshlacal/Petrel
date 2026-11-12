@@ -3,31 +3,44 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.repo.strongRef
 
+/// A URI with a content-hash fingerprint.
 public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.repo.strongRef"
-    public let uri: ATProtocolURI
-    public let cid: CID
 
-    public init(uri: ATProtocolURI, cid: CID) {
+    public let uri: ATProtocolURI
+    public let cid: CIDString
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        uri: ATProtocolURI,
+        cid: CIDString,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.uri = uri
         self.cid = cid
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-        cid = try container.decode(CID.self, forKey: .cid)
+        cid = try container.decode(CIDString.self, forKey: .cid)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(uri, forKey: .uri)
         try container.encode(cid, forKey: .cid)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
         hasher.combine(uri)
         hasher.combine(cid)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -38,7 +51,7 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
         if cid != other.cid {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -51,8 +64,10 @@ public struct ComAtprotoRepoStrongRef: ATProtocolCodable, ATProtocolValue {
         map = map.adding(key: "uri", value: uriValue)
         let cidValue = try cid.toCBORValue()
         map = map.adding(key: "cid", value: cidValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid"]
 
     private enum CodingKeys: String, CodingKey {
         case uri

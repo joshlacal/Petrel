@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.video.uploadPart
 
+/// Upload one part. Parts are idempotent and may be retried or re-sent while the session is created. Each expected length is derived from the upload size and part size, and Content-Length must match exactly. ETags are never exposed to clients.
 public enum AppBskyVideoUploadPart {
     public static let typeIdentifier = "app.bsky.video.uploadPart"
+
     public struct Parameters: Parametrizable {
         public let jobId: String
         public let partNumber: Int
@@ -21,8 +23,9 @@ public enum AppBskyVideoUploadPart {
     public struct Input: ATProtocolCodable {
         public let data: Data
 
-        /// Standard public initializer
-        public init(data: Data) {
+        public init(
+            data: Data
+        ) {
             self.data = data
         }
 
@@ -50,46 +53,34 @@ public enum AppBskyVideoUploadPart {
 
     public struct Output: ATProtocolCodable {
         public let partNumber: Int
-
         public let sizeBytes: Int
 
-        /// Standard public initializer
         public init(
             partNumber: Int,
-
             sizeBytes: Int
-
         ) {
             self.partNumber = partNumber
-
             self.sizeBytes = sizeBytes
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             partNumber = try container.decode(Int.self, forKey: .partNumber)
-
             sizeBytes = try container.decode(Int.self, forKey: .sizeBytes)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(partNumber, forKey: .partNumber)
-
             try container.encode(sizeBytes, forKey: .sizeBytes)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let partNumberValue = try partNumber.toCBORValue()
             map = map.adding(key: "partNumber", value: partNumberValue)
-
             let sizeBytesValue = try sizeBytes.toCBORValue()
             map = map.adding(key: "sizeBytes", value: sizeBytesValue)
-
             return map
         }
 
@@ -133,11 +124,11 @@ public extension ATProtoClient.App.Bsky.Video {
 
     /// Upload one part. Parts are idempotent and may be retried or re-sent while the session is created. Each expected length is derived from the upload size and part size, and Content-Length must match exactly. ETags are never exposed to clients.
     ///
-    /// - Parameter data: The binary data to upload
-    /// - Parameter params: The query parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - data: The request body bytes
+    ///   - params: The query parameters for the request
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<AppBskyVideoUploadPart.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func uploadPart(
         data: Data,
         params: AppBskyVideoUploadPart.Parameters
@@ -145,10 +136,9 @@ public extension ATProtoClient.App.Bsky.Video {
     ) async throws -> (responseCode: Int, data: AppBskyVideoUploadPart.Output?) {
         let endpoint = "app.bsky.video.uploadPart"
 
-        let dataToUpload = data
         var headers: [String: String] = [
             "Content-Type": "application/octet-stream",
-            "Content-Length": "\(dataToUpload.count)",
+            "Content-Length": "\(data.count)",
         ]
 
         headers["Accept"] = "application/json"
@@ -159,7 +149,7 @@ public extension ATProtoClient.App.Bsky.Video {
             endpoint: endpoint,
             method: "POST",
             headers: headers,
-            body: dataToUpload,
+            body: data,
             queryItems: queryItems
         )
 
@@ -169,40 +159,23 @@ public extension ATProtoClient.App.Bsky.Video {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyVideoUploadPart.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyVideoUploadPart.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.uploadPart: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyVideoUploadPart.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyVideoUploadPart.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

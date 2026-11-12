@@ -3,15 +3,23 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.createSpace
 
+/// Create a new space governed by the given policy. The space is anchored on the authenticated user's DID, who becomes the space owner. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceCreateSpace {
     public static let typeIdentifier = "com.atproto.space.createSpace"
+
     public struct Input: ATProtocolCodable {
+        /// The NSID of the space type, describing the modality of the space (e.g. app.bsky.group, app.bsky.personal).
         public let spaceType: NSID
+        /// The space key. Used to differentiate multiple spaces of the same type under the same owner. Same syntax requirements as a record key. If not provided, one will be auto-generated (TID).
         public let skey: RecordKey?
+        /// The policy governing the space, including its configuration.
         public let policy: InputPolicyUnion
 
-        /// Standard public initializer
-        public init(spaceType: NSID, skey: RecordKey? = nil, policy: InputPolicyUnion) {
+        public init(
+            spaceType: NSID,
+            skey: RecordKey? = nil,
+            policy: InputPolicyUnion
+        ) {
             self.spaceType = spaceType
             self.skey = skey
             self.policy = policy
@@ -65,34 +73,29 @@ public enum ComAtprotoSpaceCreateSpace {
     }
 
     public struct Output: ATProtocolCodable {
+        /// URI of the created space.
         public let uri: SpaceRef
 
-        /// Standard public initializer
         public init(
             uri: SpaceRef
-
         ) {
             self.uri = uri
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             uri = try container.decode(SpaceRef.self, forKey: .uri)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(uri, forKey: .uri)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
             return map
         }
 
@@ -140,6 +143,8 @@ public enum ComAtprotoSpaceCreateSpace {
         case comAtprotoPersonalspacePolicy(ComAtprotoPersonalspacePolicy)
         case comAtprotoMemberspacePolicy(ComAtprotoMemberspacePolicy)
         case comAtprotoManagedspacePolicy(ComAtprotoManagedspacePolicy)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoPersonalspacePolicy) {
             self = .comAtprotoPersonalspacePolicy(value)
@@ -308,13 +313,12 @@ public enum ComAtprotoSpaceCreateSpace {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - createSpace
 
-    // Create a new space governed by the given policy. The space is anchored on the authenticated user's DID, who becomes the space owner. Requires auth, implemented by PDS.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Create a new space governed by the given policy. The space is anchored on the authenticated user's DID, who becomes the space owner. Requires auth, implemented by PDS.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoSpaceCreateSpace.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func createSpace(
         input: ComAtprotoSpaceCreateSpace.Input
 
@@ -345,44 +349,23 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceCreateSpace.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoSpaceCreateSpace.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.space.createSpace: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSpaceCreateSpace.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoSpaceCreateSpace.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

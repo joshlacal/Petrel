@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.repo.importRepo
 
+/// Import a repo in the form of a CAR file. Requires Content-Length HTTP header to be set.
 public enum ComAtprotoRepoImportRepo {
     public static let typeIdentifier = "com.atproto.repo.importRepo"
+
     public struct Input: ATProtocolCodable {
         public let data: Data
 
-        /// Standard public initializer
-        public init(data: Data) {
+        public init(
+            data: Data
+        ) {
             self.data = data
         }
 
@@ -39,23 +42,21 @@ public enum ComAtprotoRepoImportRepo {
 public extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - importRepo
 
-    // Import a repo in the form of a CAR file. Requires Content-Length HTTP header to be set.
-    //
-    // - Parameter data: The binary data to upload
-
+    /// Import a repo in the form of a CAR file. Requires Content-Length HTTP header to be set.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - data: The request body bytes
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func importRepo(
         data: Data
 
     ) async throws -> Int {
         let endpoint = "com.atproto.repo.importRepo"
 
-        let dataToUpload = data
         let headers: [String: String] = [
             "Content-Type": "application/vnd.ipld.car",
-            "Content-Length": "\(dataToUpload.count)",
+            "Content-Length": "\(data.count)",
         ]
 
         let queryItems: [URLQueryItem]? = nil
@@ -64,14 +65,20 @@ public extension ATProtoClient.Com.Atproto.Repo {
             endpoint: endpoint,
             method: "POST",
             headers: headers,
-            body: dataToUpload,
+            body: data,
             queryItems: queryItems
         )
 
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.repo.importRepo")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

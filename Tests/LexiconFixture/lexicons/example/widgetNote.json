@@ -1,0 +1,52 @@
+{
+  "lexicon": 1,
+  "id": "com.example.widget.note",
+  "defs": {
+    "main": {
+      "type": "record",
+      "description": "A record with awkward property names.",
+      "key": "tid",
+      "record": {
+        "type": "object",
+        "required": [
+          "text",
+          "created-at"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "maxLength": 3000,
+            "maxGraphemes": 300
+          },
+          "created-at": {
+            "type": "string",
+            "format": "datetime",
+            "description": "A hyphenated property name."
+          },
+          "default": {
+            "type": "boolean",
+            "description": "A Swift keyword."
+          },
+          "extraFields": {
+            "type": "string",
+            "description": "Collides with the property generated types use for undeclared fields."
+          },
+          "container": {
+            "type": "string",
+            "description": "Collides with a local variable of the generated codec."
+          },
+          "gadgets": {
+            "type": "array",
+            "items": {
+              "type": "union",
+              "refs": [
+                "com.example.widget.defs#gadget",
+                "com.example.widget.defs#gadgetRef"
+              ]
+            }
+          }
+        }
+      }
+    }
+  }
+}

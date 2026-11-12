@@ -3,14 +3,18 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.notification.putActivitySubscription
 
+/// Puts an activity subscription entry. The key should be omitted for creation and provided for updates. Requires auth.
 public enum AppBskyNotificationPutActivitySubscription {
     public static let typeIdentifier = "app.bsky.notification.putActivitySubscription"
+
     public struct Input: ATProtocolCodable {
         public let subject: DID
         public let activitySubscription: AppBskyNotificationDefs.ActivitySubscription
 
-        /// Standard public initializer
-        public init(subject: DID, activitySubscription: AppBskyNotificationDefs.ActivitySubscription) {
+        public init(
+            subject: DID,
+            activitySubscription: AppBskyNotificationDefs.ActivitySubscription
+        ) {
             self.subject = subject
             self.activitySubscription = activitySubscription
         }
@@ -44,30 +48,27 @@ public enum AppBskyNotificationPutActivitySubscription {
 
     public struct Output: ATProtocolCodable {
         public let subject: DID
-
         public let activitySubscription: AppBskyNotificationDefs.ActivitySubscription?
 
-        /// Standard public initializer
         public init(
             subject: DID,
-
             activitySubscription: AppBskyNotificationDefs.ActivitySubscription? = nil
-
         ) {
             self.subject = subject
-
             self.activitySubscription = activitySubscription
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             subject = try container.decode(DID.self, forKey: .subject)
-
             do {
-                activitySubscription = try container.decodeIfPresent(AppBskyNotificationDefs.ActivitySubscription.self, forKey: .activitySubscription)
+                activitySubscription = try container.decodeIfPresent(AppBskyNotificationDefs.ActivitySubscription.self, forKey: .activitySubscription, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'activitySubscription' — degrading to nil: \(error)")
                 activitySubscription = nil
             }
@@ -75,25 +76,18 @@ public enum AppBskyNotificationPutActivitySubscription {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(subject, forKey: .subject)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(activitySubscription, forKey: .activitySubscription)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let subjectValue = try subject.toCBORValue()
             map = map.adding(key: "subject", value: subjectValue)
-
             if let value = activitySubscription {
-                // Encode optional property even if it's an empty array for CBOR
                 let activitySubscriptionValue = try value.toCBORValue()
                 map = map.adding(key: "activitySubscription", value: activitySubscriptionValue)
             }
-
             return map
         }
 
@@ -107,13 +101,12 @@ public enum AppBskyNotificationPutActivitySubscription {
 public extension ATProtoClient.App.Bsky.Notification {
     // MARK: - putActivitySubscription
 
-    // Puts an activity subscription entry. The key should be omitted for creation and provided for updates. Requires auth.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Puts an activity subscription entry. The key should be omitted for creation and provided for updates. Requires auth.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func putActivitySubscription(
         input: AppBskyNotificationPutActivitySubscription.Input
 
@@ -141,34 +134,26 @@ public extension ATProtoClient.App.Bsky.Notification {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.putActivitySubscription")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyNotificationPutActivitySubscription.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.notification.putActivitySubscription: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyNotificationPutActivitySubscription.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

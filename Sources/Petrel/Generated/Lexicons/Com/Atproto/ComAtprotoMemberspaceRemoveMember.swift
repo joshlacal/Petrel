@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.memberspace.removeMember
 
+/// Remove a member from the member list of a space governed by the memberspace policy. Requires auth as the space owner.
 public enum ComAtprotoMemberspaceRemoveMember {
     public static let typeIdentifier = "com.atproto.memberspace.removeMember"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// The DID of the member to remove.
         public let did: DID
 
-        /// Standard public initializer
-        public init(space: SpaceRef, did: DID) {
+        public init(
+            space: SpaceRef,
+            did: DID
+        ) {
             self.space = space
             self.did = did
         }
@@ -81,13 +87,12 @@ public enum ComAtprotoMemberspaceRemoveMember {
 public extension ATProtoClient.Com.Atproto.Memberspace {
     // MARK: - removeMember
 
-    // Remove a member from the member list of a space governed by the memberspace policy. Requires auth as the space owner.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Remove a member from the member list of a space governed by the memberspace policy. Requires auth as the space owner.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoMemberspaceRemoveMember.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func removeMember(
         input: ComAtprotoMemberspaceRemoveMember.Input
 
@@ -116,18 +121,8 @@ public extension ATProtoClient.Com.Atproto.Memberspace {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoMemberspaceRemoveMember.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoMemberspaceRemoveMember.Error.self)
         }
 
         return responseCode

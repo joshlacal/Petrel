@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.actor.putPreferences
 
+/// Set the private preferences attached to the account.
 public enum AppBskyActorPutPreferences {
     public static let typeIdentifier = "app.bsky.actor.putPreferences"
+
     public struct Input: ATProtocolCodable {
         public let preferences: AppBskyActorDefs.Preferences
 
-        /// Standard public initializer
-        public init(preferences: AppBskyActorDefs.Preferences) {
+        public init(
+            preferences: AppBskyActorDefs.Preferences
+        ) {
             self.preferences = preferences
         }
 
@@ -39,13 +42,12 @@ public enum AppBskyActorPutPreferences {
 public extension ATProtoClient.App.Bsky.Actor {
     // MARK: - putPreferences
 
-    // Set the private preferences attached to the account.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Set the private preferences attached to the account.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func putPreferences(
         input: AppBskyActorPutPreferences.Input
 
@@ -71,7 +73,13 @@ public extension ATProtoClient.App.Bsky.Actor {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.actor.putPreferences")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

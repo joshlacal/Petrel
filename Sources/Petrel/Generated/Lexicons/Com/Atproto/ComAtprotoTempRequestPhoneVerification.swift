@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.temp.requestPhoneVerification
 
+/// Request a verification code to be sent to the supplied phone number
 public enum ComAtprotoTempRequestPhoneVerification {
     public static let typeIdentifier = "com.atproto.temp.requestPhoneVerification"
+
     public struct Input: ATProtocolCodable {
         public let phoneNumber: String
 
-        /// Standard public initializer
-        public init(phoneNumber: String) {
+        public init(
+            phoneNumber: String
+        ) {
             self.phoneNumber = phoneNumber
         }
 
@@ -39,13 +42,12 @@ public enum ComAtprotoTempRequestPhoneVerification {
 public extension ATProtoClient.Com.Atproto.Temp {
     // MARK: - requestPhoneVerification
 
-    // Request a verification code to be sent to the supplied phone number
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Request a verification code to be sent to the supplied phone number
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func requestPhoneVerification(
         input: ComAtprotoTempRequestPhoneVerification.Input
 
@@ -71,7 +73,13 @@ public extension ATProtoClient.Com.Atproto.Temp {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.temp.requestPhoneVerification")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

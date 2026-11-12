@@ -38,16 +38,16 @@ object AppBskyNotificationListNotificationsDefs {
     data class AppBskyNotificationListNotificationsParameters(
 // Notification reasons to include in response.        @SerialName("reasons")
         val reasons: List<String>? = null,        @SerialName("limit")
-        val limit: Int? = null,        @SerialName("priority")
+        val limit: Int? = null,// Deprecated: this parameter is ignored.        @SerialName("priority")
         val priority: Boolean? = null,        @SerialName("cursor")
-        val cursor: String? = null,        @SerialName("seenAt")
+        val cursor: String? = null,// Deprecated: this parameter is unsupported and will cause an error.        @SerialName("seenAt")
         val seenAt: ATProtocolDate? = null    )
 
     @Serializable
     data class AppBskyNotificationListNotificationsOutput(
         @SerialName("cursor")
         val cursor: String? = null,        @SerialName("notifications")
-        val notifications: List<AppBskyNotificationListNotificationsNotification>,        @SerialName("priority")
+        val notifications: List<AppBskyNotificationListNotificationsNotification>,// Deprecated: this field is no longer populated.        @SerialName("priority")
         val priority: Boolean? = null,        @SerialName("seenAt")
         val seenAt: ATProtocolDate? = null    )
 

@@ -184,6 +184,27 @@ public enum ComAtprotoModerationDefs {
         }
     }
 
+    /// Spam: frequent unwanted promotion, replies, mentions. Prefer new lexicon definition `tools.ozone.report.defs#reasonMisleadingSpam`.
+    public static let reasonSpam = "com.atproto.moderation.defs#reasonSpam"
+
+    /// Direct violation of server rules, laws, terms of service. Prefer new lexicon definition `tools.ozone.report.defs#reasonRuleOther`.
+    public static let reasonViolation = "com.atproto.moderation.defs#reasonViolation"
+
+    /// Misleading identity, affiliation, or content. Prefer new lexicon definition `tools.ozone.report.defs#reasonMisleadingOther`.
+    public static let reasonMisleading = "com.atproto.moderation.defs#reasonMisleading"
+
+    /// Unwanted or mislabeled sexual content. Prefer new lexicon definition `tools.ozone.report.defs#reasonSexualUnlabeled`.
+    public static let reasonSexual = "com.atproto.moderation.defs#reasonSexual"
+
+    /// Rude, harassing, explicit, or otherwise unwelcoming behavior. Prefer new lexicon definition `tools.ozone.report.defs#reasonHarassmentOther`.
+    public static let reasonRude = "com.atproto.moderation.defs#reasonRude"
+
+    /// Reports not falling under another report category. Prefer new lexicon definition `tools.ozone.report.defs#reasonOther`.
+    public static let reasonOther = "com.atproto.moderation.defs#reasonOther"
+
+    /// Appeal a previously taken moderation action
+    public static let reasonAppeal = "com.atproto.moderation.defs#reasonAppeal"
+
     public struct SubjectType: Codable, ATProtocolCodable, ATProtocolValue {
         public let rawValue: String
 

@@ -1,18 +1,30 @@
-from utils import convert_to_camel_case, lowercase_first_letter
+from utils import convert_to_camel_case, lowercase_first_letter, normalize_ref
 
 class EnumGenerator:
     def __init__(self, swift_code_generator):
         self.swift_code_generator = swift_code_generator
 
-    def generate_enum_for_union(self, context_struct_name, union_name, variants):
-        unique_union_name = f"{context_struct_name}{convert_to_camel_case(union_name)}Union"
+    def _union_variants(self, name, refs, closed):
+        """Fully-qualified `$type` values of a union, with `#main` dropped.
+
+        A closed union with no refs can never hold a value; the Lexicon
+        specification calls that schema invalid.
+        """
+        if closed and not refs:
+            raise ValueError(
+                f"{self.swift_code_generator.lexicon_id}: closed union '{name}' has no refs"
+            )
+        return [normalize_ref(ref, self.swift_code_generator.lexicon_id) for ref in refs]
+
+    def generate_enum_for_union(self, context_struct_name, union_name, variants, closed=False):
+        unique_union_name = f"{convert_to_camel_case(context_struct_name)}{convert_to_camel_case(union_name)}Union"
 
         if unique_union_name in self.swift_code_generator.generated_unions:
             return
 
         self.swift_code_generator.generated_unions.add(unique_union_name)
 
-        processed_variants = [self.swift_code_generator.lexicon_id + variant if variant.startswith('#') else variant for variant in variants]
+        processed_variants = self._union_variants(unique_union_name, variants, closed)
 
         self.swift_code_generator.enum_definitions[unique_union_name] = processed_variants
 
@@ -43,7 +55,8 @@ class EnumGenerator:
             name=unique_union_name, 
             variants=processed_variants, 
             lexicon_id=self.swift_code_generator.lexicon_id,
-            is_recursive=is_recursive
+            is_recursive=is_recursive,
+            closed=bool(closed),
         )
         self.swift_code_generator.enums += enum_code + "\n\n"
 
@@ -61,7 +74,7 @@ class EnumGenerator:
         
         return check_recursive(enum_name, set())
 
-    def generate_enum_for_union_def(self, def_name, refs):
+    def generate_enum_for_union_def(self, def_name, refs, closed=False):
         """Union enum for a named top-level union definition.
 
         Unlike property-level unions (named {Struct}{Prop}Union), refs resolve
@@ -76,10 +89,7 @@ class EnumGenerator:
 
         self.swift_code_generator.generated_unions.add(unique_union_name)
 
-        processed_variants = [
-            self.swift_code_generator.lexicon_id + ref if ref.startswith('#') else ref
-            for ref in refs
-        ]
+        processed_variants = self._union_variants(unique_union_name, refs, closed)
 
         self.swift_code_generator.enum_definitions[unique_union_name] = processed_variants
 
@@ -97,10 +107,11 @@ class EnumGenerator:
             variants=processed_variants,
             lexicon_id=self.swift_code_generator.lexicon_id,
             is_recursive=is_recursive,
+            closed=bool(closed),
         )
         self.swift_code_generator.enums += enum_code + "\n\n"
 
-    def generate_enum_for_union_array(self, context_struct_name, name, refs):
+    def generate_enum_for_union_array(self, context_struct_name, name, refs, closed=False):
         unique_union_name = convert_to_camel_case(name)
         
         if unique_union_name in self.swift_code_generator.generated_unions:
@@ -108,15 +119,15 @@ class EnumGenerator:
 
         self.swift_code_generator.generated_unions.add(unique_union_name)
         refs_info = []
-        for ref in refs:
+        for ref, type_id in zip(refs, self._union_variants(unique_union_name, refs, closed)):
             swift_ref = self.swift_code_generator.type_converter.convert_ref(ref)
             refs_info.append({
-                'ref': self.swift_code_generator.lexicon_id + ref if ref.startswith('#') else ref,
+                'ref': type_id,
                 'swift_ref': swift_ref,
                 'camel_case_label': lowercase_first_letter(swift_ref),
             })
         union_array_template = self.swift_code_generator.template_manager.env.get_template('unionArray.jinja')
-        swift_code = union_array_template.render(array_name=name, union_name=unique_union_name, refs=refs_info, lexicon_id=self.swift_code_generator.lexicon_id)
+        swift_code = union_array_template.render(array_name=name, union_name=unique_union_name, refs=refs_info, lexicon_id=self.swift_code_generator.lexicon_id, closed=bool(closed))
         self.swift_code_generator.enums += swift_code + "\n\n"
 
     def generate_enum_from_known_values(self, enum_name, known_values, descriptions):

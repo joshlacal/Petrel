@@ -3,19 +3,24 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.deactivateAccount
 
+/// Deactivates a currently active account. Stops serving of repo, and future writes to repo until reactivated. Used to finalize account migration with the old host after the account has been activated on the new host.
 public enum ComAtprotoServerDeactivateAccount {
     public static let typeIdentifier = "com.atproto.server.deactivateAccount"
+
     public struct Input: ATProtocolCodable {
+        /// A recommendation to server as to how long they should hold onto the deactivated account before deleting.
         public let deleteAfter: ATProtocolDate?
 
-        /// Standard public initializer
-        public init(deleteAfter: ATProtocolDate? = nil) {
+        public init(
+            deleteAfter: ATProtocolDate? = nil
+        ) {
             self.deleteAfter = deleteAfter
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            deleteAfter = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deleteAfter)
+            let strict = decoder.isATProtoStrictDecoding
+            deleteAfter = try container.decodeIfPresent(ATProtocolDate.self, forKey: .deleteAfter, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -41,13 +46,12 @@ public enum ComAtprotoServerDeactivateAccount {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - deactivateAccount
 
-    // Deactivates a currently active account. Stops serving of repo, and future writes to repo until reactivated. Used to finalize account migration with the old host after the account has been activated on the new host.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Deactivates a currently active account. Stops serving of repo, and future writes to repo until reactivated. Used to finalize account migration with the old host after the account has been activated on the new host.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func deactivateAccount(
         input: ComAtprotoServerDeactivateAccount.Input
 
@@ -73,7 +77,13 @@ public extension ATProtoClient.Com.Atproto.Server {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "com.atproto.server.deactivateAccount")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (_, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
-        return response.statusCode
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let responseCode = response.statusCode
+
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
+
+        return responseCode
     }
 }

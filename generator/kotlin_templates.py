@@ -4,6 +4,8 @@ Kotlin template manager - loads and manages Jinja2 templates for Kotlin code gen
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 import os
 
+from utils import swift_member_name
+
 
 def to_camel_case(s: str) -> str:
     """Convert PascalCase or snake_case to camelCase."""
@@ -85,6 +87,9 @@ def sanitize_kotlin_keyword(s: str) -> str:
         'tailrec', 'vararg', 'yield'
     }
 
+    # A wire name that is not an identifier (`cid-link`) is camel-cased; the wire
+    # name itself stays in @SerialName.
+    s = swift_member_name(s)
     if s.lower() in keywords:
         return f'`{s}`'
     return s

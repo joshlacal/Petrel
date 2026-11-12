@@ -3,20 +3,49 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.actor.profile
 
+/// A declaration of a Bluesky account profile.
 public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.actor.profile"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
+
     public let displayName: String?
+    /// Free-form profile description text.
     public let description: String?
+    /// Free-form pronouns text.
     public let pronouns: String?
+    /// Deprecated: use links instead.
     public let website: URI?
+    /// Small image to be displayed next to posts from account. AKA, 'profile picture'
     public let avatar: Blob?
+    /// Larger horizontal image to display behind profile view.
     public let banner: Blob?
+    /// Self-label values, specific to the Bluesky application, on the overall account.
     public let labels: AppBskyActorProfileLabelsUnion?
     public let joinedViaStarterPack: ComAtprotoRepoStrongRef?
     public let pinnedPost: ComAtprotoRepoStrongRef?
+    /// Links shown on the profile, in display order. Each ref points to an app.bsky.actor.link record in this repo.
+    public let links: [ComAtprotoRepoStrongRef]?
     public let createdAt: ATProtocolDate?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(displayName: String? = nil, description: String? = nil, pronouns: String? = nil, website: URI? = nil, avatar: Blob? = nil, banner: Blob? = nil, labels: AppBskyActorProfileLabelsUnion? = nil, joinedViaStarterPack: ComAtprotoRepoStrongRef? = nil, pinnedPost: ComAtprotoRepoStrongRef? = nil, createdAt: ATProtocolDate? = nil) {
+    public init(
+        displayName: String? = nil,
+        description: String? = nil,
+        pronouns: String? = nil,
+        website: URI? = nil,
+        avatar: Blob? = nil,
+        banner: Blob? = nil,
+        labels: AppBskyActorProfileLabelsUnion? = nil,
+        joinedViaStarterPack: ComAtprotoRepoStrongRef? = nil,
+        pinnedPost: ComAtprotoRepoStrongRef? = nil,
+        links: [ComAtprotoRepoStrongRef]? = nil,
+        createdAt: ATProtocolDate? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.displayName = displayName
         self.description = description
         self.pronouns = pronouns
@@ -26,81 +55,125 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         self.labels = labels
         self.joinedViaStarterPack = joinedViaStarterPack
         self.pinnedPost = pinnedPost
+        self.links = links
         self.createdAt = createdAt
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         do {
-            displayName = try container.decodeIfPresent(String.self, forKey: .displayName)
+            displayName = try container.decodeIfPresent(String.self, forKey: .displayName, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'displayName' — degrading to nil: \(error)")
             displayName = nil
         }
         do {
-            description = try container.decodeIfPresent(String.self, forKey: .description)
+            description = try container.decodeIfPresent(String.self, forKey: .description, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
             description = nil
         }
         do {
-            pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns)
+            pronouns = try container.decodeIfPresent(String.self, forKey: .pronouns, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'pronouns' — degrading to nil: \(error)")
             pronouns = nil
         }
         do {
-            website = try container.decodeIfPresent(URI.self, forKey: .website)
+            website = try container.decodeIfPresent(URI.self, forKey: .website, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'website' — degrading to nil: \(error)")
             website = nil
         }
         do {
-            avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar)
+            avatar = try container.decodeIfPresent(Blob.self, forKey: .avatar, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'avatar' — degrading to nil: \(error)")
             avatar = nil
         }
         do {
-            banner = try container.decodeIfPresent(Blob.self, forKey: .banner)
+            banner = try container.decodeIfPresent(Blob.self, forKey: .banner, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'banner' — degrading to nil: \(error)")
             banner = nil
         }
         do {
-            labels = try container.decodeIfPresent(AppBskyActorProfileLabelsUnion.self, forKey: .labels)
+            labels = try container.decodeIfPresent(AppBskyActorProfileLabelsUnion.self, forKey: .labels, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
             labels = nil
         }
         do {
-            joinedViaStarterPack = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .joinedViaStarterPack)
+            joinedViaStarterPack = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .joinedViaStarterPack, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'joinedViaStarterPack' — degrading to nil: \(error)")
             joinedViaStarterPack = nil
         }
         do {
-            pinnedPost = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .pinnedPost)
+            pinnedPost = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .pinnedPost, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'pinnedPost' — degrading to nil: \(error)")
             pinnedPost = nil
         }
         do {
-            createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt)
+            links = try container.decodeIfPresent([ComAtprotoRepoStrongRef].self, forKey: .links, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
+            LogManager.logWarning("Decoding error for optional property 'links' — degrading to nil: \(error)")
+            links = nil
+        }
+        do {
+            createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt, rejectingNull: strict)
+        } catch {
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
             createdAt = nil
         }
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -115,46 +188,9 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(labels, forKey: .labels)
         try container.encodeIfPresent(joinedViaStarterPack, forKey: .joinedViaStarterPack)
         try container.encodeIfPresent(pinnedPost, forKey: .pinnedPost)
+        try container.encodeIfPresent(links, forKey: .links)
         try container.encodeIfPresent(createdAt, forKey: .createdAt)
-    }
-
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
-    }
-
-    public func isEqual(to other: any ATProtocolValue) -> Bool {
-        guard let other = other as? Self else { return false }
-        if displayName != other.displayName {
-            return false
-        }
-        if description != other.description {
-            return false
-        }
-        if pronouns != other.pronouns {
-            return false
-        }
-        if website != other.website {
-            return false
-        }
-        if avatar != other.avatar {
-            return false
-        }
-        if banner != other.banner {
-            return false
-        }
-        if labels != other.labels {
-            return false
-        }
-        if joinedViaStarterPack != other.joinedViaStarterPack {
-            return false
-        }
-        if pinnedPost != other.pinnedPost {
-            return false
-        }
-        if createdAt != other.createdAt {
-            return false
-        }
-        return true
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -203,11 +239,59 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?)
         }
+        if let value = links {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
         if let value = createdAt {
             hasher.combine(value)
         } else {
             hasher.combine(nil as Int?)
         }
+        hasher.combine(extraFields)
+    }
+
+    public func isEqual(to other: any ATProtocolValue) -> Bool {
+        guard let other = other as? Self else { return false }
+        if displayName != other.displayName {
+            return false
+        }
+        if description != other.description {
+            return false
+        }
+        if pronouns != other.pronouns {
+            return false
+        }
+        if website != other.website {
+            return false
+        }
+        if avatar != other.avatar {
+            return false
+        }
+        if banner != other.banner {
+            return false
+        }
+        if labels != other.labels {
+            return false
+        }
+        if joinedViaStarterPack != other.joinedViaStarterPack {
+            return false
+        }
+        if pinnedPost != other.pinnedPost {
+            return false
+        }
+        if links != other.links {
+            return false
+        }
+        if createdAt != other.createdAt {
+            return false
+        }
+        return extraFields == other.extraFields
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -249,12 +333,18 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
             let pinnedPostValue = try value.toCBORValue()
             map = map.adding(key: "pinnedPost", value: pinnedPostValue)
         }
+        if let value = links {
+            let linksValue = try value.toCBORValue()
+            map = map.adding(key: "links", value: linksValue)
+        }
         if let value = createdAt {
             let createdAtValue = try value.toCBORValue()
             map = map.adding(key: "createdAt", value: createdAtValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "displayName", "description", "pronouns", "website", "avatar", "banner", "labels", "joinedViaStarterPack", "pinnedPost", "links", "createdAt"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
@@ -267,11 +357,14 @@ public struct AppBskyActorProfile: ATProtocolCodable, ATProtocolValue {
         case labels
         case joinedViaStarterPack
         case pinnedPost
+        case links
         case createdAt
     }
 
     public enum AppBskyActorProfileLabelsUnion: Codable, ATProtocolCodable, ATProtocolValue, Sendable, Equatable {
         case comAtprotoLabelDefsSelfLabels(ComAtprotoLabelDefs.SelfLabels)
+        /// A value whose `$type` this union does not declare. Open unions accept and
+        /// re-encode such values unchanged.
         case unexpected(ATProtocolValueContainer)
         public init(_ value: ComAtprotoLabelDefs.SelfLabels) {
             self = .comAtprotoLabelDefsSelfLabels(value)

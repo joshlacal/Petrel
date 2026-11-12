@@ -3,29 +3,47 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.embed.video
 
+/// A video embedded in a Bluesky record (eg, a post).
 public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.embed.video"
+
+    /// The mp4 video file. May be up to 300mb, formerly limited to 100mb.
     public let video: Blob
     public let captions: [Caption]?
+    /// Alt text description of the video, for accessibility.
     public let alt: String?
     public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
+    /// A hint to the client about how to present the video.
     public let presentation: String?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(video: Blob, captions: [Caption]? = nil, alt: String? = nil, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil, presentation: String? = nil) {
+    public init(
+        video: Blob,
+        captions: [Caption]? = nil,
+        alt: String? = nil,
+        aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil,
+        presentation: String? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.video = video
         self.captions = captions
         self.alt = alt
         self.aspectRatio = aspectRatio
         self.presentation = presentation
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         video = try container.decode(Blob.self, forKey: .video)
-        captions = try container.decodeIfPresent([Caption].self, forKey: .captions)
-        alt = try container.decodeIfPresent(String.self, forKey: .alt)
-        aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
-        presentation = try container.decodeIfPresent(String.self, forKey: .presentation)
+        captions = try container.decodeIfPresent([Caption].self, forKey: .captions, rejectingNull: strict)
+        alt = try container.decodeIfPresent(String.self, forKey: .alt, rejectingNull: strict)
+        aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio, rejectingNull: strict)
+        presentation = try container.decodeIfPresent(String.self, forKey: .presentation, rejectingNull: strict)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -35,6 +53,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(alt, forKey: .alt)
         try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
         try container.encodeIfPresent(presentation, forKey: .presentation)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -59,6 +78,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         } else {
             hasher.combine(nil as Int?)
         }
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -78,7 +98,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         if presentation != other.presentation {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -105,8 +125,10 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             let presentationValue = try value.toCBORValue()
             map = map.adding(key: "presentation", value: presentationValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "video", "captions", "alt", "aspectRatio", "presentation"]
 
     private enum CodingKeys: String, CodingKey {
         case video
@@ -118,42 +140,41 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
     public struct Caption: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.video#caption"
+
         public let lang: LanguageCodeContainer
         public let file: Blob
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            lang: LanguageCodeContainer, file: Blob
+            lang: LanguageCodeContainer,
+            file: Blob,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.lang = lang
             self.file = file
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
-            } catch {
-                LogManager.logError("Decoding error for required property 'lang': \(error)")
-                throw error
-            }
-            do {
-                file = try container.decode(Blob.self, forKey: .file)
-            } catch {
-                LogManager.logError("Decoding error for required property 'file': \(error)")
-                throw error
-            }
+            lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
+            file = try container.decode(Blob.self, forKey: .file)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(lang, forKey: .lang)
             try container.encode(file, forKey: .file)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(lang)
             hasher.combine(file)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -164,7 +185,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             if file != other.file {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -173,16 +194,16 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let langValue = try lang.toCBORValue()
             map = map.adding(key: "lang", value: langValue)
             let fileValue = try file.toCBORValue()
             map = map.adding(key: "file", value: fileValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "lang", "file"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case lang
             case file
         }
@@ -190,15 +211,26 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
     public struct View: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "app.bsky.embed.video#view"
-        public let cid: CID
+
+        public let cid: CIDString
         public let playlist: URI
         public let thumbnail: URI?
         public let alt: String?
         public let aspectRatio: AppBskyEmbedDefs.AspectRatio?
+        /// A hint to the client about how to present the video.
         public let presentation: String?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            cid: CID, playlist: URI, thumbnail: URI? = nil, alt: String? = nil, aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil, presentation: String? = nil
+            cid: CIDString,
+            playlist: URI,
+            thumbnail: URI? = nil,
+            alt: String? = nil,
+            aspectRatio: AppBskyEmbedDefs.AspectRatio? = nil,
+            presentation: String? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.cid = cid
             self.playlist = playlist
@@ -206,65 +238,66 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             self.alt = alt
             self.aspectRatio = aspectRatio
             self.presentation = presentation
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            cid = try container.decode(CIDString.self, forKey: .cid)
+            playlist = try container.decode(URI.self, forKey: .playlist)
             do {
-                cid = try container.decode(CID.self, forKey: .cid)
+                thumbnail = try container.decodeIfPresent(URI.self, forKey: .thumbnail, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'cid': \(error)")
-                throw error
-            }
-            do {
-                playlist = try container.decode(URI.self, forKey: .playlist)
-            } catch {
-                LogManager.logError("Decoding error for required property 'playlist': \(error)")
-                throw error
-            }
-            do {
-                thumbnail = try container.decodeIfPresent(URI.self, forKey: .thumbnail)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'thumbnail' — degrading to nil: \(error)")
                 thumbnail = nil
             }
             do {
-                alt = try container.decodeIfPresent(String.self, forKey: .alt)
+                alt = try container.decodeIfPresent(String.self, forKey: .alt, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'alt' — degrading to nil: \(error)")
                 alt = nil
             }
             do {
-                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio)
+                aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
                 aspectRatio = nil
             }
             do {
-                presentation = try container.decodeIfPresent(String.self, forKey: .presentation)
+                presentation = try container.decodeIfPresent(String.self, forKey: .presentation, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'presentation' — degrading to nil: \(error)")
                 presentation = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(cid, forKey: .cid)
             try container.encode(playlist, forKey: .playlist)
             try container.encodeIfPresent(thumbnail, forKey: .thumbnail)
             try container.encodeIfPresent(alt, forKey: .alt)
             try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
             try container.encodeIfPresent(presentation, forKey: .presentation)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -290,6 +323,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -312,7 +346,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             if presentation != other.presentation {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -321,7 +355,6 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let cidValue = try cid.toCBORValue()
             map = map.adding(key: "cid", value: cidValue)
             let playlistValue = try playlist.toCBORValue()
@@ -342,11 +375,12 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
                 let presentationValue = try value.toCBORValue()
                 map = map.adding(key: "presentation", value: presentationValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "cid", "playlist", "thumbnail", "alt", "aspectRatio", "presentation"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case cid
             case playlist
             case thumbnail

@@ -3,29 +3,48 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.feed.repost
 
+/// Record representing a 'repost' of an existing Bluesky post.
 public struct AppBskyFeedRepost: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.feed.repost"
+
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "tid")
+
     public let subject: ComAtprotoRepoStrongRef
     public let createdAt: ATProtocolDate
     public let via: ComAtprotoRepoStrongRef?
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
 
-    public init(subject: ComAtprotoRepoStrongRef, createdAt: ATProtocolDate, via: ComAtprotoRepoStrongRef? = nil) {
+    public init(
+        subject: ComAtprotoRepoStrongRef,
+        createdAt: ATProtocolDate,
+        via: ComAtprotoRepoStrongRef? = nil,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.subject = subject
         self.createdAt = createdAt
         self.via = via
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
+        let strict = decoder.isATProtoStrictDecoding
         subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .subject)
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         do {
-            via = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .via)
+            via = try container.decodeIfPresent(ComAtprotoRepoStrongRef.self, forKey: .via, rejectingNull: strict)
         } catch {
-            // Forward compatibility: a malformed optional field must not fail the whole record.
+            // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+            // fail here. The default keeps reading what the network actually serves and
+            // drops only the malformed optional field.
+            guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'via' — degrading to nil: \(error)")
             via = nil
         }
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -34,10 +53,18 @@ public struct AppBskyFeedRepost: ATProtocolCodable, ATProtocolValue {
         try container.encode(subject, forKey: .subject)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(via, forKey: .via)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(subject)
+        hasher.combine(createdAt)
+        if let value = via {
+            hasher.combine(value)
+        } else {
+            hasher.combine(nil as Int?)
+        }
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -51,17 +78,11 @@ public struct AppBskyFeedRepost: ATProtocolCodable, ATProtocolValue {
         if via != other.via {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(subject)
-        hasher.combine(createdAt)
-        if let value = via {
-            hasher.combine(value)
-        } else {
-            hasher.combine(nil as Int?)
-        }
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -75,8 +96,10 @@ public struct AppBskyFeedRepost: ATProtocolCodable, ATProtocolValue {
             let viaValue = try value.toCBORValue()
             map = map.adding(key: "via", value: viaValue)
         }
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "createdAt", "via"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

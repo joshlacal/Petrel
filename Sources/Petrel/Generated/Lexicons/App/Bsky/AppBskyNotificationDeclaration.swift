@@ -3,27 +3,43 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.notification.declaration
 
+/// A declaration of the user's choices related to notifications that can be produced by them.
 public struct AppBskyNotificationDeclaration: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "app.bsky.notification.declaration"
-    public let allowSubscriptions: String
 
-    public init(allowSubscriptions: String) {
+    /// The record key type this collection declares (`key` in the Lexicon).
+    public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "literal:self")
+
+    /// A declaration of the user's preference for allowing activity subscriptions from other users. Absence of a record implies 'followers'.
+    public let allowSubscriptions: String
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        allowSubscriptions: String,
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
         self.allowSubscriptions = allowSubscriptions
+        self.extraFields = extraFields
     }
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         allowSubscriptions = try container.decode(String.self, forKey: .allowSubscriptions)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         var container = encoder.container(keyedBy: CodingKeys.self)
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(allowSubscriptions, forKey: .allowSubscriptions)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public static func == (lhs: Self, rhs: Self) -> Bool {
-        return lhs.isEqual(to: rhs)
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(allowSubscriptions)
+        hasher.combine(extraFields)
     }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -31,11 +47,11 @@ public struct AppBskyNotificationDeclaration: ATProtocolCodable, ATProtocolValue
         if allowSubscriptions != other.allowSubscriptions {
             return false
         }
-        return true
+        return extraFields == other.extraFields
     }
 
-    public func hash(into hasher: inout Hasher) {
-        hasher.combine(allowSubscriptions)
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        return lhs.isEqual(to: rhs)
     }
 
     public func toCBORValue() throws -> Any {
@@ -43,8 +59,10 @@ public struct AppBskyNotificationDeclaration: ATProtocolCodable, ATProtocolValue
         map = map.adding(key: "$type", value: Self.typeIdentifier)
         let allowSubscriptionsValue = try allowSubscriptions.toCBORValue()
         map = map.adding(key: "allowSubscriptions", value: allowSubscriptionsValue)
-        return map
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type", "allowSubscriptions"]
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

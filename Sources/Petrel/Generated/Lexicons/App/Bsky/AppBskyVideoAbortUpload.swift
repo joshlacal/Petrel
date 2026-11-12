@@ -3,13 +3,16 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.video.abortUpload
 
+/// Abort an upload only while it is created, releasing its quota reservation immediately. Terminal sessions are unchanged and return their terminal outcome. A finishing session returns UploadNotReady.
 public enum AppBskyVideoAbortUpload {
     public static let typeIdentifier = "app.bsky.video.abortUpload"
+
     public struct Input: ATProtocolCodable {
         public let jobId: String
 
-        /// Standard public initializer
-        public init(jobId: String) {
+        public init(
+            jobId: String
+        ) {
             self.jobId = jobId
         }
 
@@ -37,44 +40,42 @@ public enum AppBskyVideoAbortUpload {
 
     public struct Output: ATProtocolCodable {
         public let state: String
-
+        /// Present only when state is completed.
         public let completedJobId: String?
-
+        /// Present only when state is failed.
         public let failureReason: String?
 
-        /// Standard public initializer
         public init(
             state: String,
-
             completedJobId: String? = nil,
-
             failureReason: String? = nil
-
         ) {
             self.state = state
-
             self.completedJobId = completedJobId
-
             self.failureReason = failureReason
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             state = try container.decode(String.self, forKey: .state)
-
             do {
-                completedJobId = try container.decodeIfPresent(String.self, forKey: .completedJobId)
+                completedJobId = try container.decodeIfPresent(String.self, forKey: .completedJobId, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'completedJobId' — degrading to nil: \(error)")
                 completedJobId = nil
             }
-
             do {
-                failureReason = try container.decodeIfPresent(String.self, forKey: .failureReason)
+                failureReason = try container.decodeIfPresent(String.self, forKey: .failureReason, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'failureReason' — degrading to nil: \(error)")
                 failureReason = nil
             }
@@ -82,34 +83,23 @@ public enum AppBskyVideoAbortUpload {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(state, forKey: .state)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(completedJobId, forKey: .completedJobId)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(failureReason, forKey: .failureReason)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let stateValue = try state.toCBORValue()
             map = map.adding(key: "state", value: stateValue)
-
             if let value = completedJobId {
-                // Encode optional property even if it's an empty array for CBOR
                 let completedJobIdValue = try value.toCBORValue()
                 map = map.adding(key: "completedJobId", value: completedJobIdValue)
             }
-
             if let value = failureReason {
-                // Encode optional property even if it's an empty array for CBOR
                 let failureReasonValue = try value.toCBORValue()
                 map = map.adding(key: "failureReason", value: failureReasonValue)
             }
-
             return map
         }
 
@@ -138,13 +128,12 @@ public enum AppBskyVideoAbortUpload {
 public extension ATProtoClient.App.Bsky.Video {
     // MARK: - abortUpload
 
-    // Abort an upload only while it is created, releasing its quota reservation immediately. Terminal sessions are unchanged and return their terminal outcome. A finishing session returns UploadNotReady.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Abort an upload only while it is created, releasing its quota reservation immediately. Terminal sessions are unchanged and return their terminal outcome. A finishing session returns UploadNotReady.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<AppBskyVideoAbortUpload.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func abortUpload(
         input: AppBskyVideoAbortUpload.Input
 
@@ -175,40 +164,23 @@ public extension ATProtoClient.App.Bsky.Video {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyVideoAbortUpload.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyVideoAbortUpload.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.abortUpload: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyVideoAbortUpload.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyVideoAbortUpload.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

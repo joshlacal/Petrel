@@ -3,14 +3,20 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.notifyCredentialRevoked
 
+/// Notify a repo host that the space authority has revoked one or more credentials. Authenticated with service auth from the space authority, addressed to the repo DID.
 public enum ComAtprotoSpaceNotifyCredentialRevoked {
     public static let typeIdentifier = "com.atproto.space.notifyCredentialRevoked"
+
     public struct Input: ATProtocolCodable {
+        /// Reference to the space.
         public let space: SpaceRef
+        /// The jti of the revoked credentials.
         public let credentials: [String]
 
-        /// Standard public initializer
-        public init(space: SpaceRef, credentials: [String]) {
+        public init(
+            space: SpaceRef,
+            credentials: [String]
+        ) {
             self.space = space
             self.credentials = credentials
         }
@@ -67,13 +73,12 @@ public enum ComAtprotoSpaceNotifyCredentialRevoked {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - notifyCredentialRevoked
 
-    // Notify a repo host that the space authority has revoked one or more credentials. Authenticated with service auth from the space authority, addressed to the repo DID.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Notify a repo host that the space authority has revoked one or more credentials. Authenticated with service auth from the space authority, addressed to the repo DID.
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func notifyCredentialRevoked(
         input: ComAtprotoSpaceNotifyCredentialRevoked.Input
 
@@ -102,10 +107,8 @@ public extension ATProtoClient.Com.Atproto.Space {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
-                throw genericError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
         }
 
         return responseCode

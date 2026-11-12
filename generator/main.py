@@ -8,7 +8,7 @@ from collections.abc import Sequence
 from swift_code_generator import SwiftCodeGenerator, convert_json_to_swift
 from kotlin_code_generator import KotlinCodeGenerator
 from kotlin_type_converter import convert_to_pascal_case
-from utils import convert_to_camel_case
+from utils import convert_to_camel_case, swift_member_name, namespace_type_name
 from cycle_detector import CycleDetector
 from generated_projection import write_swift_projection, write_kotlin_projection
 
@@ -19,8 +19,8 @@ def get_namespace_path(lexicon_id: str) -> str:
     parts = lexicon_id.split('.')
     if len(parts) >= 2:
         # Capitalize first two parts for directory names
-        return '/'.join(part.capitalize() for part in parts[:2])
-    return parts[0].capitalize()
+        return '/'.join(convert_to_camel_case(part.capitalize()) for part in parts[:2])
+    return convert_to_camel_case(parts[0].capitalize())
 
 DEFAULT_EXCLUDED_NAMESPACES = ('tools.ozone',)
 
@@ -123,6 +123,12 @@ def resolve_owned_namespace_roots(graph_path):
                 core_manifest_path = os.path.normpath(
                     os.path.join(os.getcwd(), pkg['manifest'])
                 )
+                if not os.path.exists(core_manifest_path):
+                    # Run from another package (a third party generating its own
+                    # lexicons): the graph still describes this Petrel checkout.
+                    core_manifest_path = os.path.normpath(
+                        os.path.join(os.path.dirname(GENERATOR_DIR), pkg['manifest'])
+                    )
                 core = load_manifest(core_manifest_path)
                 return normalize_core_namespace_roots(
                     core.get('package', {}).get('core_namespace_roots', ()),
@@ -140,6 +146,34 @@ def is_excluded(lexicon_id, exclude_namespaces):
         lexicon_id == ns or lexicon_id.startswith(ns + '.')
         for ns in exclude_namespaces
     )
+
+# Reference token for the lexicons bundled with Petrel itself (com.atproto, app.bsky,
+# chat.bsky, ...). A third-party manifest writes `"reference": ["petrel:core"]` and
+# never needs to know where the Petrel checkout lives.
+CORE_REFERENCE_TOKEN = 'petrel:core'
+GENERATOR_DIR = os.path.dirname(os.path.realpath(__file__))
+CORE_LEXICON_DIR = os.path.join(GENERATOR_DIR, 'lexicons')
+CORE_MANIFEST_PATH = os.path.join(GENERATOR_DIR, 'manifests', 'petrel-core.json')
+
+
+def resolve_reference_dirs(reference_dirs, exclude_namespaces):
+    """Expand `petrel:core` in a manifest's reference list.
+
+    Returns (directories, exclude_namespaces). When the bundled set is referenced,
+    the namespaces the core package itself leaves out are excluded as well: types
+    Petrel does not generate cannot be referenced from an overlay.
+    """
+    resolved = []
+    exclude = list(exclude_namespaces)
+    for entry in reference_dirs:
+        if entry == CORE_REFERENCE_TOKEN:
+            resolved.append(CORE_LEXICON_DIR)
+            core_exclude = load_manifest(CORE_MANIFEST_PATH).get('lexicons', {}).get('exclude_namespaces', [])
+            exclude.extend(ns for ns in core_exclude if ns not in exclude)
+        else:
+            resolved.append(entry)
+    return resolved, tuple(exclude)
+
 
 async def load_lexicons(dirs, exclude_namespaces, cycle_detector, skip_ids=()):
     """Load lexicon JSONs from `dirs`, registering all types with `cycle_detector`.
@@ -184,12 +218,24 @@ async def load_lexicons(dirs, exclude_namespaces, cycle_detector, skip_ids=()):
                 loaded.append((filepath, lexicon))
     return loaded
 
+def namespace_segments(lexicon_id):
+    """Namespace path of a lexicon: every NSID segment except the final name.
+
+    An NSID has an authority of two or more segments followed by one name, so
+    `fm.example.alpha.feed.getPlay` lives in `fm.example.alpha.feed` and
+    `com.example.getRoot` in `com.example`. The per-lexicon method extensions
+    attach to exactly this path (SwiftCodeGenerator, KotlinCodeGenerator), so the
+    tree must be built from the same segments at any depth.
+    """
+    return lexicon_id.split('.')[:-1]
+
+
 def build_namespace_hierarchy(lexicon_ids):
-    """Builds the 3-level namespace tree used for client namespace classes."""
+    """Builds the namespace tree used for client namespace classes."""
     hierarchy = {}
     for lexicon_id in lexicon_ids:
         current = hierarchy
-        for part in lexicon_id.split('.')[:3]:
+        for part in namespace_segments(lexicon_id):
             current = current.setdefault(part, {})
     return hierarchy
 
@@ -203,7 +249,23 @@ async def generate_swift_from_lexicons_recursive(
     core_namespace_roots: Sequence[str] = (),
     emit_server_contracts=False,
     emit_xrpc_error_parsing=False,
+    property_type_overrides=None,
+    lexicon_documents=None,
 ):
+    """
+    lexicon_documents: `{"output": <dir>, "type": <Swift enum name>, "access": "internal"|"public"}`
+    from the manifest (`swift.lexicon_documents`). Writes one Swift file holding
+    every emitted Lexicon document as JSON, so a runtime validator can check data
+    against exactly the schemas the generated types were built from (lengths,
+    ranges, enums and the other constraints the types themselves do not carry).
+
+    property_type_overrides: `{nsid: {"<StructName>.<property>": "<SwiftType>"}}`
+    from the manifest (`swift.property_type_overrides`). Replaces the generated
+    Swift type of individual properties, for a package that ships a hand-written
+    model of an `unknown` field (Petrel core types `didDoc` as `DIDDocument`).
+    Every entry must match an emitted lexicon and property.
+    """
+    property_type_overrides = dict(property_type_overrides or {})
     type_dict = {}
     namespace_hierarchy = {}
     expected_files = {}
@@ -221,8 +283,9 @@ async def generate_swift_from_lexicons_recursive(
     # overlay-owned and excluded from the reference hierarchy.
     lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector)
     emit_ids = {lex.get('id', '') for _, lex in lexicons}
+    reference_dirs, reference_exclude = resolve_reference_dirs(reference_dirs, exclude_namespaces)
     reference_lexicons = await load_lexicons(
-        reference_dirs, exclude_namespaces, cycle_detector, skip_ids=emit_ids
+        reference_dirs, reference_exclude, cycle_detector, skip_ids=emit_ids
     )
     reference_hierarchy = build_namespace_hierarchy(
         lex.get('id', '') for _, lex in reference_lexicons
@@ -259,7 +322,7 @@ async def generate_swift_from_lexicons_recursive(
         lexicon_id = lexicon.get('id', '')
         defs = lexicon.get('defs', {})
 
-        namespace_parts = lexicon_id.split('.')[:3]
+        namespace_parts = namespace_segments(lexicon_id)
         current_level = namespace_hierarchy
         for part in namespace_parts:
             if part not in current_level:
@@ -270,7 +333,9 @@ async def generate_swift_from_lexicons_recursive(
             type_kind = type_info.get('type', '')
             swift_lex_id = convert_to_camel_case(lexicon_id)
             swift_type_name = "." + convert_to_camel_case(type_name) if type_name != 'main' else ""
-            if type_kind in ['object', 'record', 'union', 'array']:
+            # Only objects and records are ever named by a `$type` on the wire. A
+            # union or array definition is not: its members carry their own types.
+            if type_kind in ['object', 'record']:
                 type_key = f"{lexicon_id}#{type_name}" if type_name != 'main' else lexicon_id
                 type_dict[type_key] = f"{swift_lex_id}{swift_type_name}"
 
@@ -297,6 +362,7 @@ async def generate_swift_from_lexicons_recursive(
             cycle_detector,
             emit_server_contracts=should_emit_server_contracts,
             emit_xrpc_error_parsing=should_emit_xrpc_error_parsing,
+            property_type_overrides=property_type_overrides.pop(lexicon_id, None),
         ).convert()
         if overlay:
             # Overlay files compile in a separate module and need the core import.
@@ -312,6 +378,12 @@ async def generate_swift_from_lexicons_recursive(
     # Second pass: Generate code with cycle information
     for filepath, lexicon in lexicons:
         process_lexicon(filepath, lexicon)
+
+    if property_type_overrides:
+        raise ValueError(
+            "swift.property_type_overrides names lexicons this manifest does not emit: "
+            f"{sorted(property_type_overrides)}"
+        )
 
     if overlay:
         # Overlay: extend the core client's namespace tree instead of regenerating it,
@@ -351,6 +423,67 @@ async def generate_swift_from_lexicons_recursive(
         add_expected_file(compatibility_file_path, render_petrel_020_compatibility())
 
     await write_swift_projection(output_folder, expected_files)
+
+    if lexicon_documents:
+        type_name = lexicon_documents.get('type', 'BundledLexiconDocuments')
+        await write_swift_projection(
+            lexicon_documents['output'],
+            {
+                f'{type_name}.swift': render_lexicon_documents(
+                    [lexicon for _, lexicon in lexicons],
+                    type_name=type_name,
+                    access=lexicon_documents.get('access', 'internal'),
+                )
+            },
+        )
+
+
+LEXICON_DOCUMENT_CHUNK = 20
+
+
+def render_lexicon_documents(lexicons, type_name='BundledLexiconDocuments', access='internal'):
+    """Swift source holding Lexicon documents as minified JSON string literals.
+
+    Documents are ordered by NSID and appended in chunks, each in its own
+    function: one array literal with hundreds of long strings is slow to type-check.
+    """
+    if access not in ('internal', 'public'):
+        raise ValueError(f"lexicon_documents.access must be 'internal' or 'public', not {access!r}")
+    if not re.fullmatch(r'[A-Z][A-Za-z0-9_]*', type_name):
+        raise ValueError(f"lexicon_documents.type must be a Swift type name, not {type_name!r}")
+    from templates import escape_swift_string_literal
+    modifier = 'public ' if access == 'public' else ''
+    ordered = sorted(lexicons, key=lambda lexicon: lexicon.get('id', ''))
+    literals = [
+        escape_swift_string_literal(orjson.dumps(lexicon).decode('utf-8'))
+        for lexicon in ordered
+    ]
+    chunks = [literals[i:i + LEXICON_DOCUMENT_CHUNK] for i in range(0, len(literals), LEXICON_DOCUMENT_CHUNK)]
+    lines = [
+        'import Foundation',
+        '',
+        '/// The Lexicon documents the generated types of this package were built from, as JSON.',
+        '///',
+        '/// A runtime validator loads them to check data against the same schemas: the',
+        '/// generated types enforce shape, the schemas also carry lengths, ranges and enums.',
+        f'{modifier}enum {type_name} {{',
+        '    /// The number of documents.',
+        f'    {modifier}static let count = {len(literals)}',
+        '',
+        '    /// Every document as minified JSON, ordered by NSID.',
+        f'    {modifier}static var all: [String] {{',
+        '        var documents: [String] = []',
+        '        documents.reserveCapacity(count)',
+    ]
+    lines += [f'        appendChunk{index}(to: &documents)' for index in range(len(chunks))]
+    lines += ['        return documents', '    }']
+    for index, chunk in enumerate(chunks):
+        lines += ['', f'    private static func appendChunk{index}(to documents: inout [String]) {{']
+        lines += [f'        documents.append("{literal}")' for literal in chunk]
+        lines += ['    }']
+    lines += ['}', '']
+    return '\n'.join(lines)
+
 
 def render_atproto_client(generated_classes):
     from templates import TemplateManager
@@ -394,18 +527,18 @@ def generate_swift_overlay_namespaces(
         owned_reference_hierarchy.setdefault(root, {})
 
     def class_path(parts):
-        return 'ATProtoClient' + ''.join('.' + convert_to_camel_case(p) for p in parts)
+        return 'ATProtoClient' + ''.join('.' + namespace_type_name(p) for p in parts)
 
     def render_new_value_tree(name, sub, depth):
         indent = '    ' * depth
-        class_name = convert_to_camel_case(name)
+        class_name = namespace_type_name(name)
         code = f"{indent}public struct {class_name}: Sendable {{\n"
         code += f"{indent}    public let networkService: NetworkService\n"
         code += f"{indent}    public init(networkService: NetworkService) {{\n"
         code += f"{indent}        self.networkService = networkService\n"
         code += f"{indent}    }}\n\n"
         for child_name, child_sub in sub.items():
-            child_class = convert_to_camel_case(child_name)
+            child_class = namespace_type_name(child_name)
             code += (
                 f"{indent}    public var {lower_camel(child_name)}: {child_class} "
                 f"{{ {child_class}(networkService: networkService) }}\n\n"
@@ -416,7 +549,7 @@ def generate_swift_overlay_namespaces(
 
     def render_extension(parent_parts, name, sub):
         target = class_path(parent_parts)
-        class_name = convert_to_camel_case(name)
+        class_name = namespace_type_name(name)
         prop = lower_camel(name)
         code = f"public extension {target} {{\n"
         # Computed access preserves immutable value semantics. On the actor this is
@@ -462,52 +595,54 @@ def generate_overlay_registration(type_dict, package_name):
 
 
 def lower_camel(segment):
-    """Lexicon namespace segment -> lowerCamelCase Swift property name.
+    """Lexicon namespace segment -> lowerCamelCase Swift/Kotlin property name.
 
     Segments are already camelCase in lexicon ids (e.g. authManageLabelerService);
-    only the first character needs lowering. The previous .lower() collapsed them
-    to unreadable all-lowercase names (authmanagelabelerservice)."""
-    return segment[0].lower() + segment[1:] if segment else segment
+    only the first character needs lowering. Authority segments may also contain
+    hyphens or start with a digit (`my-site`, `4chan`), neither of which is legal
+    in an identifier: hyphens start a new word and a leading digit gets `_`.
+    Reserved words are backtick-escaped (`client.com.example.default`)."""
+    name = swift_member_name(segment)
+    name = name[0].lower() + name[1:] if name else name
+    return f'`{name}`' if name in SWIFT_RESERVED_IDENTIFIERS else name
+
+def legacy_lowercase_alias(namespace, prop_name):
+    """All-lowercase spelling earlier releases used for a namespace property, or None.
+
+    Emitted as a deprecated alias so existing call sites keep compiling. There is
+    none when the lowercase form is the current name, is not an identifier
+    (hyphenated or digit-led segments never had one) or is a reserved word.
+    """
+    alias = namespace.lower()
+    if alias == prop_name.strip('`'):
+        return None
+    if not re.fullmatch(r'[a-z_][a-z0-9_]*', alias) or alias in SWIFT_RESERVED_IDENTIFIERS:
+        return None
+    return alias
+
 
 def generate_swift_namespace_classes(namespace_hierarchy, network_manager="NetworkService", depth=0):
     swift_code = ""
-    indent = "    " * depth
+    indent = "    " * depth if depth else ""
 
-    if depth == 0:
-        for namespace, sub_hierarchy in namespace_hierarchy.items():
-            namespace_class = convert_to_camel_case(namespace)
-            prop_name = lower_camel(namespace)
-            swift_code += (
-                f"public var {prop_name}: {namespace_class} "
-                f"{{ {namespace_class}(networkService: networkService) }}\n\n"
-            )
-            if prop_name != namespace.lower():
-                swift_code += f"@available(*, deprecated, renamed: \"{prop_name}\")\n"
-                swift_code += f"public var {namespace.lower()}: {namespace_class} {{ {prop_name} }}\n\n"
-            swift_code += f"public struct {namespace_class}: Sendable {{\n"
-            swift_code += f"    public let networkService: NetworkService\n"
-            swift_code += f"    public init(networkService: NetworkService) {{\n"
-            swift_code += f"        self.networkService = networkService\n    }}\n\n"
-            swift_code += generate_swift_namespace_classes(sub_hierarchy, network_manager, depth + 1)
-            swift_code += "}\n\n"
-    else:
-        for namespace, sub_namespaces in namespace_hierarchy.items():
-            class_name = convert_to_camel_case(namespace)
-            prop_name = lower_camel(namespace)
-            swift_code += (
-                f"{indent}public var {prop_name}: {class_name} "
-                f"{{ {class_name}(networkService: networkService) }}\n\n"
-            )
-            if prop_name != namespace.lower():
-                swift_code += f"{indent}@available(*, deprecated, renamed: \"{prop_name}\")\n"
-                swift_code += f"{indent}public var {namespace.lower()}: {class_name} {{ {prop_name} }}\n\n"
-            swift_code += f"{indent}public struct {class_name}: Sendable {{\n"
-            swift_code += f"{indent}    public let networkService: NetworkService\n"
-            swift_code += f"{indent}    public init(networkService: NetworkService) {{\n"
-            swift_code += f"{indent}        self.networkService = networkService\n{indent}    }}\n\n"
-            if sub_namespaces:
-                swift_code += generate_swift_namespace_classes(sub_namespaces, network_manager, depth + 1)
-            swift_code += f"{indent}}}\n\n"
+    for namespace, sub_namespaces in namespace_hierarchy.items():
+        class_name = namespace_type_name(namespace)
+        prop_name = lower_camel(namespace)
+        swift_code += (
+            f"{indent}public var {prop_name}: {class_name} "
+            f"{{ {class_name}(networkService: networkService) }}\n\n"
+        )
+        alias = legacy_lowercase_alias(namespace, prop_name)
+        if alias is not None:
+            swift_code += f"{indent}@available(*, deprecated, renamed: \"{prop_name}\")\n"
+            swift_code += f"{indent}public var {alias}: {class_name} {{ {prop_name} }}\n\n"
+        swift_code += f"{indent}public struct {class_name}: Sendable {{\n"
+        swift_code += f"{indent}    public let networkService: NetworkService\n"
+        swift_code += f"{indent}    public init(networkService: NetworkService) {{\n"
+        swift_code += f"{indent}        self.networkService = networkService\n{indent}    }}\n\n"
+        if sub_namespaces:
+            swift_code += generate_swift_namespace_classes(sub_namespaces, network_manager, depth + 1)
+        swift_code += f"{indent}}}\n\n"
 
     return swift_code
 
@@ -532,8 +667,9 @@ async def generate_kotlin_from_lexicons_recursive(
     # Emit shadows reference (see Swift counterpart).
     lexicons = await load_lexicons(emit_dirs, exclude_namespaces, cycle_detector)
     emit_ids = {lex.get('id', '') for _, lex in lexicons}
+    reference_dirs, reference_exclude = resolve_reference_dirs(reference_dirs, exclude_namespaces)
     reference_lexicons = await load_lexicons(
-        reference_dirs, exclude_namespaces, cycle_detector, skip_ids=emit_ids
+        reference_dirs, reference_exclude, cycle_detector, skip_ids=emit_ids
     )
     reference_hierarchy = build_namespace_hierarchy(
         lex.get('id', '') for _, lex in reference_lexicons
@@ -554,7 +690,7 @@ async def generate_kotlin_from_lexicons_recursive(
         defs = lexicon.get('defs', {})
 
         # Build namespace hierarchy
-        namespace_parts = lexicon_id.split('.')[:3]
+        namespace_parts = namespace_segments(lexicon_id)
         current_level = namespace_hierarchy
         for part in namespace_parts:
             if part not in current_level:
@@ -606,9 +742,10 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
             namespace_class = convert_to_pascal_case(namespace)
             prop_name = lower_camel(namespace)
             kotlin_code += f"    val {prop_name}: {namespace_class} = {namespace_class}()\n\n"
-            if prop_name != namespace.lower():
+            alias = legacy_lowercase_alias(namespace, prop_name)
+            if alias is not None:
                 kotlin_code += f"    @Deprecated(\"Renamed\", ReplaceWith(\"{prop_name}\"))\n"
-                kotlin_code += f"    val {namespace.lower()}: {namespace_class} get() = {prop_name}\n\n"
+                kotlin_code += f"    val {alias}: {namespace_class} get() = {prop_name}\n\n"
             kotlin_code += f"    inner class {namespace_class} {{\n"
             kotlin_code += f"        val client: ATProtoClient get() = this@ATProtoClient\n"
             kotlin_code += generate_kotlin_namespace_classes(sub_hierarchy, depth + 2)
@@ -618,9 +755,10 @@ def generate_kotlin_namespace_classes(namespace_hierarchy, depth=0):
             class_name = convert_to_pascal_case(namespace)
             prop_name = lower_camel(namespace)
             kotlin_code += f"{indent}val {prop_name}: {class_name} = {class_name}()\n\n"
-            if prop_name != namespace.lower():
+            alias = legacy_lowercase_alias(namespace, prop_name)
+            if alias is not None:
                 kotlin_code += f"{indent}@Deprecated(\"Renamed\", ReplaceWith(\"{prop_name}\"))\n"
-                kotlin_code += f"{indent}val {namespace.lower()}: {class_name} get() = {prop_name}\n\n"
+                kotlin_code += f"{indent}val {alias}: {class_name} get() = {prop_name}\n\n"
             kotlin_code += f"{indent}inner class {class_name} {{\n"
             kotlin_code += f"{indent}    val client: ATProtoClient get() = this@ATProtoClient\n"
             if sub_namespaces:
@@ -755,6 +893,8 @@ async def run_manifest(manifest_path, language='both', graph_path=None):
             core_namespace_roots=core_namespace_roots,
             emit_server_contracts=swift_cfg.get('emit_server_contracts', False),
             emit_xrpc_error_parsing=swift_cfg.get('emit_xrpc_error_parsing', False),
+            property_type_overrides=swift_cfg.get('property_type_overrides'),
+            lexicon_documents=swift_cfg.get('lexicon_documents'),
         ))
     kotlin_cfg = manifest.get('kotlin')
     if kotlin_cfg and language in ('kotlin', 'both'):

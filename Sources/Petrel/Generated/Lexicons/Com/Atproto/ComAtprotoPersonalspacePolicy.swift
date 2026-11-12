@@ -3,23 +3,36 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.personalspace.policy
 
+/// Space policy for data that only its owner should see, such as bookmarks, mutes, or drafts. Only the space authority's own account is authorized to read, and the authority tracks no other writers. Has no configuration fields.
 public struct ComAtprotoPersonalspacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.personalspace.policy"
 
-    public init() {}
+    /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+    /// written back on encode, so re-serializing data never drops them.
+    public let extraFields: [String: ATProtocolValueContainer]
+
+    public init(
+        extraFields: [String: ATProtocolValueContainer] = [:]
+    ) {
+        self.extraFields = extraFields
+    }
 
     public init(from decoder: Decoder) throws {
-        _ = try decoder.container(keyedBy: CodingKeys.self)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
     }
 
     public func encode(to encoder: Encoder) throws {
         _ = encoder.container(keyedBy: CodingKeys.self)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
     }
 
-    public func hash(into hasher: inout Hasher) {}
+    public func hash(into hasher: inout Hasher) {
+        hasher.combine(extraFields)
+    }
 
     public func isEqual(to other: any ATProtocolValue) -> Bool {
-        return other is Self
+        guard let other = other as? Self else { return false }
+        return extraFields == other.extraFields
     }
 
     public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -27,8 +40,11 @@ public struct ComAtprotoPersonalspacePolicy: ATProtocolCodable, ATProtocolValue 
     }
 
     public func toCBORValue() throws -> Any {
-        return OrderedCBORMap()
+        let map = OrderedCBORMap()
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
     }
+
+    private static let knownFieldKeys: Swift.Set<String> = ["$type"]
 
     private enum CodingKeys: CodingKey {}
 }

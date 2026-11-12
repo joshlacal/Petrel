@@ -1,0 +1,17 @@
+{
+  "$comment": "Written by Scripts/sync-standard-lexicons.sh. The upstream commits the standard namespaces under generator/lexicons were mirrored from.",
+  "sources": [
+    {
+      "repository": "https://github.com/bluesky-social/atproto",
+      "commit": "ec49bcb0d88202e92674fe910a0201f2a44db961",
+      "path": "lexicons",
+      "namespaces": ["com.atproto", "tools.ozone"]
+    },
+    {
+      "repository": "https://github.com/bluesky-social/bsky",
+      "commit": "19fb7b03e1096ee88376ca403103804c3e5856ce",
+      "path": "lexicons",
+      "namespaces": ["app.bsky", "chat.bsky", "network.bsky"]
+    }
+  ]
+}

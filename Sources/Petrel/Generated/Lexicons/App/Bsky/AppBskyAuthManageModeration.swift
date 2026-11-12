@@ -5,4 +5,18 @@ import Foundation
 
 public enum AppBskyAuthManageModeration {
     public static let typeIdentifier = "app.bsky.authManageModeration"
+
+    /// The permission set this lexicon declares. Request it as an OAuth scope with
+    /// `permissionSet.includeScope(audience:)`.
+    public static let permissionSet = LexiconPermissionSet(
+        nsid: "app.bsky.authManageModeration",
+        title: "Manage Personal Moderation",
+        titleLang: [:],
+        detail: "Control over blocks, mutes, mod lists, mod services, and preferences.",
+        detailLang: [:],
+        permissions: [
+            LexiconPermission(resource: "rpc", parameters: ["lxm": ["app.bsky.actor.getPreferences", "app.bsky.actor.putPreferences", "app.bsky.graph.muteActor", "app.bsky.graph.muteActorList", "app.bsky.graph.muteThread", "app.bsky.graph.unmuteActor", "app.bsky.graph.unmuteActorList", "app.bsky.graph.unmuteThread"]], inheritAud: true),
+            LexiconPermission(resource: "repo", parameters: ["action": ["create", "update", "delete"], "collection": ["app.bsky.graph.block", "app.bsky.graph.listblock"]], inheritAud: false),
+        ]
+    )
 }

@@ -3,18 +3,32 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.video.startUpload
 
+/// Start a multipart video upload. The declared size is exact, while optional media properties are advisory and used only for early failure; the authoritative probe runs asynchronously after upload.
 public enum AppBskyVideoStartUpload {
     public static let typeIdentifier = "app.bsky.video.startUpload"
+
     public struct Input: ATProtocolCodable {
+        /// Exact byte size of the complete upload-ready video file before it is split into parts.
         public let sizeBytes: Int
+        /// Declared MIME type of the video.
         public let mimeType: String
+        /// Optional client-provided file name.
         public let name: String?
+        /// Advisory, non-authoritative duration used only for early failure; the authoritative probe runs asynchronously after upload.
         public let durationMs: Int?
+        /// Advisory, non-authoritative width used only for early failure; the authoritative probe runs asynchronously after upload.
         public let width: Int?
+        /// Advisory, non-authoritative height used only for early failure; the authoritative probe runs asynchronously after upload.
         public let height: Int?
 
-        /// Standard public initializer
-        public init(sizeBytes: Int, mimeType: String, name: String? = nil, durationMs: Int? = nil, width: Int? = nil, height: Int? = nil) {
+        public init(
+            sizeBytes: Int,
+            mimeType: String,
+            name: String? = nil,
+            durationMs: Int? = nil,
+            width: Int? = nil,
+            height: Int? = nil
+        ) {
             self.sizeBytes = sizeBytes
             self.mimeType = mimeType
             self.name = name
@@ -25,12 +39,13 @@ public enum AppBskyVideoStartUpload {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             sizeBytes = try container.decode(Int.self, forKey: .sizeBytes)
             mimeType = try container.decode(String.self, forKey: .mimeType)
-            name = try container.decodeIfPresent(String.self, forKey: .name)
-            durationMs = try container.decodeIfPresent(Int.self, forKey: .durationMs)
-            width = try container.decodeIfPresent(Int.self, forKey: .width)
-            height = try container.decodeIfPresent(Int.self, forKey: .height)
+            name = try container.decodeIfPresent(String.self, forKey: .name, rejectingNull: strict)
+            durationMs = try container.decodeIfPresent(Int.self, forKey: .durationMs, rejectingNull: strict)
+            width = try container.decodeIfPresent(Int.self, forKey: .width, rejectingNull: strict)
+            height = try container.decodeIfPresent(Int.self, forKey: .height, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -80,72 +95,48 @@ public enum AppBskyVideoStartUpload {
 
     public struct Output: ATProtocolCodable {
         public let jobId: String
-
         public let partSizeBytes: Int
-
         public let partCount: Int
-
         public let expiresAt: ATProtocolDate
 
-        /// Standard public initializer
         public init(
             jobId: String,
-
             partSizeBytes: Int,
-
             partCount: Int,
-
             expiresAt: ATProtocolDate
-
         ) {
             self.jobId = jobId
-
             self.partSizeBytes = partSizeBytes
-
             self.partCount = partCount
-
             self.expiresAt = expiresAt
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             jobId = try container.decode(String.self, forKey: .jobId)
-
             partSizeBytes = try container.decode(Int.self, forKey: .partSizeBytes)
-
             partCount = try container.decode(Int.self, forKey: .partCount)
-
             expiresAt = try container.decode(ATProtocolDate.self, forKey: .expiresAt)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(jobId, forKey: .jobId)
-
             try container.encode(partSizeBytes, forKey: .partSizeBytes)
-
             try container.encode(partCount, forKey: .partCount)
-
             try container.encode(expiresAt, forKey: .expiresAt)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let jobIdValue = try jobId.toCBORValue()
             map = map.adding(key: "jobId", value: jobIdValue)
-
             let partSizeBytesValue = try partSizeBytes.toCBORValue()
             map = map.adding(key: "partSizeBytes", value: partSizeBytesValue)
-
             let partCountValue = try partCount.toCBORValue()
             map = map.adding(key: "partCount", value: partCountValue)
-
             let expiresAtValue = try expiresAt.toCBORValue()
             map = map.adding(key: "expiresAt", value: expiresAtValue)
-
             return map
         }
 
@@ -187,13 +178,12 @@ public enum AppBskyVideoStartUpload {
 public extension ATProtoClient.App.Bsky.Video {
     // MARK: - startUpload
 
-    // Start a multipart video upload. The declared size is exact, while optional media properties are advisory and used only for early failure; the authoritative probe runs asynchronously after upload.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Start a multipart video upload. The declared size is exact, while optional media properties are advisory and used only for early failure; the authoritative probe runs asynchronously after upload.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<AppBskyVideoStartUpload.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func startUpload(
         input: AppBskyVideoStartUpload.Input
 
@@ -224,40 +214,23 @@ public extension ATProtoClient.App.Bsky.Video {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyVideoStartUpload.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyVideoStartUpload.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.video.startUpload: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: AppBskyVideoStartUpload.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyVideoStartUpload.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

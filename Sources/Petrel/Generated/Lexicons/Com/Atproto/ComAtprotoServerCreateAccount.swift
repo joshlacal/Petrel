@@ -3,21 +3,37 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.createAccount
 
+/// Create an account. Implemented by PDS.
 public enum ComAtprotoServerCreateAccount {
     public static let typeIdentifier = "com.atproto.server.createAccount"
+
     public struct Input: ATProtocolCodable {
         public let email: String?
+        /// Requested handle for the account.
         public let handle: Handle
+        /// Pre-existing atproto DID, being imported to a new account.
         public let did: DID?
         public let inviteCode: String?
         public let verificationCode: String?
         public let verificationPhone: String?
+        /// Initial account password. May need to meet instance-specific password strength requirements.
         public let password: String?
+        /// DID PLC rotation key (aka, recovery key) to be included in PLC creation operation.
         public let recoveryKey: String?
+        /// A signed DID PLC operation to be submitted as part of importing an existing account to this instance. NOTE: this optional field may be updated when full account migration is implemented.
         public let plcOp: ATProtocolValueContainer?
 
-        /// Standard public initializer
-        public init(email: String? = nil, handle: Handle, did: DID? = nil, inviteCode: String? = nil, verificationCode: String? = nil, verificationPhone: String? = nil, password: String? = nil, recoveryKey: String? = nil, plcOp: ATProtocolValueContainer? = nil) {
+        public init(
+            email: String? = nil,
+            handle: Handle,
+            did: DID? = nil,
+            inviteCode: String? = nil,
+            verificationCode: String? = nil,
+            verificationPhone: String? = nil,
+            password: String? = nil,
+            recoveryKey: String? = nil,
+            plcOp: ATProtocolValueContainer? = nil
+        ) {
             self.email = email
             self.handle = handle
             self.did = did
@@ -31,15 +47,16 @@ public enum ComAtprotoServerCreateAccount {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            email = try container.decodeIfPresent(String.self, forKey: .email)
+            let strict = decoder.isATProtoStrictDecoding
+            email = try container.decodeIfPresent(String.self, forKey: .email, rejectingNull: strict)
             handle = try container.decode(Handle.self, forKey: .handle)
-            did = try container.decodeIfPresent(DID.self, forKey: .did)
-            inviteCode = try container.decodeIfPresent(String.self, forKey: .inviteCode)
-            verificationCode = try container.decodeIfPresent(String.self, forKey: .verificationCode)
-            verificationPhone = try container.decodeIfPresent(String.self, forKey: .verificationPhone)
-            password = try container.decodeIfPresent(String.self, forKey: .password)
-            recoveryKey = try container.decodeIfPresent(String.self, forKey: .recoveryKey)
-            plcOp = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .plcOp)
+            did = try container.decodeIfPresent(DID.self, forKey: .did, rejectingNull: strict)
+            inviteCode = try container.decodeIfPresent(String.self, forKey: .inviteCode, rejectingNull: strict)
+            verificationCode = try container.decodeIfPresent(String.self, forKey: .verificationCode, rejectingNull: strict)
+            verificationPhone = try container.decodeIfPresent(String.self, forKey: .verificationPhone, rejectingNull: strict)
+            password = try container.decodeIfPresent(String.self, forKey: .password, rejectingNull: strict)
+            recoveryKey = try container.decodeIfPresent(String.self, forKey: .recoveryKey, rejectingNull: strict)
+            plcOp = try container.decodeIfPresent(ATProtocolValueContainer.self, forKey: .plcOp, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -109,54 +126,41 @@ public enum ComAtprotoServerCreateAccount {
 
     public struct Output: ATProtocolCodable {
         public let accessJwt: String
-
         public let refreshJwt: String
-
         public let handle: Handle
-
+        /// The DID of the new account.
         public let did: DID
-
+        /// Complete DID document.
         public let didDoc: DIDDocument?
 
-        /// Standard public initializer
         public init(
             accessJwt: String,
-
             refreshJwt: String,
-
             handle: Handle,
-
             did: DID,
-
             didDoc: DIDDocument? = nil
-
         ) {
             self.accessJwt = accessJwt
-
             self.refreshJwt = refreshJwt
-
             self.handle = handle
-
             self.did = did
-
             self.didDoc = didDoc
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             accessJwt = try container.decode(String.self, forKey: .accessJwt)
-
             refreshJwt = try container.decode(String.self, forKey: .refreshJwt)
-
             handle = try container.decode(Handle.self, forKey: .handle)
-
             did = try container.decode(DID.self, forKey: .did)
-
             do {
-                didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc)
+                didDoc = try container.decodeIfPresent(DIDDocument.self, forKey: .didDoc, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'didDoc' — degrading to nil: \(error)")
                 didDoc = nil
             }
@@ -164,40 +168,27 @@ public enum ComAtprotoServerCreateAccount {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(accessJwt, forKey: .accessJwt)
-
             try container.encode(refreshJwt, forKey: .refreshJwt)
-
             try container.encode(handle, forKey: .handle)
-
             try container.encode(did, forKey: .did)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(didDoc, forKey: .didDoc)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let accessJwtValue = try accessJwt.toCBORValue()
             map = map.adding(key: "accessJwt", value: accessJwtValue)
-
             let refreshJwtValue = try refreshJwt.toCBORValue()
             map = map.adding(key: "refreshJwt", value: refreshJwtValue)
-
             let handleValue = try handle.toCBORValue()
             map = map.adding(key: "handle", value: handleValue)
-
             let didValue = try did.toCBORValue()
             map = map.adding(key: "did", value: didValue)
-
             if let value = didDoc {
-                // Encode optional property even if it's an empty array for CBOR
                 let didDocValue = try value.toCBORValue()
                 map = map.adding(key: "didDoc", value: didDocValue)
             }
-
             return map
         }
 
@@ -231,13 +222,12 @@ public enum ComAtprotoServerCreateAccount {
 public extension ATProtoClient.Com.Atproto.Server {
     // MARK: - createAccount
 
-    // Create an account. Implemented by PDS.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Create an account. Implemented by PDS.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoServerCreateAccount.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func createAccount(
         input: ComAtprotoServerCreateAccount.Input
 
@@ -268,40 +258,23 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoServerCreateAccount.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoServerCreateAccount.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.server.createAccount: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoServerCreateAccount.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoServerCreateAccount.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

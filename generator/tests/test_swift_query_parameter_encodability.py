@@ -53,7 +53,7 @@ class SwiftQueryParameterEncodabilityTests(unittest.TestCase):
 
         generated = SwiftCodeGenerator(query_lexicon(properties)).convert()
 
-        self.assertIn("public let cid: CID?", generated)
+        self.assertIn("public let cid: CIDString?", generated)
         self.assertIn("public let datetime: ATProtocolDate?", generated)
         self.assertIn("public let space_ref_list: [SpaceRef]?", generated)
 

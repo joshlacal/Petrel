@@ -6,20 +6,43 @@ import Foundation
 public enum ComAtprotoLabelDefs {
     public static let typeIdentifier = "com.atproto.label.defs"
 
+    /// Metadata tag on an atproto resource (eg, repo or record).
     public struct Label: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.label.defs#label"
+
+        /// The AT Protocol version of the label object.
         public let ver: Int?
+        /// DID of the actor who created this label.
         public let src: DID
+        /// AT URI of the record, repository (account), or other resource that this label applies to.
         public let uri: URI
-        public let cid: CID?
+        /// Optionally, CID specifying the specific version of 'uri' resource this label applies to.
+        public let cid: CIDString?
+        /// The short string name of the value or type of this label.
         public let val: String
+        /// If true, this is a negation label, overwriting a previous label.
         public let neg: Bool?
+        /// Timestamp when this label was created.
         public let cts: ATProtocolDate
+        /// Timestamp at which this label expires (no longer applies).
         public let exp: ATProtocolDate?
+        /// Signature of dag-cbor encoded label.
         public let sig: Bytes?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            ver: Int? = nil, src: DID, uri: URI, cid: CID? = nil, val: String, neg: Bool? = nil, cts: ATProtocolDate, exp: ATProtocolDate? = nil, sig: Bytes? = nil
+            ver: Int? = nil,
+            src: DID,
+            uri: URI,
+            cid: CIDString? = nil,
+            val: String,
+            neg: Bool? = nil,
+            cts: ATProtocolDate,
+            exp: ATProtocolDate? = nil,
+            sig: Bytes? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.ver = ver
             self.src = src
@@ -30,79 +53,71 @@ public enum ComAtprotoLabelDefs {
             self.cts = cts
             self.exp = exp
             self.sig = sig
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             do {
-                ver = try container.decodeIfPresent(Int.self, forKey: .ver)
+                ver = try container.decodeIfPresent(Int.self, forKey: .ver, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'ver' — degrading to nil: \(error)")
                 ver = nil
             }
+            src = try container.decode(DID.self, forKey: .src)
+            uri = try container.decode(URI.self, forKey: .uri)
             do {
-                src = try container.decode(DID.self, forKey: .src)
+                cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'src': \(error)")
-                throw error
-            }
-            do {
-                uri = try container.decode(URI.self, forKey: .uri)
-            } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
-                throw error
-            }
-            do {
-                cid = try container.decodeIfPresent(CID.self, forKey: .cid)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
                 cid = nil
             }
+            val = try container.decode(String.self, forKey: .val)
             do {
-                val = try container.decode(String.self, forKey: .val)
+                neg = try container.decodeIfPresent(Bool.self, forKey: .neg, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'val': \(error)")
-                throw error
-            }
-            do {
-                neg = try container.decodeIfPresent(Bool.self, forKey: .neg)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'neg' — degrading to nil: \(error)")
                 neg = nil
             }
+            cts = try container.decode(ATProtocolDate.self, forKey: .cts)
             do {
-                cts = try container.decode(ATProtocolDate.self, forKey: .cts)
+                exp = try container.decodeIfPresent(ATProtocolDate.self, forKey: .exp, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'cts': \(error)")
-                throw error
-            }
-            do {
-                exp = try container.decodeIfPresent(ATProtocolDate.self, forKey: .exp)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'exp' — degrading to nil: \(error)")
                 exp = nil
             }
             do {
-                sig = try container.decodeIfPresent(Bytes.self, forKey: .sig)
+                sig = try container.decodeIfPresent(Bytes.self, forKey: .sig, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'sig' — degrading to nil: \(error)")
                 sig = nil
             }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encodeIfPresent(ver, forKey: .ver)
             try container.encode(src, forKey: .src)
             try container.encode(uri, forKey: .uri)
@@ -112,6 +127,7 @@ public enum ComAtprotoLabelDefs {
             try container.encode(cts, forKey: .cts)
             try container.encodeIfPresent(exp, forKey: .exp)
             try container.encodeIfPresent(sig, forKey: .sig)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -144,6 +160,7 @@ public enum ComAtprotoLabelDefs {
             } else {
                 hasher.combine(nil as Int?)
             }
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -175,7 +192,7 @@ public enum ComAtprotoLabelDefs {
             if sig != other.sig {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -184,7 +201,6 @@ public enum ComAtprotoLabelDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             if let value = ver {
                 let verValue = try value.toCBORValue()
                 map = map.adding(key: "ver", value: verValue)
@@ -213,11 +229,12 @@ public enum ComAtprotoLabelDefs {
                 let sigValue = try value.toCBORValue()
                 map = map.adding(key: "sig", value: sigValue)
             }
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "ver", "src", "uri", "cid", "val", "neg", "cts", "exp", "sig"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case ver
             case src
             case uri
@@ -230,34 +247,38 @@ public enum ComAtprotoLabelDefs {
         }
     }
 
+    /// Metadata tags on an atproto record, published by the author within the record.
     public struct SelfLabels: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.label.defs#selfLabels"
+
         public let values: [SelfLabel]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            values: [SelfLabel]
+            values: [SelfLabel],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.values = values
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                values = try container.decode([SelfLabel].self, forKey: .values)
-            } catch {
-                LogManager.logError("Decoding error for required property 'values': \(error)")
-                throw error
-            }
+            values = try container.decode([SelfLabel].self, forKey: .values)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(values, forKey: .values)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(values)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -265,7 +286,7 @@ public enum ComAtprotoLabelDefs {
             if values != other.values {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -274,46 +295,51 @@ public enum ComAtprotoLabelDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let valuesValue = try values.toCBORValue()
             map = map.adding(key: "values", value: valuesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "values"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case values
         }
     }
 
+    /// Metadata tag on an atproto record, published by the author within the record. Note that schemas should use #selfLabels, not #selfLabel.
     public struct SelfLabel: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.label.defs#selfLabel"
+
+        /// The short string name of the value or type of this label.
         public let val: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            val: String
+            val: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.val = val
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                val = try container.decode(String.self, forKey: .val)
-            } catch {
-                LogManager.logError("Decoding error for required property 'val': \(error)")
-                throw error
-            }
+            val = try container.decode(String.self, forKey: .val)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(val, forKey: .val)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(val)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -321,7 +347,7 @@ public enum ComAtprotoLabelDefs {
             if val != other.val {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -330,29 +356,45 @@ public enum ComAtprotoLabelDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let valValue = try val.toCBORValue()
             map = map.adding(key: "val", value: valValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "val"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case val
         }
     }
 
+    /// Declares a label value and its expected interpretations and behaviors.
     public struct LabelValueDefinition: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.label.defs#labelValueDefinition"
+
+        /// The value of the label being defined. Must only include lowercase ascii and the '-' character ([a-z-]+).
         public let identifier: String
+        /// How should a client visually convey this label? 'inform' means neutral and informational; 'alert' means negative and warning; 'none' means show nothing.
         public let severity: String
+        /// What should this label hide in the UI, if applied? 'content' hides all of the target; 'media' hides the images/video/audio; 'none' hides nothing.
         public let blurs: String
+        /// The default setting for this label.
         public let defaultSetting: String?
+        /// Does the user need to have adult content enabled in order to configure this label?
         public let adultOnly: Bool?
         public let locales: [LabelValueDefinitionStrings]
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            identifier: String, severity: String, blurs: String, defaultSetting: String? = nil, adultOnly: Bool? = nil, locales: [LabelValueDefinitionStrings]
+            identifier: String,
+            severity: String,
+            blurs: String,
+            defaultSetting: String? = nil,
+            adultOnly: Bool? = nil,
+            locales: [LabelValueDefinitionStrings],
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.identifier = identifier
             self.severity = severity
@@ -360,61 +402,48 @@ public enum ComAtprotoLabelDefs {
             self.defaultSetting = defaultSetting
             self.adultOnly = adultOnly
             self.locales = locales
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            identifier = try container.decode(String.self, forKey: .identifier)
+            severity = try container.decode(String.self, forKey: .severity)
+            blurs = try container.decode(String.self, forKey: .blurs)
             do {
-                identifier = try container.decode(String.self, forKey: .identifier)
+                defaultSetting = try container.decodeIfPresent(String.self, forKey: .defaultSetting, rejectingNull: strict)
             } catch {
-                LogManager.logError("Decoding error for required property 'identifier': \(error)")
-                throw error
-            }
-            do {
-                severity = try container.decode(String.self, forKey: .severity)
-            } catch {
-                LogManager.logError("Decoding error for required property 'severity': \(error)")
-                throw error
-            }
-            do {
-                blurs = try container.decode(String.self, forKey: .blurs)
-            } catch {
-                LogManager.logError("Decoding error for required property 'blurs': \(error)")
-                throw error
-            }
-            do {
-                defaultSetting = try container.decodeIfPresent(String.self, forKey: .defaultSetting)
-            } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'defaultSetting' — degrading to nil: \(error)")
                 defaultSetting = nil
             }
             do {
-                adultOnly = try container.decodeIfPresent(Bool.self, forKey: .adultOnly)
+                adultOnly = try container.decodeIfPresent(Bool.self, forKey: .adultOnly, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed or unknown-shaped optional field
-                // must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'adultOnly' — degrading to nil: \(error)")
                 adultOnly = nil
             }
-            do {
-                locales = try container.decode([LabelValueDefinitionStrings].self, forKey: .locales)
-            } catch {
-                LogManager.logError("Decoding error for required property 'locales': \(error)")
-                throw error
-            }
+            locales = try container.decode([LabelValueDefinitionStrings].self, forKey: .locales)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(identifier, forKey: .identifier)
             try container.encode(severity, forKey: .severity)
             try container.encode(blurs, forKey: .blurs)
             try container.encodeIfPresent(defaultSetting, forKey: .defaultSetting)
             try container.encodeIfPresent(adultOnly, forKey: .adultOnly)
             try container.encode(locales, forKey: .locales)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -432,6 +461,7 @@ public enum ComAtprotoLabelDefs {
                 hasher.combine(nil as Int?)
             }
             hasher.combine(locales)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -454,7 +484,7 @@ public enum ComAtprotoLabelDefs {
             if locales != other.locales {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -463,7 +493,6 @@ public enum ComAtprotoLabelDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let identifierValue = try identifier.toCBORValue()
             map = map.adding(key: "identifier", value: identifierValue)
             let severityValue = try severity.toCBORValue()
@@ -480,11 +509,12 @@ public enum ComAtprotoLabelDefs {
             }
             let localesValue = try locales.toCBORValue()
             map = map.adding(key: "locales", value: localesValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "identifier", "severity", "blurs", "defaultSetting", "adultOnly", "locales"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case identifier
             case severity
             case blurs
@@ -494,54 +524,53 @@ public enum ComAtprotoLabelDefs {
         }
     }
 
+    /// Strings which describe the label in the UI, localized into a specific language.
     public struct LabelValueDefinitionStrings: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.label.defs#labelValueDefinitionStrings"
+
+        /// The code of the language these strings are written in.
         public let lang: LanguageCodeContainer
+        /// A short human-readable name for the label.
         public let name: String
+        /// A longer description of what the label means and why it might be applied.
         public let description: String
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            lang: LanguageCodeContainer, name: String, description: String
+            lang: LanguageCodeContainer,
+            name: String,
+            description: String,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.lang = lang
             self.name = name
             self.description = description
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
-            } catch {
-                LogManager.logError("Decoding error for required property 'lang': \(error)")
-                throw error
-            }
-            do {
-                name = try container.decode(String.self, forKey: .name)
-            } catch {
-                LogManager.logError("Decoding error for required property 'name': \(error)")
-                throw error
-            }
-            do {
-                description = try container.decode(String.self, forKey: .description)
-            } catch {
-                LogManager.logError("Decoding error for required property 'description': \(error)")
-                throw error
-            }
+            lang = try container.decode(LanguageCodeContainer.self, forKey: .lang)
+            name = try container.decode(String.self, forKey: .name)
+            description = try container.decode(String.self, forKey: .description)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(lang, forKey: .lang)
             try container.encode(name, forKey: .name)
             try container.encode(description, forKey: .description)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(lang)
             hasher.combine(name)
             hasher.combine(description)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -555,7 +584,7 @@ public enum ComAtprotoLabelDefs {
             if description != other.description {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -564,18 +593,18 @@ public enum ComAtprotoLabelDefs {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let langValue = try lang.toCBORValue()
             map = map.adding(key: "lang", value: langValue)
             let nameValue = try name.toCBORValue()
             map = map.adding(key: "name", value: nameValue)
             let descriptionValue = try description.toCBORValue()
             map = map.adding(key: "description", value: descriptionValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "lang", "name", "description"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case lang
             case name
             case description

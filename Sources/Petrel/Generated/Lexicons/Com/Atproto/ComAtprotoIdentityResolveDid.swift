@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.identity.resolveDid
 
+/// Resolves DID to DID document. Does not bi-directionally verify handle.
 public enum ComAtprotoIdentityResolveDid {
     public static let typeIdentifier = "com.atproto.identity.resolveDid"
+
     public struct Parameters: Parametrizable {
         public let did: DID
 
@@ -16,34 +18,29 @@ public enum ComAtprotoIdentityResolveDid {
     }
 
     public struct Output: ATProtocolCodable {
+        /// The complete DID document for the identity.
         public let didDoc: DIDDocument
 
-        /// Standard public initializer
         public init(
             didDoc: DIDDocument
-
         ) {
             self.didDoc = didDoc
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             didDoc = try container.decode(DIDDocument.self, forKey: .didDoc)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(didDoc, forKey: .didDoc)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let didDocValue = try didDoc.toCBORValue()
             map = map.adding(key: "didDoc", value: didDocValue)
-
             return map
         }
 
@@ -73,9 +70,8 @@ public extension ATProtoClient.Com.Atproto.Identity {
     /// Resolves DID to DID document. Does not bi-directionally verify handle.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoIdentityResolveDid.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func resolveDid(input: ComAtprotoIdentityResolveDid.Parameters) async throws -> (responseCode: Int, data: ComAtprotoIdentityResolveDid.Output?) {
         let endpoint = "com.atproto.identity.resolveDid"
 
@@ -95,41 +91,23 @@ public extension ATProtoClient.Com.Atproto.Identity {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoIdentityResolveDid.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoIdentityResolveDid.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.identity.resolveDid: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoIdentityResolveDid.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoIdentityResolveDid.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.server.deleteSession
 
+/// Delete the current session. Requires auth using the 'refreshJwt' (not the 'accessJwt').
 public enum ComAtprotoServerDeleteSession {
     public static let typeIdentifier = "com.atproto.server.deleteSession"
+
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case invalidToken = "InvalidToken"
         case expiredToken = "ExpiredToken"
@@ -23,8 +25,8 @@ public extension ATProtoClient.Com.Atproto.Server {
 
     /// Delete the current session. Requires auth using the 'refreshJwt' (not the 'accessJwt').
     ///
-    /// - Returns: The HTTP response code
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx).
+    /// - Throws: `ATProtoError<ComAtprotoServerDeleteSession.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), and `NetworkError` for transport failures.
     func deleteSession(
     ) async throws -> Int {
         let endpoint = "com.atproto.server.deleteSession"
@@ -49,14 +51,8 @@ public extension ATProtoClient.Com.Atproto.Server {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        if !(200 ... 299).contains(responseCode) {
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoServerDeleteSession.Error.self
-            ) {
-                throw atprotoError
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoServerDeleteSession.Error.self)
         }
 
         return responseCode

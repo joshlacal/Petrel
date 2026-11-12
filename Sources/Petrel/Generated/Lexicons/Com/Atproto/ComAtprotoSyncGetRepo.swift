@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.sync.getRepo
 
+/// Download a repository export as CAR file. Optionally only a 'diff' since a previous revision. Does not require auth; implemented by PDS.
 public enum ComAtprotoSyncGetRepo {
     public static let typeIdentifier = "com.atproto.sync.getRepo"
+
     public struct Parameters: Parametrizable {
         public let did: DID
         public let since: TID?
@@ -21,33 +23,22 @@ public enum ComAtprotoSyncGetRepo {
     public struct Output: ATProtocolCodable {
         public let data: Data
 
-        /// Standard public initializer
-        public init(
-            data: Data
-
-        ) {
+        public init(data: Data) {
             self.data = data
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             data = try container.decode(Data.self, forKey: .data)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(data, forKey: .data)
         }
 
         public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-
-            let dataValue = try data.toCBORValue()
-            map = map.adding(key: "data", value: dataValue)
-
-            return map
+            return data
         }
 
         private enum CodingKeys: String, CodingKey {
@@ -76,9 +67,8 @@ public extension ATProtoClient.Com.Atproto.Sync {
     /// Download a repository export as CAR file. Optionally only a 'diff' since a previous revision. Does not require auth; implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoSyncGetRepo.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getRepo(input: ComAtprotoSyncGetRepo.Parameters) async throws -> (responseCode: Int, data: ComAtprotoSyncGetRepo.Output?) {
         let endpoint = "com.atproto.sync.getRepo"
 
@@ -98,33 +88,18 @@ public extension ATProtoClient.Com.Atproto.Sync {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: "nil")
-            }
-
-            if !contentType.lowercased().contains("application/vnd.ipld.car") {
-                throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: contentType)
-            }
-
-            let decodedData = ComAtprotoSyncGetRepo.Output(data: responseData)
-            return (responseCode, decodedData)
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoSyncGetRepo.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSyncGetRepo.Error.self)
         }
+
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: "nil")
+        }
+
+        if !contentType.lowercased().contains("application/vnd.ipld.car") {
+            throw NetworkError.invalidContentType(expected: "application/vnd.ipld.car", actual: contentType)
+        }
+
+        return (responseCode, ComAtprotoSyncGetRepo.Output(data: responseData))
     }
 }

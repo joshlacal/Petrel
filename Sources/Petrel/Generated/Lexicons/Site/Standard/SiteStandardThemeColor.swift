@@ -8,52 +8,47 @@ public enum SiteStandardThemeColor {
 
     public struct Rgb: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "site.standard.theme.color#rgb"
+
         public let b: Int
         public let g: Int
         public let r: Int
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            b: Int, g: Int, r: Int
+            b: Int,
+            g: Int,
+            r: Int,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.b = b
             self.g = g
             self.r = r
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                b = try container.decode(Int.self, forKey: .b)
-            } catch {
-                LogManager.logError("Decoding error for required property 'b': \(error)")
-                throw error
-            }
-            do {
-                g = try container.decode(Int.self, forKey: .g)
-            } catch {
-                LogManager.logError("Decoding error for required property 'g': \(error)")
-                throw error
-            }
-            do {
-                r = try container.decode(Int.self, forKey: .r)
-            } catch {
-                LogManager.logError("Decoding error for required property 'r': \(error)")
-                throw error
-            }
+            b = try container.decode(Int.self, forKey: .b)
+            g = try container.decode(Int.self, forKey: .g)
+            r = try container.decode(Int.self, forKey: .r)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(b, forKey: .b)
             try container.encode(g, forKey: .g)
             try container.encode(r, forKey: .r)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
             hasher.combine(b)
             hasher.combine(g)
             hasher.combine(r)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -67,7 +62,7 @@ public enum SiteStandardThemeColor {
             if r != other.r {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -76,18 +71,18 @@ public enum SiteStandardThemeColor {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let bValue = try b.toCBORValue()
             map = map.adding(key: "b", value: bValue)
             let gValue = try g.toCBORValue()
             map = map.adding(key: "g", value: gValue)
             let rValue = try r.toCBORValue()
             map = map.adding(key: "r", value: rValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "b", "g", "r"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case b
             case g
             case r
@@ -96,55 +91,45 @@ public enum SiteStandardThemeColor {
 
     public struct Rgba: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "site.standard.theme.color#rgba"
+
         public let a: Int
         public let b: Int
         public let g: Int
         public let r: Int
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
 
         public init(
-            a: Int, b: Int, g: Int, r: Int
+            a: Int,
+            b: Int,
+            g: Int,
+            r: Int,
+            extraFields: [String: ATProtocolValueContainer] = [:]
         ) {
             self.a = a
             self.b = b
             self.g = g
             self.r = r
+            self.extraFields = extraFields
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                a = try container.decode(Int.self, forKey: .a)
-            } catch {
-                LogManager.logError("Decoding error for required property 'a': \(error)")
-                throw error
-            }
-            do {
-                b = try container.decode(Int.self, forKey: .b)
-            } catch {
-                LogManager.logError("Decoding error for required property 'b': \(error)")
-                throw error
-            }
-            do {
-                g = try container.decode(Int.self, forKey: .g)
-            } catch {
-                LogManager.logError("Decoding error for required property 'g': \(error)")
-                throw error
-            }
-            do {
-                r = try container.decode(Int.self, forKey: .r)
-            } catch {
-                LogManager.logError("Decoding error for required property 'r': \(error)")
-                throw error
-            }
+            a = try container.decode(Int.self, forKey: .a)
+            b = try container.decode(Int.self, forKey: .b)
+            g = try container.decode(Int.self, forKey: .g)
+            r = try container.decode(Int.self, forKey: .r)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
             try container.encode(a, forKey: .a)
             try container.encode(b, forKey: .b)
             try container.encode(g, forKey: .g)
             try container.encode(r, forKey: .r)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -152,6 +137,7 @@ public enum SiteStandardThemeColor {
             hasher.combine(b)
             hasher.combine(g)
             hasher.combine(r)
+            hasher.combine(extraFields)
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
@@ -168,7 +154,7 @@ public enum SiteStandardThemeColor {
             if r != other.r {
                 return false
             }
-            return true
+            return extraFields == other.extraFields
         }
 
         public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -177,7 +163,6 @@ public enum SiteStandardThemeColor {
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
             let aValue = try a.toCBORValue()
             map = map.adding(key: "a", value: aValue)
             let bValue = try b.toCBORValue()
@@ -186,11 +171,12 @@ public enum SiteStandardThemeColor {
             map = map.adding(key: "g", value: gValue)
             let rValue = try r.toCBORValue()
             map = map.adding(key: "r", value: rValue)
-            return map
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
         }
 
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "a", "b", "g", "r"]
+
         private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
             case a
             case b
             case g

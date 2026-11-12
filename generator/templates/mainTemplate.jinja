@@ -1,40 +1,28 @@
 import Foundation
 
-{% if is_blob_upload %}
-#if canImport(UIKit)
-import UIKit
-#elseif canImport(AppKit)
-import AppKit
-#endif
-
-{% endif %}
 
 // lexicon: {{ lexicon_version }}, id: {{ lexicon_id }}
 
-public struct {{ struct_name }}{{ conformance }} { 
+{% if description %}/// {{ description | escapeComment }}
+{% endif %}public struct {{ struct_name }}{{ conformance }} {
 
-    public static let typeIdentifier = "{{ lexicon_id | escapeStringLiteral }}" 
-    
-    {{- main_properties }}
-    {{- record_struct }}                       
-    {{- lex_definitions }}
-    {{- query_parameters }}
-    {{- input_struct }}
-    {{- output_struct }}
-    {{- message_union }}
-    {{- errors_enum }}
-{%- if space_declaration %}
-    {{- space_declaration }}
-{%- endif %}
-{%- if server_contracts %}
-    {{- server_contracts }}
-{%- endif %}
+    public static let typeIdentifier = "{{ lexicon_id | escapeStringLiteral }}"
 
+{{ main_properties }}
+{{ record_struct }}
+{{ lex_definitions }}
+{{ query_parameters }}
+{{ input_struct }}
+{{ output_struct }}
+{{ message_union }}
+{{ errors_enum }}
+{{ permission_set }}
+{{ space_declaration }}
+{{ server_contracts }}
 
 {{ enums }}
 }
 
 {{ procedure }}
-{{ query }}                           
+{{ query }}
 {{ subscription }}
-

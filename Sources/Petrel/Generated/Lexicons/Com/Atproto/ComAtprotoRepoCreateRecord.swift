@@ -3,18 +3,32 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.repo.createRecord
 
+/// Create a single new repository record. Requires auth, implemented by PDS.
 public enum ComAtprotoRepoCreateRecord {
     public static let typeIdentifier = "com.atproto.repo.createRecord"
-    public struct Input: ATProtocolCodable {
-        public let repo: ATIdentifier
-        public let collection: NSID
-        public let rkey: RecordKey?
-        public let validate: Bool?
-        public let record: ATProtocolValueContainer
-        public let swapCommit: CID?
 
-        /// Standard public initializer
-        public init(repo: ATIdentifier, collection: NSID, rkey: RecordKey? = nil, validate: Bool? = nil, record: ATProtocolValueContainer, swapCommit: CID? = nil) {
+    public struct Input: ATProtocolCodable {
+        /// The handle or DID of the repo (aka, current account).
+        public let repo: ATIdentifier
+        /// The NSID of the record collection.
+        public let collection: NSID
+        /// The Record Key.
+        public let rkey: RecordKey?
+        /// Can be set to 'false' to skip Lexicon schema validation of record data, 'true' to require it, or leave unset to validate only for known Lexicons.
+        public let validate: Bool?
+        /// The record itself. Must contain a $type field.
+        public let record: ATProtocolValueContainer
+        /// Compare and swap with the previous commit by CID.
+        public let swapCommit: CIDString?
+
+        public init(
+            repo: ATIdentifier,
+            collection: NSID,
+            rkey: RecordKey? = nil,
+            validate: Bool? = nil,
+            record: ATProtocolValueContainer,
+            swapCommit: CIDString? = nil
+        ) {
             self.repo = repo
             self.collection = collection
             self.rkey = rkey
@@ -25,12 +39,13 @@ public enum ComAtprotoRepoCreateRecord {
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
             repo = try container.decode(ATIdentifier.self, forKey: .repo)
             collection = try container.decode(NSID.self, forKey: .collection)
-            rkey = try container.decodeIfPresent(RecordKey.self, forKey: .rkey)
-            validate = try container.decodeIfPresent(Bool.self, forKey: .validate)
+            rkey = try container.decodeIfPresent(RecordKey.self, forKey: .rkey, rejectingNull: strict)
+            validate = try container.decodeIfPresent(Bool.self, forKey: .validate, rejectingNull: strict)
             record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
-            swapCommit = try container.decodeIfPresent(CID.self, forKey: .swapCommit)
+            swapCommit = try container.decodeIfPresent(CIDString.self, forKey: .swapCommit, rejectingNull: strict)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -78,52 +93,44 @@ public enum ComAtprotoRepoCreateRecord {
 
     public struct Output: ATProtocolCodable {
         public let uri: ATProtocolURI
-
-        public let cid: CID
-
+        public let cid: CIDString
         public let commit: ComAtprotoRepoDefs.CommitMeta?
-
         public let validationStatus: String?
 
-        /// Standard public initializer
         public init(
             uri: ATProtocolURI,
-
-            cid: CID,
-
+            cid: CIDString,
             commit: ComAtprotoRepoDefs.CommitMeta? = nil,
-
             validationStatus: String? = nil
-
         ) {
             self.uri = uri
-
             self.cid = cid
-
             self.commit = commit
-
             self.validationStatus = validationStatus
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
+            let strict = decoder.isATProtoStrictDecoding
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
-
-            cid = try container.decode(CID.self, forKey: .cid)
-
+            cid = try container.decode(CIDString.self, forKey: .cid)
             do {
-                commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit)
+                commit = try container.decodeIfPresent(ComAtprotoRepoDefs.CommitMeta.self, forKey: .commit, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'commit' — degrading to nil: \(error)")
                 commit = nil
             }
-
             do {
-                validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus)
+                validationStatus = try container.decodeIfPresent(String.self, forKey: .validationStatus, rejectingNull: strict)
             } catch {
-                // Forward compatibility: a malformed optional field must not fail the whole response.
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // drops only the malformed optional field.
+                guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'validationStatus' — degrading to nil: \(error)")
                 validationStatus = nil
             }
@@ -131,39 +138,26 @@ public enum ComAtprotoRepoCreateRecord {
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(uri, forKey: .uri)
-
             try container.encode(cid, forKey: .cid)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(commit, forKey: .commit)
-
-            // Encode optional property even if it's an empty array
             try container.encodeIfPresent(validationStatus, forKey: .validationStatus)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let uriValue = try uri.toCBORValue()
             map = map.adding(key: "uri", value: uriValue)
-
             let cidValue = try cid.toCBORValue()
             map = map.adding(key: "cid", value: cidValue)
-
             if let value = commit {
-                // Encode optional property even if it's an empty array for CBOR
                 let commitValue = try value.toCBORValue()
                 map = map.adding(key: "commit", value: commitValue)
             }
-
             if let value = validationStatus {
-                // Encode optional property even if it's an empty array for CBOR
                 let validationStatusValue = try value.toCBORValue()
                 map = map.adding(key: "validationStatus", value: validationStatusValue)
             }
-
             return map
         }
 
@@ -191,13 +185,12 @@ public enum ComAtprotoRepoCreateRecord {
 public extension ATProtoClient.Com.Atproto.Repo {
     // MARK: - createRecord
 
-    // Create a single new repository record. Requires auth, implemented by PDS.
-    //
-    // - Parameter input: The input parameters for the request
-
+    /// Create a single new repository record. Requires auth, implemented by PDS.
     ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Parameters:
+    ///   - input: The request body
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoError<ComAtprotoRepoCreateRecord.Error>` when the server answers with an error this Lexicon declares, `ATProtoXRPCError` for any other non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func createRecord(
         input: ComAtprotoRepoCreateRecord.Input
 
@@ -228,40 +221,23 @@ public extension ATProtoClient.Com.Atproto.Repo {
         let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled by the caller via the status code.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoRepoCreateRecord.Error.self)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(ComAtprotoRepoCreateRecord.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for com.atproto.repo.createRecord: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // Try to parse a declared structured error response
-            if let atprotoError = ATProtoErrorParser.parse(
-                data: responseData,
-                statusCode: responseCode,
-                errorType: ComAtprotoRepoCreateRecord.Error.self
-            ) {
-                throw atprotoError
-            }
-
-            // Don't try to decode unknown or malformed error responses as success types
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(ComAtprotoRepoCreateRecord.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }

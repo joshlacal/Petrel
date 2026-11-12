@@ -3,8 +3,10 @@ import Foundation
 
 // lexicon: 1, id: app.bsky.notification.getPreferences
 
+/// Get notification-related preferences for an account. Requires auth.
 public enum AppBskyNotificationGetPreferences {
     public static let typeIdentifier = "app.bsky.notification.getPreferences"
+
     public struct Parameters: Parametrizable {
         public init() {}
     }
@@ -12,32 +14,26 @@ public enum AppBskyNotificationGetPreferences {
     public struct Output: ATProtocolCodable {
         public let preferences: AppBskyNotificationDefs.Preferences
 
-        /// Standard public initializer
         public init(
             preferences: AppBskyNotificationDefs.Preferences
-
         ) {
             self.preferences = preferences
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-
             preferences = try container.decode(AppBskyNotificationDefs.Preferences.self, forKey: .preferences)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-
             try container.encode(preferences, forKey: .preferences)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-
             let preferencesValue = try preferences.toCBORValue()
             map = map.adding(key: "preferences", value: preferencesValue)
-
             return map
         }
 
@@ -53,9 +49,8 @@ public extension ATProtoClient.App.Bsky.Notification {
     /// Get notification-related preferences for an account. Requires auth.
     ///
     /// - Parameter input: The input parameters for the request
-    ///
-    /// - Returns: A tuple containing the HTTP response code and the decoded response data
-    /// - Throws: NetworkError if the request fails or the response cannot be processed
+    /// - Returns: The HTTP status code (always 2xx) and the decoded response body.
+    /// - Throws: `ATProtoXRPCError` for a non-2xx response (its `error` and `message` are the server's `{error, message}` body), `XRPCResponseDecodingError` when a 2xx body does not match the output schema, and `NetworkError` for transport failures.
     func getPreferences(input: AppBskyNotificationGetPreferences.Parameters) async throws -> (responseCode: Int, data: AppBskyNotificationGetPreferences.Output?) {
         let endpoint = "app.bsky.notification.getPreferences"
 
@@ -72,35 +67,26 @@ public extension ATProtoClient.App.Bsky.Notification {
         // Determine service DID for this endpoint
         let serviceDID = await networkService.getServiceDID(for: "app.bsky.notification.getPreferences")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
-        let (responseData, response) = try await networkService.performRequest(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
+        let (responseData, response) = try await networkService.performRequestReturningHTTPErrorResponses(urlRequest, skipTokenRefresh: false, additionalHeaders: proxyHeaders)
         let responseCode = response.statusCode
 
-        // Only validate Content-Type and decode on success. Error responses
-        // (4xx/5xx) may have missing or different Content-Type headers and
-        // are handled via the status code / structured error parser below.
-        if (200 ... 299).contains(responseCode) {
-            guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
-            }
+        guard (200 ... 299).contains(responseCode) else {
+            throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
+        }
 
-            if !contentType.lowercased().contains("application/json") {
-                throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
-            }
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
+        }
 
-            do {
-                let decoder = JSONDecoder()
-                let decodedData = try decoder.decode(AppBskyNotificationGetPreferences.Output.self, from: responseData)
+        if !contentType.lowercased().contains("application/json") {
+            throw NetworkError.invalidContentType(expected: "application/json", actual: contentType)
+        }
 
-                return (responseCode, decodedData)
-            } catch {
-                // Log the decoding error for debugging but still return the response code
-                LogManager.logError("Failed to decode successful response for app.bsky.notification.getPreferences: \(error)")
-                return (responseCode, nil)
-            }
-        } else {
-            // If we can't parse a structured error, return the response code
-            // (maintains backward compatibility for endpoints without defined errors)
-            return (responseCode, nil)
+        do {
+            let decodedData = try JSONDecoder().decode(AppBskyNotificationGetPreferences.Output.self, from: responseData)
+            return (responseCode, decodedData)
+        } catch {
+            throw XRPCResponseDecodingError(endpoint: endpoint, statusCode: responseCode, underlying: error)
         }
     }
 }
