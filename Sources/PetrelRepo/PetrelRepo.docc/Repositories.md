@@ -189,10 +189,14 @@ try await RepositoryCommitDiff.verifyInversion(
 does both steps, and checks the record blocks, in one call.
 
 On a firehose, hand the event's fields straight to
-``RepositoryCommitDiff/verifyCommitEvent(blocks:commitCID:did:revision:operations:previousDataCID:keyResolver:limits:policy:)``
+``RepositoryCommitDiff/verifyCommitEvent(blocks:commitCID:did:revision:operations:previousDataCID:keyResolver:limits:policy:now:maximumClockSkew:)``
 for a `#commit` event, or to
-``RepositoryCommitDiff/verifySyncEvent(blocks:did:revision:keyResolver:limits:)``
+``RepositoryCommitDiff/verifySyncEvent(blocks:did:revision:keyResolver:limits:now:maximumClockSkew:)``
 for a `#sync` event. Both also check that the event's `repo`/`did`, `rev` and
-`commit` are the ones inside the signed commit. Supply a
-``RepositorySigningKeyResolver`` backed by DID resolution; a signature that
-fails against a cached key is retried once against a refreshed one.
+`commit` are the ones inside the signed commit, and refuse a `rev` more than
+five minutes ahead of the clock. For the key, pass
+`CachingServiceAuthKeyResolver(upstream: IdentityResolver())`: both conform
+to ``RepositorySigningKeyResolver``, and the cache limits how often a bad
+signature can force a fresh DID-document fetch. A signature that fails
+against a cached key is retried once against a refreshed one. PetrelFirehose
+applies all of this to a decoded event with `RelayCommitEvent.verify(keyResolver:)`.

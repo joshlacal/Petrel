@@ -59,6 +59,20 @@ public enum RepositoryCommitDiffError: Error, Sendable, Equatable {
     case rootMismatch(root: CID, commit: CID)
     /// The event's `rev` is not the revision inside the signed commit.
     case revisionMismatch(event: String, commit: String)
+    /// The event's `rev` is a timestamp further ahead of the consumer's clock
+    /// than the allowed skew. The specification says to reject such events.
+    case revisionInFuture(revision: String)
+    /// The event lists more operations than ``PublicRepositoryLimits/maximumWrites``.
+    case tooManyOperations(count: Int, limit: Int)
+    /// The event's `blocks` are larger than
+    /// ``PublicRepositoryLimits/maximumRelevantBlockBytes``.
+    case blocksTooLarge(byteCount: Int, limit: Int)
+    /// An operation of the event is malformed: its path is not a repository
+    /// path, or it lacks the record CID or previous CID its action requires.
+    case malformedOperation(path: String)
+    /// The `#commit` event has no `prevData`, so its operations cannot be
+    /// inverted. Events from before sync v1.1 omit it.
+    case missingPreviousData
 }
 
 /// A commit diff that passed ``RepositoryCommitDiff/verify(commitCID:operations:previousDataCID:blocks:keyResolver:expectedDID:limits:policy:)``.
@@ -242,7 +256,11 @@ public enum RepositoryCommitDiff {
     /// On top of ``verify(commitCID:operations:previousDataCID:blocks:keyResolver:expectedDID:limits:policy:)``
     /// this checks the event envelope against what was signed: the CAR's
     /// first root is the event's `commit`, the commit is for the event's
-    /// `repo`, and its revision is the event's `rev`.
+    /// `repo`, and its revision is the event's `rev`. Before any signature
+    /// work it refuses an event whose `rev` lies further in the future than
+    /// `maximumClockSkew`, more operations than
+    /// ``PublicRepositoryLimits/maximumWrites``, or `blocks` larger than
+    /// ``PublicRepositoryLimits/maximumRelevantBlockBytes``.
     ///
     /// - Parameters:
     ///   - car: The event's `blocks`.
@@ -253,8 +271,12 @@ public enum RepositoryCommitDiff {
     ///   - previousDataCID: The event's `prevData`.
     ///   - keyResolver: Looks up the account's signing key; asked again with
     ///     a refresh if the signature does not verify.
-    ///   - limits: Bounds on the archive, the tree and record size.
+    ///   - limits: Bounds on the archive, the tree and record size, the
+    ///     operation count and the size of `blocks`.
     ///   - policy: How strictly record content is checked.
+    ///   - now: The consumer's current time.
+    ///   - maximumClockSkew: How far ahead of `now` a revision may be, in
+    ///     seconds. Five minutes by default.
     /// - Throws: ``RepositoryCommitDiffError``.
     public static func verifyCommitEvent(
         blocks car: Data,
@@ -265,8 +287,21 @@ public enum RepositoryCommitDiff {
         previousDataCID: CID,
         keyResolver: any RepositorySigningKeyResolver,
         limits: PublicRepositoryLimits = .standard,
-        policy: RepositoryReadPolicy = .dataModel
+        policy: RepositoryReadPolicy = .dataModel,
+        now: Date = Date(),
+        maximumClockSkew: TimeInterval = 300
     ) async throws -> VerifiedRepositoryCommitDiff {
+        try requireNotInFuture(revision, now: now, maximumClockSkew: maximumClockSkew)
+        guard operations.count <= limits.maximumWrites else {
+            throw RepositoryCommitDiffError.tooManyOperations(
+                count: operations.count, limit: limits.maximumWrites
+            )
+        }
+        guard car.count <= limits.maximumRelevantBlockBytes else {
+            throw RepositoryCommitDiffError.blocksTooLarge(
+                byteCount: car.count, limit: limits.maximumRelevantBlockBytes
+            )
+        }
         let store = try await loadEventBlocks(car, commitCID: commitCID, limits: limits)
         let verified = try await verify(
             commitCID: commitCID,
@@ -288,8 +323,9 @@ public enum RepositoryCommitDiff {
     /// The event carries only the commit block. This checks that the block
     /// is present and is the CAR's root, that it is a canonical commit
     /// signed by the key of the event's `did`, and that its revision is the
-    /// event's `rev`. The returned commit's `data` is the tree root to fetch
-    /// and verify against.
+    /// event's `rev`. Before any signature work it refuses an event whose
+    /// `rev` lies further in the future than `maximumClockSkew`. The
+    /// returned commit's `data` is the tree root to fetch and verify against.
     ///
     /// - Parameters:
     ///   - car: The event's `blocks`.
@@ -297,14 +333,20 @@ public enum RepositoryCommitDiff {
     ///   - revision: The event's `rev`.
     ///   - keyResolver: Looks up the account's signing key.
     ///   - limits: Bounds on the archive.
+    ///   - now: The consumer's current time.
+    ///   - maximumClockSkew: How far ahead of `now` a revision may be, in
+    ///     seconds. Five minutes by default.
     /// - Throws: ``RepositoryCommitDiffError``.
     public static func verifySyncEvent(
         blocks car: Data,
         did: String,
         revision: String,
         keyResolver: any RepositorySigningKeyResolver,
-        limits: PublicRepositoryLimits = .standard
+        limits: PublicRepositoryLimits = .standard,
+        now: Date = Date(),
+        maximumClockSkew: TimeInterval = 300
     ) async throws -> VerifiedPublicRepositorySignedCommit {
+        try requireNotInFuture(revision, now: now, maximumClockSkew: maximumClockSkew)
         let store = InMemoryRepositoryBlockStore()
         let parsed: PublicRepositoryCARParseResult
         do {
@@ -351,6 +393,21 @@ public enum RepositoryCommitDiff {
             throw RepositoryCommitDiffError.rootMismatch(root: parsed.rootCID, commit: commitCID)
         }
         return store
+    }
+
+    /// The specification: "reject commit events with a rev corresponding to
+    /// a future timestamp (beyond a fudge factor)". A `rev` that is not a
+    /// TID is left to the revision check against the signed commit, which
+    /// only accepts TIDs.
+    private static func requireNotInFuture(
+        _ revision: String,
+        now: Date,
+        maximumClockSkew: TimeInterval
+    ) throws {
+        guard let tid = try? PublicRepositoryTID(revision) else { return }
+        if tid.isInFuture(comparedTo: now, tolerance: max(0, maximumClockSkew)) {
+            throw RepositoryCommitDiffError.revisionInFuture(revision: revision)
+        }
     }
 
     private static func requireRevision(

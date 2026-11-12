@@ -606,7 +606,12 @@ public class DAGCBOR {
         case let bool as Bool: return .boolean(bool)
         case let data as Data: return .byteString(data.map { $0 })
         case let int as Int: return CBOR.fromInt(int) // Handles positive/negative
-        case let uint as UInt: return .unsignedInt(UInt64(uint))
+        case let uint as UInt:
+            // The data model's integer is a signed 64-bit value.
+            guard UInt64(uint) <= UInt64(Int64.max) else {
+                throw DAGCBORError.encodingFailed("Unsigned integer exceeds the signed 64-bit range")
+            }
+            return .unsignedInt(UInt64(uint))
         case let int8 as Int8: return CBOR.fromInt(Int(int8))
         case let uint8 as UInt8: return .unsignedInt(UInt64(uint8))
         case let int16 as Int16: return CBOR.fromInt(Int(int16))
@@ -614,7 +619,11 @@ public class DAGCBOR {
         case let int32 as Int32: return CBOR.fromInt(Int(int32))
         case let uint32 as UInt32: return .unsignedInt(UInt64(uint32))
         case let int64 as Int64: return CBOR.fromInt64(int64)
-        case let uint64 as UInt64: return .unsignedInt(uint64)
+        case let uint64 as UInt64:
+            guard uint64 <= UInt64(Int64.max) else {
+                throw DAGCBORError.encodingFailed("Unsigned integer exceeds the signed 64-bit range")
+            }
+            return .unsignedInt(uint64)
         // Handle Arrays
         case let array as [Any]:
             var cborArray = [CBOR]()

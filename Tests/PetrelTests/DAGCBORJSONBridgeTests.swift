@@ -90,13 +90,21 @@ struct DAGCBORJSONBridgeTests {
     func carUnsignedIntegerPolicyUsesExactBoundary() throws {
         let throughIntMax = UInt64(Int.max)
         let aboveIntMax = throughIntMax + 1
-        let root = OrderedCBORMap(entries: [
-            (key: "throughIntMax", value: throughIntMax),
-            (key: "aboveIntMax", value: aboveIntMax),
-            (key: "uintMax", value: UInt64.max),
-        ])
+        // The encoder refuses values above Int64.max (the data model's
+        // integer is signed 64-bit), so the map is written by hand, in
+        // canonical key order: length first, then bytes.
+        func text(_ string: String) -> Data {
+            Data([0x60 | UInt8(string.utf8.count)]) + Data(string.utf8)
+        }
+        func unsigned(_ value: UInt64) -> Data {
+            Data([0x1b]) + Data((0 ..< 8).reversed().map { UInt8(truncatingIfNeeded: value >> ($0 * 8)) })
+        }
+        let encoded = Data([0xa3])
+            + text("uintMax") + unsigned(UInt64.max)
+            + text("aboveIntMax") + unsigned(aboveIntMax)
+            + text("throughIntMax") + unsigned(throughIntMax)
 
-        let decoded = try CARRepository.decodeRecordCBOR(DAGCBOR.encodeValue(root))
+        let decoded = try CARRepository.decodeRecordCBOR(encoded)
 
         guard case let .object(rootObject) = decoded else {
             #expect(Bool(false), "Expected a CAR object root")

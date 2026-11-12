@@ -77,17 +77,20 @@ public struct PreparedPublicRepositoryMutation: Sendable, Equatable {
     /// The record operations in wire form, with the previous record CID for
     /// updates and deletes.
     public var operations: [RepositoryCommitOperation] {
-        recordResults.compactMap { result in
-            switch result.action {
-            case .create:
-                return result.recordCID.map { .create(path: result.path, cid: $0) }
-            case .update:
-                guard let cid = result.recordCID, let previous = result.previousRecordCID else {
-                    return nil
-                }
+        // The engine sets `recordCID` for every create and update and
+        // `previousRecordCID` for every update and delete. Dropping a result
+        // that lacked one would yield a diff that later fails inversion with
+        // a misleading error, so a missing CID stops here instead.
+        recordResults.map { result in
+            switch (result.action, result.recordCID, result.previousRecordCID) {
+            case let (.create, cid?, _):
+                return .create(path: result.path, cid: cid)
+            case let (.update, cid?, previous?):
                 return .update(path: result.path, cid: cid, previous: previous)
-            case .delete:
-                return result.previousRecordCID.map { .delete(path: result.path, previous: $0) }
+            case let (.delete, _, previous?):
+                return .delete(path: result.path, previous: previous)
+            default:
+                preconditionFailure("engine produced a \(result.action) result without its CIDs")
             }
         }
     }

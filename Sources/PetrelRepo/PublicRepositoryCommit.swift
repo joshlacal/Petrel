@@ -184,8 +184,10 @@ public struct LegacyRepositoryCommitV2: Sendable, Equatable {
 
 /// Supplies the signing key an account currently publishes.
 ///
-/// Implement this over DID resolution: return the key from the
-/// `#atproto` verification method of the account's DID document. The commit
+/// `IdentityResolver` and `CachingServiceAuthKeyResolver` conform: wrap the
+/// first in the second for untrusted input. A custom implementation returns
+/// the key from the `#atproto` verification method of the account's DID
+/// document. The commit
 /// codec calls it once with `forceRefresh: false` and, only if the signature
 /// does not verify against that key, once more with `forceRefresh: true`, so
 /// a cached document that predates a key rotation is refreshed exactly once.
