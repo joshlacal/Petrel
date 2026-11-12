@@ -59,23 +59,32 @@ public extension DIDDocument {
 
     /// The first service whose id is `identifier.id`, written as a fragment or as this DID
     /// followed by the fragment, and whose type matches when a type is required.
+    ///
+    /// `nil` also when the first such entry in the document could not be read (for example
+    /// its `serviceEndpoint` is a map): later entries with the same id are ignored.
     func service(_ identifier: DIDServiceIdentifier) -> Service? {
-        service.first { entry in
-            matches(entry.id, fragment: identifier.id) && (identifier.type == nil || entry.type == identifier.type)
-        }
+        guard case let .readable(entry)? = firstServiceEntry(identifier) else { return nil }
+        return entry
     }
 
     /// The endpoint of the first matching service, checked against the DID specification: an
     /// `https` URL (or `http` to `localhost`, `127.0.0.1` or `::1`) with a host and nothing
     /// besides scheme, host and port.
     ///
-    /// Later entries with the same id are ignored even when the first one is unusable.
+    /// Later entries with the same id are ignored even when the first one is unusable, whether
+    /// its endpoint is not a URI string or is a URI that fails these checks.
     ///
     /// - Throws: ``IdentityError/missingService(did:id:)`` or
     ///   ``IdentityError/invalidServiceEndpoint(did:id:)``.
     func serviceEndpoint(_ identifier: DIDServiceIdentifier) throws -> URL {
-        guard let entry = service(identifier) else {
+        let entry: Service
+        switch firstServiceEntry(identifier) {
+        case nil:
             throw IdentityError.missingService(did: id, id: identifier.id)
+        case .unreadable:
+            throw IdentityError.invalidServiceEndpoint(did: id, id: identifier.id)
+        case let .readable(readable):
+            entry = readable
         }
         guard let url = Self.validatedServiceEndpoint(entry.serviceEndpoint) else {
             throw IdentityError.invalidServiceEndpoint(did: id, id: identifier.id)
@@ -168,6 +177,32 @@ extension DIDDocument {
     /// (`<this DID>#atproto`).
     private func matches(_ entryID: String, fragment: String) -> Bool {
         entryID == fragment || entryID == id + fragment
+    }
+
+    private enum ServiceEntry {
+        case readable(Service)
+        case unreadable
+    }
+
+    /// The first service entry, in document order and counting unreadable entries, whose id
+    /// and type match `identifier`.
+    private func firstServiceEntry(_ identifier: DIDServiceIdentifier) -> ServiceEntry? {
+        func isMatch(id entryID: String, type: String?) -> Bool {
+            matches(entryID, fragment: identifier.id) && (identifier.type == nil || type == identifier.type)
+        }
+        let unreadable = Dictionary(
+            unreadableServices.map { ($0.position, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        var readable = service.makeIterator()
+        for position in 0 ..< (service.count + unreadable.count) {
+            if let entry = unreadable[position] {
+                if isMatch(id: entry.id, type: entry.type) { return .unreadable }
+            } else if let entry = readable.next() {
+                if isMatch(id: entry.id, type: entry.type) { return .readable(entry) }
+            }
+        }
+        return nil
     }
 
     /// `endpoint` as a URL when it is only a scheme, a host and an optional port over `https`,
