@@ -128,7 +128,8 @@ struct XRPCValidationTests {
           "exact":{"type":"boolean","default":false},
           "tags":{"type":"array","maxLength":2,"items":{"type":"string","maxLength":4}},
           "flags":{"type":"array","items":{"type":"boolean"}},
-          "opaque":{"type":"unknown"}
+          "opaque":{"type":"unknown"},
+          "opaqueList":{"type":"array","minLength":2,"maxLength":3,"items":{"type":"unknown"}}
         }}}}}
         """#.utf8))
         try catalog.add(json: Data(#"{"lexicon":1,"id":"com.example.bare","defs":{"main":{"type":"query"}}}"#.utf8))
@@ -147,6 +148,22 @@ struct XRPCValidationTests {
         #expect(explicit == [
             "q": "cats", "limit": 100, "sort": "latest", "exact": true, "tags": ["a", "b"], "flags": [true, false], "opaque": "{}",
         ])
+    }
+
+    @Test("an array of unknown items still has its length checked")
+    func unknownItemArrayLength() throws {
+        let catalog = try Self.defaultsCatalog()
+        func codes(_ pairs: KeyValuePairs<String, String?>) -> [LexiconValidationIssue.Code] {
+            Self.issues { try catalog.validateXRPCParameters(Self.items(pairs), nsid: "com.example.search") }.map(\.code)
+        }
+        #expect(codes(["q": "cats", "opaqueList": "a"]) == [.arrayTooShort])
+        #expect(codes(["q": "cats", "opaqueList": "a", "opaqueList": "b"]) == [])
+        #expect(codes(["q": "cats", "opaqueList": "a", "opaqueList": "b", "opaqueList": "c", "opaqueList": "d"]) == [.arrayTooLong])
+        // Typed parameters take the same path.
+        let typed = Self.issues {
+            try catalog.validateXRPCParameters(["q": "cats", "opaqueList": [["a": 1]]], nsid: "com.example.search")
+        }
+        #expect(typed.map(\.code) == [.arrayTooShort])
     }
 
     @Test("parameter constraints: range, enum, lengths")

@@ -423,9 +423,17 @@ public struct LexiconCatalog: Sendable {
             // `unknown` in a query string has no object form to check.
             if case .unknown = property { continue }
             if case let .array(array) = property, case .unknown = array.items {
-                guard case .array = value else {
+                guard case let .array(items) = value else {
                     validator.report(.typeMismatch, path, "must be an array, found \(value.kind)")
                     continue
+                }
+                // The items have no object form to check, but the array's own
+                // length constraints still apply.
+                if let minLength = array.minLength, items.count < minLength {
+                    validator.report(.arrayTooShort, path, "must not have fewer than \(minLength) elements (has \(items.count))")
+                }
+                if let maxLength = array.maxLength, items.count > maxLength {
+                    validator.report(.arrayTooLong, path, "must not have more than \(maxLength) elements (has \(items.count))")
                 }
                 continue
             }
