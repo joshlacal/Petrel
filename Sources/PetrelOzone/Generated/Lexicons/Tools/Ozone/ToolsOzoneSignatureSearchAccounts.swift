@@ -16,7 +16,7 @@ public enum ToolsOzoneSignatureSearchAccounts {
         public init(
             values: [String],
             cursor: String? = nil,
-            limit: Int? = nil
+            limit: Int? = 50
         ) {
             self.values = values
             self.cursor = cursor
@@ -123,3 +123,11 @@ public extension ATProtoClient.Tools.Ozone.Signature {
         }
     }
 }
+
+extension ToolsOzoneSignatureSearchAccounts.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(values: values, cursor: cursor, limit: limit)
+    }
+}
+
+extension ToolsOzoneSignatureSearchAccounts.Output: XRPCCursorPaginatedOutput {}

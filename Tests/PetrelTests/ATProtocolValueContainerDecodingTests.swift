@@ -554,10 +554,9 @@ struct ATProtocolValueContainerDecodingTests {
         }
         #expect(try decodedNestedRoot.encodedDAGCBOR() == nestedCBOR)
 
-        // `langs` does not match its schema. The Lexicon specification treats such a
-        // record as invalid as a whole, and a typed view that silently dropped the
-        // field would delete it when the record is written back. The value therefore
-        // stays raw, with every field intact.
+        // `langs` does not match its schema. The default lenient decoding reads it as
+        // nil, and the typed record keeps the raw value in `extraFields` (re-audit r-5),
+        // so writing the record back keeps every field and the original bytes.
         let malformedPost = ATProtocolValueContainer.object([
             "$type": .string(type),
             "text": .string("malformed optional value"),
@@ -566,12 +565,14 @@ struct ATProtocolValueContainerDecodingTests {
         ])
         let malformedCBOR = try malformedPost.encodedDAGCBOR()
         let decodedMalformed = try ATProtocolValueContainer.decodedFromDAGCBOR(malformedCBOR)
-        guard case let .unknownType(malformedType, .object(malformedRaw)) = decodedMalformed else {
-            Issue.record("Expected a record with a malformed optional field to stay raw, got \(decodedMalformed)")
+        guard case let .knownType(malformedValue) = decodedMalformed,
+              let malformedTyped = malformedValue as? AppBskyFeedPost
+        else {
+            Issue.record("Expected a typed record that keeps its malformed field, got \(decodedMalformed)")
             return
         }
-        #expect(malformedType == type)
-        #expect(malformedRaw["langs"] == .string("not-an-array"))
+        #expect(malformedTyped.langs == nil)
+        #expect(malformedTyped.extraFields["langs"] == .string("not-an-array"))
         #expect(try decodedMalformed.encodedDAGCBOR() == malformedCBOR)
 
         // Decoding the type directly is still lenient by default, and strict on request.

@@ -24,7 +24,7 @@ public enum AppBskyUnspeccedSearchPostsSkeleton {
 
         public init(
             q: String,
-            sort: String? = nil,
+            sort: String? = "latest",
             since: String? = nil,
             until: String? = nil,
             mentions: ATIdentifier? = nil,
@@ -34,7 +34,7 @@ public enum AppBskyUnspeccedSearchPostsSkeleton {
             url: URI? = nil,
             tag: [String]? = nil,
             viewer: DID? = nil,
-            limit: Int? = nil,
+            limit: Int? = 25,
             cursor: String? = nil
         ) {
             self.q = q
@@ -183,3 +183,11 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         }
     }
 }
+
+extension AppBskyUnspeccedSearchPostsSkeleton.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(q: q, sort: sort, since: since, until: until, mentions: mentions, author: author, lang: lang, domain: domain, url: url, tag: tag, viewer: viewer, limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyUnspeccedSearchPostsSkeleton.Output: XRPCCursorPaginatedOutput {}

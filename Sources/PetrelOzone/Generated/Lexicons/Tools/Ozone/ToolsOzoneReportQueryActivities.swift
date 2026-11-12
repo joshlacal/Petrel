@@ -20,8 +20,8 @@ public enum ToolsOzoneReportQueryActivities {
             activityTypes: [String]? = nil,
             createdAfter: ATProtocolDate? = nil,
             createdBefore: ATProtocolDate? = nil,
-            sortDirection: ParametersSortDirection? = nil,
-            limit: Int? = nil,
+            sortDirection: ParametersSortDirection? = .value_desc,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.activityTypes = activityTypes
@@ -146,3 +146,11 @@ public extension ATProtoClient.Tools.Ozone.Report {
         }
     }
 }
+
+extension ToolsOzoneReportQueryActivities.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(activityTypes: activityTypes, createdAfter: createdAfter, createdBefore: createdBefore, sortDirection: sortDirection, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneReportQueryActivities.Output: XRPCCursorPaginatedOutput {}

@@ -16,9 +16,9 @@ public enum ChatBskyModerationGetMessageContext {
         public init(
             convoId: String? = nil,
             messageId: String,
-            before: Int? = nil,
-            after: Int? = nil,
-            maxInterleavedSystemMessages: Int? = nil
+            before: Int? = 5,
+            after: Int? = 5,
+            maxInterleavedSystemMessages: Int? = 10
         ) {
             self.convoId = convoId
             self.messageId = messageId

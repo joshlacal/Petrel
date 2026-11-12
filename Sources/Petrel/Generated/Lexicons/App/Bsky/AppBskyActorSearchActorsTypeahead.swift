@@ -15,7 +15,7 @@ public enum AppBskyActorSearchActorsTypeahead {
         public init(
             term: String? = nil,
             q: String? = nil,
-            limit: Int? = nil
+            limit: Int? = 10
         ) {
             self.term = term
             self.q = q

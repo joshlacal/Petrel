@@ -13,7 +13,7 @@ public enum ComAtprotoTempFetchLabels {
 
         public init(
             since: Int? = nil,
-            limit: Int? = nil
+            limit: Int? = 50
         ) {
             self.since = since
             self.limit = limit

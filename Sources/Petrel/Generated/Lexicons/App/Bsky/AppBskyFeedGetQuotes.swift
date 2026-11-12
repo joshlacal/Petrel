@@ -17,7 +17,7 @@ public enum AppBskyFeedGetQuotes {
         public init(
             uri: ATProtocolURI,
             cid: CIDString? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
             sort: String? = nil
         ) {
@@ -155,3 +155,11 @@ public extension ATProtoClient.App.Bsky.Feed {
         }
     }
 }
+
+extension AppBskyFeedGetQuotes.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(uri: uri, cid: cid, limit: limit, cursor: cursor, sort: sort)
+    }
+}
+
+extension AppBskyFeedGetQuotes.Output: XRPCCursorPaginatedOutput {}

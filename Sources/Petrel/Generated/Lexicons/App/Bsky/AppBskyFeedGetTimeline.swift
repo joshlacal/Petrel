@@ -15,7 +15,7 @@ public enum AppBskyFeedGetTimeline {
 
         public init(
             algorithm: String? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
             since: String? = nil
         ) {
@@ -145,3 +145,11 @@ public extension ATProtoClient.App.Bsky.Feed {
         }
     }
 }
+
+extension AppBskyFeedGetTimeline.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(algorithm: algorithm, limit: limit, cursor: cursor, since: since)
+    }
+}
+
+extension AppBskyFeedGetTimeline.Output: XRPCCursorPaginatedOutput {}

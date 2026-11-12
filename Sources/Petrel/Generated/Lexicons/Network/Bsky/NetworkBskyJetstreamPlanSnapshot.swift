@@ -49,6 +49,7 @@ public enum NetworkBskyJetstreamPlanSnapshot {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             name = try container.decode(String.self, forKey: .name)
             index = try container.decode(Int.self, forKey: .index)
             checksum = try container.decode(String.self, forKey: .checksum)
@@ -60,12 +61,14 @@ public enum NetworkBskyJetstreamPlanSnapshot {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'blocks' — degrading to nil: \(error)")
                 blocks = nil
+                malformedFields.insert("blocks")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -77,7 +80,7 @@ public enum NetworkBskyJetstreamPlanSnapshot {
             try container.encode(maxSeq, forKey: .maxSeq)
             try container.encode(mode, forKey: .mode)
             try container.encodeIfPresent(blocks, forKey: .blocks)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -143,10 +146,25 @@ public enum NetworkBskyJetstreamPlanSnapshot {
                 let blocksValue = try value.toCBORValue()
                 map = map.adding(key: "blocks", value: blocksValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "index", "checksum", "minSeq", "maxSeq", "mode", "blocks"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "name": return true
+            case "index": return true
+            case "checksum": return true
+            case "minSeq": return true
+            case "maxSeq": return true
+            case "mode": return true
+            case "blocks": return blocks != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case name

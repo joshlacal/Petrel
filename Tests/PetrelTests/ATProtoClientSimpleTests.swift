@@ -187,7 +187,7 @@ struct ATProtoClientSimpleTests {
     // Test with nil optional parameters
     let emptyParams = AppBskyFeedGetTimeline.Parameters()
     #expect(emptyParams.algorithm == nil, "Optional algorithm should be nil")
-    #expect(emptyParams.limit == nil, "Optional limit should be nil")
+    #expect(emptyParams.limit == 50, "limit defaults to the Lexicon's default, 50")
     #expect(emptyParams.cursor == nil, "Optional cursor should be nil")
 
     // Test with minimum values

@@ -13,7 +13,7 @@ public enum AppBskyUnspeccedGetPopularFeedGenerators {
         public let query: String?
 
         public init(
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
             query: String? = nil
         ) {
@@ -122,3 +122,11 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         }
     }
 }
+
+extension AppBskyUnspeccedGetPopularFeedGenerators.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(limit: limit, cursor: cursor, query: query)
+    }
+}
+
+extension AppBskyUnspeccedGetPopularFeedGenerators.Output: XRPCCursorPaginatedOutput {}

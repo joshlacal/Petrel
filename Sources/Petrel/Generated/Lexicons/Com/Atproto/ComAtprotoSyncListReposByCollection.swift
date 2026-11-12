@@ -73,7 +73,7 @@ public enum ComAtprotoSyncListReposByCollection {
 
         public init(
             collection: NSID,
-            limit: Int? = nil,
+            limit: Int? = 500,
             cursor: String? = nil
         ) {
             self.collection = collection
@@ -181,3 +181,11 @@ public extension ATProtoClient.Com.Atproto.Sync {
         }
     }
 }
+
+extension ComAtprotoSyncListReposByCollection.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(collection: collection, limit: limit, cursor: cursor)
+    }
+}
+
+extension ComAtprotoSyncListReposByCollection.Output: XRPCCursorPaginatedOutput {}

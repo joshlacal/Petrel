@@ -16,7 +16,7 @@ public enum AppBskyUnspeccedSearchStarterPacksSkeleton {
         public init(
             q: String,
             viewer: DID? = nil,
-            limit: Int? = nil,
+            limit: Int? = 25,
             cursor: String? = nil
         ) {
             self.q = q
@@ -156,3 +156,11 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         }
     }
 }
+
+extension AppBskyUnspeccedSearchStarterPacksSkeleton.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(q: q, viewer: viewer, limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyUnspeccedSearchStarterPacksSkeleton.Output: XRPCCursorPaginatedOutput {}

@@ -61,6 +61,7 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         self.property_type_overrides = dict(property_type_overrides or {})
         self.used_property_type_overrides = set()
         self.inline_objects = {}
+        self.inline_object_names = {}
         self.parameter_properties = []
         self.struct_name = convert_to_camel_case(self.lexicon_id)
         self.conformance = ""
@@ -288,8 +289,12 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             and (lenient or (not prop['nullable'] and not server_input))
             for prop in properties
         )
+        keeps_malformed = lenient and extra_fields and any(
+            prop['wire_optional'] and not prop['strict_decode'] for prop in properties
+        )
         return {
             'uses_strict_flag': uses_strict_flag,
+            'keeps_malformed': keeps_malformed,
             'encodes_type': encodes_type,
             'value_semantics': value_semantics,
             'lenient': lenient,
@@ -304,17 +309,19 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         An inline object has no name of its own, so it is named after the struct and
         property that contain it (`ViewMeta` for `view.meta`) and never carries `$type`.
         """
-        struct_name = f"{convert_to_camel_case(current_struct_name)}{convert_to_camel_case(name)}"
         identity = (context_identity, current_struct_name, name)
-        existing = self.inline_objects.get(struct_name)
+        existing = self.inline_object_names.get(identity)
         if existing is not None:
-            if existing != identity:
-                raise ValueError(
-                    f"{self.lexicon_id}: inline object type name '{struct_name}' is produced by two "
-                    f"different properties ({existing!r} and {identity!r})"
-                )
-            return struct_name
+            return existing
+        base_name = f"{convert_to_camel_case(current_struct_name)}{convert_to_camel_case(name)}"
+        struct_name = self.unclaimed_inline_type_name(base_name)
+        if struct_name in self.inline_objects:
+            raise ValueError(
+                f"{self.lexicon_id}: inline object type name '{struct_name}' is produced by two "
+                f"different properties ({self.inline_objects[struct_name]!r} and {identity!r})"
+            )
         self.inline_objects[struct_name] = identity
+        self.inline_object_names[identity] = struct_name
         properties = self.generate_properties(
             schema.get('properties', {}),
             schema.get('required', []),
@@ -332,6 +339,33 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             ),
         ) + "\n\n"
         return struct_name
+
+    # Types every lexicon container may declare besides its named definitions.
+    FIXED_CONTAINER_TYPE_NAMES = frozenset({"Parameters", "Input", "Output", "Message", "Error"})
+
+    def unclaimed_inline_type_name(self, base_name: str) -> str:
+        """`base_name`, or `<base_name>Object[N]` when the container already has a type
+        of that name.
+
+        An inline object is named after its struct and property (`ViewMeta` for
+        `view.meta`), which can be the name of a named definition (`viewMeta`) or of
+        another generated type. A named definition keeps its name, since other
+        lexicons refer to it as `Container.Name`; nothing refers to an inline
+        object's type by name from outside, so the inline object yields.
+        """
+        taken = set(self.FIXED_CONTAINER_TYPE_NAMES)
+        taken.update(convert_to_camel_case(name) for name in self.defs if name != 'main')
+        taken.update(f"Defs{convert_to_camel_case(name)}" for name, schema in self.defs.items()
+                     if isinstance(schema, dict) and schema.get('type') == 'string' and 'enum' in schema)
+        taken.update(self.closed_enum_identity_by_name)
+        if base_name not in taken:
+            return base_name
+        candidate = f"{base_name}Object"
+        suffix = 2
+        while candidate in taken or candidate in self.inline_objects:
+            candidate = f"{base_name}Object{suffix}"
+            suffix += 1
+        return candidate
 
     def resolve_strict_ref_contract(self, ref: str) -> tuple[List[str], str]:
         nsid, separator, fragment = ref.partition('#')
@@ -385,9 +419,48 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             tri_state_nullable=False,
         )
         for prop in properties:
-            self.check_query_parameter_encodable(prop, parameters['properties'][prop['name']])
+            schema = parameters['properties'][prop['name']]
+            self.check_query_parameter_encodable(prop, schema)
+            prop['default_literal'] = self.parameter_default_literal(prop, schema)
         self.parameter_properties = properties
         return self.template_manager.query_parameters_template.render(properties=properties)
+
+    def parameter_default_literal(self, prop: Dict[str, Any], schema: Dict[str, Any]) -> Optional[str]:
+        """The Swift literal for a parameter's Lexicon `default`, or None.
+
+        The Lexicon specification says a client should send a parameter's default
+        (so caches see one request, not two), so the default becomes the
+        initializer's default argument: `limit: Int? = 50`. A caller can still pass
+        `nil` to leave the parameter out.
+        """
+        if 'default' not in schema:
+            return None
+        value = schema['default']
+        schema_type = schema.get('type')
+        where = f"{self.lexicon_id} query parameter '{prop['name']}'"
+        if schema_type == 'integer':
+            if isinstance(value, bool) or not isinstance(value, int):
+                raise ValueError(f"{where} has default {value!r}, which is not an integer")
+            return str(value)
+        if schema_type == 'boolean':
+            if not isinstance(value, bool):
+                raise ValueError(f"{where} has default {value!r}, which is not a boolean")
+            return 'true' if value else 'false'
+        if schema_type == 'string':
+            if not isinstance(value, str):
+                raise ValueError(f"{where} has default {value!r}, which is not a string")
+            if 'enum' in schema:
+                if value not in schema['enum']:
+                    raise ValueError(f"{where} has default '{value}', which is not in its enum")
+                return '.' + self.enum_generator._case_identifier(value)
+            if prop['type'] == 'String':
+                return self.enum_generator._swift_string_literal(value)
+            # A string format with its own Swift type (DID, Handle, ...) has no
+            # literal form; the parameter is left out unless the caller sets it.
+            return None
+        raise ValueError(
+            f"{where} has a default, which the Lexicon allows only on boolean, integer and string"
+        )
 
     def check_query_parameter_encodable(self, prop: Dict[str, Any], schema: Dict[str, Any]) -> None:
         leaf = schema.get('items', {}) if schema.get('type') == 'array' else schema
@@ -932,6 +1005,7 @@ class SwiftCodeGenerator(BaseCodeGenerator):
         
         # Render the query template with the encoding information
         return self.template_manager.query_template.render(
+            pagination=self.pagination_conformances(main_def, output_encoding),
             template_namespace_name=template_namespace_name,
             query_name=query_name,
             input_parameters=input_parameters,
@@ -944,6 +1018,45 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             has_errors=bool(main_def.get('errors')),
             struct_name=self.struct_name,
             emit_xrpc_error_parsing=self.emit_xrpc_error_parsing,
+        )
+
+    def pagination_conformances(self, main_def, output_encoding) -> str:
+        """XRPCPages conformances for a query that pages with a `cursor`.
+
+        The query must take an optional plain-string `cursor` parameter and return
+        an object whose optional `cursor` is a plain string. Everything else
+        (a typed cursor, an output that is a ref to a shared def) is left alone.
+        """
+        if output_encoding != 'application/json':
+            return ""
+        cursor_param = next((p for p in self.parameter_properties if p['name'] == 'cursor'), None)
+        if cursor_param is None or cursor_param['type'] != 'String' or not cursor_param['wire_optional']:
+            return ""
+        schema = main_def.get('output', {}).get('schema', {})
+        if schema.get('type') != 'object':
+            return ""
+        cursor_schema = schema.get('properties', {}).get('cursor')
+        if (
+            not isinstance(cursor_schema, dict)
+            or cursor_schema.get('type') != 'string'
+            or 'format' in cursor_schema
+            or 'enum' in cursor_schema
+            or 'knownValues' in cursor_schema
+            or 'cursor' in schema.get('required', [])
+            or 'cursor' in schema.get('nullable', [])
+        ):
+            return ""
+        arguments = ', '.join(
+            f"{p['ident']}: {'cursor' if p['name'] == 'cursor' else p['ident']}"
+            for p in self.parameter_properties
+        )
+        return (
+            f"extension {self.struct_name}.Parameters: XRPCCursorPaginatedParameters {{\n"
+            f"    public func withCursor(_ cursor: String?) -> Self {{\n"
+            f"        Self({arguments})\n"
+            f"    }}\n"
+            f"}}\n\n"
+            f"extension {self.struct_name}.Output: XRPCCursorPaginatedOutput {{}}\n"
         )
 
     def generate_procedure_function(self, lexicon_id, main_def):
@@ -1040,8 +1153,11 @@ class SwiftCodeGenerator(BaseCodeGenerator):
                 if leaf in self.closed_enum_identity_by_name:
                     # The method lives in an extension outside the lexicon container.
                     swift_type = swift_type.replace(leaf, f"{self.struct_name}.{leaf}")
+                default = prop.get('default_literal')
                 if prop['optional']:
-                    param_list.append(f"{prop['ident']}: {swift_type}? = nil")
+                    param_list.append(f"{prop['ident']}: {swift_type}? = {default or 'nil'}")
+                elif default:
+                    param_list.append(f"{prop['ident']}: {swift_type} = {default}")
                 else:
                     param_list.append(f"{prop['ident']}: {swift_type}")
                 value_list.append(f"{prop['ident']}: {prop['ident']}")

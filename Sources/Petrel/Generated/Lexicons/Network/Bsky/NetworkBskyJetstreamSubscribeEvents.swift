@@ -58,6 +58,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             seq = try container.decode(Int.self, forKey: .seq)
             did = try container.decode(DID.self, forKey: .did)
             time = try container.decode(ATProtocolDate.self, forKey: .time)
@@ -70,22 +71,26 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'record' — degrading to nil: \(error)")
                 record = nil
+                malformedFields.insert("record")
             }
             do {
                 cid = try container.decodeIfPresent(CIDString.self, forKey: .cid, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'cid' — degrading to nil: \(error)")
                 cid = nil
+                malformedFields.insert("cid")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -99,7 +104,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             try container.encode(rkey, forKey: .rkey)
             try container.encodeIfPresent(record, forKey: .record)
             try container.encodeIfPresent(cid, forKey: .cid)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -183,10 +188,27 @@ public enum NetworkBskyJetstreamSubscribeEvents {
                 let cidValue = try value.toCBORValue()
                 map = map.adding(key: "cid", value: cidValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "seq", "did", "time", "rev", "operation", "collection", "rkey", "record", "cid"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "seq": return true
+            case "did": return true
+            case "time": return true
+            case "rev": return true
+            case "operation": return true
+            case "collection": return true
+            case "rkey": return true
+            case "record": return record != nil
+            case "cid": return cid != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case seq
@@ -518,25 +540,28 @@ public enum NetworkBskyJetstreamSubscribeEvents {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             name = try container.decode(String.self, forKey: .name)
             do {
                 message = try container.decodeIfPresent(String.self, forKey: .message, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'message' — degrading to nil: \(error)")
                 message = nil
+                malformedFields.insert("message")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(message, forKey: .message)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -572,10 +597,20 @@ public enum NetworkBskyJetstreamSubscribeEvents {
                 let messageValue = try value.toCBORValue()
                 map = map.adding(key: "message", value: messageValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "message"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "name": return true
+            case "message": return message != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case name
@@ -596,7 +631,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
             kinds: [ParametersKinds]? = nil,
             dids: [DID]? = nil,
             collections: [String]? = nil,
-            maxMessageSizeBytes: Int? = nil,
+            maxMessageSizeBytes: Int? = 0,
             zstdDictionary: Int? = nil
         ) {
             self.cursor = cursor
@@ -728,7 +763,7 @@ public enum NetworkBskyJetstreamSubscribeEvents {
 
 public extension ATProtoClient.Network.Bsky.Jetstream {
     func subscribeEvents(
-        cursor: Int? = nil, kinds: [NetworkBskyJetstreamSubscribeEvents.ParametersKinds]? = nil, dids: [DID]? = nil, collections: [String]? = nil, maxMessageSizeBytes: Int? = nil, zstdDictionary: Int? = nil
+        cursor: Int? = nil, kinds: [NetworkBskyJetstreamSubscribeEvents.ParametersKinds]? = nil, dids: [DID]? = nil, collections: [String]? = nil, maxMessageSizeBytes: Int? = 0, zstdDictionary: Int? = nil
     ) async throws -> AsyncThrowingStream<NetworkBskyJetstreamSubscribeEvents.Message, Error> {
         let params = NetworkBskyJetstreamSubscribeEvents.Parameters(cursor: cursor, kinds: kinds, dids: dids, collections: collections, maxMessageSizeBytes: maxMessageSizeBytes, zstdDictionary: zstdDictionary)
         return try await networkService.subscribe(

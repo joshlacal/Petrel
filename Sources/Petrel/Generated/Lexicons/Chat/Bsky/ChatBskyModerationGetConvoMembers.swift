@@ -14,7 +14,7 @@ public enum ChatBskyModerationGetConvoMembers {
 
         public init(
             convoId: String,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.convoId = convoId
@@ -133,3 +133,11 @@ public extension ATProtoClient.Chat.Bsky.Moderation {
         }
     }
 }
+
+extension ChatBskyModerationGetConvoMembers.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(convoId: convoId, limit: limit, cursor: cursor)
+    }
+}
+
+extension ChatBskyModerationGetConvoMembers.Output: XRPCCursorPaginatedOutput {}

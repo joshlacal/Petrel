@@ -18,7 +18,7 @@ public enum ComAtprotoSpaceListBlobs {
             space: SpaceRef,
             repo: DID,
             since: TID? = nil,
-            limit: Int? = nil,
+            limit: Int? = 500,
             cursor: String? = nil
         ) {
             self.space = space
@@ -164,3 +164,11 @@ public extension ATProtoClient.Com.Atproto.Space {
         }
     }
 }
+
+extension ComAtprotoSpaceListBlobs.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(space: space, repo: repo, since: since, limit: limit, cursor: cursor)
+    }
+}
+
+extension ComAtprotoSpaceListBlobs.Output: XRPCCursorPaginatedOutput {}

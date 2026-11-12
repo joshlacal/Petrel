@@ -16,11 +16,11 @@ public enum ToolsOzoneSetQuerySets {
         public let sortDirection: ParametersSortDirection?
 
         public init(
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
             namePrefix: String? = nil,
-            sortBy: ParametersSortBy? = nil,
-            sortDirection: ParametersSortDirection? = nil
+            sortBy: ParametersSortBy? = .value_name,
+            sortDirection: ParametersSortDirection? = .value_asc
         ) {
             self.limit = limit
             self.cursor = cursor
@@ -158,3 +158,11 @@ public extension ATProtoClient.Tools.Ozone.Set {
         }
     }
 }
+
+extension ToolsOzoneSetQuerySets.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(limit: limit, cursor: cursor, namePrefix: namePrefix, sortBy: sortBy, sortDirection: sortDirection)
+    }
+}
+
+extension ToolsOzoneSetQuerySets.Output: XRPCCursorPaginatedOutput {}

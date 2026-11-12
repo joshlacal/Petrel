@@ -29,25 +29,28 @@ public enum ToolsOzoneSetDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             name = try container.decode(String.self, forKey: .name)
             do {
                 description = try container.decodeIfPresent(String.self, forKey: .description, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
                 description = nil
+                malformedFields.insert("description")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(name, forKey: .name)
             try container.encodeIfPresent(description, forKey: .description)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -83,10 +86,20 @@ public enum ToolsOzoneSetDefs {
                 let descriptionValue = try value.toCBORValue()
                 map = map.adding(key: "description", value: descriptionValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "description"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "name": return true
+            case "description": return description != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case name
@@ -125,21 +138,24 @@ public enum ToolsOzoneSetDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             name = try container.decode(String.self, forKey: .name)
             do {
                 description = try container.decodeIfPresent(String.self, forKey: .description, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
                 description = nil
+                malformedFields.insert("description")
             }
             setSize = try container.decode(Int.self, forKey: .setSize)
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             updatedAt = try container.decode(ATProtocolDate.self, forKey: .updatedAt)
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -149,7 +165,7 @@ public enum ToolsOzoneSetDefs {
             try container.encode(setSize, forKey: .setSize)
             try container.encode(createdAt, forKey: .createdAt)
             try container.encode(updatedAt, forKey: .updatedAt)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -203,10 +219,23 @@ public enum ToolsOzoneSetDefs {
             map = map.adding(key: "createdAt", value: createdAtValue)
             let updatedAtValue = try updatedAt.toCBORValue()
             map = map.adding(key: "updatedAt", value: updatedAtValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "name", "description", "setSize", "createdAt", "updatedAt"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "name": return true
+            case "description": return description != nil
+            case "setSize": return true
+            case "createdAt": return true
+            case "updatedAt": return true
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case name

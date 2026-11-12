@@ -11,7 +11,7 @@ public enum AppBskyUnspeccedGetSuggestedUsersForDiscover {
         public let limit: Int?
 
         public init(
-            limit: Int? = nil
+            limit: Int? = 25
         ) {
             self.limit = limit
         }

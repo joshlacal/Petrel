@@ -16,7 +16,7 @@ public enum ChatBskyConvoListConvos {
         public let lockStatus: String?
 
         public init(
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
             readState: String? = nil,
             status: String? = nil,
@@ -131,3 +131,11 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         }
     }
 }
+
+extension ChatBskyConvoListConvos.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(limit: limit, cursor: cursor, readState: readState, status: status, kind: kind, lockStatus: lockStatus)
+    }
+}
+
+extension ChatBskyConvoListConvos.Output: XRPCCursorPaginatedOutput {}

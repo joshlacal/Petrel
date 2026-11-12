@@ -49,67 +49,80 @@ public enum ToolsOzoneModerationEmitEvent {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             do {
                 ids = try container.decodeIfPresent([Int].self, forKey: .ids, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'ids' — degrading to nil: \(error)")
                 ids = nil
+                malformedFields.insert("ids")
             }
             do {
                 types = try container.decodeIfPresent([String].self, forKey: .types, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'types' — degrading to nil: \(error)")
                 types = nil
+                malformedFields.insert("types")
             }
             do {
                 all = try container.decodeIfPresent(Bool.self, forKey: .all, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'all' — degrading to nil: \(error)")
                 all = nil
+                malformedFields.insert("all")
             }
             do {
                 allOwned = try container.decodeIfPresent(Bool.self, forKey: .allOwned, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'allOwned' — degrading to nil: \(error)")
                 allOwned = nil
+                malformedFields.insert("allOwned")
             }
             do {
                 note = try container.decodeIfPresent(String.self, forKey: .note, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'note' — degrading to nil: \(error)")
                 note = nil
+                malformedFields.insert("note")
             }
             do {
                 isAutomated = try container.decodeIfPresent(Bool.self, forKey: .isAutomated, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'isAutomated' — degrading to nil: \(error)")
                 isAutomated = nil
+                malformedFields.insert("isAutomated")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -120,7 +133,7 @@ public enum ToolsOzoneModerationEmitEvent {
             try container.encodeIfPresent(allOwned, forKey: .allOwned)
             try container.encodeIfPresent(note, forKey: .note)
             try container.encodeIfPresent(isAutomated, forKey: .isAutomated)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -210,10 +223,24 @@ public enum ToolsOzoneModerationEmitEvent {
                 let isAutomatedValue = try value.toCBORValue()
                 map = map.adding(key: "isAutomated", value: isAutomatedValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "ids", "types", "all", "allOwned", "note", "isAutomated"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "ids": return ids != nil
+            case "types": return types != nil
+            case "all": return all != nil
+            case "allOwned": return allOwned != nil
+            case "note": return note != nil
+            case "isAutomated": return isAutomated != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case ids

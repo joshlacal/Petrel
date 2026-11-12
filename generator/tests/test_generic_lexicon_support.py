@@ -327,9 +327,14 @@ class ObjectShapeTests(unittest.TestCase):
             },
         )
         self.assertEqual(generated.count("public let extraFields: [String: ATProtocolValueContainer]"), 2)
-        self.assertEqual(generated.count("ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)"), 2)
-        self.assertEqual(generated.count("ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)"), 2)
-        self.assertEqual(generated.count("ATProtocolValueContainer.addingExtraFields(extraFields, to: map)"), 2)
+        # The record has no optional field; `detail` has one, so it also keeps a malformed
+        # value of it (r-5) and lets a set property win over an extra field of its name.
+        self.assertEqual(generated.count("ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)"), 1)
+        self.assertEqual(generated.count("ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)"), 1)
+        self.assertEqual(generated.count("ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)"), 1)
+        self.assertEqual(generated.count("ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))"), 1)
+        self.assertEqual(generated.count("ATProtocolValueContainer.addingExtraFields(extraFields, to: map)"), 1)
+        self.assertEqual(generated.count("ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))"), 1)
         self.assertIn('private static let knownFieldKeys: Swift.Set<String> = ["$type", "text"]', generated)
         self.assertIn("hasher.combine(extraFields)", generated)
         self.assertIn("return self.extraFields == other.extraFields", generated)

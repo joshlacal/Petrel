@@ -100,7 +100,7 @@ public enum ComAtprotoRepoListRecords {
         public init(
             repo: ATIdentifier,
             collection: NSID,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
             reverse: Bool? = nil
         ) {
@@ -211,3 +211,11 @@ public extension ATProtoClient.Com.Atproto.Repo {
         }
     }
 }
+
+extension ComAtprotoRepoListRecords.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(repo: repo, collection: collection, limit: limit, cursor: cursor, reverse: reverse)
+    }
+}
+
+extension ComAtprotoRepoListRecords.Output: XRPCCursorPaginatedOutput {}

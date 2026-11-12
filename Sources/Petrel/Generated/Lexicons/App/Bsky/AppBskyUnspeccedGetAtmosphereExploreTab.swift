@@ -30,25 +30,28 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             items = try container.decode([ArticleItem].self, forKey: .items)
             do {
                 recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
                 recIdStr = nil
+                malformedFields.insert("recIdStr")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(items, forKey: .items)
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -84,10 +87,20 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items", "recIdStr"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "items": return true
+            case "recIdStr": return recIdStr != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case items
@@ -118,25 +131,28 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             items = try container.decode([PublicationItem].self, forKey: .items)
             do {
                 recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
                 recIdStr = nil
+                malformedFields.insert("recIdStr")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(items, forKey: .items)
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -172,10 +188,20 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items", "recIdStr"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "items": return true
+            case "recIdStr": return recIdStr != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case items
@@ -206,25 +232,28 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             items = try container.decode([GalleryItem].self, forKey: .items)
             do {
                 recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
                 recIdStr = nil
+                malformedFields.insert("recIdStr")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(items, forKey: .items)
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -260,10 +289,20 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items", "recIdStr"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "items": return true
+            case "recIdStr": return recIdStr != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case items
@@ -294,25 +333,28 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             items = try container.decode([LivestreamItem].self, forKey: .items)
             do {
                 recIdStr = try container.decodeIfPresent(String.self, forKey: .recIdStr, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'recIdStr' — degrading to nil: \(error)")
                 recIdStr = nil
+                malformedFields.insert("recIdStr")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(items, forKey: .items)
             try container.encodeIfPresent(recIdStr, forKey: .recIdStr)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -348,10 +390,20 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let recIdStrValue = try value.toCBORValue()
                 map = map.adding(key: "recIdStr", value: recIdStrValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "items", "recIdStr"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "items": return true
+            case "recIdStr": return recIdStr != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case items
@@ -680,77 +732,92 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             do {
                 id = try container.decodeIfPresent(String.self, forKey: .id, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'id' — degrading to nil: \(error)")
                 id = nil
+                malformedFields.insert("id")
             }
             do {
                 title = try container.decodeIfPresent(String.self, forKey: .title, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'title' — degrading to nil: \(error)")
                 title = nil
+                malformedFields.insert("title")
             }
             do {
                 description = try container.decodeIfPresent(String.self, forKey: .description, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
                 description = nil
+                malformedFields.insert("description")
             }
             do {
                 url = try container.decodeIfPresent(URI.self, forKey: .url, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'url' — degrading to nil: \(error)")
                 url = nil
+                malformedFields.insert("url")
             }
             do {
                 image = try container.decodeIfPresent(URI.self, forKey: .image, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'image' — degrading to nil: \(error)")
                 image = nil
+                malformedFields.insert("image")
             }
             do {
                 overlayColor = try container.decodeIfPresent(String.self, forKey: .overlayColor, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'overlayColor' — degrading to nil: \(error)")
                 overlayColor = nil
+                malformedFields.insert("overlayColor")
             }
             do {
                 textColor = try container.decodeIfPresent(String.self, forKey: .textColor, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'textColor' — degrading to nil: \(error)")
                 textColor = nil
+                malformedFields.insert("textColor")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -762,7 +829,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encodeIfPresent(image, forKey: .image)
             try container.encodeIfPresent(overlayColor, forKey: .overlayColor)
             try container.encodeIfPresent(textColor, forKey: .textColor)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -864,10 +931,25 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let textColorValue = try value.toCBORValue()
                 map = map.adding(key: "textColor", value: textColorValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "title", "description", "url", "image", "overlayColor", "textColor"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "id": return id != nil
+            case "title": return title != nil
+            case "description": return description != nil
+            case "url": return url != nil
+            case "image": return image != nil
+            case "overlayColor": return overlayColor != nil
+            case "textColor": return textColor != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case id
@@ -923,97 +1005,116 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             do {
                 id = try container.decodeIfPresent(String.self, forKey: .id, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'id' — degrading to nil: \(error)")
                 id = nil
+                malformedFields.insert("id")
             }
             do {
                 title = try container.decodeIfPresent(String.self, forKey: .title, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'title' — degrading to nil: \(error)")
                 title = nil
+                malformedFields.insert("title")
             }
             do {
                 description = try container.decodeIfPresent(String.self, forKey: .description, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'description' — degrading to nil: \(error)")
                 description = nil
+                malformedFields.insert("description")
             }
             do {
                 logo = try container.decodeIfPresent(URI.self, forKey: .logo, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'logo' — degrading to nil: \(error)")
                 logo = nil
+                malformedFields.insert("logo")
             }
             do {
                 backgroundImage = try container.decodeIfPresent(URI.self, forKey: .backgroundImage, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'backgroundImage' — degrading to nil: \(error)")
                 backgroundImage = nil
+                malformedFields.insert("backgroundImage")
             }
             do {
                 overlayColor = try container.decodeIfPresent(String.self, forKey: .overlayColor, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'overlayColor' — degrading to nil: \(error)")
                 overlayColor = nil
+                malformedFields.insert("overlayColor")
             }
             do {
                 textColor = try container.decodeIfPresent(String.self, forKey: .textColor, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'textColor' — degrading to nil: \(error)")
                 textColor = nil
+                malformedFields.insert("textColor")
             }
             do {
                 url = try container.decodeIfPresent(URI.self, forKey: .url, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'url' — degrading to nil: \(error)")
                 url = nil
+                malformedFields.insert("url")
             }
             do {
                 category = try container.decodeIfPresent(String.self, forKey: .category, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'category' — degrading to nil: \(error)")
                 category = nil
+                malformedFields.insert("category")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -1027,7 +1128,7 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
             try container.encodeIfPresent(textColor, forKey: .textColor)
             try container.encodeIfPresent(url, forKey: .url)
             try container.encodeIfPresent(category, forKey: .category)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -1153,10 +1254,27 @@ public enum AppBskyUnspeccedGetAtmosphereExploreTab {
                 let categoryValue = try value.toCBORValue()
                 map = map.adding(key: "category", value: categoryValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "title", "description", "logo", "backgroundImage", "overlayColor", "textColor", "url", "category"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "id": return id != nil
+            case "title": return title != nil
+            case "description": return description != nil
+            case "logo": return logo != nil
+            case "backgroundImage": return backgroundImage != nil
+            case "overlayColor": return overlayColor != nil
+            case "textColor": return textColor != nil
+            case "url": return url != nil
+            case "category": return category != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case id

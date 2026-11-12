@@ -19,7 +19,7 @@ public enum ToolsOzoneTeamListMembers {
             q: String? = nil,
             disabled: Bool? = nil,
             roles: [String]? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.q = q
@@ -129,3 +129,11 @@ public extension ATProtoClient.Tools.Ozone.Team {
         }
     }
 }
+
+extension ToolsOzoneTeamListMembers.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(q: q, disabled: disabled, roles: roles, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneTeamListMembers.Output: XRPCCursorPaginatedOutput {}

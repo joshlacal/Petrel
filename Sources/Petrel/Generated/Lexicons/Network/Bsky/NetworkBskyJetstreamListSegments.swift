@@ -174,7 +174,7 @@ public enum NetworkBskyJetstreamListSegments {
         public let cursor: String?
 
         public init(
-            limit: Int? = nil,
+            limit: Int? = 100,
             cursor: String? = nil
         ) {
             self.limit = limit
@@ -281,3 +281,11 @@ public extension ATProtoClient.Network.Bsky.Jetstream {
         }
     }
 }
+
+extension NetworkBskyJetstreamListSegments.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(limit: limit, cursor: cursor)
+    }
+}
+
+extension NetworkBskyJetstreamListSegments.Output: XRPCCursorPaginatedOutput {}

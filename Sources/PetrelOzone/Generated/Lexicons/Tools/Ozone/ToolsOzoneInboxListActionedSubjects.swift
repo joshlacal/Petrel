@@ -18,10 +18,10 @@ public enum ToolsOzoneInboxListActionedSubjects {
 
         public init(
             did: DID? = nil,
-            filter: ParametersFilter? = nil,
-            sortField: ParametersSortField? = nil,
-            sortDirection: ParametersSortDirection? = nil,
-            limit: Int? = nil,
+            filter: ParametersFilter? = .value_all,
+            sortField: ParametersSortField? = .value_updatedAt,
+            sortDirection: ParametersSortDirection? = .value_desc,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.did = did
@@ -176,3 +176,11 @@ public extension ATProtoClient.Tools.Ozone.Inbox {
         }
     }
 }
+
+extension ToolsOzoneInboxListActionedSubjects.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(did: did, filter: filter, sortField: sortField, sortDirection: sortDirection, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneInboxListActionedSubjects.Output: XRPCCursorPaginatedOutput {}

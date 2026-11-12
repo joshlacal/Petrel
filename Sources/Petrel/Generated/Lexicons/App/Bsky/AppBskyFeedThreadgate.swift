@@ -38,16 +38,19 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let strict = decoder.isATProtoStrictDecoding
+        var malformedFields: Swift.Set<String> = []
         post = try container.decode(ATProtocolURI.self, forKey: .post)
         do {
             allow = try container.decodeIfPresent([AppBskyFeedThreadgateAllowUnion].self, forKey: .allow, rejectingNull: strict)
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
             // fail here. The default keeps reading what the network actually serves and
-            // drops only the malformed optional field.
+            // reads only the malformed optional field as nil. Its raw value is kept in
+            // the extra fields, so writing this value back does not lose it.
             guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'allow' — degrading to nil: \(error)")
             allow = nil
+            malformedFields.insert("allow")
         }
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         do {
@@ -55,12 +58,14 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
             // fail here. The default keeps reading what the network actually serves and
-            // drops only the malformed optional field.
+            // reads only the malformed optional field as nil. Its raw value is kept in
+            // the extra fields, so writing this value back does not lose it.
             guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'hiddenReplies' — degrading to nil: \(error)")
             hiddenReplies = nil
+            malformedFields.insert("hiddenReplies")
         }
-        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -70,7 +75,7 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(allow, forKey: .allow)
         try container.encode(createdAt, forKey: .createdAt)
         try container.encodeIfPresent(hiddenReplies, forKey: .hiddenReplies)
-        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -125,10 +130,23 @@ public struct AppBskyFeedThreadgate: ATProtocolCodable, ATProtocolValue {
             let hiddenRepliesValue = try value.toCBORValue()
             map = map.adding(key: "hiddenReplies", value: hiddenRepliesValue)
         }
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "post", "allow", "createdAt", "hiddenReplies"]
+
+    /// Whether this value writes the wire field `name` itself. An extra field of the
+    /// same name (a malformed value kept from decoding) is written only when it is not.
+    private func hasValue(forField name: String) -> Bool {
+        switch name {
+        case "$type": return true
+        case "post": return true
+        case "allow": return allow != nil
+        case "createdAt": return true
+        case "hiddenReplies": return hiddenReplies != nil
+        default: return false
+        }
+    }
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

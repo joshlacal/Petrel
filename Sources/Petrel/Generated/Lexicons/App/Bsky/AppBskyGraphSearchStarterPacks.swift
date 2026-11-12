@@ -14,7 +14,7 @@ public enum AppBskyGraphSearchStarterPacks {
 
         public init(
             q: String,
-            limit: Int? = nil,
+            limit: Int? = 25,
             cursor: String? = nil
         ) {
             self.q = q
@@ -122,3 +122,11 @@ public extension ATProtoClient.App.Bsky.Graph {
         }
     }
 }
+
+extension AppBskyGraphSearchStarterPacks.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(q: q, limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyGraphSearchStarterPacks.Output: XRPCCursorPaginatedOutput {}

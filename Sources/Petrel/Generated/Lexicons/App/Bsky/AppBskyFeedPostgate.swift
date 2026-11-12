@@ -38,6 +38,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let strict = decoder.isATProtoStrictDecoding
+        var malformedFields: Swift.Set<String> = []
         createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
         post = try container.decode(ATProtocolURI.self, forKey: .post)
         do {
@@ -45,22 +46,26 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
             // fail here. The default keeps reading what the network actually serves and
-            // drops only the malformed optional field.
+            // reads only the malformed optional field as nil. Its raw value is kept in
+            // the extra fields, so writing this value back does not lose it.
             guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'detachedEmbeddingUris' — degrading to nil: \(error)")
             detachedEmbeddingUris = nil
+            malformedFields.insert("detachedEmbeddingUris")
         }
         do {
             embeddingRules = try container.decodeIfPresent([AppBskyFeedPostgateEmbeddingRulesUnion].self, forKey: .embeddingRules, rejectingNull: strict)
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
             // fail here. The default keeps reading what the network actually serves and
-            // drops only the malformed optional field.
+            // reads only the malformed optional field as nil. Its raw value is kept in
+            // the extra fields, so writing this value back does not lose it.
             guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'embeddingRules' — degrading to nil: \(error)")
             embeddingRules = nil
+            malformedFields.insert("embeddingRules")
         }
-        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -70,7 +75,7 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
         try container.encode(post, forKey: .post)
         try container.encodeIfPresent(detachedEmbeddingUris, forKey: .detachedEmbeddingUris)
         try container.encodeIfPresent(embeddingRules, forKey: .embeddingRules)
-        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -125,10 +130,23 @@ public struct AppBskyFeedPostgate: ATProtocolCodable, ATProtocolValue {
             let embeddingRulesValue = try value.toCBORValue()
             map = map.adding(key: "embeddingRules", value: embeddingRulesValue)
         }
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "post", "detachedEmbeddingUris", "embeddingRules"]
+
+    /// Whether this value writes the wire field `name` itself. An extra field of the
+    /// same name (a malformed value kept from decoding) is written only when it is not.
+    private func hasValue(forField name: String) -> Bool {
+        switch name {
+        case "$type": return true
+        case "createdAt": return true
+        case "post": return true
+        case "detachedEmbeddingUris": return detachedEmbeddingUris != nil
+        case "embeddingRules": return embeddingRules != nil
+        default: return false
+        }
+    }
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

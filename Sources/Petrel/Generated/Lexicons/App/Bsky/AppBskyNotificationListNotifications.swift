@@ -55,6 +55,7 @@ public enum AppBskyNotificationListNotifications {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             uri = try container.decode(ATProtocolURI.self, forKey: .uri)
             cid = try container.decode(CIDString.self, forKey: .cid)
             author = try container.decode(AppBskyActorDefs.ProfileView.self, forKey: .author)
@@ -64,10 +65,12 @@ public enum AppBskyNotificationListNotifications {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'reasonSubject' — degrading to nil: \(error)")
                 reasonSubject = nil
+                malformedFields.insert("reasonSubject")
             }
             record = try container.decode(ATProtocolValueContainer.self, forKey: .record)
             do {
@@ -75,10 +78,12 @@ public enum AppBskyNotificationListNotifications {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'starterPack' — degrading to nil: \(error)")
                 starterPack = nil
+                malformedFields.insert("starterPack")
             }
             isRead = try container.decode(Bool.self, forKey: .isRead)
             indexedAt = try container.decode(ATProtocolDate.self, forKey: .indexedAt)
@@ -87,12 +92,14 @@ public enum AppBskyNotificationListNotifications {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
                 labels = nil
+                malformedFields.insert("labels")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -107,7 +114,7 @@ public enum AppBskyNotificationListNotifications {
             try container.encode(isRead, forKey: .isRead)
             try container.encode(indexedAt, forKey: .indexedAt)
             try container.encodeIfPresent(labels, forKey: .labels)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -203,10 +210,28 @@ public enum AppBskyNotificationListNotifications {
                 let labelsValue = try value.toCBORValue()
                 map = map.adding(key: "labels", value: labelsValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "uri", "cid", "author", "reason", "reasonSubject", "record", "starterPack", "isRead", "indexedAt", "labels"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "uri": return true
+            case "cid": return true
+            case "author": return true
+            case "reason": return true
+            case "reasonSubject": return reasonSubject != nil
+            case "record": return true
+            case "starterPack": return starterPack != nil
+            case "isRead": return true
+            case "indexedAt": return true
+            case "labels": return labels != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case uri
@@ -231,7 +256,7 @@ public enum AppBskyNotificationListNotifications {
 
         public init(
             reasons: [String]? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             priority: Bool? = nil,
             cursor: String? = nil,
             seenAt: ATProtocolDate? = nil
@@ -382,3 +407,11 @@ public extension ATProtoClient.App.Bsky.Notification {
         }
     }
 }
+
+extension AppBskyNotificationListNotifications.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(reasons: reasons, limit: limit, priority: priority, cursor: cursor, seenAt: seenAt)
+    }
+}
+
+extension AppBskyNotificationListNotifications.Output: XRPCCursorPaginatedOutput {}

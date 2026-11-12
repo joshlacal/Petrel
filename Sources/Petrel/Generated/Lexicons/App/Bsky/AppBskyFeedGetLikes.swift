@@ -99,7 +99,7 @@ public enum AppBskyFeedGetLikes {
         public init(
             uri: ATProtocolURI,
             cid: CIDString? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.uri = uri
@@ -235,3 +235,11 @@ public extension ATProtoClient.App.Bsky.Feed {
         }
     }
 }
+
+extension AppBskyFeedGetLikes.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(uri: uri, cid: cid, limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyFeedGetLikes.Output: XRPCCursorPaginatedOutput {}

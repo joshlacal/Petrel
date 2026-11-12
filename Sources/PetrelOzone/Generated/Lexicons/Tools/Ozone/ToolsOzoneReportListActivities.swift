@@ -15,7 +15,7 @@ public enum ToolsOzoneReportListActivities {
 
         public init(
             reportId: Int,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.reportId = reportId
@@ -123,3 +123,11 @@ public extension ATProtoClient.Tools.Ozone.Report {
         }
     }
 }
+
+extension ToolsOzoneReportListActivities.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(reportId: reportId, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneReportListActivities.Output: XRPCCursorPaginatedOutput {}

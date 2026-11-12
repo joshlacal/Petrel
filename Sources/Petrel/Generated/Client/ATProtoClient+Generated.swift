@@ -424,12 +424,20 @@ public actor ATProtoClient {
     // MARK: - Moderation Methods
 
     /// Sets the labeler service to receive moderation reports
+    ///
+    /// This writes `atproto-proxy` into the headers shared by every request of this
+    /// client, so until ``clearReportLabeler()`` every call is routed to the labeler, not
+    /// only reports. Pass the labeler to the report itself instead.
     /// - Parameter did: The DID of the labeler service
+    @available(*, deprecated, message: "Sets atproto-proxy for every request of this client. Use client.bsky.createModerationReport(_:labeler:), which routes only the report.")
     public func setReportLabeler(did: String) async {
         await networkService.setHeader(name: "atproto-proxy", value: "\(did)#atproto_labeler")
     }
 
     /// Clears any previously set report labeler
+    ///
+    /// This removes `atproto-proxy` from the client's shared headers, whoever set it.
+    @available(*, deprecated, message: "Removes any atproto-proxy from this client's shared headers. Use client.bsky.createModerationReport(_:labeler:), which routes only the report.")
     public func clearReportLabeler() async {
         await networkService.removeHeader(name: "atproto-proxy")
     }

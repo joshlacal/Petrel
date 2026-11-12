@@ -36,14 +36,14 @@ public enum ToolsOzoneModerationQueryEvents {
         public init(
             types: [String]? = nil,
             createdBy: DID? = nil,
-            sortDirection: ParametersSortDirection? = nil,
+            sortDirection: ParametersSortDirection? = .value_desc,
             createdAfter: ATProtocolDate? = nil,
             createdBefore: ATProtocolDate? = nil,
             subject: URI? = nil,
             collections: [NSID]? = nil,
             subjectType: String? = nil,
-            includeAllUserRecords: Bool? = nil,
-            limit: Int? = nil,
+            includeAllUserRecords: Bool? = false,
+            limit: Int? = 50,
             hasComment: Bool? = nil,
             comment: String? = nil,
             addedLabels: [String]? = nil,
@@ -197,3 +197,11 @@ public extension ATProtoClient.Tools.Ozone.Moderation {
         }
     }
 }
+
+extension ToolsOzoneModerationQueryEvents.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(types: types, createdBy: createdBy, sortDirection: sortDirection, createdAfter: createdAfter, createdBefore: createdBefore, subject: subject, collections: collections, subjectType: subjectType, includeAllUserRecords: includeAllUserRecords, limit: limit, hasComment: hasComment, comment: comment, addedLabels: addedLabels, removedLabels: removedLabels, addedTags: addedTags, removedTags: removedTags, reportTypes: reportTypes, policies: policies, modTool: modTool, batchId: batchId, ageAssuranceState: ageAssuranceState, withStrike: withStrike, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneModerationQueryEvents.Output: XRPCCursorPaginatedOutput {}

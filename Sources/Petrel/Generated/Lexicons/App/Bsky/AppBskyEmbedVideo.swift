@@ -244,6 +244,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             cid = try container.decode(CIDString.self, forKey: .cid)
             playlist = try container.decode(URI.self, forKey: .playlist)
             do {
@@ -251,42 +252,50 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'thumbnail' — degrading to nil: \(error)")
                 thumbnail = nil
+                malformedFields.insert("thumbnail")
             }
             do {
                 alt = try container.decodeIfPresent(String.self, forKey: .alt, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'alt' — degrading to nil: \(error)")
                 alt = nil
+                malformedFields.insert("alt")
             }
             do {
                 aspectRatio = try container.decodeIfPresent(AppBskyEmbedDefs.AspectRatio.self, forKey: .aspectRatio, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'aspectRatio' — degrading to nil: \(error)")
                 aspectRatio = nil
+                malformedFields.insert("aspectRatio")
             }
             do {
                 presentation = try container.decodeIfPresent(String.self, forKey: .presentation, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'presentation' — degrading to nil: \(error)")
                 presentation = nil
+                malformedFields.insert("presentation")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -297,7 +306,7 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
             try container.encodeIfPresent(alt, forKey: .alt)
             try container.encodeIfPresent(aspectRatio, forKey: .aspectRatio)
             try container.encodeIfPresent(presentation, forKey: .presentation)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -375,10 +384,24 @@ public struct AppBskyEmbedVideo: ATProtocolCodable, ATProtocolValue {
                 let presentationValue = try value.toCBORValue()
                 map = map.adding(key: "presentation", value: presentationValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "cid", "playlist", "thumbnail", "alt", "aspectRatio", "presentation"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "cid": return true
+            case "playlist": return true
+            case "thumbnail": return thumbnail != nil
+            case "alt": return alt != nil
+            case "aspectRatio": return aspectRatio != nil
+            case "presentation": return presentation != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case cid

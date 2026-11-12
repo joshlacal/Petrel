@@ -18,8 +18,8 @@ public enum ToolsOzoneInboxListNotifications {
         public init(
             section: String? = nil,
             reasons: [String]? = nil,
-            unreadOnly: Bool? = nil,
-            limit: Int? = nil,
+            unreadOnly: Bool? = false,
+            limit: Int? = 50,
             cursor: String? = nil,
             did: DID? = nil
         ) {
@@ -131,3 +131,11 @@ public extension ATProtoClient.Tools.Ozone.Inbox {
         }
     }
 }
+
+extension ToolsOzoneInboxListNotifications.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(section: section, reasons: reasons, unreadOnly: unreadOnly, limit: limit, cursor: cursor, did: did)
+    }
+}
+
+extension ToolsOzoneInboxListNotifications.Output: XRPCCursorPaginatedOutput {}

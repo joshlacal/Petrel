@@ -13,7 +13,7 @@ public enum AppBskyUnspeccedGetSuggestedOnboardingUsers {
 
         public init(
             category: String? = nil,
-            limit: Int? = nil
+            limit: Int? = 25
         ) {
             self.category = category
             self.limit = limit

@@ -12,7 +12,7 @@ public enum AppBskyGraphGetListBlocks {
         public let cursor: String?
 
         public init(
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.limit = limit
@@ -119,3 +119,11 @@ public extension ATProtoClient.App.Bsky.Graph {
         }
     }
 }
+
+extension AppBskyGraphGetListBlocks.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyGraphGetListBlocks.Output: XRPCCursorPaginatedOutput {}

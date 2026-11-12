@@ -33,6 +33,7 @@ public enum ChatBskyModerationDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             id = try container.decode(String.self, forKey: .id)
             rev = try container.decode(String.self, forKey: .rev)
             do {
@@ -40,12 +41,14 @@ public enum ChatBskyModerationDefs {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'kind' — degrading to nil: \(error)")
                 kind = nil
+                malformedFields.insert("kind")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -53,7 +56,7 @@ public enum ChatBskyModerationDefs {
             try container.encode(id, forKey: .id)
             try container.encode(rev, forKey: .rev)
             try container.encodeIfPresent(kind, forKey: .kind)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -95,10 +98,21 @@ public enum ChatBskyModerationDefs {
                 let kindValue = try value.toCBORValue()
                 map = map.adding(key: "kind", value: kindValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "id", "rev", "kind"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "id": return true
+            case "rev": return true
+            case "kind": return kind != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case id
@@ -196,23 +210,26 @@ public enum ChatBskyModerationDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             createdAt = try container.decode(ATProtocolDate.self, forKey: .createdAt)
             do {
                 joinLink = try container.decodeIfPresent(ChatBskyGroupDefs.JoinLinkView.self, forKey: .joinLink, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'joinLink' — degrading to nil: \(error)")
                 joinLink = nil
+                malformedFields.insert("joinLink")
             }
             joinRequestCount = try container.decode(Int.self, forKey: .joinRequestCount)
             lockStatus = try container.decode(ChatBskyConvoDefs.ConvoLockStatus.self, forKey: .lockStatus)
             memberCount = try container.decode(Int.self, forKey: .memberCount)
             memberLimit = try container.decode(Int.self, forKey: .memberLimit)
             name = try container.decode(String.self, forKey: .name)
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -224,7 +241,7 @@ public enum ChatBskyModerationDefs {
             try container.encode(memberCount, forKey: .memberCount)
             try container.encode(memberLimit, forKey: .memberLimit)
             try container.encode(name, forKey: .name)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -290,10 +307,25 @@ public enum ChatBskyModerationDefs {
             map = map.adding(key: "memberLimit", value: memberLimitValue)
             let nameValue = try name.toCBORValue()
             map = map.adding(key: "name", value: nameValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "createdAt", "joinLink", "joinRequestCount", "lockStatus", "memberCount", "memberLimit", "name"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "createdAt": return true
+            case "joinLink": return joinLink != nil
+            case "joinRequestCount": return true
+            case "lockStatus": return true
+            case "memberCount": return true
+            case "memberLimit": return true
+            case "name": return true
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case createdAt

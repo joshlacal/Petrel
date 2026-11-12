@@ -14,7 +14,7 @@ public enum ChatBskyConvoGetMessages {
 
         public init(
             convoId: String,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.convoId = convoId
@@ -323,3 +323,11 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         }
     }
 }
+
+extension ChatBskyConvoGetMessages.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(convoId: convoId, limit: limit, cursor: cursor)
+    }
+}
+
+extension ChatBskyConvoGetMessages.Output: XRPCCursorPaginatedOutput {}

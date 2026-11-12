@@ -16,10 +16,10 @@ public enum ToolsOzoneReportGetAssignments {
         public let cursor: String?
 
         public init(
-            onlyActive: Bool? = nil,
+            onlyActive: Bool? = true,
             reportIds: [Int]? = nil,
             dids: [DID]? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.onlyActive = onlyActive
@@ -129,3 +129,11 @@ public extension ATProtoClient.Tools.Ozone.Report {
         }
     }
 }
+
+extension ToolsOzoneReportGetAssignments.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(onlyActive: onlyActive, reportIds: reportIds, dids: dids, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneReportGetAssignments.Output: XRPCCursorPaginatedOutput {}

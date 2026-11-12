@@ -43,6 +43,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let strict = decoder.isATProtoStrictDecoding
+        var malformedFields: Swift.Set<String> = []
         version = try container.decode(String.self, forKey: .version)
         currentKey = try container.decode(Bytes.self, forKey: .currentKey)
         do {
@@ -50,32 +51,38 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
             // fail here. The default keeps reading what the network actually serves and
-            // drops only the malformed optional field.
+            // reads only the malformed optional field as nil. Its raw value is kept in
+            // the extra fields, so writing this value back does not lose it.
             guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'messageMe' — degrading to nil: \(error)")
             messageMe = nil
+            malformedFields.insert("messageMe")
         }
         do {
             keyPackage = try container.decodeIfPresent(Bytes.self, forKey: .keyPackage, rejectingNull: strict)
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
             // fail here. The default keeps reading what the network actually serves and
-            // drops only the malformed optional field.
+            // reads only the malformed optional field as nil. Its raw value is kept in
+            // the extra fields, so writing this value back does not lose it.
             guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'keyPackage' — degrading to nil: \(error)")
             keyPackage = nil
+            malformedFields.insert("keyPackage")
         }
         do {
             continuityProofs = try container.decodeIfPresent([Bytes].self, forKey: .continuityProofs, rejectingNull: strict)
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
             // fail here. The default keeps reading what the network actually serves and
-            // drops only the malformed optional field.
+            // reads only the malformed optional field as nil. Its raw value is kept in
+            // the extra fields, so writing this value back does not lose it.
             guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'continuityProofs' — degrading to nil: \(error)")
             continuityProofs = nil
+            malformedFields.insert("continuityProofs")
         }
-        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -86,7 +93,7 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
         try container.encodeIfPresent(messageMe, forKey: .messageMe)
         try container.encodeIfPresent(keyPackage, forKey: .keyPackage)
         try container.encodeIfPresent(continuityProofs, forKey: .continuityProofs)
-        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -153,10 +160,24 @@ public struct ComGermnetworkDeclaration: ATProtocolCodable, ATProtocolValue {
             let continuityProofsValue = try value.toCBORValue()
             map = map.adding(key: "continuityProofs", value: continuityProofsValue)
         }
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "version", "currentKey", "messageMe", "keyPackage", "continuityProofs"]
+
+    /// Whether this value writes the wire field `name` itself. An extra field of the
+    /// same name (a malformed value kept from decoding) is written only when it is not.
+    private func hasValue(forField name: String) -> Bool {
+        switch name {
+        case "$type": return true
+        case "version": return true
+        case "currentKey": return true
+        case "messageMe": return messageMe != nil
+        case "keyPackage": return keyPackage != nil
+        case "continuityProofs": return continuityProofs != nil
+        default: return false
+        }
+    }
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"
