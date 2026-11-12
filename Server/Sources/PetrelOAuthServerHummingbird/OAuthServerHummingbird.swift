@@ -13,15 +13,28 @@ public enum OAuthServerHummingbird {
   /// the request to an ``OAuthHTTPRequest``, calls
   /// ``OAuthAuthorizationServer/handle(_:)`` and converts the result back.
   /// The adapter adds no behaviour of its own.
+  ///
+  /// The client's address reaches the server as
+  /// ``OAuthHTTPRequest/remoteAddress`` and from there the account
+  /// authenticator, which needs it to limit sign-in attempts. It is read from
+  /// the connection when `Context` conforms to `RemoteAddressRequestContext`
+  /// (``OAuthServerRequestContext`` does; Hummingbird's `BasicRequestContext`
+  /// does not), and from `X-Forwarded-For` only as `clientAddress` allows.
   public static func addRoutes<Context: RequestContext>(
     to router: Router<Context>,
     server: OAuthAuthorizationServer,
-    maximumBodyBytes: Int = 64 * 1024
+    maximumBodyBytes: Int = 64 * 1024,
+    clientAddress: OAuthClientAddressPolicy = .connection
   ) {
     for route in OAuthAuthorizationServer.routes {
       guard let method = HTTPRequest.Method(route.method) else { continue }
-      router.on(RouterPath(route.path), method: method) { request, _ -> Response in
-        guard let converted = await convert(request, maximumBodyBytes: maximumBodyBytes) else {
+      router.on(RouterPath(route.path), method: method) { request, context -> Response in
+        let peer = (context as? any RemoteAddressRequestContext)?.remoteAddress?.ipAddress
+        guard let converted = await convert(
+          request,
+          maximumBodyBytes: maximumBodyBytes,
+          remoteAddress: clientAddress.clientAddress(peer: peer, headers: headers(request))
+        ) else {
           return Response(status: .contentTooLarge)
         }
         return response(await server.handle(converted))
@@ -79,7 +92,7 @@ public enum OAuthServerHummingbird {
     OAuthHTTPHeaders(request.headers.map { ($0.name.rawName, $0.value) })
   }
 
-  static func convert(_ request: Request, maximumBodyBytes: Int) async -> OAuthHTTPRequest? {
+  static func convert(_ request: Request, maximumBodyBytes: Int, remoteAddress: String?) async -> OAuthHTTPRequest? {
     var request = request
     guard let buffer = try? await request.collectBody(upTo: maximumBodyBytes) else { return nil }
     return OAuthHTTPRequest(
@@ -87,8 +100,53 @@ public enum OAuthServerHummingbird {
       path: request.uri.path,
       query: request.uri.query,
       headers: headers(request),
-      body: Data(buffer.readableBytesView)
+      body: Data(buffer.readableBytesView),
+      remoteAddress: remoteAddress
     )
+  }
+}
+
+/// Where the adapter takes the client's network address from.
+public enum OAuthClientAddressPolicy: Sendable, Equatable {
+  /// The address of the connection's peer. Correct when clients connect to
+  /// this process directly.
+  case connection
+  /// Behind reverse proxies: when the connection comes from one of
+  /// `trustedProxies` (literal IP addresses), the address is the right-most
+  /// `X-Forwarded-For` entry that is not itself a trusted proxy. A request
+  /// from any other peer is attributed to that peer, so a client cannot
+  /// choose its own address by sending the header.
+  case forwardedFor(trustedProxies: Set<String>)
+
+  /// The client address for a request from `peer` with `headers`.
+  public func clientAddress(peer: String?, headers: OAuthHTTPHeaders) -> String? {
+    guard case let .forwardedFor(trustedProxies) = self, let peer, trustedProxies.contains(peer) else {
+      return peer
+    }
+    // Every X-Forwarded-For field, in order; each proxy appends on the right.
+    let hops = headers.values(for: "X-Forwarded-For")
+      .flatMap { $0.split(separator: ",") }
+      .map { $0.trimmingCharacters(in: .whitespaces) }
+    for hop in hops.reversed() where !trustedProxies.contains(hop) {
+      return hop.isEmpty ? peer : hop
+    }
+    return peer
+  }
+}
+
+/// A Hummingbird request context that records the connection's peer address,
+/// so ``OAuthServerHummingbird/addRoutes(to:server:maximumBodyBytes:clientAddress:)``
+/// can pass it to the authorization server.
+public struct OAuthServerRequestContext: RequestContext, RemoteAddressRequestContext {
+  /// Hummingbird's per-request storage.
+  public var coreContext: CoreRequestContextStorage
+  /// The connection's peer.
+  public let remoteAddress: SocketAddress?
+
+  /// Creates the context for a request on `source.channel`.
+  public init(source: ApplicationRequestContextSource) {
+    coreContext = .init(source: source)
+    remoteAddress = source.channel.remoteAddress
   }
 }
 

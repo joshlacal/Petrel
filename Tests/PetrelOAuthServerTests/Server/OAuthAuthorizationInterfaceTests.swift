@@ -355,7 +355,7 @@ struct OAuthAuthorizationInterfaceTests {
             Path.signIn, [("identifier", TestAccounts.alice.handle ?? TestAccounts.alice.did), ("password", "alice-password")]
         )
         let cookies = opened.headers.values(for: "Set-Cookie") + signedIn.headers.values(for: "Set-Cookie")
-        #expect(cookies.contains { $0.hasPrefix(Self.flowCookie + "=") })
+        #expect(cookies.contains { $0.hasPrefix(Self.flowCookie + "-") })
         #expect(cookies.contains { $0.hasPrefix(Self.deviceCookie + "=") })
         for cookie in cookies {
             #expect(cookie.hasPrefix("__Host-"), "\(cookie)")

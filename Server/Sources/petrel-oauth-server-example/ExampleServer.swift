@@ -22,6 +22,8 @@ public struct ExampleServer: Sendable {
   public let verifier: OAuthResourceServerVerifier
   /// The origin clients address the server by.
   public let origin: URL
+  /// The account system, which remembers the address of the last sign-in.
+  let accounts = DemoAccounts()
 
   /// Creates the example for an origin such as `http://127.0.0.1:8787`.
   ///
@@ -58,7 +60,7 @@ public struct ExampleServer: Sendable {
         secureCookies: origin.scheme == "https"
       ),
       store: store,
-      accounts: DemoAccounts(),
+      accounts: accounts,
       clients: resolver,
       interface: OAuthDefaultInterface(serviceName: "Petrel example server"),
       clock: clock
@@ -79,8 +81,8 @@ public struct ExampleServer: Sendable {
   }
 
   /// The router: every OAuth endpoint, plus one protected XRPC method.
-  public func router() -> Router<BasicRequestContext> {
-    let router = Router(context: BasicRequestContext.self)
+  public func router() -> Router<OAuthServerRequestContext> {
+    let router = Router(context: OAuthServerRequestContext.self)
     OAuthServerHummingbird.addRoutes(to: router, server: server)
 
     router.get("/health") { _, _ in "OK" }
@@ -124,9 +126,19 @@ public struct ExampleServer: Sendable {
   }
 }
 
-/// The example's account system: one account, one password.
-struct DemoAccounts: OAuthAccountAuthenticating {
-  func signIn(identifier: String, password: String, context _: OAuthSignInContext) async throws -> OAuthSignInResult {
+/// The example's account system: one account, one password. A real one limits
+/// attempts per account and per `context.remoteAddress`.
+final class DemoAccounts: OAuthAccountAuthenticating, @unchecked Sendable {
+  private let lock = NSLock()
+  private var lastAddress: String?
+
+  /// The client address of the most recent sign-in attempt.
+  var lastSignInAddress: String? {
+    lock.withLock { lastAddress }
+  }
+
+  func signIn(identifier: String, password: String, context: OAuthSignInContext) async throws -> OAuthSignInResult {
+    lock.withLock { lastAddress = context.remoteAddress }
     let account = ExampleServer.account
     guard identifier == account.handle || identifier == account.did, password == ExampleServer.password else {
       return .rejected

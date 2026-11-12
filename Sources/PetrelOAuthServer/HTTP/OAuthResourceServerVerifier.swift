@@ -71,11 +71,7 @@ public struct OAuthResourceServerVerifier: Sendable {
     /// A verifier for a resource server that shares the authorization
     /// server's stores, secret and nonces.
     public init(authorizationServer server: OAuthAuthorizationServer) {
-        var keys: [OAuthJSONWebKey] = []
-        if case let .signedJWT(key) = server.configuration.accessTokenFormat, let jwk = try? key.publicJWK {
-            keys = [jwk]
-        }
-        mode = .shared(store: server.store, digest: server.digest, keys: keys)
+        mode = .shared(store: server.store, digest: server.digest, keys: server.configuration.accessTokenVerificationKeys)
         issuer = server.issuer
         resource = Self.trimmed(server.configuration.resource)
         dpopValidator = server.dpopValidator
@@ -236,7 +232,9 @@ public struct OAuthResourceServerVerifier: Sendable {
                     clockSkew: 30,
                     requireIssuedAt: true,
                     requireExpiration: true,
-                    maxLifetime: 30 * 60
+                    // The profile's cap for tokens that cannot be revoked
+                    // individually (oauth.mdx:280); the server mints no longer.
+                    maxLifetime: 15 * 60
                 )
             )
             let claims = try OAuthCompactJWT.decodeClaims(OAuthAccessTokenClaims.self, from: verified)

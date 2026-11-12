@@ -172,6 +172,12 @@ public actor InMemoryOAuthStore: OAuthAuthorizationRequestStore, OAuthSessionSto
         sessions.values.contains { $0.binding.clientID == clientID && $0.isActive(at: now) && $0.tokens != nil }
     }
 
+    /// How many records the store holds, for tests of purging.
+    var storedRecordCount: Int {
+        requests.count + codes.count + sessions.count + retiredRefreshTokens.count
+            + replay.values.reduce(0) { $0 + $1.count } + clientMetadata.count
+    }
+
     public func purgeExpired(now: Date) {
         requests = requests.filter { $0.value.expiresAt > now }
         let dead = Set(sessions.values.filter { session in
