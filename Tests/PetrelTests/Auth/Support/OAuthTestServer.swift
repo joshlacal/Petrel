@@ -189,6 +189,12 @@ struct DecodedDPoPProof: @unchecked Sendable {
 /// Endpoint paths deliberately avoid the `/oauth/` prefix the reference PDS
 /// uses: the client must take every endpoint from server metadata.
 final class FakeOAuthServer: OAuthTestBackend, @unchecked Sendable {
+    /// Seconds added to the freshness windows below. The client stamps proofs and assertions
+    /// with the real clock and this server checks them with it moments later; a CI runner
+    /// that freezes the process in between (87 to 129 s have been seen) would otherwise turn
+    /// a correct client into a rejected one. The windows still catch a wrong clock or unit.
+    static let stallAllowance = 5 * 60
+
     enum Endpoint: String, Sendable {
         case protectedResourceMetadata, authorizationServerMetadata, par, token, revoke, resource, unknown
     }
@@ -542,7 +548,9 @@ final class FakeOAuthServer: OAuthTestBackend, @unchecked Sendable {
         expectedHTU.query = nil
         expectedHTU.fragment = nil
         guard proof.htu == expectedHTU.string else { return ("invalid_dpop_proof", "htu mismatch") }
-        guard let iat = proof.iat, abs(Int(Date().timeIntervalSince1970) - iat) <= 60 else {
+        guard let iat = proof.iat,
+              abs(Int(Date().timeIntervalSince1970) - iat) <= 60 + FakeOAuthServer.stallAllowance
+        else {
             return ("invalid_dpop_proof", "iat outside window")
         }
         guard let jti = proof.jti, !jti.isEmpty, seenJTIs.insert(jti).inserted else {
@@ -601,8 +609,8 @@ final class FakeOAuthServer: OAuthTestBackend, @unchecked Sendable {
             let now = Int(Date().timeIntervalSince1970)
             guard payload["iss"] as? String == clientID, payload["sub"] as? String == clientID,
                   payload["aud"] as? String == issuer,
-                  let exp = payload["exp"] as? Int, exp > now,
-                  let iat = payload["iat"] as? Int, abs(now - iat) <= 60,
+                  let exp = payload["exp"] as? Int, exp > now - Self.stallAllowance,
+                  let iat = payload["iat"] as? Int, abs(now - iat) <= 60 + Self.stallAllowance,
                   let jti = payload["jti"] as? String, seenAssertions.insert(jti).inserted
             else {
                 return oauthError(401, "invalid_client", "assertion claims or replay")

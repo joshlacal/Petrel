@@ -8,7 +8,7 @@ import Foundation
     import FoundationNetworking
 #endif
 import PetrelCrypto
-import PetrelPLC
+@testable import PetrelPLC
 
 /// The vendored sample of the public PLC directory. See
 /// `Vectors/plc-directory/README.md` for provenance.
@@ -335,12 +335,25 @@ actor FakePLCDirectory: PLCHTTPTransport {
 
 /// The directory under test in stubbed tests: `https://plc.test`.
 /// The timeout for HTTP exchanges answered in-process by a `URLProtocol`
-/// stub: the transport's ceiling. Nothing on the other end is slow, but a
-/// loaded CI runner can stall the whole test process for several seconds
-/// (one stalled 7.5 s), and a 5-second `URLRequest` timeout then fires before
-/// the stub answers. These tests are about bounds and cancellation, not
-/// timeouts; `testURLSessionPLCTransportReportsATimeout` covers the timeout.
-let stubbedExchangeTimeout: TimeInterval = 30
+/// stub. Nothing on the other end is slow, but a loaded CI runner can freeze
+/// the whole test process (stalls of 87 to 129 s have been seen), and a
+/// `URLRequest` timeout that fires during the freeze fails the exchange
+/// before the stub answers. Ten minutes outlasts any stall seen; it is above
+/// the 30 second ceiling the public API enforces, so stubbed tests build
+/// their transport and configuration through the internal seams below.
+/// These tests are about bounds and cancellation, not timeouts;
+/// `testURLSessionPLCTransportReportsATimeout` covers the timeout.
+let stubbedExchangeTimeout: TimeInterval = 10 * 60
+
+/// A `URLSessionPLCTransport` over `configuration` that accepts
+/// ``stubbedExchangeTimeout``.
+func stubbedURLSessionTransport(configuration: URLSessionConfiguration) throws -> URLSessionPLCTransport {
+    try URLSessionPLCTransport(
+        maximumTimeout: stubbedExchangeTimeout,
+        configuration: configuration,
+        timeoutCeiling: stubbedExchangeTimeout
+    )
+}
 
 func plcTestClient(
     _ directory: FakePLCDirectory,

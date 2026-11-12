@@ -51,10 +51,11 @@ public struct PLCClientConfiguration: Sendable, Equatable {
         maximumAuditBytes: Int,
         maximumSubmitResponseBytes: Int,
         maximumExportBytes: Int,
-        operationLimits: PLCOperationLimits
+        operationLimits: PLCOperationLimits,
+        timeoutCeiling: TimeInterval = 30
     ) throws {
         let bounds = 1 ... Self.maximumResponseBytesCeiling
-        guard timeout > 0, timeout <= 30, timeout.isFinite,
+        guard timeout > 0, timeout <= timeoutCeiling, timeout.isFinite,
               bounds.contains(maximumStateBytes),
               bounds.contains(maximumAuditBytes),
               bounds.contains(maximumSubmitResponseBytes),
@@ -125,6 +126,28 @@ public struct PLCClientConfiguration: Sendable, Equatable {
             operationLimits: operationLimits
         )
     }
+
+    #if DEBUG
+        /// ``production(origin:timeout:maximumStateBytes:maximumAuditBytes:maximumSubmitResponseBytes:maximumExportBytes:operationLimits:allowsNonDefaultPort:)``
+        /// with a per-request timeout above the 30 second ceiling. Only for
+        /// tests whose exchanges are answered in-process: a stalled CI runner
+        /// can freeze the test process for minutes, and a timeout that fires
+        /// during the freeze fails a test that is not about timeouts.
+        static func stubbedProduction(origin: URL, timeout: TimeInterval) throws -> Self {
+            try .init(
+                origin: origin,
+                laboratory: false,
+                submitSuccessResponsePolicy: .strict,
+                timeout: timeout,
+                maximumStateBytes: 256 * 1_024,
+                maximumAuditBytes: 4 * 1_024 * 1_024,
+                maximumSubmitResponseBytes: 64 * 1_024,
+                maximumExportBytes: 16 * 1_024 * 1_024,
+                operationLimits: .specification,
+                timeoutCeiling: timeout
+            )
+        }
+    #endif
 
     /// A development directory reached over plain HTTP on a literal
     /// loopback address (or one explicitly allowlisted host), on a port of

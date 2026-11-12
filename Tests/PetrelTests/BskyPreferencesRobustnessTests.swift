@@ -9,7 +9,7 @@ import Testing
 struct BskyPreferencesRobustnessTests {
     // MARK: Serialization
 
-    @Test("parallel setters are serialized; no write is lost", .timeLimit(.minutes(1)))
+    @Test("parallel setters are serialized; no write is lost", .timeLimit(.minutes(5)))
     func parallelSettersDoNotClobber() async throws {
         let (engine, backend) = PrefsFixture.make()
         let count = 40
@@ -29,7 +29,7 @@ struct BskyPreferencesRobustnessTests {
         #expect(backend.entries(ofType: "app.bsky.actor.defs#hiddenPostsPref").count == 1)
     }
 
-    @Test("parallel setters of different kinds all land", .timeLimit(.minutes(1)))
+    @Test("parallel setters of different kinds all land", .timeLimit(.minutes(5)))
     func parallelMixedSetters() async throws {
         let (engine, _) = PrefsFixture.make()
 
@@ -96,7 +96,7 @@ struct BskyPreferencesRobustnessTests {
 
     @Test(
         "concurrent labeler changes leave the header matching the saved subscriptions",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(5)),
         arguments: 0 ..< 50
     )
     func concurrentLabelerChanges(_: Int) async throws {
@@ -127,7 +127,7 @@ struct BskyPreferencesRobustnessTests {
 
     // MARK: Failure handling
 
-    @Test("a failed write releases the lock and leaves the store untouched", .timeLimit(.minutes(1)))
+    @Test("a failed write releases the lock and leaves the store untouched", .timeLimit(.minutes(5)))
     func lockReleasedOnThrow() async throws {
         let (engine, backend) = PrefsFixture.make()
         try await engine.setAdultContentEnabled(true)
@@ -144,7 +144,7 @@ struct BskyPreferencesRobustnessTests {
         #expect(try await engine.getPreferences().moderationPrefs.adultContentEnabled == false)
     }
 
-    @Test("a throwing transform releases the lock and writes nothing", .timeLimit(.minutes(1)))
+    @Test("a throwing transform releases the lock and writes nothing", .timeLimit(.minutes(5)))
     func lockReleasedWhenTransformThrows() async throws {
         let (engine, backend) = PrefsFixture.make()
         struct Boom: Error {}

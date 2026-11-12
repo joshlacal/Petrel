@@ -332,7 +332,7 @@ struct BskyPreferencesWireTests {
 
     @Test(
         "concurrent labeler changes through agents sharing one network service leave the header matching the saved subscriptions",
-        .timeLimit(.minutes(1)),
+        .timeLimit(.minutes(5)),
         arguments: 0 ..< 20
     )
     func concurrentLabelerChanges(_: Int) async throws {

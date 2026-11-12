@@ -272,7 +272,7 @@ struct JetstreamLegacyAPITests {
     #expect(await factory.connectedURLs.first?.query == "compress=true")
   }
 
-  @Test("distinct events sharing a time_us are all delivered", .timeLimit(.minutes(1)))
+  @Test("distinct events sharing a time_us are all delivered", .timeLimit(.minutes(5)))
   func distinctEventsSharingATimestamp() async throws {
     // time_us is a timestamp, not an event identifier: several events can carry the same one.
     let session = ScriptedWebSocketSession(messages: [
@@ -297,7 +297,7 @@ struct JetstreamLegacyAPITests {
     ])
   }
 
-  @Test("the inclusive replay at the resume time_us drops only events already delivered", .timeLimit(.minutes(1)))
+  @Test("the inclusive replay at the resume time_us drops only events already delivered", .timeLimit(.minutes(5)))
   func replayAtResumeTimestamp() async throws {
     // The connection drops after the first of two events at time_us 200. The server replays
     // from 200 inclusive: the event already delivered must be dropped, its sibling must not.
@@ -323,7 +323,7 @@ struct JetstreamLegacyAPITests {
     #expect(await factory.cursors == [nil, "200"])
   }
 
-  @Test("updateOptions during a connect attempt reaches the new connection", .timeLimit(.minutes(1)))
+  @Test("updateOptions during a connect attempt reaches the new connection", .timeLimit(.minutes(5)))
   func updateOptionsDuringConnect() async throws {
     let session = ScriptedWebSocketSession(messages: [
       Self.commit(timeUS: 1, collection: "app.bsky.feed.post"),
@@ -370,7 +370,7 @@ struct JetstreamLegacyAPITests {
     #expect(await session.sentTexts.isEmpty)
   }
 
-  @Test("concurrent updateOptions leave every connection on the newest options", .timeLimit(.minutes(1)))
+  @Test("concurrent updateOptions leave every connection on the newest options", .timeLimit(.minutes(5)))
   func concurrentUpdatesAreSerialized() async throws {
     let gate = FirstSendGate()
     let first = GatedSendSession(gate: gate)
@@ -408,7 +408,7 @@ struct JetstreamLegacyAPITests {
     }
   }
 
-  @Test("the runner's stream closes the socket on cancellation even while the runner is held", .timeLimit(.minutes(1)))
+  @Test("the runner's stream closes the socket on cancellation even while the runner is held", .timeLimit(.minutes(5)))
   func cancellationClosesSocketIndependentOfRunnerLifetime() async throws {
     let session = ScriptedWebSocketSession(messages: [Self.commit(timeUS: 1), Self.commit(timeUS: 2)])
     let configuration = Self.configuration(ScriptedWebSocketFactory(sessions: [session]))
@@ -439,7 +439,7 @@ struct JetstreamLegacyAPITests {
     withExtendedLifetime((stream, runner)) {}
   }
 
-  @Test("cancelling between reads closes the socket of a retained stream", .timeLimit(.minutes(1)))
+  @Test("cancelling between reads closes the socket of a retained stream", .timeLimit(.minutes(5)))
   func cancellationBetweenReadsClosesRetainedStream() async throws {
     let session = ScriptedWebSocketSession(messages: [Self.commit(timeUS: 1), Self.commit(timeUS: 2)])
     let subscription = JetstreamSubscription(

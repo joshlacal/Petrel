@@ -346,15 +346,21 @@ struct NetworkPerformanceHygieneTests {
 
             let cancellationHost = "cancellation-test.bsky.social"
             let enteredOperation = AsyncBarrier()
+            // The lookup stays blocked until the test lets it go, after the caller has already
+            // returned. "Promptly" is proven by order, not by a clock: the caller cannot have
+            // waited for a lookup that had not finished. (A time bound here failed whenever a CI
+            // runner froze the process.)
+            let lookupReleased = Mutex(false)
 
-            NetworkService.dnsResolutionHook = { host, isCancelled in
+            NetworkService.dnsResolutionHook = { host, _ in
                 guard host == cancellationHost else { return }
                 enteredOperation.signal()
-                while !isCancelled() {
+                while !lookupReleased.withLock({ $0 }) {
                     Thread.sleep(forTimeInterval: 0.002)
                 }
             }
             defer {
+                lookupReleased.withLock { $0 = true }
                 NetworkService.dnsResolutionHook = nil
             }
 
@@ -368,41 +374,35 @@ struct NetworkPerformanceHygieneTests {
                 )
             }
 
-            // Wait with a bounded timeout until the BlockOperation has actually been dequeued and started
-            try await enteredOperation.waitUntilSignaled(timeoutNanoseconds: 5_000_000_000)
+            // Wait until the BlockOperation has actually been dequeued and started.
+            try await enteredOperation.waitUntilSignaled()
 
-            let cancelStartTime = ContinuousClock.now
-
-            // Cancel while the operation is actively running on dnsResolutionQueue
+            // Cancel while the operation is running on dnsResolutionQueue, and blocked there.
             task.cancel()
 
-            // Assert that CancellationError reaches caller promptly (within 200ms) with a bounded race against a clock deadline
             let completionBarrier = AsyncBarrier()
-            let resultHolder = Mutex<(result: Result<URLRequest, any Error>?, elapsed: Duration?)>((nil, nil))
+            let resultHolder = Mutex<(result: Result<URLRequest, any Error>?, lookupStillBlocked: Bool)>((nil, false))
 
             Task {
+                let result: Result<URLRequest, any Error>
                 do {
-                    let req = try await task.value
-                    resultHolder.withLock {
-                        $0 = (.success(req), ContinuousClock.now - cancelStartTime)
-                    }
+                    result = try .success(await task.value)
                 } catch {
-                    resultHolder.withLock {
-                        $0 = (.failure(error), ContinuousClock.now - cancelStartTime)
-                    }
+                    result = .failure(error)
                 }
+                let blocked = !lookupReleased.withLock { $0 }
+                resultHolder.withLock { $0 = (result, blocked) }
                 completionBarrier.signal()
             }
 
-            let completed = try await completionBarrier.wait(timeoutNanoseconds: 2_000_000_000)
+            let completed = try await completionBarrier.wait()
             #expect(completed, "Timed out waiting for cancelled DNS resolution to complete")
             guard completed else { return }
-            let (result, elapsed) = resultHolder.withLock { $0 }
+            let (result, lookupStillBlocked) = resultHolder.withLock { $0 }
+            #expect(lookupStillBlocked, "The caller returned only after the DNS lookup ended")
             switch result {
             case .failure(is CancellationError):
-                if let elapsed {
-                    #expect(elapsed < .milliseconds(200))
-                }
+                break
             case let .failure(error):
                 Issue.record("Expected CancellationError, but got: \(error)")
             case .success:
@@ -513,7 +513,7 @@ struct NetworkPerformanceHygieneTests {
                 parameters: nil
             )
             // Hold consumption until overflow is observed, independently of scheduler speed.
-            try await terminated.waitUntilSignaled(timeoutNanoseconds: 5_000_000_000)
+            try await terminated.waitUntilSignaled()
             var caughtOverflow = false
             do {
                 for try await _ in stream {

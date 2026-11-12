@@ -1,6 +1,14 @@
 import Foundation
 import Synchronization
 
+/// How long a test waits for something it expects to happen before giving up.
+///
+/// It only bounds a failure: a passing test is woken as soon as the event
+/// happens. CI runners have frozen whole test processes for 87 to 129 s, and
+/// the clock keeps running through a freeze, so a bound under a few minutes
+/// turns a stall into a false failure.
+let expectedEventTimeoutNanoseconds: UInt64 = 5 * 60 * 1_000_000_000
+
 struct TimeoutError: Error, CustomStringConvertible, Sendable {
     var description: String { "Timed out waiting for synchronization point" }
 }
@@ -31,7 +39,7 @@ final class AsyncBarrier: @unchecked Sendable {
         }
     }
 
-    func wait(timeoutNanoseconds: UInt64 = 5_000_000_000, onTimeout: (@Sendable () -> Void)? = nil) async throws -> Bool {
+    func wait(timeoutNanoseconds: UInt64 = expectedEventTimeoutNanoseconds, onTimeout: (@Sendable () -> Void)? = nil) async throws -> Bool {
         let success = await withCheckedContinuation { (continuation: CheckedContinuation<Bool, Never>) in
             let immediateResult: Bool? = state.withLock { s in
                 if s.isSignaled {
@@ -71,7 +79,7 @@ final class AsyncBarrier: @unchecked Sendable {
         return success
     }
 
-    func waitUntilSignaled(timeoutNanoseconds: UInt64 = 5_000_000_000, onTimeout: (@Sendable () -> Void)? = nil) async throws {
+    func waitUntilSignaled(timeoutNanoseconds: UInt64 = expectedEventTimeoutNanoseconds, onTimeout: (@Sendable () -> Void)? = nil) async throws {
         let signaled = try await wait(timeoutNanoseconds: timeoutNanoseconds, onTimeout: onTimeout)
         guard signaled else {
             throw TimeoutError()
@@ -101,7 +109,7 @@ final class RetrievalGate: @unchecked Sendable {
         releaseSemaphore.wait()
     }
 
-    func waitUntilHeld(timeoutNanoseconds: UInt64 = 5_000_000_000) async throws {
+    func waitUntilHeld(timeoutNanoseconds: UInt64 = expectedEventTimeoutNanoseconds) async throws {
         do {
             try await barrier.waitUntilSignaled(timeoutNanoseconds: timeoutNanoseconds)
         } catch {
