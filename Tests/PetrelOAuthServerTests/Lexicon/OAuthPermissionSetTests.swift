@@ -167,53 +167,86 @@ struct OAuthPermissionSetTests {
             guard let include = ATProtoScope.include(IncludeScope(nsid: Self.setNSID, aud: .service(aud))).scopeString else {
                 continue
             }
-            // What the server stores: every value an ASCII scope-token (so
-            // String identity is byte identity), each reading back as granted.
-            let expanded = try await OAuthLexiconScopeResolution.expandIncludes(
-                ["atproto", include], resolver: resolver, stage: .pushedAuthorizationRequest
-            )
-            #expect(expanded.scopes.allSatisfy(ScopeToken.isScopeToken), "\(aud)")
-            let stored = ScopePermissions(rawScopes: expanded.scopes)
-            #expect(stored.allowsRPC(.init(lxm: "app.example.getFeed", aud: aud)), "\(aud)")
-            for other in Self.adversarialAudiences where !other.utf8.elementsEqual(aud.utf8) {
-                #expect(!stored.allowsRPC(.init(lxm: "app.example.getFeed", aud: other)), "\(aud) also granted \(other)")
-            }
-
-            // What a resource server reads from a signed token.
-            let harness = try TestServer(
-                accessTokenFormat: .signedJWT(key), lexiconResolver: resolver, webClientScopes: ["atproto", include]
-            )
-            let client = try TestClient(harness)
-            let tokens = try await client.signIn(scope: "atproto \(include)")
-            let verifier = try OAuthResourceServerVerifier(
-                issuer: #require(URL(string: TestServer.issuer)),
-                resource: #require(URL(string: TestServer.issuer)),
-                keys: OAuthJSONWebKeySet(keys: [key.publicJWK]),
-                secret: Data(repeating: 9, count: 32),
-                replayStore: InMemoryOAuthStore(),
-                clock: harness.clock
-            )
-            let grant = try await authenticate(verifier, client, token: tokens.accessToken)
-            try grant.requireRPC(lxm: "app.example.getFeed", aud: aud)
-            for other in Self.adversarialAudiences where !other.utf8.elementsEqual(aud.utf8) {
-                do {
-                    try grant.requireRPC(lxm: "app.example.getFeed", aud: other)
-                    Issue.record("\(aud) also granted \(other)")
-                } catch let .insufficientScope(needed) {
-                    // The denial names a scope that reads back as the service
-                    // denied, or, where no scope can name it, only the family.
-                    guard let named = try? ATProtoScope.parse(needed) else {
-                        #expect(needed == "rpc", "denying \(other) under \(aud) named unparseable \(needed)")
-                        continue
-                    }
-                    guard case let .rpc(permission) = named else { Issue.record("\(needed)"); continue }
-                    #expect(permission.matches(.init(lxm: "app.example.getFeed", aud: other)), "\(needed)")
-                    #expect(!permission.matches(.init(lxm: "app.example.getFeed", aud: aud)), "\(needed)")
-                }
-            }
+            try await checkStoredGrant(include: include, aud: aud, resolver: resolver)
+            try await checkSignedTokenGrant(include: include, aud: aud, resolver: resolver, key: key)
             checked += 1
         }
         #expect(checked >= 6)
+    }
+
+    /// What the server stores: every value an ASCII scope-token (so String
+    /// identity is byte identity), each reading back as granted for `aud` only.
+    private func checkStoredGrant(include: String, aud: String, resolver: MutableLexiconResolver) async throws {
+        let expanded = try await OAuthLexiconScopeResolution.expandIncludes(
+            ["atproto", include], resolver: resolver, stage: .pushedAuthorizationRequest
+        )
+        #expect(expanded.scopes.allSatisfy(ScopeToken.isScopeToken), "\(aud)")
+        let stored = ScopePermissions(rawScopes: expanded.scopes)
+        #expect(stored.allowsRPC(.init(lxm: "app.example.getFeed", aud: aud)), "\(aud)")
+        for other in Self.adversarialAudiences where !other.utf8.elementsEqual(aud.utf8) {
+            #expect(!stored.allowsRPC(.init(lxm: "app.example.getFeed", aud: other)), "\(aud) also granted \(other)")
+        }
+    }
+
+    /// What a resource server reads from a signed token: `aud` allowed, every
+    /// other audience denied with a scope that names only the denied service.
+    private func checkSignedTokenGrant(
+        include: String,
+        aud: String,
+        resolver: MutableLexiconResolver,
+        key: OAuthSigningKey
+    ) async throws {
+        let harness = try TestServer(
+            accessTokenFormat: .signedJWT(key), lexiconResolver: resolver, webClientScopes: ["atproto", include]
+        )
+        let client = try TestClient(harness)
+        let tokens = try await client.signIn(scope: "atproto \(include)")
+        let verifier = try OAuthResourceServerVerifier(
+            issuer: #require(URL(string: TestServer.issuer)),
+            resource: #require(URL(string: TestServer.issuer)),
+            keys: OAuthJSONWebKeySet(keys: [key.publicJWK]),
+            secret: Data(repeating: 9, count: 32),
+            replayStore: InMemoryOAuthStore(),
+            clock: harness.clock
+        )
+        let grant = try await authenticate(verifier, client, token: tokens.accessToken)
+        try grant.requireRPC(lxm: "app.example.getFeed", aud: aud)
+        for other in Self.adversarialAudiences where !other.utf8.elementsEqual(aud.utf8) {
+            let outcome = Result { () throws(OAuthResourceAuthorizationFailure) in
+                try grant.requireRPC(lxm: "app.example.getFeed", aud: other)
+            }
+            checkDenial(outcome, granted: aud, denied: other)
+        }
+    }
+
+    /// The denial names a scope that reads back as the denied service, or,
+    /// where no scope can name it, only the family.
+    private func checkDenial(
+        _ outcome: Result<Void, OAuthResourceAuthorizationFailure>,
+        granted aud: String,
+        denied other: String
+    ) {
+        let needed: String
+        switch outcome {
+        case .success:
+            Issue.record("\(aud) also granted \(other)")
+            return
+        case let .failure(.insufficientScope(scope)):
+            needed = scope
+        case let .failure(failure):
+            Issue.record("denying \(other) under \(aud) failed with \(failure)")
+            return
+        }
+        guard let named = try? ATProtoScope.parse(needed) else {
+            #expect(needed == "rpc", "denying \(other) under \(aud) named unparseable \(needed)")
+            return
+        }
+        guard case let .rpc(permission) = named else {
+            Issue.record("\(needed)")
+            return
+        }
+        #expect(permission.matches(.init(lxm: "app.example.getFeed", aud: other)), "\(needed)")
+        #expect(!permission.matches(.init(lxm: "app.example.getFeed", aud: aud)), "\(needed)")
     }
 
     @Test("the consent page shows the set's title, localised, and the permissions inside it")
