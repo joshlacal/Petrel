@@ -193,7 +193,7 @@ public struct Session: Codable, Equatable, Sendable {
 
     /// Whether the token has expired
     public var isExpired: Bool {
-        Date() > createdAt.addingTimeInterval(expiresIn)
+        PetrelClock.now() > createdAt.addingTimeInterval(expiresIn)
     }
 
     /// How long before expiry a token is treated as due for refresh: 20 % of its
@@ -209,7 +209,7 @@ public struct Session: Codable, Equatable, Sendable {
     /// Whether the token is close enough to expiry that it should be refreshed
     /// before the next request. See ``refreshLeadTime``.
     public var isExpiringSoon: Bool {
-        Date() > createdAt.addingTimeInterval(expiresIn - refreshLeadTime)
+        PetrelClock.now() > createdAt.addingTimeInterval(expiresIn - refreshLeadTime)
     }
 
     public init(

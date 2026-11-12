@@ -268,26 +268,31 @@ struct OAuthRefreshConformanceTests {
 
     @Test("The refresh lead time is a fifth of the lifetime, capped at a minute")
     func refreshLeadTime() {
+        // Ages are measured from one pinned instant, so the 10 s and 55 s margins
+        // below hold however long the runner pauses between building and reading.
+        let now = Date()
         func session(lifetime: TimeInterval, age: TimeInterval) -> Session {
             Session(
-                accessToken: "a", refreshToken: "r", createdAt: Date().addingTimeInterval(-age),
+                accessToken: "a", refreshToken: "r", createdAt: now.addingTimeInterval(-age),
                 expiresIn: lifetime, tokenType: .dpop, did: Self.aliceDID
             )
         }
-        #expect(session(lifetime: 300, age: 0).refreshLeadTime == 60)
-        #expect(session(lifetime: 900, age: 0).refreshLeadTime == 60)
-        #expect(session(lifetime: 3600, age: 0).refreshLeadTime == 60)
-        #expect(session(lifetime: 100, age: 0).refreshLeadTime == 20)
+        PetrelClock.$pinned.withValue(now) {
+            #expect(session(lifetime: 300, age: 0).refreshLeadTime == 60)
+            #expect(session(lifetime: 900, age: 0).refreshLeadTime == 60)
+            #expect(session(lifetime: 3600, age: 0).refreshLeadTime == 60)
+            #expect(session(lifetime: 100, age: 0).refreshLeadTime == 20)
 
-        // A five-minute token: fresh for four minutes, due in the last one.
-        #expect(!session(lifetime: 300, age: 0).isExpiringSoon)
-        #expect(!session(lifetime: 300, age: 230).isExpiringSoon)
-        #expect(session(lifetime: 300, age: 245).isExpiringSoon)
-        #expect(!session(lifetime: 300, age: 245).isExpired)
-        #expect(session(lifetime: 300, age: 301).isExpired)
-        // A fifteen-minute token is not due from the moment it is issued.
-        #expect(!session(lifetime: 900, age: 600).isExpiringSoon)
-        #expect(session(lifetime: 900, age: 845).isExpiringSoon)
+            // A five-minute token: fresh for four minutes, due in the last one.
+            #expect(!session(lifetime: 300, age: 0).isExpiringSoon)
+            #expect(!session(lifetime: 300, age: 230).isExpiringSoon)
+            #expect(session(lifetime: 300, age: 245).isExpiringSoon)
+            #expect(!session(lifetime: 300, age: 245).isExpired)
+            #expect(session(lifetime: 300, age: 301).isExpired)
+            // A fifteen-minute token is not due from the moment it is issued.
+            #expect(!session(lifetime: 900, age: 600).isExpiringSoon)
+            #expect(session(lifetime: 900, age: 845).isExpiringSoon)
+        }
     }
 
     @Test("A token response without expires_in gets the conservative assumed lifetime")
@@ -343,22 +348,20 @@ struct OAuthRefreshConformanceTests {
         try await withOAuthTestNetwork([server]) {
             let client = await OAuthTestClient.make(namespace: "refresh.none.nearexpiry", server: server)
             try await client.signIn(handle: "alice.test", did: Self.aliceDID, server: server)
-            let account = try #require(try await client.storage.getAccount(for: Self.aliceDID))
             let session = try #require(try await client.storage.getSession(for: Self.aliceDID))
 
-            // The same tokens, 55 minutes into their hour: inside the refresh
-            // lead time, where a session with a refresh token would refresh.
-            let aging = Session(
-                accessToken: session.accessToken, refreshToken: nil,
-                createdAt: Date().addingTimeInterval(-3550), expiresIn: 3600,
-                tokenType: .dpop, did: Self.aliceDID, grantedScopes: session.grantedScopes
-            )
-            #expect(aging.isExpiringSoon && !aging.isExpired)
-            try await client.storage.saveAccountAndSession(account, session: aging, for: Self.aliceDID)
-
-            #expect(try await client.strategy.refreshTokenIfNeeded() == .stillValid)
-            #expect(try await client.getSession().1.statusCode == 200)
-            #expect(refreshRequests(server).isEmpty)
+            // The client reads the time 50 s before the stored token expires: inside
+            // the refresh lead time, where a session with a refresh token would
+            // refresh. A pinned time rather than a backdated session, because the
+            // store keeps the newer session over an older one, and because 50 s of
+            // wall clock is less than a stalled runner can freeze for.
+            let nearExpiry = session.createdAt.addingTimeInterval(session.expiresIn - 50)
+            try await PetrelClock.$pinned.withValue(nearExpiry) { () async throws in
+                #expect(session.isExpiringSoon && !session.isExpired)
+                #expect(try await client.strategy.refreshTokenIfNeeded() == .stillValid)
+                #expect(try await client.getSession().1.statusCode == 200)
+                #expect(refreshRequests(server).isEmpty)
+            }
         }
     }
 

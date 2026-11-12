@@ -118,6 +118,11 @@ private struct TestAuthority: Sendable {
 private enum Fixtures {
   static let authority: TestAuthority = try! TestAuthority()
 
+  /// The loopback TLS server answers at once; a stalled CI runner freezes both
+  /// ends while the clock runs, so a short deadline would turn the stall into a
+  /// timeout instead of the outcome each test checks.
+  static let exchangeTimeout: TimeInterval = 5 * 60
+
   static func transport() throws -> PinnedNIOOAuthRemoteTransport {
     try PinnedNIOOAuthRemoteTransport(
       trustRoots: .certificates([NIOSSLCertificate(bytes: Array(authority.certificatePEM.utf8), format: .pem)])
@@ -139,7 +144,7 @@ struct PinnedNIOOAuthRemoteTransportTests {
     let url = try #require(URL(string: "https://pinned.example.test:\(server.port)/client-metadata.json"))
     let transport = try Fixtures.transport()
     #expect(transport.pinsConnectionsToApprovedPeers)
-    let response = try await transport.get(url: url, approvedPeers: loopback, timeout: 5, maximumBodyBytes: 1024)
+    let response = try await transport.get(url: url, approvedPeers: loopback, timeout: Fixtures.exchangeTimeout, maximumBodyBytes: 1024)
     #expect(response.status == 200)
     #expect(response.body == body)
     #expect(response.connectedPeerAddress == OAuthIPAddress(literal: "127.0.0.1"))
@@ -153,7 +158,7 @@ struct PinnedNIOOAuthRemoteTransportTests {
     defer { Task { try? await server.close() } }
     let url = try #require(URL(string: "https://pinned.example.test:\(server.port)/client-metadata.json"))
     let error = await #expect(throws: (any Error).self) {
-      _ = try await Fixtures.transport().get(url: url, approvedPeers: loopback, timeout: 5, maximumBodyBytes: 1024)
+      _ = try await Fixtures.transport().get(url: url, approvedPeers: loopback, timeout: Fixtures.exchangeTimeout, maximumBodyBytes: 1024)
     }
     // Refused by the TLS layer, not by anything after the handshake.
     #expect(error is NIOSSLError || error is NIOSSLExtraError, "\(String(describing: error))")
@@ -165,7 +170,7 @@ struct PinnedNIOOAuthRemoteTransportTests {
     defer { Task { try? await server.close() } }
     let url = try #require(URL(string: "https://pinned.example.test:\(server.port)/client-metadata.json"))
     await #expect(throws: OAuthServerError.self) {
-      _ = try await Fixtures.transport().get(url: url, approvedPeers: loopback, timeout: 5, maximumBodyBytes: 1024)
+      _ = try await Fixtures.transport().get(url: url, approvedPeers: loopback, timeout: Fixtures.exchangeTimeout, maximumBodyBytes: 1024)
     }
   }
 
@@ -173,7 +178,7 @@ struct PinnedNIOOAuthRemoteTransportTests {
   func noApprovedAddress() async throws {
     let url = try #require(URL(string: "https://pinned.example.test/client-metadata.json"))
     await #expect(throws: OAuthServerError.self) {
-      _ = try await Fixtures.transport().get(url: url, approvedPeers: [], timeout: 5, maximumBodyBytes: 1024)
+      _ = try await Fixtures.transport().get(url: url, approvedPeers: [], timeout: Fixtures.exchangeTimeout, maximumBodyBytes: 1024)
     }
   }
 
