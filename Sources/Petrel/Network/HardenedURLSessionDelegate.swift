@@ -39,6 +39,34 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
         self.resolver = resolver
         super.init()
     }
+
+    #if DEBUG
+        private static let deinitObservers = NSLock()
+        private nonisolated(unsafe) static var deinitObserverTable: [UUID: @Sendable (ObjectIdentifier) -> Void] = [:]
+
+        /// Test seam: calls `observer` with the identity of every delegate as it is released.
+        /// Tests use it to wait for a release without a wall-clock deadline. Returns a token
+        /// for ``removeDeinitObserver(_:)``.
+        package static func addDeinitObserver(_ observer: @escaping @Sendable (ObjectIdentifier) -> Void) -> UUID {
+            let token = UUID()
+            deinitObservers.withLock { deinitObserverTable[token] = observer }
+            return token
+        }
+
+        /// Removes an observer added with ``addDeinitObserver(_:)``.
+        package static func removeDeinitObserver(_ token: UUID) {
+            _ = deinitObservers.withLock { deinitObserverTable.removeValue(forKey: token) }
+        }
+    #endif
+
+    deinit {
+        #if DEBUG
+            let identity = ObjectIdentifier(self)
+            for observer in Self.deinitObservers.withLock({ Array(Self.deinitObserverTable.values) }) {
+                observer(identity)
+            }
+        #endif
+    }
     package final class TaskContextManager: @unchecked Sendable {
         private let lock = NSLock()
         private var taskContexts = [Int: TaskContext]()
