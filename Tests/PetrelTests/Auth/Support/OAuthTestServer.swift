@@ -260,6 +260,10 @@ final class FakeOAuthServer: OAuthTestBackend, @unchecked Sendable {
     /// the reference PDS does) or signals it only through `WWW-Authenticate`
     /// (all RFC 9449 §9 requires).
     var resourceNonceErrorInBody = true
+    /// Whether response header names are sent in lower case, as HTTP/2 always
+    /// sends them and as swift-corelibs-foundation passes them through without
+    /// canonicalising.
+    var lowercasesResponseHeaderNames = false
     /// The hosting status `com.atproto.server.getSession` reports.
     var sessionStatus: (active: Bool?, status: String?) = (true, nil)
     /// Forces these endpoints to fail with the given status and OAuth error code.
@@ -426,6 +430,9 @@ final class FakeOAuthServer: OAuthTestBackend, @unchecked Sendable {
         var allHeaders = headers
         if allHeaders["Content-Type"] == nil {
             allHeaders["Content-Type"] = "application/json"
+        }
+        if lowercasesResponseHeaderNames {
+            allHeaders = Dictionary(allHeaders.map { ($0.key.lowercased(), $0.value) }, uniquingKeysWith: { first, _ in first })
         }
         let data = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data()
         let response = HTTPURLResponse(url: url, statusCode: status, httpVersion: "HTTP/1.1", headerFields: allHeaders)!

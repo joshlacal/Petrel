@@ -1040,7 +1040,10 @@ public actor NetworkService: NetworkServiceProtocol {
     nonisolated func extractContentLabelers(from response: HTTPURLResponse) async -> [(
         did: String, redact: Bool
     )] {
-        guard let contentLabelers = response.allHeaderFields["atproto-content-labelers"] as? String
+        // Header names are case-insensitive; `allHeaderFields` is keyed as the
+        // transport delivered them (lower case over HTTP/2, canonicalised by
+        // Darwin, as received on Linux), so look the name up without regard to case.
+        guard let contentLabelers = response.value(forHTTPHeaderField: "atproto-content-labelers")
         else {
             return []
         }

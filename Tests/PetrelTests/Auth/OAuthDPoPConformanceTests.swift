@@ -311,6 +311,26 @@ struct OAuthDPoPConformanceTests {
         }
     }
 
+    /// HTTP/2 sends every header name in lower case, and swift-corelibs-foundation
+    /// hands names through as received, so `dpop-nonce` and `www-authenticate`
+    /// must be found whatever their case.
+    @Test("Lower-case DPoP-Nonce and WWW-Authenticate names are honoured, at the authorization and resource servers")
+    func lowercaseHeaderNames() async throws {
+        let server = FakeOAuthServer()
+        server.lowercasesResponseHeaderNames = true
+        server.resourceNonceErrorInBody = false // the challenge is only in www-authenticate
+        try await withOAuthTestNetwork([server]) {
+            let client = await OAuthTestClient.make(namespace: "dpop.lowercase.headers", server: server)
+            try await client.signIn(handle: "alice.test", did: Self.aliceDID, server: server)
+            #expect(try await client.getSession().1.statusCode == 200)
+            let attempts = server.requests(to: .resource)
+            #expect(attempts.map(\.status) == [401, 200])
+            #expect(attempts[1].proof?.nonce == server.currentResourceServerNonce)
+            #expect(try await client.getSession().1.statusCode == 200)
+            #expect(server.requests(to: .resource).count == 3)
+        }
+    }
+
     @Test("A server that keeps demanding a new nonce is retried once, not forever")
     func nonceRetryIsBounded() async throws {
         let server = FakeOAuthServer()
