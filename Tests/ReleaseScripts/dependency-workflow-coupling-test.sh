@@ -77,6 +77,7 @@ for workflow in \
   generator.yml \
   kotlin.yml \
   lint.yml \
+  oauth-server.yml \
   sync-lexicons.yml; do
   if /usr/bin/grep -F "$GATE" "$ROOT/.github/workflows/$workflow" >/dev/null; then
     echo "dependency gate must not run from $workflow" >&2

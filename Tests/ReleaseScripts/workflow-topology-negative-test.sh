@@ -679,6 +679,7 @@ for workflow in \
   generator.yml \
   kotlin.yml \
   lint.yml \
+  oauth-server.yml \
   swift.yml \
   sync-lexicons.yml; do
   fixture=$TMP/job-level-permissions-${workflow%.yml}
