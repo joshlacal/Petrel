@@ -8,6 +8,7 @@ import Foundation
     import FoundationNetworking
 #endif
 @testable import Petrel
+import Synchronization
 import Testing
 
 private final class DummyDIDResolver: DIDResolving, @unchecked Sendable {
@@ -396,19 +397,24 @@ struct SpaceHostResolverTests {
 
         weak var weakSession: URLSession?
         weak var weakDelegate: HardenedURLSessionDelegate?
+        let firstRelease = DelegateReleaseSignal()
         let (data, response) = try await SpaceHostResolver.withPerCallHardenedSession(
             configuration: config,
             limits: .default
         ) { session, delegate in
             weakSession = session
             weakDelegate = delegate
+            firstRelease.watch(delegate)
             return try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
         }
         #expect(data == body)
         #expect((response as? HTTPURLResponse)?.statusCode == 200)
-        #expect(await isEventuallyReleased { weakSession == nil && weakDelegate == nil })
+        await firstRelease.wait()
+        #expect(weakDelegate == nil)
+        #expect(await isEventuallyReleased { weakSession == nil })
 
         // A call that fails before sending anything releases its session too.
+        let secondRelease = DelegateReleaseSignal()
         do {
             try await SpaceHostResolver.withPerCallHardenedSession(
                 configuration: .ephemeral,
@@ -416,25 +422,31 @@ struct SpaceHostResolverTests {
             ) { (session, delegate) async throws -> Void in
                 weakSession = session
                 weakDelegate = delegate
+                secondRelease.watch(delegate)
                 throw URLError(.cancelled)
             }
             Issue.record("Expected the call to throw")
         } catch {
             #expect(error is URLError)
         }
-        #expect(await isEventuallyReleased { weakSession == nil && weakDelegate == nil })
+        await secondRelease.wait()
+        #expect(weakDelegate == nil)
+        #expect(await isEventuallyReleased { weakSession == nil })
     }
 
     @Test("A resolver invalidates the session it created when released, never an injected one")
     func resolverReleasesOnlyItsOwnSession() async throws {
         weak var owned: HardenedURLSessionDelegate?
+        let ownedRelease = DelegateReleaseSignal()
         do {
             let resolver = SpaceHostResolver(didResolver: DummyDIDResolver())
             let delegate = await resolver.sessionDelegate
             #expect(delegate != nil)
+            if let delegate { ownedRelease.watch(delegate) }
             owned = delegate
         }
-        #expect(await isEventuallyReleased { owned == nil })
+        await ownedRelease.wait()
+        #expect(owned == nil)
 
         let injected = URLSession(
             configuration: .ephemeral,
@@ -453,16 +465,47 @@ struct SpaceHostResolverTests {
     }
 }
 
-/// URLSession releases an invalidated session's delegate asynchronously, so
-/// release is polled for up to five seconds.
+/// URLSession releases an invalidated session asynchronously. Polled with a 300 s ceiling,
+/// so a stalled CI runner cannot fail it while a real leak still does.
 private func isEventuallyReleased(_ released: () -> Bool) async -> Bool {
-    for _ in 0 ..< 500 {
+    for _ in 0 ..< 30000 {
         if released() {
             return true
         }
         try? await Task.sleep(nanoseconds: 10_000_000)
     }
     return released()
+}
+
+/// Signals when one particular `HardenedURLSessionDelegate` is deinitialised, through the
+/// type's DEBUG deinit seam. Waiting has no wall-clock deadline: a delegate that is never
+/// released hangs the test, which the test runner reports, instead of failing under load.
+private final class DelegateReleaseSignal: Sendable {
+    private let stream: AsyncStream<Void>
+    private let continuation: AsyncStream<Void>.Continuation
+    private let token = Mutex<UUID?>(nil)
+
+    init() {
+        (stream, continuation) = AsyncStream.makeStream(of: Void.self)
+    }
+
+    func watch(_ delegate: HardenedURLSessionDelegate) {
+        let identity = ObjectIdentifier(delegate)
+        let continuation = continuation
+        let added = HardenedURLSessionDelegate.addDeinitObserver { released in
+            if released == identity { continuation.yield() }
+        }
+        token.withLock { $0 = added }
+    }
+
+    func wait() async {
+        for await _ in stream {
+            break
+        }
+        if let token = token.withLock({ $0 }) {
+            HardenedURLSessionDelegate.removeDeinitObserver(token)
+        }
+    }
 }
 
 @Suite("Space author KEM key representations")

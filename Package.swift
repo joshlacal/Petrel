@@ -278,7 +278,7 @@ let package = Package(
         ),
         .testTarget(
             name: "PetrelTests",
-            dependencies: ["Petrel", "PetrelCrypto"],
+            dependencies: ["Petrel", "PetrelCrypto", .product(name: "Logging", package: "swift-log")],
             resources: [.copy("Vectors")]
         ),
         .testTarget(

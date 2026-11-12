@@ -21,32 +21,22 @@ public struct PetrelLogEvent: Sendable {
 
 /// Internal logger that also broadcasts events to optional observers.
 public class LogManager {
-    /// Bootstrap swift-log with OSLogHandler on Apple platforms (runs once before any logger is created)
-    private static let bootstrapOnce: Void = {
+    /// Petrel's loggers. A library must not call `LoggingSystem.bootstrap`: it can run only
+    /// once per process, so doing it here would take that choice from the app (and trap if the
+    /// app bootstraps too). On Apple platforms Petrel's own loggers write to the unified log
+    /// through ``OSLogHandler``; elsewhere they use whatever handler the app bootstrapped
+    /// (swift-log's default, standard error, if none).
+    private static func makeLogger(_ label: String) -> Logger {
         #if canImport(os)
-            LoggingSystem.bootstrap { label in
-                OSLogHandler(label: label)
-            }
+            Logger(label: label, factory: { OSLogHandler(label: $0) })
         #else
-            // On non-Apple platforms, use the default StreamLogHandler
-            LoggingSystem.bootstrap(StreamLogHandler.standardOutput)
+            Logger(label: label)
         #endif
-    }()
+    }
 
-    private static let networkLogger: Logger = {
-        _ = bootstrapOnce
-        return Logger(label: "com.joshlacalamito.Petrel.Network")
-    }()
-
-    private static let authLogger: Logger = {
-        _ = bootstrapOnce
-        return Logger(label: "com.joshlacalamito.Petrel.Authentication")
-    }()
-
-    private static let generalLogger: Logger = {
-        _ = bootstrapOnce
-        return Logger(label: "com.joshlacalamito.Petrel.General")
-    }()
+    private static let networkLogger = makeLogger("com.joshlacalamito.Petrel.Network")
+    private static let authLogger = makeLogger("com.joshlacalamito.Petrel.Authentication")
+    private static let generalLogger = makeLogger("com.joshlacalamito.Petrel.General")
 
     private static let sensitiveHeaders = [
         "authorization", "dpop", "x-dpop", "dpop-nonce", "cookie", "set-cookie",

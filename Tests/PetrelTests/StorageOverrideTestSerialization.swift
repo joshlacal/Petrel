@@ -41,6 +41,18 @@ func withSerializedStorageOverrideTest<T>(
     }
 }
 
+/// For XCTest classes that swap the override in `setUp` and restore it in `tearDown`:
+/// call this first in `setUp` and ``releaseStorageOverrideTestLock()`` last in `tearDown`,
+/// so the override is held exclusively for the whole test.
+func acquireStorageOverrideTestLock() async {
+    await StorageOverrideTestLock.shared.acquire()
+}
+
+/// Releases the lock taken by ``acquireStorageOverrideTestLock()``.
+func releaseStorageOverrideTestLock() async {
+    await StorageOverrideTestLock.shared.release()
+}
+
 final class GroupAwareInMemorySecureStorage: SecureStorage, @unchecked Sendable {
     private let lock = NSLock()
     private var items: [String: Data] = [:]

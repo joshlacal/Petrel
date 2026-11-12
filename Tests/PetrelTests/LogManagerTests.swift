@@ -2,11 +2,22 @@ import Foundation
 #if canImport(FoundationNetworking)
     import FoundationNetworking
 #endif
+import Logging
 @testable import Petrel
 import Testing
 
 @Suite("LogManager Tests", .serialized)
 struct LogManagerTests {
+    /// swift-log can be bootstrapped once per process and traps on a second call, so a
+    /// library that bootstraps takes the choice from the app. Petrel logs first here, then the
+    /// "app" bootstraps; this is the only bootstrap in the test process.
+    @Test("Logging through Petrel leaves the swift-log bootstrap to the app")
+    func appCanBootstrapAfterPetrelHasLogged() {
+        LogManager.logInfo("LogManagerTests: before the app bootstraps swift-log")
+        LoggingSystem.bootstrap(StreamLogHandler.standardError)
+        LogManager.logInfo("LogManagerTests: after the app bootstrapped swift-log")
+    }
+
     @Test("Logout auto-switch incidents preserve logout semantics")
     func logoutAutoSwitchIncidentMapping() {
         let event = LogManager.convertToAuthEvent(

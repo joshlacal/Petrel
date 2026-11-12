@@ -60,6 +60,7 @@ extension AccountManaging {
 
 /// Lock-protected slot for the account-removal handler, so it can be installed
 /// synchronously from the authentication layer's initializer.
+// @unchecked Sendable: all mutable state is read and written only under `lock`.
 final class AccountRemovalHandlerBox: @unchecked Sendable {
     private let lock = NSLock()
     private var handler: (@Sendable (String) async -> Void)?

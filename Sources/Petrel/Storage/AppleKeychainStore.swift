@@ -23,6 +23,7 @@
 
     /// Secure storage implementation using Apple's Keychain Services
     final class AppleKeychainStore: SecureStorage {
+        // @unchecked Sendable: immutable closures over the thread-safe Security framework calls (tests inject fakes).
         internal struct Operations: @unchecked Sendable {
             let copyMatching: (CFDictionary, UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus
             let update: (CFDictionary, CFDictionary) -> OSStatus

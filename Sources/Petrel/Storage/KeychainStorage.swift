@@ -126,6 +126,7 @@ private actor AuthContinuityMutationHub {
 }
 
 /// Mutation hub for synchronous DPoP generation bumps and awaited cache invalidation.
+// @unchecked Sendable: all mutable state is read and written only under `lock`.
 public final class DPoPKeyMutationHub: @unchecked Sendable {
     private let lock = NSLock()
     private var observers: [UUID: @Sendable (String?) async -> Void] = [:]
@@ -173,6 +174,7 @@ public final class DPoPKeyMutationHub: @unchecked Sendable {
 }
 
 /// Mutation hub for synchronous Account generation bumps and awaited cache invalidation across AccountManager instances.
+// @unchecked Sendable: all mutable state is read and written only under `lock`.
 public final class AccountMutationHub: @unchecked Sendable {
     public struct ScopeDID: Hashable, Sendable {
         public let namespace: String
@@ -260,6 +262,7 @@ public final class AccountMutationHub: @unchecked Sendable {
         }
     }
 }
+// @unchecked Sendable: all mutable state is read and written only under `lock`.
 private final class AsyncSerialGate: @unchecked Sendable {
     private let lock = NSLock()
     private var waiters: [CheckedContinuation<Void, Never>] = []
@@ -298,6 +301,7 @@ private final class AsyncSerialGate: @unchecked Sendable {
     }
 }
 
+// @unchecked Sendable: all mutable state is read and written only under `lock`.
 private final class GatewaySessionMutationCoordinator: @unchecked Sendable {
     private let lock = NSLock()
     private var gates: [String: AsyncSerialGate] = [:]

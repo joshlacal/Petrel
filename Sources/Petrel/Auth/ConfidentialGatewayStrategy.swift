@@ -342,6 +342,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
     /// Coordinates stateful lifecycle operations serially to prevent actor reentrancy races
     /// and grants authenticated request leases while requests are launched.
+    // @unchecked Sendable: all mutable state is read and written only under `lock`. The test hook is lock-protected too.
     final class SerialOperationCoordinator: @unchecked Sendable {
         private struct Waiter {
             let id: UUID
@@ -353,7 +354,14 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         private var queue: [Waiter] = []
         private var canceledWaiterIDs: Set<UUID> = []
 
-        var _onBeforeRegistration: (@Sendable (UUID) -> Void)?
+        private var onBeforeRegistrationHook: (@Sendable (UUID) -> Void)?
+
+        /// Test hook run just before a waiter registers. Lock-protected, because tests set it
+        /// while another task may be inside `acquireLease`.
+        var _onBeforeRegistration: (@Sendable (UUID) -> Void)? {
+            get { lock.withLock { onBeforeRegistrationHook } }
+            set { lock.withLock { onBeforeRegistrationHook = newValue } }
+        }
 
         func acquireLease() async throws -> AuthenticationRequestLease {
             try Task.checkCancellation()

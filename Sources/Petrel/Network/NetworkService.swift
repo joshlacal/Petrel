@@ -21,12 +21,37 @@ public enum RequestSecurityPolicy: Sendable, Equatable {
     case authenticated(recipient: ExactAuthRequestOrigin)
 }
 
+/// Caps on the size of one HTTP response, so a hostile or broken server cannot make Petrel
+/// buffer unbounded data.
+///
+/// Every `NetworkService` reads whole responses into memory and applies these limits on the
+/// wire and again after decompression. The default is 10 MiB, which fits every Bluesky and
+/// atproto JSON response but not a large repository export (`com.atproto.sync.getRepo`) or a
+/// video blob (`com.atproto.sync.getBlob`). For those, raise the limit for just the calls
+/// that need it:
+///
+/// ```swift
+/// let car = try await NetworkService.withResponseLimits(
+///     NetworkResponseLimits(maximumWireBytes: 100 << 20, maximumDecodedBytes: 100 << 20)
+/// ) {
+///     try await client.com.atproto.sync.getRepo(input: .init(did: did))
+/// }
+/// ```
+///
+/// Scoped limits are clamped to 128 MiB. Petrel has no streaming download API, so a response
+/// larger than that cannot be fetched through `NetworkService`; fetch it with your own
+/// `URLSession` download task and read it with `PetrelRepo`.
 public struct NetworkResponseLimits: Sendable, Equatable {
+    /// Largest response body accepted as received, before any content decoding.
     public let maximumWireBytes: Int
+    /// Largest response body accepted after gzip or deflate decoding.
     public let maximumDecodedBytes: Int
+    /// Largest accepted ratio of decoded to wire size, against compression bombs.
     public let maximumExpansionRatio: Int
+    /// Most bytes of an error body kept for diagnostics and logs.
     public let maximumDiagnosticBytes: Int
 
+    /// Creates limits; every argument defaults to the value in ``default``.
     public init(
         maximumWireBytes: Int = 10 * 1024 * 1024,
         maximumDecodedBytes: Int = 10 * 1024 * 1024,
@@ -39,6 +64,7 @@ public struct NetworkResponseLimits: Sendable, Equatable {
         self.maximumDiagnosticBytes = maximumDiagnosticBytes
     }
 
+    /// 10 MiB on the wire and decoded, a 20x expansion ratio, and 8 KiB of diagnostics.
     public static let `default` = NetworkResponseLimits()
 }
 
@@ -221,6 +247,7 @@ public protocol ConnectionPolicyAdapter: Sendable {
 }
 
 /// An internal lease representing exclusive access to authentication lifecycle state while a request is in flight.
+// @unchecked Sendable: `isReleased` is guarded by `lock`; `onRelease` is an immutable `@Sendable` closure.
 public final class AuthenticationRequestLease: @unchecked Sendable {
     private let onRelease: (@Sendable () -> Void)?
     private let lock = NSLock()
@@ -2987,6 +3014,7 @@ public actor NetworkService: NetworkServiceProtocol {
     static func resolveHostIPsOffActor(host: String) async throws -> [String] {
         try Task.checkCancellation()
 
+        // @unchecked Sendable: all mutable state is read and written only under `lock`.
         final class ResolutionState: @unchecked Sendable {
             private let lock = NSLock()
             private var continuation: CheckedContinuation<[String], Error>?
@@ -3132,6 +3160,7 @@ extension Result {
 
 /// The result of one data task, handed to the request awaiting it whichever arrives first: the
 /// delegate's completion or the request's continuation.
+// @unchecked Sendable: all mutable state is read and written only under `lock`.
 final class DataTaskCompletion: @unchecked Sendable {
     private let lock = NSLock()
     private var continuation: CheckedContinuation<(Data, URLResponse), Error>?

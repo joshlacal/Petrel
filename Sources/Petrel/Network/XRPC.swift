@@ -126,6 +126,7 @@ public struct XRPCResponseMetadata: Sendable, Equatable {
 
 /// Collects the metadata of the last response seen inside a
 /// ``NetworkService/withResponseMetadata(_:)`` scope.
+// @unchecked Sendable: all mutable state is read and written only under `lock`.
 final class XRPCResponseMetadataCollector: @unchecked Sendable {
     private let lock = NSLock()
     private var latest: XRPCResponseMetadata?

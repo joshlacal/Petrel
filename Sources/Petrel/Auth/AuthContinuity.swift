@@ -33,6 +33,7 @@ public enum AuthContinuityTransactionResult<Value: Sendable>: Sendable {
     case continuityChanged
 }
 
+// @unchecked Sendable: all mutable state is read and written only under `lock`.
 final class ExactAuthGeneratedRequestScopeState: @unchecked Sendable {
     private let lock = NSLock()
     private var launchClaimed = false
