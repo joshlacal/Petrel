@@ -364,6 +364,90 @@ final class HTTPErrorResponseTests: XCTestCase {
         XCTAssertEqual(HTTPErrorResponseURLProtocol.requestCount, 2)
     }
 
+    /// A client with no session has nothing to refresh and no session to lose: a 401 must not
+    /// broadcast an automatic logout, and the caller gets the server's body.
+    func testUnauthenticated401DoesNotBroadcastLogout() async throws {
+        let body = Data(#"{"error":"AuthMissing","message":"Authentication Required"}"#.utf8)
+        HTTPErrorResponseURLProtocol.install(.response(statusCode: 401, body: body))
+        let networkService = NetworkService(baseURL: baseURL)
+        let logoutEvents = HTTPErrorResponseLogoutRecorder()
+        await AuthEventBroadcaster.shared.addObserver { event in
+            // An unauthenticated request has no DID; that is what the old event carried.
+            if case let .autoLogoutTriggered(did, _) = event, did.isEmpty { logoutEvents.record() }
+        }
+
+        let (data, response) = try await networkService.performRequestReturningHTTPErrorResponses(
+            request(path: "xrpc/app.bsky.feed.getTimeline"),
+            skipTokenRefresh: false
+        )
+
+        XCTAssertEqual(response.statusCode, 401)
+        XCTAssertEqual(data, body)
+        try await Task.sleep(nanoseconds: 50_000_000)
+        XCTAssertEqual(logoutEvents.count, 0, "an unauthenticated 401 must not auto-logout")
+    }
+
+    /// Only the XRPC error name `ExpiredToken` triggers a refresh, not a body that merely
+    /// mentions the word (a refresh-and-resend of a POST is not harmless).
+    func testExpiredTokenIsMatchedByErrorNameNotSubstring() async throws {
+        let echo = Data(#"{"error":"InvalidRequest","message":"ExpiredToken is not a valid handle"}"#.utf8)
+        HTTPErrorResponseURLProtocol.install(.response(statusCode: 400, body: echo))
+        let provider = HTTPErrorResponseAuthProvider()
+        let networkService = NetworkService(baseURL: baseURL, authService: provider)
+        await provider.install(networkService: networkService)
+
+        let (data, response) = try await networkService.performRequestReturningHTTPErrorResponses(
+            request(path: "xrpc/com.example.echo"),
+            skipTokenRefresh: false
+        )
+        XCTAssertEqual(response.statusCode, 400)
+        XCTAssertEqual(data, echo)
+        // Not retried: one request reached the server.
+        XCTAssertEqual(HTTPErrorResponseURLProtocol.requestCount, 1)
+        let refreshesAfterEcho = await provider.refreshCount
+
+        let ok = Data(#"{"ok":true}"#.utf8)
+        HTTPErrorResponseURLProtocol.install([
+            .response(statusCode: 400, body: Data(#"{"error":"ExpiredToken","message":"Token has expired"}"#.utf8)),
+            .response(statusCode: 200, body: ok),
+        ])
+        let (retried, retriedResponse) = try await networkService.performRequestReturningHTTPErrorResponses(
+            request(path: "xrpc/com.example.expired"),
+            skipTokenRefresh: false
+        )
+        XCTAssertEqual(retriedResponse.statusCode, 200)
+        XCTAssertEqual(retried, ok)
+        // Refreshed once more than the two pre-flight checks, then retried.
+        XCTAssertEqual(HTTPErrorResponseURLProtocol.requestCount, 2)
+        let refreshesAfterExpired = await provider.refreshCount
+        XCTAssertEqual(refreshesAfterExpired - refreshesAfterEcho, 3)
+    }
+
+    func testXRPCErrorNameReadsOnlyTheEnvelope() {
+        XCTAssertEqual(NetworkService.xrpcErrorName(in: Data(#"{"error":"ExpiredToken"}"#.utf8)), "ExpiredToken")
+        XCTAssertNil(NetworkService.xrpcErrorName(in: Data(#"{"message":"ExpiredToken"}"#.utf8)))
+        XCTAssertNil(NetworkService.xrpcErrorName(in: Data("ExpiredToken".utf8)))
+        XCTAssertNil(NetworkService.xrpcErrorName(in: Data(#"["ExpiredToken"]"#.utf8)))
+    }
+
+    /// Logged request headers never contain credentials, whatever the value looks like.
+    func testLoggedHeadersRedactCredentialsByName() {
+        let redacted = NetworkService.redactedHeadersForLogging([
+            "Authorization": "DPoP eyJhbGciOi.payload.sig",
+            "DPoP": "eyJ0eXAiOiJkcG9wK2p3dCJ9.payload.sig",
+            "cookie": "session=abc",
+            "Proxy-Authorization": "Basic Zm9vOmJhcg==",
+            "X-Debug": "Bearer leaked",
+            "Accept": "application/json",
+        ])
+        XCTAssertEqual(redacted["Authorization"], "<REDACTED>")
+        XCTAssertEqual(redacted["DPoP"], "<REDACTED>")
+        XCTAssertEqual(redacted["cookie"], "<REDACTED>")
+        XCTAssertEqual(redacted["Proxy-Authorization"], "<REDACTED>")
+        XCTAssertEqual(redacted["X-Debug"], "<REDACTED>")
+        XCTAssertEqual(redacted["Accept"], "application/json")
+    }
+
     private let baseURL = URL(string: "https://example.com")!
 
     private func request(path: String) -> URLRequest {

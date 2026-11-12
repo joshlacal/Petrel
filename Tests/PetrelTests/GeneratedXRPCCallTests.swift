@@ -736,6 +736,96 @@ final class GeneratedXRPCCallTests: XCTestCase {
             rkey: RecordKey(keyString: "3jwdwj2ctlk26")
         )
     }
+
+    // MARK: - Generic headers (lex-20)
+
+    /// A generic SDK must not send one app's headers. Only `User-Agent` identifies the client.
+    func testNoAppSpecificHeadersAreSentByDefault() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: #"{"feed":[]}"#)
+        let service = NetworkService(baseURL: baseURL)
+        await service.setUserAgent("ExampleApp/1.0")
+
+        _ = try await ATProtoClient.App(networkService: service).bsky.feed.getTimeline(input: .init())
+
+        let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        let names = (request.allHTTPHeaderFields ?? [:]).keys.map { $0.lowercased() }
+        XCTAssertFalse(names.contains { $0.hasPrefix("x-catbird") }, "unexpected headers: \(names)")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "User-Agent"), "ExampleApp/1.0")
+    }
+
+    /// An app that correlates requests with its own gateway opts in with a header name.
+    func testRequestIDHeaderIsOptInAndFreshPerRequest() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: #"{"feed":[]}"#)
+        let service = NetworkService(baseURL: baseURL)
+        let feed = ATProtoClient.App(networkService: service).bsky.feed
+        await service.setRequestIDHeader(name: "X-Request-Id")
+
+        _ = try await feed.getTimeline(input: .init())
+        let first = try XCTUnwrap(XRPCStubURLProtocol.lastRequest?.value(forHTTPHeaderField: "X-Request-Id"))
+        _ = try await feed.getTimeline(input: .init(limit: 2))
+        let second = try XCTUnwrap(XRPCStubURLProtocol.lastRequest?.value(forHTTPHeaderField: "X-Request-Id"))
+        XCTAssertNotNil(UUID(uuidString: first))
+        XCTAssertNotEqual(first, second)
+
+        await service.setRequestIDHeader(name: nil)
+        _ = try await feed.getTimeline(input: .init())
+        XCTAssertNil(XRPCStubURLProtocol.lastRequest?.value(forHTTPHeaderField: "X-Request-Id"))
+    }
+
+    // MARK: - Status handling (r-3, r-12)
+
+    /// A client with no session that gets a 401 sees the server's error, not a generic
+    /// "authentication required".
+    func testUnauthenticated401CarriesTheEnvelope() async throws {
+        XRPCStubURLProtocol.install(
+            status: 401,
+            body: #"{"error":"AuthMissing","message":"Authentication Required"}"#
+        )
+
+        do {
+            _ = try await client().bsky.feed.getTimeline(input: .init())
+            XCTFail("a 401 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "AuthMissing")
+            XCTAssertEqual(error.message, "Authentication Required")
+            XCTAssertEqual(error.statusCode, 401)
+        }
+        XCTAssertEqual(XRPCStubURLProtocol.requestCount, 1)
+    }
+
+    /// A status outside 2xx/4xx/5xx still reaches the typed error path with its body.
+    func testUnexpectedStatusCarriesTheEnvelope() async throws {
+        XRPCStubURLProtocol.install(status: 600, body: #"{"error":"Weird","message":"odd gateway"}"#)
+
+        do {
+            _ = try await client().bsky.feed.getTimeline(input: .init())
+            XCTFail("a 600 response must throw")
+        } catch let error as ATProtoXRPCError {
+            XCTAssertEqual(error.error, "Weird")
+            XCTAssertEqual(error.statusCode, 600)
+        }
+    }
+
+    // MARK: - Request bodies
+
+    /// XRPC requires a Content-Type on every body. An empty one is refused before sending.
+    func testProcedureBodyWithoutContentTypeIsRefusedBeforeSending() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: "{}")
+        let service = NetworkService(baseURL: baseURL)
+
+        for contentType in ["", "  ", "octet-stream"] {
+            do {
+                _ = try await service.xrpcProcedure(
+                    "com.example.upload",
+                    body: .bytes(Data([1, 2, 3]), contentType: contentType)
+                )
+                XCTFail("content type \"\(contentType)\" must be refused")
+            } catch let NetworkError.badRequest(description) {
+                XCTAssertTrue(description.contains("Content-Type"), description)
+            }
+        }
+        XCTAssertEqual(XRPCStubURLProtocol.requestCount, 0)
+    }
 }
 
 /// Answers every request with one canned response and records what was sent.

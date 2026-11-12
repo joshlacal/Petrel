@@ -149,7 +149,8 @@ final class XRPCResponseMetadataCollector: @unchecked Sendable {
 public enum XRPCBody: Sendable, Equatable {
     /// JSON bytes, sent as `application/json`.
     case json(Data)
-    /// Arbitrary bytes with their MIME type, sent untouched.
+    /// Arbitrary bytes with their MIME type, sent untouched. The MIME type must be a
+    /// `type/subtype` value; a call with an empty one throws `NetworkError.badRequest`.
     case bytes(Data, contentType: String)
 
     /// A JSON body encoded from any `Encodable` value, for example an
@@ -309,7 +310,12 @@ public extension NetworkService {
 
         var headers: [String: String] = [:]
         if let body {
-            headers["Content-Type"] = body.contentType
+            // XRPC requires a Content-Type on every request body; an empty one is a caller bug.
+            let contentType = body.contentType.trimmingCharacters(in: .whitespaces)
+            guard contentType.contains("/") else {
+                throw NetworkError.badRequest(description: "XRPC body has no valid Content-Type: \"\(body.contentType)\"")
+            }
+            headers["Content-Type"] = contentType
         }
 
         // An explicit options argument wins over an enclosing withCallOptions scope.
