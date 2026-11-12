@@ -31,13 +31,24 @@ public struct PLCOperationDraft: Sendable, Equatable {
     }
 
     /// Starts from an identity's current state.
+    ///
+    /// The directory accepts states that Petrel's write rules refuse: repeated
+    /// rotation keys (every legacy `create` whose recovery key equals its
+    /// signing key) and repeated aliases. Later repeats are dropped, which
+    /// changes nothing: a key's authority, and an alias's priority, is that of
+    /// its first position.
     public init(_ data: PLCDocumentData) {
         self.init(
-            rotationKeys: data.rotationKeys,
+            rotationKeys: Self.firstOccurrences(data.rotationKeys),
             verificationMethods: data.verificationMethods,
-            alsoKnownAs: data.alsoKnownAs,
+            alsoKnownAs: Self.firstOccurrences(data.alsoKnownAs),
             services: data.services
         )
+    }
+
+    private static func firstOccurrences(_ values: [String]) -> [String] {
+        var seen = Set<String>()
+        return values.filter { seen.insert($0).inserted }
     }
 
     /// Sets the atproto handle: replaces the first `at://` alias, or puts

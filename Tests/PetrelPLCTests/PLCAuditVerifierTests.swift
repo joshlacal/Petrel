@@ -279,10 +279,12 @@ struct PLCAuditVerifierTests {
         let did = try PLCOperationCodec.genesisDID(for: genesis)
 
         #expect(try PLCOperationCodec.verify(genesis, authorizedRotationKeys: genesis.rotationKeys ?? []) == 1)
-        // Carrying the duplicate forward is refused: an update is a write.
-        #expect(throws: PetrelPLCError.self) {
-            try PLCOperationCodec.updatePDS(after: genesis, endpoint: "https://low.example.com")
-        }
+        // An update is a write, so the duplicate is not carried forward: the
+        // draft keeps each key at its first, authoritative, position.
+        #expect(
+            try PLCOperationCodec.updatePDS(after: genesis, endpoint: "https://low.example.com").rotationKeys
+                == [low.didKey, high.didKey]
+        )
         func deduplicatingUpdate(pds: String, signer: any ATProtoSigner) async throws -> PLCSignedOperation {
             try await PLCOperationCodec.sign(.regular(PLCOperationCodec.update(after: genesis) { draft in
                 draft.rotationKeys = [low.didKey, high.didKey]

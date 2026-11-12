@@ -766,7 +766,10 @@ public enum PLCOperationCodec {
     ) throws {
         guard !value.isEmpty, value.utf8.count <= maximumLength,
               !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
-            throw PetrelPLCError.malformed("PLC operation \(field) is invalid")
+            throw PetrelPLCError.malformed(
+                "PLC operation \(field) is invalid: each entry must be 1...\(maximumLength) UTF-8 bytes"
+                    + " with no control characters"
+            )
         }
     }
 
