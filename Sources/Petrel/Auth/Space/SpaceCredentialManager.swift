@@ -319,7 +319,7 @@ public actor SpaceCredentialManager {
     /// key) when absent or past its refresh deadline: the credential's own
     /// `exp` less min(60 s, half its issued lifetime).
     public func credential(for space: SpaceRef) async throws -> SpaceCredential {
-        let now = Date()
+        let now = PetrelClock.now()
         if let cached = cache[space], cached.refreshAt > now {
             return cached
         }
@@ -610,7 +610,7 @@ public actor SpaceCredentialManager {
         } else {
             (data, response) = try await urlSession.data(for: request)
         }
-        let receivedAt = Date()
+        let receivedAt = PetrelClock.now()
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw SpaceCredentialError.invalidResponse

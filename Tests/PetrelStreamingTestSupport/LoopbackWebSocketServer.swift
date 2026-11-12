@@ -80,8 +80,9 @@ public final class LoopbackWebSocketServer: @unchecked Sendable {
   private var pings = 0
   private var openGates: Set<String> = []
   /// Upper bound for every blocking script step. It only turns a broken test into a failure
-  /// instead of a hang; no step relies on it elapsing.
-  private static let stepDeadline: TimeInterval = 120
+  /// instead of a hang; no step relies on it elapsing. Generous, because CI runners have frozen
+  /// test processes for up to 129 s while the clock kept running.
+  private static let stepDeadline: TimeInterval = 5 * 60
   private var openSockets: Set<Int32> = []
 
   /// Starts listening on `127.0.0.1` at an ephemeral port. `handler` is called once per

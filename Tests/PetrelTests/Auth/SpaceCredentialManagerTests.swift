@@ -1481,12 +1481,15 @@ extension SpaceCredentialManagerTests {
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
             let exchangeCount = Mutex<Int>(0)
+            // The manager reads this pinned time, so a stalled runner cannot carry the
+            // 60 s credential past its 30 s reuse window between the reads below.
+            let pinnedNow = Date()
 
             SpaceMockURLProtocol.setHandler { request in
                 if request.url?.absoluteString == "https://space.test/xrpc/com.atproto.space.getSpaceCredential" {
                     exchangeCount.withLock { $0 += 1 }
                     // Swan's conversation-space policy issues exp = iat + 60.
-                    let iat = Int(Date().timeIntervalSince1970)
+                    let iat = Int(pinnedNow.timeIntervalSince1970)
                     let jwt = try makeSignedCredentialJWT(for: request, space: space, exp: iat + 60, iat: iat)
                     let resp = HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: ["Content-Type": "application/json"])!
                     return try (resp, JSONEncoder().encode(["credential": jwt]))
@@ -1505,15 +1508,17 @@ extension SpaceCredentialManagerTests {
             )
             let url = try #require(URL(string: "https://repo.test/xrpc/com.atproto.space.getBlob?repo=did:plc:writer"))
 
-            let first = try await manager.credential(for: space)
-            for _ in 0 ..< 3 {
-                let (_, response) = try await manager.get(url: url, space: space)
-                #expect(response.statusCode == 200)
+            try await PetrelClock.$pinned.withValue(pinnedNow) {
+                let first = try await manager.credential(for: space)
+                for _ in 0 ..< 3 {
+                    let (_, response) = try await manager.get(url: url, space: space)
+                    #expect(response.statusCode == 200)
+                }
+                let reused = try await manager.credential(for: space)
+                #expect(exchangeCount.withLock { $0 } == 1)
+                #expect(reused.keyRawRepresentation == first.keyRawRepresentation)
+                #expect(reused.refreshAt == first.expiresAt.addingTimeInterval(-30))
             }
-            let reused = try await manager.credential(for: space)
-            #expect(exchangeCount.withLock { $0 } == 1)
-            #expect(reused.keyRawRepresentation == first.keyRawRepresentation)
-            #expect(reused.refreshAt == first.expiresAt.addingTimeInterval(-30))
         }
     }
 

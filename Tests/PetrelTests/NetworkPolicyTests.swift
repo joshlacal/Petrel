@@ -498,7 +498,9 @@ struct NetworkPolicyTests {
 
             let delegate = HardenedURLSessionDelegate(allowsRedirects: false)
             let configuration = URLSessionConfiguration.ephemeral
-            configuration.timeoutIntervalForRequest = 5
+            // Generous: the loopback server answers at once, and a stalled runner
+            // keeps the clock running while it freezes client and server alike.
+            configuration.timeoutIntervalForRequest = 300
             let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
             defer { session.invalidateAndCancel() }
             var request = URLRequest(url: source.baseURL.appendingPathComponent("xrpc/step1"))
