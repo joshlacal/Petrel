@@ -34,10 +34,15 @@ public struct ExampleServer: Sendable {
   ///     publish a metadata document. Discoverable `https` clients and
   ///     `http://localhost` development clients work without registration.
   ///   - clock: the time source.
+  ///   - clientFetcher: fetches client metadata and JWKS documents when no
+  ///     clients are pre-registered. By default, the policy's defaults over
+  ///     the pinned transport with the platform's trust roots; tests pass one
+  ///     that trusts a test authority.
   public init(
     origin: URL,
     clients: [OAuthResolvedClientMetadata] = [],
-    clock: any OAuthClock = SystemOAuthClock()
+    clock: any OAuthClock = SystemOAuthClock(),
+    clientFetcher: OAuthRemoteDocumentFetcher? = nil
   ) throws {
     self.origin = origin
     let store = InMemoryOAuthStore()
@@ -52,7 +57,7 @@ public struct ExampleServer: Sendable {
       transport: PinnedNIOOAuthRemoteTransport()
     )
     let resolver: any OAuthClientResolving = try clients.isEmpty
-      ? OAuthClientMetadataLoader(fetcher: fetcher, cache: store)
+      ? OAuthClientMetadataLoader(fetcher: clientFetcher ?? fetcher, cache: store)
       : StaticOAuthClientResolver(clients)
     let lexicons = try CachingOAuthLexiconResolver(
       upstream: AuthenticatedOAuthLexiconResolver(fetcher: fetcher, clock: clock),

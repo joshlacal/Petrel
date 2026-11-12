@@ -2,8 +2,7 @@
 // against petrel-oauth-server-example, with no browser: the Authorization
 // Interface forms are submitted with plain HTTP requests.
 //
-// For each of two clients (a public http://localhost development client and a
-// confidential private_key_jwt client) it performs:
+// For each client it performs:
 //   discovery -> PAR -> sign-in -> consent -> callback (iss + state check)
 //   -> code exchange -> DPoP resource request -> forced refresh
 //   -> resource request -> revocation -> proof the session is dead
@@ -14,7 +13,17 @@
 //   node run.mjs --prepare <dir>                   only write the confidential client's key + metadata
 //   node run.mjs --origin <url> --client-dir <dir> run against a server that is already listening and
 //                                                  has <dir>/client-metadata.json registered
+//   --discovery                                    with --origin: instead of the registered confidential
+//                                                  client, run the clients the server must discover over
+//                                                  https (the documents in <dir>/discovery/, served by the
+//                                                  caller at https://ts-interop.example.test/)
+//   --commit <id>                                  record the commit under test in the transcript
 //   --log <file>                                   also write the transcript to a file
+//
+// Clients: a public http://localhost development client; then either a
+// pre-registered confidential private_key_jwt client (inline jwks), or, with
+// --discovery, a discoverable public https client and a discoverable
+// confidential client whose keys are at its jwks_uri.
 
 import { spawn } from 'node:child_process'
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync, appendFileSync } from 'node:fs'
@@ -33,6 +42,7 @@ const DEMO_PASSWORD = 'petrel-demo'
 const SCOPE = 'atproto transition:generic'
 const CONFIDENTIAL_CLIENT_ID = 'https://ts-interop.example.test/client-metadata.json'
 const CONFIDENTIAL_REDIRECT = 'https://ts-interop.example.test/callback'
+const DISCOVERY_ORIGIN = 'https://ts-interop.example.test'
 const LOOPBACK_REDIRECT = 'http://127.0.0.1:53124/callback'
 
 const args = parseArgs(process.argv.slice(2))
@@ -79,7 +89,34 @@ async function prepare(dir) {
   }
   writeFileSync(join(dir, 'client-metadata.json'), JSON.stringify(metadata, null, 2))
   writeFileSync(join(dir, 'private-key.jwk.json'), JSON.stringify(key.privateJwk))
+
+  // The documents for --discovery, which the server fetches itself.
+  const discovery = join(dir, 'discovery')
+  mkdirSync(discovery, { recursive: true })
+  const { jwks, ...withoutKeys } = metadata
+  writeFileSync(join(discovery, 'confidential-client-metadata.json'), JSON.stringify({
+    ...withoutKeys,
+    client_id: `${DISCOVERY_ORIGIN}/confidential-client-metadata.json`,
+    client_name: 'TS interop confidential client (jwks_uri)',
+    jwks_uri: `${DISCOVERY_ORIGIN}/jwks.json`,
+  }, null, 2))
+  writeFileSync(join(discovery, 'jwks.json'), JSON.stringify(jwks, null, 2))
+  writeFileSync(join(discovery, 'public-client-metadata.json'), JSON.stringify(publicDiscoverableMetadata(), null, 2))
   return dir
+}
+
+function publicDiscoverableMetadata() {
+  return {
+    client_id: `${DISCOVERY_ORIGIN}/public-client-metadata.json`,
+    client_name: 'TS interop public client',
+    application_type: 'web',
+    grant_types: ['authorization_code', 'refresh_token'],
+    response_types: ['code'],
+    redirect_uris: [CONFIDENTIAL_REDIRECT],
+    scope: SCOPE,
+    token_endpoint_auth_method: 'none',
+    dpop_bound_access_tokens: true,
+  }
 }
 
 // --- a one-account PLC directory, so the client can verify `sub` -------------
@@ -326,6 +363,7 @@ async function main() {
   const versions = JSON.parse(readFileSync(join(here, 'package.json'), 'utf8')).dependencies
   log(`reference client: @atproto/oauth-client-node ${versions['@atproto/oauth-client-node']} (node ${process.version})`)
   log(`server under test: ${origin}`)
+  if (typeof args.commit === 'string') log(`commit under test: ${args.commit}`)
   log(`transport: plain http on loopback, client option allowHttp: true`)
 
   try {
@@ -339,16 +377,35 @@ async function main() {
       redirectUri: LOOPBACK_REDIRECT,
     })
 
-    const confidentialMetadata = JSON.parse(readFileSync(join(clientDir, 'client-metadata.json'), 'utf8'))
     const privateJwk = JSON.parse(readFileSync(join(clientDir, 'private-key.jwk.json'), 'utf8'))
-    await runFlow({
-      label: 'confidential client (private_key_jwt)',
-      origin,
-      plcDirectoryUrl: plc.url,
-      clientMetadata: confidentialMetadata,
-      keyset: [await JoseKey.fromJWK(privateJwk)],
-      redirectUri: CONFIDENTIAL_REDIRECT,
-    })
+    if (args.discovery) {
+      // The server has no registration for these: it fetches each client's
+      // metadata (and the confidential client's jwks_uri) over https.
+      await runFlow({
+        label: 'public https client (discovered)',
+        origin,
+        plcDirectoryUrl: plc.url,
+        clientMetadata: publicDiscoverableMetadata(),
+        redirectUri: CONFIDENTIAL_REDIRECT,
+      })
+      await runFlow({
+        label: 'confidential client, private_key_jwt with jwks_uri (discovered)',
+        origin,
+        plcDirectoryUrl: plc.url,
+        clientMetadata: JSON.parse(readFileSync(join(clientDir, 'discovery', 'confidential-client-metadata.json'), 'utf8')),
+        keyset: [await JoseKey.fromJWK(privateJwk)],
+        redirectUri: CONFIDENTIAL_REDIRECT,
+      })
+    } else {
+      await runFlow({
+        label: 'confidential client (private_key_jwt, registered)',
+        origin,
+        plcDirectoryUrl: plc.url,
+        clientMetadata: JSON.parse(readFileSync(join(clientDir, 'client-metadata.json'), 'utf8')),
+        keyset: [await JoseKey.fromJWK(privateJwk)],
+        redirectUri: CONFIDENTIAL_REDIRECT,
+      })
+    }
     log('\nINTEROP PASS')
   } finally {
     plc.server.close()
