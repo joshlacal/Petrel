@@ -12,6 +12,8 @@ final class AuthContinuityTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
+        // The override is process-wide; hold it for the whole test.
+        await acquireStorageOverrideTestLock()
         backend = GroupAwareInMemorySecureStorage()
         KeychainManager._setStorageOverride(backend)
     }
@@ -19,6 +21,7 @@ final class AuthContinuityTests: XCTestCase {
     override func tearDown() async throws {
         KeychainManager._setStorageOverride(nil)
         backend = nil
+        await releaseStorageOverrideTestLock()
         try await super.tearDown()
     }
 

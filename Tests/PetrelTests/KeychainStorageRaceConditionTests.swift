@@ -16,6 +16,8 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
 
     override func setUp() async throws {
         try await super.setUp()
+        // The override is process-wide; hold it for the whole test.
+        await acquireStorageOverrideTestLock()
         backend = GroupAwareInMemorySecureStorage()
         KeychainManager._setStorageOverride(backend)
         keychainStorage = KeychainStorage(namespace: testNamespace)
@@ -38,6 +40,7 @@ final class KeychainStorageRaceConditionTests: XCTestCase {
         try? await keychainStorage.deleteGatewaySession(for: testDID)
         KeychainManager._setStorageOverride(nil)
         backend = nil
+        await releaseStorageOverrideTestLock()
         try await super.tearDown()
     }
 
