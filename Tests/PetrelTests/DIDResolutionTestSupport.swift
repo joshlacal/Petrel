@@ -56,10 +56,15 @@ final class MockIdentityDNS: IdentityDNSResolver, @unchecked Sendable {
     private var records: [String: [String]] = [:]
     private var failing: Set<String> = []
     private var delays: [String: UInt64] = [:]
+    private var hanging: Set<String> = []
+    private var cancelled: [String] = []
     private var recorded: [String] = []
 
     /// Every name queried, in order.
     var queries: [String] { lock.withLock { recorded } }
+
+    /// Every hanging lookup that was cancelled, in order.
+    var cancelledQueries: [String] { lock.withLock { cancelled } }
 
     func set(_ name: String, _ values: [String]) {
         lock.withLock {
@@ -78,10 +83,34 @@ final class MockIdentityDNS: IdentityDNSResolver, @unchecked Sendable {
         lock.withLock { delays[name] = UInt64(seconds * 1_000_000_000) }
     }
 
+    /// Makes the lookup of `name` never answer: it returns only by being cancelled, which is
+    /// recorded in ``cancelledQueries``.
+    func hang(_ name: String) {
+        lock.withLock { _ = hanging.insert(name) }
+    }
+
+    /// Waits until the hanging lookup of `name` has been cancelled. Bounded by the caller's
+    /// test time limit, not by a wall-clock assertion.
+    func waitUntilCancelled(_ name: String) async throws {
+        while !cancelledQueries.contains(name) {
+            try await Task.sleep(nanoseconds: 1_000_000)
+        }
+    }
+
     func queryTXT(name: String) async throws -> [String] {
-        let (values, fails, delay) = lock.withLock { () -> ([String], Bool, UInt64?) in
+        let (values, fails, delay, hangs) = lock.withLock { () -> ([String], Bool, UInt64?, Bool) in
             recorded.append(name)
-            return (records[name] ?? [], failing.contains(name), delays[name])
+            return (records[name] ?? [], failing.contains(name), delays[name], hanging.contains(name))
+        }
+        if hangs {
+            do {
+                while true {
+                    try await Task.sleep(nanoseconds: 3_600_000_000_000)
+                }
+            } catch {
+                lock.withLock { cancelled.append(name) }
+                throw error
+            }
         }
         if let delay {
             try await Task.sleep(nanoseconds: delay)
