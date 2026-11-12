@@ -3,9 +3,8 @@ import Foundation
 import Petrel
 import PetrelCrypto
 
-/// The alpha deliberately exposes a small public-repository substrate: valid
-/// identity state, public repository status, and export. Public record writes,
-/// relays, and firehose behavior are intentionally not implied by this type.
+/// The identity of a repository that has no records yet: a DID and a first
+/// revision. For a repository you can read and write, use ``Repository``.
 public struct EmptyPublicRepository: Sendable, Equatable {
     public let did: String
     public let revision: String
@@ -18,9 +17,11 @@ public struct EmptyPublicRepository: Sendable, Equatable {
     }
 }
 
-/// A bounded, empty repository-v3 genesis CAR. It is deliberately not a
-/// general MST or repository writer: it always contains exactly the signed
-/// commit and the canonical empty MST block.
+/// The first commit of a repository as a self-contained CAR: exactly the
+/// signed commit and the canonical empty MST block.
+///
+/// ``Repository/create(did:signer:store:revision:options:)`` is the general
+/// way to start a repository; this type is the minimal two-block archive.
 public struct PublicRepositoryGenesis: Sendable, Equatable {
     public let did: String
     public let revision: String
@@ -62,9 +63,8 @@ public enum PublicRepositoryGenesisError: Error, Sendable, Equatable {
     case invalidSignature
 }
 
-/// Canonical v3 empty-repository creation and verification. This codec keeps
-/// its input bound small because the alpha has no general public-MST walker;
-/// full repository CAR streaming belongs to a later implementation slice.
+/// Creates and verifies the two-block archive of an empty repository, on
+/// either signing curve.
 public enum PublicRepositoryGenesisCodec {
     /// A genesis CAR has two tiny DAG-CBOR blocks. This limit makes accidental
     /// use as a general CAR importer fail closed and bounds all local copies.
@@ -84,10 +84,45 @@ public enum PublicRepositoryGenesisCodec {
     ) throws -> PublicRepositoryGenesis {
         try validateDID(did)
         try validateRevision(revision)
+        let (_, emptyMSTCID) = try emptyMSTBlock()
+        let unsignedCommit = try encodeUnsignedCommit(did: did, revision: revision, dataCID: emptyMSTCID)
+        return try assemble(
+            did: did,
+            revision: revision,
+            signature: try P256WireSignature.sign(unsignedCommit, using: signingKey)
+        )
+    }
 
+    /// Builds a v3 commit over the canonical empty MST with any AT Protocol
+    /// signer: P-256 or secp256k1, in memory or external.
+    ///
+    /// - Parameters:
+    ///   - did: The account DID (syntax-checked only).
+    ///   - revision: The first revision.
+    ///   - signer: Signs the DAG-CBOR of the unsigned commit.
+    public static func create(
+        did: String,
+        revision: String,
+        signer: any ATProtoSigner
+    ) async throws -> PublicRepositoryGenesis {
+        try validateDID(did)
+        try validateRevision(revision)
+        let (_, emptyMSTCID) = try emptyMSTBlock()
+        let unsignedCommit = try encodeUnsignedCommit(did: did, revision: revision, dataCID: emptyMSTCID)
+        let signature = try await signer.sign(unsignedCommit)
+        guard ATProtoSignature.isCanonical(signature, curve: signer.curve) else {
+            throw PublicRepositoryGenesisError.invalidSignature
+        }
+        return try assemble(did: did, revision: revision, signature: signature)
+    }
+
+    private static func assemble(
+        did: String,
+        revision: String,
+        signature: Data
+    ) throws -> PublicRepositoryGenesis {
         let (emptyMST, emptyMSTCID) = try emptyMSTBlock()
         let unsignedCommit = try encodeUnsignedCommit(did: did, revision: revision, dataCID: emptyMSTCID)
-        let signature = try P256WireSignature.sign(unsignedCommit, using: signingKey)
         let signedCommit = try encodeSignedCommit(
             did: did,
             revision: revision,
@@ -115,6 +150,16 @@ public enum PublicRepositoryGenesisCodec {
     public static func verify(
         car: Data,
         publicKey: P256.Signing.PublicKey
+    ) throws -> PublicRepositoryGenesis {
+        try verify(car: car, publicKey: ATProtoPublicKey(publicKey))
+    }
+
+    /// Strictly validates a genesis archive against a public key on either
+    /// curve: one commit root followed by the canonical empty MST, nothing
+    /// else, with a low-S signature that verifies.
+    public static func verify(
+        car: Data,
+        publicKey: ATProtoPublicKey
     ) throws -> PublicRepositoryGenesis {
         guard !car.isEmpty, car.count <= maximumCARBytes else {
             throw PublicRepositoryGenesisError.malformedCAR
@@ -170,13 +215,7 @@ public enum PublicRepositoryGenesisCodec {
             throw PublicRepositoryGenesisError.invalidCommit
         }
 
-        let signature: P256.Signing.ECDSASignature
-        do {
-            signature = try P256WireSignature.decodeCanonical(decoded.signature)
-        } catch {
-            throw PublicRepositoryGenesisError.invalidSignature
-        }
-        guard publicKey.isValidSignature(signature, for: unsignedCommit) else {
+        guard publicKey.isValidSignature(decoded.signature, for: unsignedCommit, options: .strict) else {
             throw PublicRepositoryGenesisError.invalidSignature
         }
 
@@ -192,8 +231,8 @@ public enum PublicRepositoryGenesisCodec {
         )
     }
 
-    /// AT Protocol permits DID methods beyond the two Swan account-management
-    /// methods. Genesis creation therefore validates generic canonical DID
+    /// AT Protocol permits DID methods beyond `did:plc` and `did:web`.
+    /// Genesis creation therefore validates generic canonical DID
     /// syntax without attempting network resolution or method-specific policy.
     /// Callers supply the already-canonical identifier they control.
     public static func validateDID(_ did: String) throws {
@@ -412,6 +451,7 @@ public enum PublicRepositoryGenesisCodec {
     }
 }
 
-/// Retains an explicit compile-time dependency on Petrel's canonical CID/CAR
-/// implementation for users who need to type public repository identifiers.
+/// `CID` is the one CID type in Petrel; it lives in `PetrelCore` and is
+/// re-exported by `Petrel`. This alias only exists for source compatibility.
+@available(*, deprecated, renamed: "CID")
 public typealias PetrelCID = CID

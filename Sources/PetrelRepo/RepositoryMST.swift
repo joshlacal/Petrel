@@ -5,6 +5,7 @@
 
 import Foundation
 import Petrel
+import Synchronization
 
 public enum RepositoryMSTMutationError: Error, Sendable, Equatable {
     case duplicateKey
@@ -18,8 +19,17 @@ public enum RepositoryMSTMutationError: Error, Sendable, Equatable {
     case relevantBlockBudgetExceeded
 }
 
+/// The root CID of a tree and the MST node blocks that are new relative to
+/// the tree it was loaded from.
+///
+/// "New" is decided by comparing trees, not by asking the block store what it
+/// already holds: a node is new when it is in this tree and was not part of
+/// the base tree. A store that happens to retain a block from older history
+/// therefore cannot make a block disappear from a commit diff.
 public struct MaterializedRepositoryMST: Sendable, Equatable {
+    /// CID of the root node.
     public let rootCID: CID
+    /// Node blocks present in this tree and absent from its base tree.
     public let newBlocks: PublicRepositoryBlockMap
 }
 
@@ -50,6 +60,7 @@ public struct RepositoryMST: Sendable {
     private var knownEntries: [Entry]?
     private var knownLayer: Int?
     private let limits: PublicRepositoryLimits
+    private let options: RepositoryMSTOptions
     private let context: RepositoryMSTMutationContext
     private init(
         blocks: any PublicRepositoryBlockSource,
@@ -57,6 +68,7 @@ public struct RepositoryMST: Sendable {
         entries: [Entry]?,
         layer: Int?,
         limits: PublicRepositoryLimits,
+        options: RepositoryMSTOptions,
         context: RepositoryMSTMutationContext = RepositoryMSTMutationContext()
     ) {
         self.blocks = blocks
@@ -64,13 +76,25 @@ public struct RepositoryMST: Sendable {
         knownEntries = entries
         knownLayer = layer
         self.limits = limits
+        self.options = options
         self.context = context
     }
 
+    /// Opens the tree rooted at `rootCID` without reading any block. Nodes
+    /// are fetched from `blocks` only when an operation reaches them, so a
+    /// source holding just part of the tree (a proof, a commit diff) works
+    /// for every operation that stays inside that part.
+    ///
+    /// - Parameters:
+    ///   - rootCID: CID of the root node (a commit's `data`).
+    ///   - blocks: Where node blocks are read from.
+    ///   - limits: Bounds on nodes, entries per node and commit-diff size.
+    ///   - options: Key syntax and leaf-link policy.
     public static func load(
         rootCID: CID,
         blocks: any PublicRepositoryBlockSource,
-        limits: PublicRepositoryLimits = .standard
+        limits: PublicRepositoryLimits = .standard,
+        options: RepositoryMSTOptions = .strict
     ) throws -> Self {
         do {
             try PublicRepositoryCID.validate(rootCID)
@@ -78,17 +102,23 @@ public struct RepositoryMST: Sendable {
             throw RepositoryMSTMutationError.blockCIDMismatch
         }
         let context = RepositoryMSTMutationContext()
+        context.noteBase(rootCID)
         return Self(
             blocks: blocks,
             pointer: rootCID,
             entries: nil,
             layer: nil,
             limits: limits,
+            options: options,
             context: context
         )
     }
 
-    public static func empty(limits: PublicRepositoryLimits = .standard) throws -> Self {
+    /// The empty tree: one node with no entries.
+    public static func empty(
+        limits: PublicRepositoryLimits = .standard,
+        options: RepositoryMSTOptions = .strict
+    ) throws -> Self {
         let bytes = PublicRepositoryGenesisCodec.canonicalEmptyMST
         let cid = CID.fromDAGCBOR(bytes)
         let source = try PublicRepositoryBlockMap(
@@ -96,12 +126,14 @@ public struct RepositoryMST: Sendable {
             maximumRelevantBytes: limits.maximumRelevantBlockBytes
         )
         let context = RepositoryMSTMutationContext()
+        context.noteBase(cid)
         return Self(
             blocks: source,
             pointer: cid,
             entries: [],
             layer: 0,
             limits: limits,
+            options: options,
             context: context
         )
     }
@@ -243,8 +275,17 @@ public struct RepositoryMST: Sendable {
         )
     }
 
+    /// Encodes every node this lineage created and returns the root CID with
+    /// the node blocks that are new relative to the base tree.
+    ///
+    /// The total size of the new blocks is bounded by
+    /// `limits.maximumRelevantBlockBytes`, the commit-diff budget. Raise that
+    /// limit for bulk construction.
     public func materialized() async throws -> MaterializedRepositoryMST {
-        var collector = NewBlockCollector(limits: limits)
+        var collector = NewBlockCollector(
+            maximumNodes: limits.maximumMSTNodes,
+            maximumBytes: limits.maximumRelevantBlockBytes
+        )
         var copy = self
         let root = try await copy.collectNewBlocks(into: &collector)
         let map: PublicRepositoryBlockMap
@@ -259,6 +300,73 @@ public struct RepositoryMST: Sendable {
             throw error
         }
         return MaterializedRepositoryMST(rootCID: root, newBlocks: map)
+    }
+
+    /// The CID of the root node, encoding whatever this lineage changed.
+    ///
+    /// Unlike ``materialized()`` this is not bounded by the commit-diff
+    /// budget and returns no blocks. It reads no block that the operations so
+    /// far did not already reach, which is what lets an operation-inversion
+    /// check run over a partial tree.
+    public func rootCID() async throws -> CID {
+        var collector = NewBlockCollector(
+            maximumNodes: limits.maximumMSTNodes,
+            maximumBytes: Int.max
+        )
+        var copy = self
+        return try await copy.collectNewBlocks(into: &collector)
+    }
+
+    /// The node blocks a consumer needs to verify, and to invert, an
+    /// operation on `path` against this tree: the search path for the key and
+    /// the paths to its nearest neighbour on each side.
+    ///
+    /// This is the "covering proof" of the sync specification and matches the
+    /// reference implementation's `MST.getCoveringProof`. Call it on the tree
+    /// *after* the commit, once per created, updated or deleted path.
+    public func coveringProof(for path: PublicRepositoryPath) async throws -> [PublicRepositoryBlock] {
+        try await coveringProof(for: [path])
+    }
+
+    /// The union of ``coveringProof(for:)-(PublicRepositoryPath)`` over
+    /// several paths, without duplicates, in first-visited order.
+    public func coveringProof(for paths: [PublicRepositoryPath]) async throws -> [PublicRepositoryBlock] {
+        var collector = NewBlockCollector(
+            maximumNodes: limits.maximumMSTNodes,
+            maximumBytes: Int.max,
+            collectsEverything: true
+        )
+        var copy = self
+        let root = try await copy.collectNewBlocks(into: &collector)
+        let overlay = RepositoryOverlayBlockSource(
+            overlay: Dictionary(
+                collector.blocks.map { ($0.cid, $0.bytes) },
+                uniquingKeysWith: { first, _ in first }
+            ),
+            base: blocks
+        )
+        var seen = Set<CID>()
+        var result: [PublicRepositoryBlock] = []
+        for path in paths {
+            let proof: [PublicRepositoryBlock]
+            do {
+                proof = try await RepositoryMSTProof.coveringProof(
+                    rootCID: root,
+                    path: path,
+                    blocks: overlay,
+                    limits: limits,
+                    options: options
+                )
+            } catch let error as RepositoryMSTValidationError {
+                throw error == .missingBlock
+                    ? RepositoryMSTMutationError.missingBlock
+                    : RepositoryMSTMutationError.invalidNode
+            }
+            for block in proof where seen.insert(block.cid).inserted {
+                result.append(block)
+            }
+        }
+        return result
     }
 
     // MARK: Mutation
@@ -311,6 +419,7 @@ public struct RepositoryMST: Sendable {
                 entries: [],
                 layer: layer - 1,
                 limits: limits,
+                options: options,
                 context: context
             )
             let updatedChild = try await child.add(
@@ -343,6 +452,7 @@ public struct RepositoryMST: Sendable {
             entries: rootEntries,
             layer: keyDepth,
             limits: limits,
+            options: options,
             context: context
         ).checked()
     }
@@ -442,6 +552,7 @@ public struct RepositoryMST: Sendable {
             entries: [.tree(self)],
             layer: layer + 1,
             limits: limits,
+            options: options,
             context: context
         ).checked()
     }
@@ -461,11 +572,13 @@ public struct RepositoryMST: Sendable {
         guard let pointer else {
             throw RepositoryMSTMutationError.missingBlock
         }
+        // Reads are bounded by the number of distinct nodes, never by a
+        // running byte total: looking the same key up twice must cost the
+        // same as looking it up once.
         try context.visit(pointer, limits: limits)
         guard let bytes = try await blocks.block(for: pointer) else {
             throw RepositoryMSTMutationError.missingBlock
         }
-        try context.recordBytes(bytes.count, limits: limits)
         do {
             try PublicRepositoryCID.validate(pointer, blockBytes: bytes)
         } catch {
@@ -473,15 +586,19 @@ public struct RepositoryMST: Sendable {
         }
         let node: RepositoryMSTNode
         do {
-            node = try RepositoryMSTCodec.decode(bytes)
+            node = try RepositoryMSTCodec.decode(bytes, options: options)
         } catch {
             throw RepositoryMSTMutationError.invalidNode
         }
         let leaves: [RepositoryMSTLeaf]
         do {
-            leaves = try RepositoryMSTCodec.reconstructedLeaves(from: node)
+            leaves = try RepositoryMSTCodec.reconstructedLeaves(from: node, options: options)
         } catch {
             throw RepositoryMSTMutationError.invalidNode
+        }
+        if let left = node.leftTreeCID { context.noteBase(left) }
+        for leaf in leaves {
+            if let right = leaf.rightTreeCID { context.noteBase(right) }
         }
         let inferredLayer = leaves.first.map(\.path.keyDepth)
         let childLayer = knownLayer.map { $0 - 1 } ?? inferredLayer.map { $0 - 1 }
@@ -493,6 +610,7 @@ public struct RepositoryMST: Sendable {
                 entries: nil,
                 layer: childLayer,
                 limits: limits,
+                options: options,
                 context: context
             )))
         }
@@ -505,6 +623,7 @@ public struct RepositoryMST: Sendable {
                     entries: nil,
                     layer: childLayer,
                     limits: limits,
+                    options: options,
                     context: context
                 )))
             }
@@ -564,12 +683,13 @@ public struct RepositoryMST: Sendable {
     }
 
     private mutating func collectNewBlocks(into collector: inout NewBlockCollector) async throws -> CID {
-        // A CID-only node is an untouched subtree loaded from the immutable
-        // base source. Its pointer is already the complete persisted
-        // projection, so do not fetch/decode it merely to rediscover that it
-        // contributes no new blocks. This is the same stored-pointer
-        // short-circuit used by the pinned TypeScript implementation.
-        if let pointer, knownEntries == nil {
+        // A node that still has its pointer is an untouched part of the base
+        // tree, whether or not it has been read: every mutation builds a new
+        // node without one. It contributes no new blocks and must not be
+        // fetched merely to rediscover that, which is also what lets this run
+        // over a partial tree. This is the stored-pointer short-circuit of
+        // the reference implementation.
+        if let pointer {
             return pointer
         }
         let (resolvedEntries, _) = try await loadNode()
@@ -598,16 +718,21 @@ public struct RepositoryMST: Sendable {
         let node: RepositoryMSTNode
         let bytes: Data
         do {
-            node = try RepositoryMSTCodec.node(leaves: leaves, leftTreeCID: leftTreeCID)
+            node = try RepositoryMSTCodec.node(
+                leaves: leaves,
+                leftTreeCID: leftTreeCID,
+                options: options
+            )
             bytes = try RepositoryMSTCodec.encodeUnchecked(node)
         } catch {
             throw RepositoryMSTMutationError.invalidNode
         }
         let cid = CID.fromDAGCBOR(bytes)
-        if let existing = try await blocks.block(for: cid) {
-            guard existing == bytes else {
-                throw RepositoryMSTMutationError.blockCIDMismatch
-            }
+        // A rebuilt node is new unless the base tree already contained it
+        // (for example a delete followed by a re-create in one batch). That is
+        // a comparison of trees. Whether the block store happens to hold the
+        // bytes from older history is irrelevant and is not consulted.
+        if !collector.collectsEverything, context.isBase(cid) {
             return cid
         }
         try collector.add(cid: cid, bytes: bytes)
@@ -705,6 +830,7 @@ public struct RepositoryMST: Sendable {
             entries: entries,
             layer: layer ?? knownLayer,
             limits: limits,
+            options: options,
             context: context
         ).checked()
     }
@@ -749,6 +875,9 @@ public struct RepositoryMST: Sendable {
     }
 
     private func validateRecordCID(_ cid: CID) throws {
+        // Restoring a deleted leaf during operation inversion has to put back
+        // exactly the link that was there, blessed or not.
+        if options.allowsNonBlessedLeafLinks { return }
         do {
             try PublicRepositoryCID.validate(cid)
         } catch {
@@ -757,26 +886,49 @@ public struct RepositoryMST: Sendable {
     }
 }
 
-final class RepositoryMSTMutationContext: @unchecked Sendable {
-    private var loadedNodes = Set<CID>()
-    private var byteCount = 0
+/// Reads from an in-memory overlay first, then from a base source.
+struct RepositoryOverlayBlockSource: PublicRepositoryBlockSource {
+    let overlay: [CID: Data]
+    let base: any PublicRepositoryBlockSource
+
+    func block(for cid: CID) async throws -> Data? {
+        if let bytes = overlay[cid] { return bytes }
+        return try await base.block(for: cid)
+    }
+}
+
+/// Shared by every tree value derived from one `load`/`empty` call.
+///
+/// Tracks two things: which base-tree nodes have been read (to bound distinct
+/// node reads) and which CIDs are known to belong to the base tree (to tell a
+/// rebuilt-but-identical node from a new one). The state is behind a mutex,
+/// so the `Sendable` conformance is checked by the compiler.
+final class RepositoryMSTMutationContext: Sendable {
+    private struct State {
+        var loadedNodes = Set<CID>()
+        var baseNodes = Set<CID>()
+    }
+
+    private let state = Mutex(State())
+
     init() {}
 
     func visit(_ cid: CID, limits: PublicRepositoryLimits) throws {
-        guard loadedNodes.insert(cid).inserted else {
-            return
-        }
-        guard loadedNodes.count <= limits.maximumMSTNodes else {
-            throw RepositoryMSTMutationError.nodeLimitExceeded
+        try state.withLock { state in
+            state.baseNodes.insert(cid)
+            guard state.loadedNodes.insert(cid).inserted else { return }
+            guard state.loadedNodes.count <= limits.maximumMSTNodes else {
+                throw RepositoryMSTMutationError.nodeLimitExceeded
+            }
         }
     }
 
-    func recordBytes(_ count: Int, limits: PublicRepositoryLimits) throws {
-        let (next, overflow) = byteCount.addingReportingOverflow(count)
-        guard !overflow, next <= limits.maximumRelevantBlockBytes else {
-            throw RepositoryMSTMutationError.relevantBlockBudgetExceeded
-        }
-        byteCount = next
+    func noteBase(_ cid: CID) {
+        state.withLock { _ = $0.baseNodes.insert(cid) }
+    }
+
+    func isBase(_ cid: CID) -> Bool {
+        state.withLock { $0.baseNodes.contains(cid) }
     }
 }
 
@@ -801,18 +953,23 @@ private final class RepositoryMSTPageTraversalBudget: @unchecked Sendable {
 }
 
 private struct NewBlockCollector {
-    let limits: PublicRepositoryLimits
+    let maximumNodes: Int
+    let maximumBytes: Int
+    /// When set, a rebuilt node is collected even if the base tree already
+    /// contained an identical one, so the result holds every node this
+    /// lineage encoded.
+    var collectsEverything = false
     var blocks: [PublicRepositoryBlock] = []
     var cids = Set<CID>()
     var byteCount = 0
 
     mutating func add(cid: CID, bytes: Data) throws {
         guard cids.insert(cid).inserted else { return }
-        guard blocks.count < limits.maximumMSTNodes else {
+        guard blocks.count < maximumNodes else {
             throw RepositoryMSTMutationError.nodeLimitExceeded
         }
         let (next, overflow) = byteCount.addingReportingOverflow(bytes.count)
-        guard !overflow, next <= limits.maximumRelevantBlockBytes else {
+        guard !overflow, next <= maximumBytes else {
             throw RepositoryMSTMutationError.relevantBlockBudgetExceeded
         }
         blocks.append(.init(cid: cid, bytes: bytes))

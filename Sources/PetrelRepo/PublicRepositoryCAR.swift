@@ -2,7 +2,7 @@
 // bluesky-social/atproto@3f6c96d5d2d25438bd40fa89d6ecc37865f8e354
 // packages/repo/src/{car,sync/provider}.ts, used under the repository's
 // MIT OR Apache-2.0 notice policy recorded in THIRD_PARTY_NOTICES.md.
-// Strict canonical parsing and hostile-input limits are Swan-specific.
+// Strict canonical parsing and hostile-input limits are additions.
 
 import Foundation
 import Petrel
@@ -37,10 +37,21 @@ extension PublicRepositoryCARFrameSink {
     public func flush() async throws {}
 }
 
+/// What the streaming CAR parser saw.
 public struct PublicRepositoryCARParseResult: Sendable, Equatable {
+    /// The first root: the commit.
     public let rootCID: CID
+    /// Bytes consumed from the source.
     public let receivedByteCount: Int
+    /// Block frames delivered to the sink.
     public let frameCount: Int
+    /// Roots after the first. The repository specification allows them and
+    /// leaves their meaning undefined; they are reported, never interpreted.
+    public let additionalRootCIDs: [CID]
+    /// Block frames skipped because their CID is not a blessed DAG-CBOR CID
+    /// (for example a blob included in the archive). Always 0 under
+    /// ``RepositoryReadPolicy/strict``, which refuses such frames instead.
+    public let ignoredFrameCount: Int
 }
 
 public enum PublicRepositoryCARError: Error, Sendable, Equatable {
@@ -119,6 +130,9 @@ public enum PublicRepositoryCAR {
         return result
     }
 
+    /// Writes a CAR archive with one root, pulling blocks from `blocks`.
+    ///
+    /// Every block is checked against its CID before it is written.
     public static func write(
         rootCID: CID,
         blocks: any PublicRepositoryCARBlockStream,
@@ -126,88 +140,14 @@ public enum PublicRepositoryCAR {
         limits: PublicRepositoryLimits = .standard,
         maximumChunkBytes: Int = defaultMaximumChunkBytes
     ) async throws -> PublicRepositoryCARWriteResult {
-        guard maximumChunkBytes > 0 else {
-            throw PublicRepositoryCARError.invalidChunkSize
-        }
-        do {
-            try PublicRepositoryCID.validate(rootCID)
-        } catch {
-            throw PublicRepositoryCARError.invalidRootCID
-        }
-
-        let header: Data
-        do {
-            header = try DAGCBOR.encodeValue(OrderedCBORMap(entries: [
-                (key: "roots", value: [ATProtoLink(cid: rootCID)]),
-                (key: "version", value: 1),
-            ]))
-        } catch {
-            throw PublicRepositoryCARError.malformedHeader
-        }
-
-        var total = 0
-        var count = 0
-        try await writeSegment(
-            canonicalUnsignedVarint(UInt64(header.count)),
-            to: sink,
-            total: &total,
-            maximumTotal: limits.maximumCARBytes,
-            maximumChunkBytes: maximumChunkBytes
+        let writer = try CARFrameWriter(
+            sink: sink, limits: limits, maximumChunkBytes: maximumChunkBytes
         )
-        try await writeSegment(
-            header,
-            to: sink,
-            total: &total,
-            maximumTotal: limits.maximumCARBytes,
-            maximumChunkBytes: maximumChunkBytes
-        )
-
+        try await writer.writeHeader(rootCID: rootCID)
         while let block = try await blocks.nextBlock() {
-            try Task.checkCancellation()
-            guard count < limits.maximumCARBlocks else {
-                throw PublicRepositoryCARError.blockLimitExceeded
-            }
-            do {
-                try PublicRepositoryCID.validate(block.cid)
-            } catch {
-                throw PublicRepositoryCARError.invalidBlockCID
-            }
-            do {
-                try PublicRepositoryCID.validate(block.cid, blockBytes: block.bytes)
-            } catch {
-                throw PublicRepositoryCARError.blockCIDMismatch
-            }
-            guard block.bytes.count <= limits.maximumRecordBlockBytes else {
-                throw PublicRepositoryCARError.blockBodyLimitExceeded
-            }
-            let (frameLength, overflow) = block.cid.bytes.count.addingReportingOverflow(block.bytes.count)
-            guard !overflow else {
-                throw PublicRepositoryCARError.byteLimitExceeded
-            }
-            try await writeSegment(
-                canonicalUnsignedVarint(UInt64(frameLength)),
-                to: sink,
-                total: &total,
-                maximumTotal: limits.maximumCARBytes,
-                maximumChunkBytes: maximumChunkBytes
-            )
-            try await writeSegment(
-                block.cid.bytes,
-                to: sink,
-                total: &total,
-                maximumTotal: limits.maximumCARBytes,
-                maximumChunkBytes: maximumChunkBytes
-            )
-            try await writeSegment(
-                block.bytes,
-                to: sink,
-                total: &total,
-                maximumTotal: limits.maximumCARBytes,
-                maximumChunkBytes: maximumChunkBytes
-            )
-            count += 1
+            try await writer.writeBlock(block)
         }
-        return PublicRepositoryCARWriteResult(byteCount: total, blockCount: count)
+        return writer.result
     }
 
     /// Emits the frozen full-repository ordering from the pinned TypeScript
@@ -218,7 +158,8 @@ public enum PublicRepositoryCAR {
         blocks: any PublicRepositoryBlockSource,
         to sink: any PublicRepositoryCARByteSink,
         limits: PublicRepositoryLimits = .standard,
-        maximumChunkBytes: Int = defaultMaximumChunkBytes
+        maximumChunkBytes: Int = defaultMaximumChunkBytes,
+        policy: RepositoryReadPolicy = .strict
     ) async throws -> PublicRepositoryCARWriteResult {
         try await export(
             commitCID: signedCommit.commitCID,
@@ -227,7 +168,8 @@ public enum PublicRepositoryCAR {
             blocks: blocks,
             to: sink,
             limits: limits,
-            maximumChunkBytes: maximumChunkBytes
+            maximumChunkBytes: maximumChunkBytes,
+            policy: policy
         )
     }
 
@@ -239,7 +181,8 @@ public enum PublicRepositoryCAR {
         blocks: any PublicRepositoryBlockSource,
         to sink: any PublicRepositoryCARByteSink,
         limits: PublicRepositoryLimits = .standard,
-        maximumChunkBytes: Int = defaultMaximumChunkBytes
+        maximumChunkBytes: Int = defaultMaximumChunkBytes,
+        policy: RepositoryReadPolicy = .strict
     ) async throws -> PublicRepositoryCARWriteResult {
         try await export(
             commitCID: signedCommit.commitCID,
@@ -248,7 +191,8 @@ public enum PublicRepositoryCAR {
             blocks: blocks,
             to: sink,
             limits: limits,
-            maximumChunkBytes: maximumChunkBytes
+            maximumChunkBytes: maximumChunkBytes,
+            policy: policy
         )
     }
 
@@ -261,7 +205,8 @@ public enum PublicRepositoryCAR {
         blocks: any PublicRepositoryBlockSource,
         to sink: any PublicRepositoryCARByteSink,
         limits: PublicRepositoryLimits = .standard,
-        maximumChunkBytes: Int = defaultMaximumChunkBytes
+        maximumChunkBytes: Int = defaultMaximumChunkBytes,
+        policy: RepositoryReadPolicy = .strict
     ) async throws -> PublicRepositoryCARWriteResult {
         try await export(
             commitCID: signedCommit.commitCID,
@@ -270,7 +215,8 @@ public enum PublicRepositoryCAR {
             blocks: blocks,
             to: sink,
             limits: limits,
-            maximumChunkBytes: maximumChunkBytes
+            maximumChunkBytes: maximumChunkBytes,
+            policy: policy
         )
     }
 
@@ -281,7 +227,8 @@ public enum PublicRepositoryCAR {
         blocks: any PublicRepositoryBlockSource,
         to sink: any PublicRepositoryCARByteSink,
         limits: PublicRepositoryLimits,
-        maximumChunkBytes: Int
+        maximumChunkBytes: Int,
+        policy: RepositoryReadPolicy
     ) async throws -> PublicRepositoryCARWriteResult {
         do {
             try PublicRepositoryCID.validate(
@@ -297,7 +244,8 @@ public enum PublicRepositoryCAR {
             validated = try await RepositoryMSTValidation.validate(
                 rootCID: dataCID,
                 blocks: blocks,
-                limits: limits
+                limits: limits,
+                policy: policy
             )
         } catch is CancellationError {
             throw CancellationError()
@@ -325,14 +273,20 @@ public enum PublicRepositoryCAR {
         )
     }
 
+    /// Reads a whole repository CAR into memory, verifies the commit and
+    /// validates the tree.
+    ///
+    /// Everything is held in memory at once. For large repositories, or to
+    /// keep the blocks on disk, use ``Repository``.
     public static func importRepository(
         from source: any PublicRepositoryCARByteSource,
         verifier: any PublicRepositoryCommitVerifier,
-        limits: PublicRepositoryLimits = .standard
+        limits: PublicRepositoryLimits = .standard,
+        policy: RepositoryReadPolicy = .strict
     ) async throws -> VerifiedPublicRepositoryCAR {
         let collectingSink = InMemoryImportFrameSink()
         let parsed = try await parseIncrementally(
-            from: source, to: collectingSink, limits: limits
+            from: source, to: collectingSink, limits: limits, policy: policy
         )
         let root = parsed.rootCID
         let allBlocks = await collectingSink.blocks
@@ -359,7 +313,8 @@ public enum PublicRepositoryCAR {
             repository = try await RepositoryMSTValidation.validate(
                 rootCID: verifiedCommit.descriptor.dataCID,
                 blocks: importedSource,
-                limits: limits
+                limits: limits,
+                policy: policy
             )
         } catch is CancellationError {
             throw CancellationError()
@@ -404,10 +359,16 @@ public enum PublicRepositoryCAR {
     /// Strictly parses CARv1 framing without retaining the CAR. Duplicate
     /// policy is deliberately owned by the sink because durable staging must
     /// compare against prior frames, including frames received before restart.
+    ///
+    /// Framing is always strict: canonical varints, a canonical header, and
+    /// every delivered block re-hashed against its CID. `policy` decides the
+    /// two things the repository specification asks readers to tolerate:
+    /// roots after the first, and blocks that are not repository blocks.
     public static func parseIncrementally(
         from source: any PublicRepositoryCARByteSource,
         to sink: any PublicRepositoryCARFrameSink,
-        limits: PublicRepositoryLimits = .standard
+        limits: PublicRepositoryLimits = .standard,
+        policy: RepositoryReadPolicy = .strict
     ) async throws -> PublicRepositoryCARParseResult {
         let reader = StreamingCARInput(source: source, maximumBytes: limits.maximumCARBytes)
         let headerLength = try await reader.readCanonicalVarint()
@@ -415,23 +376,46 @@ public enum PublicRepositoryCAR {
             throw PublicRepositoryCARError.malformedHeader
         }
         let header = try await reader.readExactly(Int(headerLength))
-        let root = try parseCanonicalHeader(header)
+        let roots = try parseHeader(header, policy: policy)
+        let root = roots.commit
         try await sink.receiveHeader(
             rootCID: root,
             receivedByteCount: reader.receivedByteCount
         )
 
         var blockCount = 0
+        var ignoredCount = 0
+        // A foreign block's CID may be longer than the 36 bytes of a blessed
+        // one, so allow for that when it is going to be skipped anyway.
+        let maximumFrameBytes = UInt64(limits.maximumRecordBlockBytes)
+            + (policy.rejectsForeignCARBlocks ? 36 : 1_100)
         while let frameLength = try await reader.readCanonicalVarintOrEOF() {
             try Task.checkCancellation()
-            guard blockCount < limits.maximumCARBlocks else {
+            guard blockCount + ignoredCount < limits.maximumCARBlocks else {
                 throw PublicRepositoryCARError.blockLimitExceeded
             }
-            guard frameLength > 36,
-                  frameLength <= UInt64(36 + limits.maximumRecordBlockBytes) else {
+            guard frameLength >= 2, frameLength <= maximumFrameBytes else {
                 throw PublicRepositoryCARError.blockBodyLimitExceeded
             }
-            let cidBytes = try await reader.readExactly(36)
+            let frame = try await reader.readExactly(Int(frameLength))
+            let isRepositoryBlock = frame.count > 36
+                && frame.prefix(4).elementsEqual(blessedDAGCBORCIDPrefix)
+            guard isRepositoryBlock else {
+                // Anything else is not part of a repository: a blob, or a
+                // block from another system. The specification says to
+                // ignore it. It still has to be a well-formed frame.
+                guard !policy.rejectsForeignCARBlocks else {
+                    throw frame.count > 36
+                        ? PublicRepositoryCARError.invalidBlockCID
+                        : PublicRepositoryCARError.blockBodyLimitExceeded
+                }
+                guard RepositoryRecordBlockValidator.cidPrefixLength(in: frame) != nil else {
+                    throw PublicRepositoryCARError.invalidBlockCID
+                }
+                ignoredCount += 1
+                continue
+            }
+            let cidBytes = Data(frame.prefix(36))
             let cid: CID
             do {
                 cid = try CID(bytes: cidBytes)
@@ -442,7 +426,10 @@ public enum PublicRepositoryCAR {
             guard cid.bytes == cidBytes else {
                 throw PublicRepositoryCARError.invalidBlockCID
             }
-            let body = try await reader.readExactly(Int(frameLength) - 36)
+            let body = Data(frame.dropFirst(36))
+            guard body.count <= limits.maximumRecordBlockBytes else {
+                throw PublicRepositoryCARError.blockBodyLimitExceeded
+            }
             do {
                 try PublicRepositoryCID.validate(cid, blockBytes: body)
             } catch {
@@ -459,8 +446,101 @@ public enum PublicRepositoryCAR {
         return .init(
             rootCID: root,
             receivedByteCount: reader.receivedByteCount,
-            frameCount: blockCount
+            frameCount: blockCount,
+            additionalRootCIDs: roots.additional,
+            ignoredFrameCount: ignoredCount
         )
+    }
+
+    /// Reads a CAR archive into a block store, one block at a time.
+    ///
+    /// Every block is re-hashed against its CID before it is stored. Nothing
+    /// about the repository is verified; use ``Repository`` for that. This is
+    /// the entry point for archives that hold only part of a tree, such as
+    /// the `blocks` of a `#commit` firehose event.
+    ///
+    /// - Parameters:
+    ///   - source: The archive bytes.
+    ///   - store: Receives the blocks.
+    ///   - limits: Bounds on the archive.
+    ///   - policy: Whether extra roots and non-repository blocks are
+    ///     tolerated (the default) or refused.
+    /// - Returns: The root and frame counts.
+    @discardableResult
+    public static func load(
+        from source: any PublicRepositoryCARByteSource,
+        into store: any RepositoryBlockStore,
+        limits: PublicRepositoryLimits = .networkScale,
+        policy: RepositoryReadPolicy = .dataModel
+    ) async throws -> PublicRepositoryCARParseResult {
+        try await parseIncrementally(
+            from: source,
+            to: RepositoryStoreFrameSink(store: store),
+            limits: limits,
+            policy: policy
+        )
+    }
+
+    /// Encodes a small set of blocks as one CAR archive in memory: a commit
+    /// diff, or a record proof.
+    ///
+    /// - Parameters:
+    ///   - rootCID: The single root (the commit).
+    ///   - blocks: The blocks, written in the order given.
+    ///   - limits: Bounds on the archive.
+    public static func encode(
+        rootCID: CID,
+        blocks: [PublicRepositoryBlock],
+        limits: PublicRepositoryLimits = .standard
+    ) async throws -> Data {
+        let sink = DataCARByteSink()
+        _ = try await write(
+            rootCID: rootCID,
+            blocks: ArrayCARBlockStream(blocks),
+            to: sink,
+            limits: limits
+        )
+        return await sink.data
+    }
+
+    /// Bytes every blessed DAG-CBOR CID begins with: CIDv1, `dag-cbor`,
+    /// SHA-256, 32-byte digest. The rule itself is `CID.blessedKind`; this is
+    /// only the fast test for "is this frame a repository block".
+    private static let blessedDAGCBORCIDPrefix: [UInt8] = [0x01, 0x71, 0x12, 0x20]
+
+    private static func parseHeader(
+        _ header: Data,
+        policy: RepositoryReadPolicy
+    ) throws -> (commit: CID, additional: [CID]) {
+        // One blessed root is by far the common case and has a single exact
+        // 58-byte encoding.
+        if header.count == 58 {
+            return (try parseCanonicalHeader(header), [])
+        }
+        var parser = CARHeaderParser(Array(header))
+        let rootPayloads = try parser.parse()
+        guard let first = rootPayloads.first else {
+            throw PublicRepositoryCARError.invalidRootCount
+        }
+        guard rootPayloads.count == 1 || !policy.requiresSingleCARRoot else {
+            throw PublicRepositoryCARError.invalidRootCount
+        }
+        let commit: CID
+        do {
+            commit = try CID(bytes: first)
+            try PublicRepositoryCID.validate(commit)
+        } catch {
+            throw PublicRepositoryCARError.invalidRootCID
+        }
+        var additional: [CID] = []
+        for payload in rootPayloads.dropFirst() {
+            if let cid = try? CID(bytes: payload) {
+                additional.append(cid)
+            } else if !RepositoryRecordBlockValidator.isStructurallyCID(payload) {
+                throw PublicRepositoryCARError.invalidRootCID
+            }
+        }
+        return (commit, additional)
     }
 
     private static func parseCanonicalHeader(_ header: Data) throws -> CID {
@@ -506,23 +586,92 @@ public enum PublicRepositoryCAR {
         }
         return cid
     }
+}
 
-    private static func writeSegment(
-        _ bytes: Data,
-        to sink: any PublicRepositoryCARByteSink,
-        total: inout Int,
-        maximumTotal: Int,
-        maximumChunkBytes: Int
-    ) async throws {
+/// Push-style CAR v1 writer: a header, then block frames, each checked
+/// against its CID and against the archive limits as it is written.
+final class CARFrameWriter {
+    private let sink: any PublicRepositoryCARByteSink
+    private let limits: PublicRepositoryLimits
+    private let maximumChunkBytes: Int
+    private var total = 0
+    private var count = 0
+
+    init(
+        sink: any PublicRepositoryCARByteSink,
+        limits: PublicRepositoryLimits,
+        maximumChunkBytes: Int = PublicRepositoryCAR.defaultMaximumChunkBytes
+    ) throws {
+        guard maximumChunkBytes > 0 else {
+            throw PublicRepositoryCARError.invalidChunkSize
+        }
+        self.sink = sink
+        self.limits = limits
+        self.maximumChunkBytes = maximumChunkBytes
+    }
+
+    var result: PublicRepositoryCARWriteResult {
+        PublicRepositoryCARWriteResult(byteCount: total, blockCount: count)
+    }
+
+    func writeHeader(rootCID: CID) async throws {
+        do {
+            try PublicRepositoryCID.validate(rootCID)
+        } catch {
+            throw PublicRepositoryCARError.invalidRootCID
+        }
+        let header: Data
+        do {
+            header = try DAGCBOR.encodeValue(OrderedCBORMap(entries: [
+                (key: "roots", value: [ATProtoLink(cid: rootCID)]),
+                (key: "version", value: 1),
+            ]))
+        } catch {
+            throw PublicRepositoryCARError.malformedHeader
+        }
+        try await writeSegment(PublicRepositoryCAR.canonicalUnsignedVarint(UInt64(header.count)))
+        try await writeSegment(header)
+    }
+
+    func writeBlock(_ block: PublicRepositoryBlock) async throws {
+        try Task.checkCancellation()
+        guard count < limits.maximumCARBlocks else {
+            throw PublicRepositoryCARError.blockLimitExceeded
+        }
+        do {
+            try PublicRepositoryCID.validate(block.cid)
+        } catch {
+            throw PublicRepositoryCARError.invalidBlockCID
+        }
+        do {
+            try PublicRepositoryCID.validate(block.cid, blockBytes: block.bytes)
+        } catch {
+            throw PublicRepositoryCARError.blockCIDMismatch
+        }
+        guard block.bytes.count <= limits.maximumRecordBlockBytes else {
+            throw PublicRepositoryCARError.blockBodyLimitExceeded
+        }
+        let cidBytes = block.cid.bytes
+        let (frameLength, overflow) = cidBytes.count.addingReportingOverflow(block.bytes.count)
+        guard !overflow else {
+            throw PublicRepositoryCARError.byteLimitExceeded
+        }
+        try await writeSegment(PublicRepositoryCAR.canonicalUnsignedVarint(UInt64(frameLength)))
+        try await writeSegment(cidBytes)
+        try await writeSegment(block.bytes)
+        count += 1
+    }
+
+    private func writeSegment(_ bytes: Data) async throws {
         let (nextTotal, overflow) = total.addingReportingOverflow(bytes.count)
-        guard !overflow, nextTotal <= maximumTotal else {
+        guard !overflow, nextTotal <= limits.maximumCARBytes else {
             throw PublicRepositoryCARError.byteLimitExceeded
         }
         var offset = 0
         while offset < bytes.count {
             try Task.checkCancellation()
             let end = min(bytes.count, offset + maximumChunkBytes)
-            try await sink.write(Data(bytes[offset ..< end]))
+            try await sink.write(Data(bytes[(bytes.startIndex + offset) ..< (bytes.startIndex + end)]))
             offset = end
         }
         total = nextTotal
@@ -557,6 +706,111 @@ private actor RepositoryExportBlockStream: PublicRepositoryCARBlockStream {
             throw PublicRepositoryCARError.repository(.missingBlock)
         }
         return PublicRepositoryBlock(cid: cid, bytes: bytes)
+    }
+}
+
+/// Yields a fixed list of blocks.
+private actor ArrayCARBlockStream: PublicRepositoryCARBlockStream {
+    private let blocks: [PublicRepositoryBlock]
+    private var index = 0
+
+    init(_ blocks: [PublicRepositoryBlock]) {
+        self.blocks = blocks
+    }
+
+    func nextBlock() async throws -> PublicRepositoryBlock? {
+        guard index < blocks.count else { return nil }
+        defer { index += 1 }
+        return blocks[index]
+    }
+}
+
+/// Strict parser for a CARv1 header with any number of roots:
+/// `{"roots": [link, ...], "version": 1}` in canonical DAG-CBOR.
+private struct CARHeaderParser {
+    private let bytes: [UInt8]
+    private var offset = 0
+
+    init(_ bytes: [UInt8]) {
+        self.bytes = bytes
+    }
+
+    /// Returns the binary CID of each root, in order.
+    mutating func parse() throws -> [Data] {
+        guard try readLength(major: 5) == 2, try readText() == "roots" else {
+            throw PublicRepositoryCARError.malformedHeader
+        }
+        let count = try readLength(major: 4)
+        // Each root occupies at least four bytes, which bounds the count by
+        // the header size before anything is allocated.
+        guard count <= (bytes.count - offset) / 4 else {
+            throw PublicRepositoryCARError.malformedHeader
+        }
+        var roots: [Data] = []
+        roots.reserveCapacity(count)
+        for _ in 0 ..< count {
+            guard try readLength(major: 6) == 42 else {
+                throw PublicRepositoryCARError.malformedHeader
+            }
+            let length = try readLength(major: 2)
+            guard length > 1, length <= bytes.count - offset, bytes[offset] == 0 else {
+                throw PublicRepositoryCARError.invalidRootCID
+            }
+            roots.append(Data(bytes[(offset + 1) ..< (offset + length)]))
+            offset += length
+        }
+        guard try readText() == "version" else {
+            throw PublicRepositoryCARError.malformedHeader
+        }
+        guard try readLength(major: 0) == 1 else {
+            throw PublicRepositoryCARError.unsupportedVersion
+        }
+        guard offset == bytes.count else {
+            throw PublicRepositoryCARError.malformedHeader
+        }
+        return roots
+    }
+
+    private mutating func readText() throws -> String {
+        let length = try readLength(major: 3)
+        guard length <= bytes.count - offset,
+              let text = String(bytes: bytes[offset ..< offset + length], encoding: .utf8) else {
+            throw PublicRepositoryCARError.malformedHeader
+        }
+        offset += length
+        return text
+    }
+
+    /// Reads a canonical (shortest-form) CBOR argument of the given major
+    /// type. A header is at most 1,024 bytes, so two-byte arguments suffice.
+    private mutating func readLength(major: UInt8) throws -> Int {
+        guard offset < bytes.count, bytes[offset] >> 5 == major else {
+            throw PublicRepositoryCARError.malformedHeader
+        }
+        let info = bytes[offset] & 0x1f
+        offset += 1
+        switch info {
+        case 0 ... 23:
+            return Int(info)
+        case 24:
+            guard offset < bytes.count, bytes[offset] >= 24 else {
+                throw PublicRepositoryCARError.malformedHeader
+            }
+            defer { offset += 1 }
+            return Int(bytes[offset])
+        case 25:
+            guard bytes.count - offset >= 2 else {
+                throw PublicRepositoryCARError.malformedHeader
+            }
+            let value = Int(bytes[offset]) << 8 | Int(bytes[offset + 1])
+            guard value > 255 else {
+                throw PublicRepositoryCARError.malformedHeader
+            }
+            offset += 2
+            return value
+        default:
+            throw PublicRepositoryCARError.malformedHeader
+        }
     }
 }
 
@@ -656,7 +910,8 @@ private final class StreamingCARInput {
                 throw PublicRepositoryCARError.malformedFrame
             }
         }
-        let result = Data(buffer[offset ..< offset + count])
+        let start = buffer.startIndex + offset
+        let result = Data(buffer[start ..< start + count])
         offset += count
         compactIfNeeded()
         return result
@@ -668,7 +923,7 @@ private final class StreamingCARInput {
         while availableBytes == 0 {
             guard try await fill(maximumBytes: 1) else { return nil }
         }
-        let byte = buffer[offset]
+        let byte = buffer[buffer.startIndex + offset]
         offset += 1
         compactIfNeeded()
         return byte
@@ -714,7 +969,7 @@ private final class StreamingCARInput {
             buffer.removeAll(keepingCapacity: true)
             offset = 0
         } else if offset >= Self.readChunkBytes {
-            buffer.removeFirst(offset)
+            buffer = Data(buffer[(buffer.startIndex + offset)...])
             offset = 0
         }
     }

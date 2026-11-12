@@ -291,7 +291,8 @@ let package = Package(
         ),
         .testTarget(
             name: "PetrelRepoTests",
-            dependencies: ["PetrelRepo"]
+            dependencies: ["PetrelRepo"],
+            resources: [.copy("Vectors")]
         ),
         // Test support only (not a product): a loopback WebSocket server on a real socket and an
         // independent DAG-CBOR fixture encoder, shared by the two streaming test targets.

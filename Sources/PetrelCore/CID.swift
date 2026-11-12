@@ -45,9 +45,9 @@ public enum DAGCBORError: Error, Equatable {
 /// yields `.string` (a StrongRef's `cid` field). Any consumer that encodes
 /// Petrel values itself — a PDS writing canonical record bytes, for instance —
 /// has to be able to tell those two apart. While this type was internal, such
-/// a consumer could only see an opaque value it had no case for: Swan rejected
-/// every record carrying a blob or a StrongRef with `InvalidRequest`, which is
-/// every like, repost, reply, quote and image post.
+/// a consumer could only see an opaque value it had no case for, and so could
+/// not encode any record carrying a blob or a StrongRef: every like, repost,
+/// reply, quote and image post.
 public struct CIDAsLink {
     public enum Representation {
         case link
@@ -103,7 +103,12 @@ public struct Multihash: Codable, Equatable, Hashable, Sendable, DAGCBOREncodabl
     public static let sha256Length: UInt8 = 0x20 // 32 bytes
     public static let sha512Code: UInt8 = 0x13
     public static let sha512Length: UInt8 = 0x40 // 64 bytes
+    /// Not the BLAKE2b-256 multicodec: that code is the two-byte varint
+    /// `0xb220`, which this single-byte field cannot hold. Nothing in Petrel
+    /// reads the constant.
+    @available(*, deprecated, message: "0xB2 is not the BLAKE2b-256 multihash code (0xb220); this constant matches nothing")
     public static let blake2b256Code: UInt8 = 0xB2
+    @available(*, deprecated, message: "Unused; see blake2b256Code")
     public static let blake2b256Length: UInt8 = 0x20 // 32 bytes
     /// Get a human-readable name for the hash algorithm
     public var algorithmName: String {
@@ -114,8 +119,6 @@ public struct Multihash: Codable, Equatable, Hashable, Sendable, DAGCBOREncodabl
             return "SHA-256"
         case Multihash.sha512Code:
             return "SHA-512"
-        case Multihash.blake2b256Code:
-            return "BLAKE2b-256"
         default:
             return "Unknown (0x\(String(format: "%02X", algorithm)))"
         }
@@ -200,25 +203,24 @@ public struct ATProtoLink: Codable, DAGCBORCodable, Hashable, Equatable, Sendabl
     }
 
     private static func validate(_ cid: CID) throws {
+        // The blessed-format rule lives in `CID.blessedKind`; this only maps
+        // its verdict onto the encoder's error vocabulary.
         guard cid.codec == .raw || cid.codec == .dagCBOR else {
             throw DAGCBORError.invalidCIDEncoding(
                 "ATProtoLink requires raw or dag-cbor codec, received \(cid.codec.name)"
             )
         }
-
         guard cid.multihash.algorithm == Multihash.sha256Code else {
             throw DAGCBORError.invalidCIDEncoding(
                 "ATProtoLink requires SHA-256 multihash algorithm"
             )
         }
-
         guard cid.multihash.length == Multihash.sha256Length else {
             throw DAGCBORError.invalidCIDEncoding(
                 "ATProtoLink requires a declared multihash length of 32 bytes"
             )
         }
-
-        guard cid.multihash.digest.count == Int(Multihash.sha256Length) else {
+        guard cid.blessedKind != nil else {
             throw DAGCBORError.invalidCIDEncoding(
                 "ATProtoLink requires a 32-byte multihash digest"
             )
@@ -273,6 +275,11 @@ public struct CID: Equatable, Hashable, Codable, Sendable, CustomStringConvertib
             invalidVersion(UInt8)
         case unsupportedCodec(UInt8)
         case invalidHashAlgorithm(UInt8, UInt8)
+        /// The string decodes to a CID but is not its canonical spelling
+        /// (mixed case, surplus characters, non-zero padding bits).
+        case nonCanonicalEncoding
+        /// The CID is well formed but not in a blessed AT Protocol format.
+        case notBlessed
     }
 
     public static func parse(_ cidString: String) throws -> CID {
@@ -285,8 +292,9 @@ public struct CID: Equatable, Hashable, Codable, Sendable, CustomStringConvertib
             throw CIDParseError.invalidPrefix("Requires 'b' prefix")
         }
 
-        // Validate reasonable length (CIDs should be around 50-60 characters typically)
-        guard cidString.count >= 10 && cidString.count <= 100 else {
+        // A blessed CID is 59 characters. The longest CID this type can hold
+        // (a 64-byte digest) is 110; anything longer cannot be one.
+        guard cidString.count >= 10 && cidString.count <= 110 else {
             throw CIDParseError.invalidPrefix("CID string length out of valid range")
         }
 
@@ -296,7 +304,82 @@ public struct CID: Equatable, Hashable, Codable, Sendable, CustomStringConvertib
             throw CIDParseError.invalidBase32Encoding
         }
 
-        return try CID(bytes: cidBytes)
+        let cid = try CID(bytes: cidBytes)
+        // Multibase `b` is lower-case, unpadded RFC 4648 base32. The decoder
+        // above is case-insensitive and drops leftover bits, so without this
+        // check a mixed-case string, a string with one surplus trailing
+        // character, or one with non-zero padding bits would all parse to the
+        // same CID as the canonical spelling. Two different strings must not
+        // name one CID.
+        guard cid.string == cidString else {
+            throw CIDParseError.nonCanonicalEncoding
+        }
+        return cid
+    }
+
+    // MARK: Blessed format (the single home of the rule)
+
+    /// The CID shapes the AT Protocol data model blesses: CIDv1, SHA-256 with
+    /// a 32-byte digest, and one of two content codecs.
+    ///
+    /// Every "is this CID acceptable here" decision in Petrel's repository,
+    /// CAR, MST, commit and `cid-link` code is derived from ``blessedKind``;
+    /// there is no second copy of the rule.
+    public enum BlessedKind: Sendable, Hashable {
+        /// `dag-cbor` (0x71): commits, MST nodes, records.
+        case dagCBOR
+        /// `raw` (0x55): blobs.
+        case raw
+    }
+
+    /// The blessed shape this CID has, or `nil` if it is well formed but not
+    /// one of the blessed formats (another hash, another codec, a truncated
+    /// digest).
+    public var blessedKind: BlessedKind? {
+        guard multihash.algorithm == Multihash.sha256Code,
+              multihash.length == Multihash.sha256Length,
+              multihash.digest.count == Int(Multihash.sha256Length) else {
+            return nil
+        }
+        switch codec {
+        case .dagCBOR: return .dagCBOR
+        case .raw: return .raw
+        default: return nil
+        }
+    }
+
+    /// Whether this CID is in one of the blessed formats.
+    public var isBlessed: Bool { blessedKind != nil }
+
+    /// Strictly parses the canonical string form of a blessed CID.
+    ///
+    /// Use this for CIDs that name repository structure (commits, MST nodes,
+    /// records) or blobs. It accepts exactly the lower-case base32 multibase
+    /// spelling of a CIDv1 with SHA-256 and the requested codec, and nothing
+    /// else. The looser, syntax-level check Lexicon applies to `format: cid`
+    /// strings is a separate validator and is deliberately not this one.
+    ///
+    /// - Parameters:
+    ///   - cidString: The CID in string form.
+    ///   - kind: Require this blessed shape. `nil` accepts either.
+    /// - Throws: ``CIDParseError`` — `.notBlessed` when the string is a valid
+    ///   CID of another shape.
+    public static func parseBlessed(_ cidString: String, kind: BlessedKind? = nil) throws -> CID {
+        let cid = try parse(cidString)
+        guard let actual = cid.blessedKind, kind == nil || kind == actual else {
+            throw CIDParseError.notBlessed
+        }
+        return cid
+    }
+
+    /// Checks that `bytes` hash to this CID.
+    ///
+    /// Only blessed CIDs can be checked, because SHA-256 is the only hash the
+    /// data model requires implementations to compute. Returns `false` for a
+    /// non-blessed CID rather than guessing.
+    public func matchesContent(_ bytes: Data) -> Bool {
+        guard isBlessed else { return false }
+        return Data(SHA256.hash(data: bytes)) == multihash.digest
     }
 
     /// Initialize CID from its raw binary representation (version + codec + multihash)
@@ -637,6 +720,19 @@ public class DAGCBOR {
             maximumDepth: 64,
             maximumNodes: 10_000,
             maximumContainerElements: 65_536
+        )
+
+        /// Limits for one repository block (a record or an MST node).
+        ///
+        /// ``standard`` caps a document at 10,000 values, which a legal record
+        /// can exceed: a 1 MB record made of small values holds several
+        /// hundred thousand of them. Every value occupies at least one byte,
+        /// so one million nodes admits any block the 1 MB record limit
+        /// admits while still bounding work.
+        public static let repositoryBlock = PreflightLimits(
+            maximumDepth: 64,
+            maximumNodes: 1_000_000,
+            maximumContainerElements: 1_000_000
         )
 
         public init(

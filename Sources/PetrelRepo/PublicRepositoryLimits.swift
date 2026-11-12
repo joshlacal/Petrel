@@ -1,33 +1,43 @@
-/// Resource limits shared by the public repository mutation and import paths.
+/// Resource limits for reading, verifying and writing repositories.
 ///
-/// `maximumWrites` and `maximumRelevantBlockBytes` are frozen interoperability
-/// bounds from the pinned atproto implementation. The remaining values are
-/// explicit Swan hostile-input policy and may only be tightened or enlarged
-/// within the documented construction bounds.
+/// Every value is policy, chosen by the application that embeds Petrel. None
+/// is a protocol constant except the two firehose-facing defaults
+/// (``pinnedMaximumWrites`` and ``pinnedMaximumRelevantBlockBytes``), and even
+/// those can be raised for bulk work such as an import or a migration.
+///
+/// Three presets cover the common cases:
+///
+/// - ``networkScale``: what the ``Repository`` type uses. Sized for the
+///   repository specification's expectation of "single-digit millions" of
+///   records per account, with room to spare.
+/// - ``standard``: a conservative policy for a service that hosts accounts and
+///   wants a small, fixed bound on any one of them (100,000 records). It is the
+///   default of the lower-level `PublicRepository*` functions for
+///   compatibility with existing callers.
+/// - A custom policy from ``init(maximumRecordBlockBytes:maximumCARBytes:maximumCARBlocks:maximumMSTNodes:maximumMSTEntriesPerNode:maximumCBORNestingDepth:maximumRepositoryRecords:maximumWrites:maximumRelevantBlockBytes:)``,
+///   bounded only by the `maximumPermitted…` ceilings below, which exist to
+///   keep size arithmetic reviewable rather than to restrict use.
 public struct PublicRepositoryLimits: Sendable, Equatable {
-    /// Pinned maximum writes in one atomic repository request.
+    /// Maximum writes in one `com.atproto.repo.applyWrites` request in the
+    /// reference implementation. The default for ``maximumWrites``.
     public static let pinnedMaximumWrites = 200
 
-    /// Pinned maximum aggregate bytes in new/relevant commit blocks.
+    /// Maximum size of the `blocks` field of a `#commit` firehose event
+    /// (`com.atproto.sync.subscribeRepos`). The default for
+    /// ``maximumRelevantBlockBytes``.
     public static let pinnedMaximumRelevantBlockBytes = 2_000_000
 
-    /// The acceptance suite requires a 256 MiB CAR to stream successfully.
+    /// The smallest CAR byte budget a policy may set.
     public static let requiredStreamingCARBytes = 256 * 1_024 * 1_024
 
-    /// The largest live record count a repository may present.
-    ///
-    /// This is not a work budget like the others: it is the number the *read*
-    /// surface already enforces. `PublicRepositoryReadLimits`
-    /// `.maximumGenerationIndexEntries` refuses generation admission — and
-    /// therefore `getRecord`, `listRecords`, `getLatestCommit` and `getRepo` —
-    /// for any account whose record index exceeds it. Validating an import
-    /// against a smaller number than that would refuse repositories Swan can
-    /// serve; validating against a larger one would let an import produce a
-    /// repository nobody can read. The two must stay equal, which
-    /// `PublicRepositoryRecordCeilingTests` pins across the module boundary.
+    /// The record ceiling of the conservative ``standard`` preset.
     public static let standardMaximumRepositoryRecords = 100_000
 
-    /// Initial Swan hostile-import policy.
+    /// A conservative policy for a hosting service: 100,000 records,
+    /// 1,000,000 CAR blocks, 500,000 MST nodes, 512 MiB of CAR.
+    ///
+    /// Use ``networkScale`` (or a custom policy) to read arbitrary accounts
+    /// from the network.
     public static let standard = try! PublicRepositoryLimits(
         maximumRecordBlockBytes: 1_000_000,
         maximumCARBytes: 512 * 1_024 * 1_024,
@@ -37,25 +47,58 @@ public struct PublicRepositoryLimits: Sendable, Equatable {
         maximumCBORNestingDepth: 64
     )
 
+    /// A policy sized for any account on the network: 20,000,000 records,
+    /// 64,000,000 CAR blocks, 32,000,000 MST nodes and 64 GiB of CAR.
+    ///
+    /// The repository specification expects implementations to handle
+    /// "single-digit millions" of records. These bounds sit above that so the
+    /// limit is never what stops a legitimate repository, while still giving a
+    /// hostile input a finite amount of work. Pair it with a
+    /// ``FileRepositoryBlockStore`` so memory use follows the block index and
+    /// not the archive size.
+    public static let networkScale = try! PublicRepositoryLimits(
+        maximumRecordBlockBytes: 2_000_000,
+        maximumCARBytes: 64 * 1_024 * 1_024 * 1_024,
+        maximumCARBlocks: 64_000_000,
+        maximumMSTNodes: 32_000_000,
+        maximumMSTEntriesPerNode: 4_096,
+        maximumCBORNestingDepth: 64,
+        maximumRepositoryRecords: 20_000_000
+    )
+
+    /// Maximum record writes in one commit.
     public let maximumWrites: Int
+    /// Maximum total bytes of the blocks one commit adds (its diff).
     public let maximumRelevantBlockBytes: Int
+    /// Maximum size of any single block (record or MST node).
     public let maximumRecordBlockBytes: Int
+    /// Maximum size of a CAR archive, and of a repository's reachable blocks.
     public let maximumCARBytes: Int
+    /// Maximum number of block frames in a CAR archive.
     public let maximumCARBlocks: Int
+    /// Maximum number of MST nodes in one repository.
     public let maximumMSTNodes: Int
+    /// Maximum number of entries in one MST node.
     public let maximumMSTEntriesPerNode: Int
+    /// Maximum nesting depth of a record's DAG-CBOR.
     public let maximumCBORNestingDepth: Int
+    /// Maximum number of records in one repository.
     public let maximumRepositoryRecords: Int
 
-    /// Constructs a bounded Swan policy while preserving the pinned protocol
-    /// limits. Custom policies can reduce most work budgets; the CAR byte
-    /// budget cannot fall below the required 256 MiB streaming acceptance
-    /// case.
+    /// Constructs a policy.
     ///
-    /// `maximumRepositoryRecords` is defaulted rather than required so that
-    /// the durable import-session rows, which persist the six work budgets
-    /// they were opened with and know nothing about a seventh, keep
-    /// reconstructing a policy that carries the standard ceiling.
+    /// - Parameters:
+    ///   - maximumRecordBlockBytes: Largest single block, `1...maximumPermittedRecordBlockBytes`.
+    ///   - maximumCARBytes: Largest archive, `requiredStreamingCARBytes...maximumPermittedCARBytes`.
+    ///   - maximumCARBlocks: Most block frames, `1...maximumPermittedCARBlocks`.
+    ///   - maximumMSTNodes: Most MST nodes, `1...maximumPermittedMSTNodes`; not above `maximumCARBlocks`.
+    ///   - maximumMSTEntriesPerNode: Most entries per node, `1...maximumPermittedMSTEntriesPerNode`.
+    ///   - maximumCBORNestingDepth: Deepest record nesting, `1...maximumPermittedCBORNestingDepth`.
+    ///   - maximumRepositoryRecords: Most records, `1...maximumPermittedRepositoryRecords`.
+    ///     Defaults to ``standardMaximumRepositoryRecords``.
+    ///   - maximumWrites: Most writes per commit, `1...maximumPermittedWrites`.
+    ///   - maximumRelevantBlockBytes: Largest commit diff, `1...maximumPermittedCARBytes`.
+    /// - Throws: ``PublicRepositoryLimitError`` naming the value out of range.
     public init(
         maximumRecordBlockBytes: Int,
         maximumCARBytes: Int,
@@ -63,7 +106,9 @@ public struct PublicRepositoryLimits: Sendable, Equatable {
         maximumMSTNodes: Int,
         maximumMSTEntriesPerNode: Int,
         maximumCBORNestingDepth: Int,
-        maximumRepositoryRecords: Int = Self.standardMaximumRepositoryRecords
+        maximumRepositoryRecords: Int = Self.standardMaximumRepositoryRecords,
+        maximumWrites: Int = Self.pinnedMaximumWrites,
+        maximumRelevantBlockBytes: Int = Self.pinnedMaximumRelevantBlockBytes
     ) throws {
         guard (1...Self.maximumPermittedRecordBlockBytes).contains(maximumRecordBlockBytes) else {
             throw PublicRepositoryLimitError.maximumRecordBlockBytesOutOfRange
@@ -90,10 +135,16 @@ public struct PublicRepositoryLimits: Sendable, Equatable {
             .contains(maximumRepositoryRecords) else {
             throw PublicRepositoryLimitError.maximumRepositoryRecordsOutOfRange
         }
+        guard (1...Self.maximumPermittedWrites).contains(maximumWrites) else {
+            throw PublicRepositoryLimitError.maximumWritesOutOfRange
+        }
+        guard (1...Self.maximumPermittedCARBytes).contains(maximumRelevantBlockBytes) else {
+            throw PublicRepositoryLimitError.maximumRelevantBlockBytesOutOfRange
+        }
 
         self.maximumRepositoryRecords = maximumRepositoryRecords
-        maximumWrites = Self.pinnedMaximumWrites
-        maximumRelevantBlockBytes = Self.pinnedMaximumRelevantBlockBytes
+        self.maximumWrites = maximumWrites
+        self.maximumRelevantBlockBytes = maximumRelevantBlockBytes
         self.maximumRecordBlockBytes = maximumRecordBlockBytes
         self.maximumCARBytes = maximumCARBytes
         self.maximumCARBlocks = maximumCARBlocks
@@ -102,18 +153,26 @@ public struct PublicRepositoryLimits: Sendable, Equatable {
         self.maximumCBORNestingDepth = maximumCBORNestingDepth
     }
 
-    /// A finite ceiling keeps frame-count arithmetic and operational policy
-    /// reviewable even on 64-bit platforms where `Int.max` is much larger.
-    public static let maximumPermittedRecordBlockBytes = 1_000_000
-    public static let maximumPermittedCARBytes = 4 * 1_024 * 1_024 * 1_024
-    public static let maximumPermittedCARBlocks = 1_000_000
-    public static let maximumPermittedMSTNodes = 500_000
+    // The ceilings below bound what a policy may ask for. They are far above
+    // any real repository and exist so that sums of counts and sizes stay
+    // well inside `Int` on every supported (64-bit) platform.
+
+    /// Ceiling for ``maximumRecordBlockBytes``.
+    public static let maximumPermittedRecordBlockBytes = 16 * 1_024 * 1_024
+    /// Ceiling for ``maximumCARBytes`` and ``maximumRelevantBlockBytes``.
+    public static let maximumPermittedCARBytes = 1_024 * 1_024 * 1_024 * 1_024
+    /// Ceiling for ``maximumCARBlocks``.
+    public static let maximumPermittedCARBlocks = 1_000_000_000
+    /// Ceiling for ``maximumMSTNodes``.
+    public static let maximumPermittedMSTNodes = 500_000_000
+    /// Ceiling for ``maximumMSTEntriesPerNode``.
     public static let maximumPermittedMSTEntriesPerNode = 4_096
+    /// Ceiling for ``maximumCBORNestingDepth``.
     public static let maximumPermittedCBORNestingDepth = 64
-    /// The public read surface refuses anything above the standard ceiling, so
-    /// a policy may only tighten this, never raise it.
-    public static let maximumPermittedRepositoryRecords =
-        standardMaximumRepositoryRecords
+    /// Ceiling for ``maximumRepositoryRecords``.
+    public static let maximumPermittedRepositoryRecords = 1_000_000_000
+    /// Ceiling for ``maximumWrites``.
+    public static let maximumPermittedWrites = 1_000_000
 
     /// A conservative encoded ceiling for one canonical repository MST node.
     /// Each entry can carry at most one complete 1,024-byte key suffix plus
@@ -123,17 +182,16 @@ public struct PublicRepositoryLimits: Sendable, Equatable {
         64 + maximumPermittedMSTEntriesPerNode
             * (PublicRepositoryPath.maximumMSTKeyBytes + 128)
 
-    /// No authenticated repository block can legitimately exceed this value:
-    /// records have their own smaller limit, locally/imported relevant blocks
-    /// obey the pinned aggregate budget, and canonical MST nodes obey the
-    /// structural bound above. SQLite uses this before materializing a BLOB.
+    /// An upper bound on any block a storage layer should expect to persist
+    /// under the default record and commit-diff sizes.
     public static let maximumPersistedBlockBytes = max(
-        maximumPermittedRecordBlockBytes,
+        1_000_000,
         pinnedMaximumRelevantBlockBytes,
         maximumCanonicalMSTBlockBytes
     )
 }
 
+/// Why a ``PublicRepositoryLimits`` value could not be constructed.
 public enum PublicRepositoryLimitError: Error, Sendable, Equatable {
     case maximumRecordBlockBytesOutOfRange
     case maximumCARBytesOutOfRange
@@ -143,4 +201,6 @@ public enum PublicRepositoryLimitError: Error, Sendable, Equatable {
     case maximumMSTEntriesPerNodeOutOfRange
     case maximumCBORNestingDepthOutOfRange
     case maximumRepositoryRecordsOutOfRange
+    case maximumWritesOutOfRange
+    case maximumRelevantBlockBytesOutOfRange
 }

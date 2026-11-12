@@ -7,6 +7,51 @@ import Crypto
 import Foundation
 import Petrel
 
+/// Which strings an MST accepts as keys.
+public enum RepositoryMSTKeySyntax: Sendable, Equatable {
+    /// A repository path: a valid NSID, `/`, a valid record key. This is what
+    /// the repository specification requires of a repository's tree.
+    case repositoryPath
+    /// The reference implementation's tree-level rule: exactly two non-empty
+    /// segments of `A-Z a-z 0-9 _ ~ - : .` separated by `/`, at most 1,024
+    /// bytes. The official MST and commit-proof test vectors use keys such as
+    /// `A0/374913` that satisfy this rule but are not repository paths.
+    case mstKey
+}
+
+/// How a ``RepositoryMST`` and ``RepositoryMSTCodec`` treat the two things
+/// the specification lets vary below the repository level.
+public struct RepositoryMSTOptions: Sendable, Equatable {
+    /// The key rule applied to every key read from or written to a node.
+    public var keySyntax: RepositoryMSTKeySyntax
+    /// Whether a leaf may link a record through a CID that is not a blessed
+    /// DAG-CBOR CID.
+    ///
+    /// The specification allows "more flexibility" for leaf links and asks
+    /// implementations to "retain the exact CID links". With this set, such a
+    /// link is read and written back unchanged; links between MST nodes are
+    /// always required to be blessed.
+    public var allowsNonBlessedLeafLinks: Bool
+
+    /// Creates options.
+    public init(
+        keySyntax: RepositoryMSTKeySyntax = .repositoryPath,
+        allowsNonBlessedLeafLinks: Bool = false
+    ) {
+        self.keySyntax = keySyntax
+        self.allowsNonBlessedLeafLinks = allowsNonBlessedLeafLinks
+    }
+
+    /// Repository paths only, blessed leaf links only. What a writer and a
+    /// hosting service want.
+    public static let strict = RepositoryMSTOptions()
+
+    /// Repository paths, any well-formed leaf link. What a reader of other
+    /// people's repositories wants.
+    public static let dataModel = RepositoryMSTOptions(allowsNonBlessedLeafLinks: true)
+}
+
+/// One entry of an MST node as it appears on the wire.
 public struct RepositoryMSTEntry: Sendable, Equatable {
     public let prefixLength: Int
     public let keySuffix: Data
@@ -21,6 +66,7 @@ public struct RepositoryMSTEntry: Sendable, Equatable {
     }
 }
 
+/// One MST node as it appears on the wire.
 public struct RepositoryMSTNode: Sendable, Equatable {
     public let leftTreeCID: CID?
     public let entries: [RepositoryMSTEntry]
@@ -31,6 +77,7 @@ public struct RepositoryMSTNode: Sendable, Equatable {
     }
 }
 
+/// A key and the record CID it maps to, with the subtree that follows it.
 public struct RepositoryMSTLeaf: Sendable, Equatable {
     public let path: PublicRepositoryPath
     public let recordCID: CID
@@ -43,6 +90,7 @@ public struct RepositoryMSTLeaf: Sendable, Equatable {
     }
 }
 
+/// Encoding, decoding and key arithmetic for MST nodes.
 public enum RepositoryMSTCodec {
     public static func keyDepth(for path: PublicRepositoryPath) -> Int {
         path.keyDepth
@@ -67,12 +115,15 @@ public enum RepositoryMSTCodec {
 
     public static func node(
         leaves: [RepositoryMSTLeaf],
-        leftTreeCID: CID? = nil
+        leftTreeCID: CID? = nil,
+        options: RepositoryMSTOptions = .strict
     ) throws -> RepositoryMSTNode {
         var entries: [RepositoryMSTEntry] = []
         var previous = Data()
         for (index, leaf) in leaves.enumerated() {
-            try PublicRepositoryCID.validate(leaf.recordCID)
+            if !options.allowsNonBlessedLeafLinks {
+                try PublicRepositoryCID.validate(leaf.recordCID)
+            }
             if let right = leaf.rightTreeCID {
                 try PublicRepositoryCID.validate(right)
             }
@@ -95,7 +146,10 @@ public enum RepositoryMSTCodec {
         return RepositoryMSTNode(leftTreeCID: leftTreeCID, entries: entries)
     }
 
-    public static func reconstructedLeaves(from node: RepositoryMSTNode) throws -> [RepositoryMSTLeaf] {
+    public static func reconstructedLeaves(
+        from node: RepositoryMSTNode,
+        options: RepositoryMSTOptions = .strict
+    ) throws -> [RepositoryMSTLeaf] {
         var previous = Data()
         var leaves: [RepositoryMSTLeaf] = []
         for (index, entry) in node.entries.enumerated() {
@@ -113,19 +167,18 @@ public enum RepositoryMSTCodec {
             guard index == 0 || lexicographicallyPrecedes(previous, key) else {
                 throw RepositoryMSTValidationError.keysNotStrictlyIncreasing
             }
-            guard let slash = key.firstIndex(of: 0x2f),
-                  !key[key.index(after: slash)...].contains(0x2f),
-                  let collection = String(data: key[..<slash], encoding: .ascii),
-                  let recordKey = String(data: key[key.index(after: slash)...], encoding: .ascii) else {
+            guard let keyString = String(data: key, encoding: .ascii) else {
                 throw RepositoryMSTValidationError.invalidPath
             }
             let path: PublicRepositoryPath
             do {
-                path = try PublicRepositoryPath(collection: collection, recordKey: recordKey)
+                path = try PublicRepositoryPath(mstKey: keyString, syntax: options.keySyntax)
             } catch {
                 throw RepositoryMSTValidationError.invalidPath
             }
-            try PublicRepositoryCID.validate(entry.valueCID)
+            if !options.allowsNonBlessedLeafLinks {
+                try PublicRepositoryCID.validate(entry.valueCID)
+            }
             if let right = entry.rightTreeCID {
                 try PublicRepositoryCID.validate(right)
             }
@@ -135,11 +188,14 @@ public enum RepositoryMSTCodec {
         return leaves
     }
 
-    public static func encode(_ node: RepositoryMSTNode) throws -> Data {
+    public static func encode(
+        _ node: RepositoryMSTNode,
+        options: RepositoryMSTOptions = .strict
+    ) throws -> Data {
         if let left = node.leftTreeCID {
             try PublicRepositoryCID.validate(left)
         }
-        _ = try reconstructedLeaves(from: node)
+        _ = try reconstructedLeaves(from: node, options: options)
         return try encodeUnchecked(node)
     }
 
@@ -148,7 +204,9 @@ public enum RepositoryMSTCodec {
             OrderedCBORMap(entries: [
                 (key: "p", value: UInt64(entry.prefixLength)),
                 (key: "k", value: entry.keySuffix),
-                (key: "v", value: ATProtoLink(cid: entry.valueCID)),
+                // `CIDAsLink` writes tag 42 over the exact CID bytes. A leaf
+                // link is retained verbatim even when it is not blessed.
+                (key: "v", value: CIDAsLink(cid: entry.valueCID, representation: .link)),
                 (key: "t", value: entry.rightTreeCID.map { ATProtoLink(cid: $0) } ?? NSNull()),
             ])
         }
@@ -160,13 +218,16 @@ public enum RepositoryMSTCodec {
 
     /// Decodes only the exact repository MST schema. The parser checks shortest
     /// CBOR forms and canonical map order while consuming.
-    public static func decode(_ bytes: Data) throws -> RepositoryMSTNode {
-        var parser = MSTCBORParser(bytes)
+    public static func decode(
+        _ bytes: Data,
+        options: RepositoryMSTOptions = .strict
+    ) throws -> RepositoryMSTNode {
+        var parser = MSTCBORParser(bytes, allowsNonBlessedLeafLinks: options.allowsNonBlessedLeafLinks)
         let node = try parser.parseNode()
         guard parser.isAtEnd else {
             throw RepositoryMSTValidationError.invalidNodeSchema
         }
-        _ = try reconstructedLeaves(from: node)
+        _ = try reconstructedLeaves(from: node, options: options)
         return node
     }
 
@@ -213,10 +274,12 @@ public enum RepositoryMSTCodec {
 
 private struct MSTCBORParser {
     private let bytes: [UInt8]
+    private let allowsNonBlessedLeafLinks: Bool
     private(set) var offset = 0
 
-    init(_ data: Data) {
+    init(_ data: Data, allowsNonBlessedLeafLinks: Bool) {
         bytes = Array(data)
+        self.allowsNonBlessedLeafLinks = allowsNonBlessedLeafLinks
     }
 
     var isAtEnd: Bool { offset == bytes.count }
@@ -259,7 +322,7 @@ private struct MSTCBORParser {
         guard try readText() == "t" else { throw RepositoryMSTValidationError.invalidEntrySchema }
         let tree = try readOptionalLink()
         guard try readText() == "v" else { throw RepositoryMSTValidationError.invalidEntrySchema }
-        let value = try readRequiredLink()
+        let value = try readRequiredLink(blessedOnly: !allowsNonBlessedLeafLinks)
         return RepositoryMSTEntry(
             prefixLength: Int(prefix),
             keySuffix: suffix,
@@ -273,21 +336,24 @@ private struct MSTCBORParser {
             offset += 1
             return nil
         }
-        return try readRequiredLink()
+        return try readRequiredLink(blessedOnly: true)
     }
 
-    private mutating func readRequiredLink() throws -> CID {
+    private mutating func readRequiredLink(blessedOnly: Bool) throws -> CID {
         guard try readLength(major: 6) == 42 else {
             throw RepositoryMSTValidationError.invalidCIDLink
         }
         let payload = try readBytes()
-        guard payload.count == 37, payload.first == 0 else {
+        guard payload.count > 1, payload.first == 0,
+              !blessedOnly || payload.count == 37 else {
             throw RepositoryMSTValidationError.invalidCIDLink
         }
         let cid: CID
         do {
             cid = try CID(bytes: Data(payload.dropFirst()))
-            try PublicRepositoryCID.validate(cid)
+            if blessedOnly {
+                try PublicRepositoryCID.validate(cid)
+            }
         } catch {
             throw RepositoryMSTValidationError.invalidCIDLink
         }

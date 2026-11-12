@@ -1,10 +1,12 @@
 import Foundation
 import Petrel
 
+/// Read access to blocks by CID. Returns `nil` for a block it does not hold.
 public protocol PublicRepositoryBlockSource: Sendable {
     func block(for cid: CID) async throws -> Data?
 }
 
+/// One block: a CID and the bytes that hash to it.
 public struct PublicRepositoryBlock: Sendable, Equatable {
     public let cid: CID
     public let bytes: Data
@@ -18,6 +20,7 @@ public struct PublicRepositoryBlock: Sendable, Equatable {
 /// Immutable, verified new blocks keyed by CID.
 public struct PublicRepositoryBlockMap: Sendable, Equatable, PublicRepositoryBlockSource {
     private let storage: [CID: Data]
+    private let order: [CID]
     public let relevantByteCount: Int
     /// The immutable effective budget selected when this map was created.
     public let maximumRelevantBytes: Int
@@ -26,10 +29,11 @@ public struct PublicRepositoryBlockMap: Sendable, Equatable, PublicRepositoryBlo
         blocks: [PublicRepositoryBlock] = [],
         maximumRelevantBytes: Int = PublicRepositoryLimits.pinnedMaximumRelevantBlockBytes
     ) throws {
-        guard (0...PublicRepositoryLimits.pinnedMaximumRelevantBlockBytes).contains(maximumRelevantBytes) else {
+        guard (0...PublicRepositoryLimits.maximumPermittedCARBytes).contains(maximumRelevantBytes) else {
             throw PublicRepositoryDomainError.relevantBlockBudgetExceeded
         }
         var storage: [CID: Data] = [:]
+        var order: [CID] = []
         var relevantByteCount = 0
         for block in blocks {
             if let existing = storage[block.cid] {
@@ -44,15 +48,28 @@ public struct PublicRepositoryBlockMap: Sendable, Equatable, PublicRepositoryBlo
                 throw PublicRepositoryDomainError.relevantBlockBudgetExceeded
             }
             storage[block.cid] = block.bytes
+            order.append(block.cid)
             relevantByteCount = newCount
         }
         self.storage = storage
+        self.order = order
         self.relevantByteCount = relevantByteCount
         self.maximumRelevantBytes = maximumRelevantBytes
     }
 
     public var count: Int { storage.count }
     public var cids: Set<CID> { Set(storage.keys) }
+
+    /// The blocks in the order they were first added.
+    public var orderedBlocks: [PublicRepositoryBlock] {
+        order.compactMap { cid in
+            storage[cid].map { PublicRepositoryBlock(cid: cid, bytes: $0) }
+        }
+    }
+
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.storage == rhs.storage && lhs.maximumRelevantBytes == rhs.maximumRelevantBytes
+    }
 
     public func block(for cid: CID) -> Data? {
         storage[cid]
@@ -63,7 +80,6 @@ public struct PublicRepositoryBlockMap: Sendable, Equatable, PublicRepositoryBlo
     }
 
     public func adding(_ blocks: [PublicRepositoryBlock]) throws -> Self {
-        let existing = storage.map { PublicRepositoryBlock(cid: $0.key, bytes: $0.value) }
-        return try Self(blocks: existing + blocks, maximumRelevantBytes: maximumRelevantBytes)
+        try Self(blocks: orderedBlocks + blocks, maximumRelevantBytes: maximumRelevantBytes)
     }
 }

@@ -3,7 +3,7 @@
 // packages/repo/src/mst/mst.ts (`MST.get`), used under the repository's
 // MIT OR Apache-2.0 notice policy recorded in THIRD_PARTY_NOTICES.md.
 // The bounded work budget and the absent/unprovable distinction are
-// Swan-specific hardening.
+// additions.
 
 import Foundation
 import Petrel
@@ -24,7 +24,7 @@ import Petrel
 /// (`RepositoryMST` bounds entries per node and bounds *page* traversal, not a
 /// point lookup), recurses instead of iterating, and reports through
 /// `RepositoryMSTMutationError`, whose vocabulary is about mutating a
-/// repository Swan owns rather than about proving a claim over bytes an
+/// repository the caller owns rather than about proving a claim over bytes an
 /// untrusted PDS chose. The walk below is the same descent under a bounded,
 /// iterative loop in the validation error domain.
 public enum RepositoryMSTProof {
@@ -66,28 +66,36 @@ public enum RepositoryMSTProof {
     /// no second MST budget: two budgets that can drift apart is a worse
     /// outcome than either number.
     ///
-    /// - Parameter key: the canonical MST key, `<collection>/<record-key>`.
+    /// - Parameters:
+    ///   - rootCID: The MST root, taken from a verified commit's `data`.
+    ///   - key: The canonical MST key, `<collection>/<record-key>`.
+    ///   - blocks: The blocks of the proof (or of the whole repository).
+    ///   - limits: Bounds on nodes visited and entries per node.
+    ///   - options: Key syntax and leaf-link policy.
     public static func membership(
         rootCID: CID,
         key: String,
         blocks: any PublicRepositoryBlockSource,
-        limits: PublicRepositoryLimits = .standard
+        limits: PublicRepositoryLimits = .standard,
+        options: RepositoryMSTOptions = .strict
     ) async throws -> CID? {
         try await membership(
             rootCID: rootCID,
-            path: try path(forMSTKey: key),
+            path: try path(forMSTKey: key, syntax: options.keySyntax),
             blocks: blocks,
-            limits: limits
+            limits: limits,
+            options: options
         )
     }
 
-    /// Path-typed sibling of ``membership(rootCID:key:blocks:limits:)`` for
+    /// Path-typed sibling of ``membership(rootCID:key:blocks:limits:options:)`` for
     /// callers that already hold a validated repository path.
     public static func membership(
         rootCID: CID,
         path: PublicRepositoryPath,
         blocks: any PublicRepositoryBlockSource,
-        limits: PublicRepositoryLimits = .standard
+        limits: PublicRepositoryLimits = .standard,
+        options: RepositoryMSTOptions = .strict
     ) async throws -> CID? {
         do {
             try PublicRepositoryCID.validate(rootCID)
@@ -123,14 +131,14 @@ public enum RepositoryMSTProof {
                 throw RepositoryMSTValidationError.blockCIDMismatch
             }
 
-            let node = try RepositoryMSTCodec.decode(bytes)
+            let node = try RepositoryMSTCodec.decode(bytes, options: options)
             guard node.entries.count <= limits.maximumMSTEntriesPerNode else {
                 throw RepositoryMSTValidationError.entryLimitExceeded
             }
             // Reconstruction re-derives every key from its prefix compression
             // and enforces strictly increasing order within the node, so the
             // scan below can rely on both.
-            let leaves = try RepositoryMSTCodec.reconstructedLeaves(from: node)
+            let leaves = try RepositoryMSTCodec.reconstructedLeaves(from: node, options: options)
             let leafKeys = leaves.map { Data($0.path.mstKey.utf8) }
             for leafKey in leafKeys {
                 guard isInside(leafKey, lower: lowerBound, upper: upperBound) else {
@@ -176,16 +184,13 @@ public enum RepositoryMSTProof {
     /// The round-trip check refuses any key whose canonical form differs from
     /// the input, so a caller cannot search for a key that no well-formed node
     /// could ever contain and read the resulting `nil` as absence.
-    static func path(forMSTKey key: String) throws -> PublicRepositoryPath {
-        guard let separator = key.firstIndex(of: "/") else {
-            throw RepositoryMSTValidationError.invalidPath
-        }
+    static func path(
+        forMSTKey key: String,
+        syntax: RepositoryMSTKeySyntax = .repositoryPath
+    ) throws -> PublicRepositoryPath {
         let path: PublicRepositoryPath
         do {
-            path = try PublicRepositoryPath(
-                collection: String(key[key.startIndex ..< separator]),
-                recordKey: String(key[key.index(after: separator)...])
-            )
+            path = try PublicRepositoryPath(mstKey: key, syntax: syntax)
         } catch {
             throw RepositoryMSTValidationError.invalidPath
         }
@@ -199,5 +204,195 @@ public enum RepositoryMSTProof {
         if let lower, !lower.lexicographicallyPrecedes(key) { return false }
         if let upper, !key.lexicographicallyPrecedes(upper) { return false }
         return true
+    }
+
+    // MARK: Producing proofs
+
+    /// The MST node blocks on the search path from `rootCID` to `path`: the
+    /// blocks a `com.atproto.sync.getRecord` response must carry, besides the
+    /// commit and the record itself.
+    ///
+    /// The path is the same whether or not the key is present, so the result
+    /// is an inclusion proof for a key that exists and an exclusion proof for
+    /// one that does not. Matches the reference implementation's
+    /// `MST.cidsForPath`.
+    ///
+    /// - Returns: The node blocks from the root downwards, and the record CID
+    ///   the key maps to (`nil` if absent).
+    public static func pathBlocks(
+        rootCID: CID,
+        path: PublicRepositoryPath,
+        blocks: any PublicRepositoryBlockSource,
+        limits: PublicRepositoryLimits = .standard,
+        options: RepositoryMSTOptions = .strict
+    ) async throws -> (nodes: [PublicRepositoryBlock], recordCID: CID?) {
+        let target = path.mstKeyBytes
+        var nodes: [PublicRepositoryBlock] = []
+        var next: CID? = rootCID
+        while let cid = next {
+            let node = try await ProofNode.load(cid, blocks: blocks, limits: limits, options: options)
+            try guardDepth(nodes.count)
+            nodes.append(node.block)
+            let index = node.firstLeafIndex(notLessThan: target)
+            if case let .leaf(key, recordCID)? = node.item(at: index), key == target {
+                return (nodes, recordCID)
+            }
+            if case let .tree(child)? = node.item(at: index - 1) {
+                next = child
+            } else {
+                next = nil
+            }
+        }
+        return (nodes, nil)
+    }
+
+    /// The node blocks needed to verify, and to invert, one operation on
+    /// `path` against the tree rooted at `rootCID`: the search path for the
+    /// key, plus the paths to the keys immediately to its left and right.
+    ///
+    /// A consumer that holds only these blocks can delete the key (or put it
+    /// back) and recompute the root, because a delete may merge the two
+    /// neighbouring subtrees and an insert may split them. Matches the
+    /// reference implementation's `MST.getCoveringProof`.
+    ///
+    /// Call it on the tree as it is *after* the commit.
+    public static func coveringProof(
+        rootCID: CID,
+        path: PublicRepositoryPath,
+        blocks: any PublicRepositoryBlockSource,
+        limits: PublicRepositoryLimits = .standard,
+        options: RepositoryMSTOptions = .strict
+    ) async throws -> [PublicRepositoryBlock] {
+        let target = path.mstKeyBytes
+        var seen = Set<CID>()
+        var result: [PublicRepositoryBlock] = []
+        func add(_ block: PublicRepositoryBlock) {
+            if seen.insert(block.cid).inserted { result.append(block) }
+        }
+        func load(_ cid: CID, depth: Int) async throws -> ProofNode {
+            try guardDepth(depth)
+            return try await ProofNode.load(cid, blocks: blocks, limits: limits, options: options)
+        }
+
+        // The key itself. A search that ends in a node with no subtree for
+        // the key's gap does not contribute that last node here; the two
+        // sibling walks below always include it.
+        var visited: [PublicRepositoryBlock] = []
+        var next: CID? = rootCID
+        while let cid = next {
+            let node = try await load(cid, depth: visited.count)
+            let index = node.firstLeafIndex(notLessThan: target)
+            if case let .leaf(key, _)? = node.item(at: index), key == target {
+                visited.append(node.block)
+                next = nil
+            } else if case let .tree(child)? = node.item(at: index - 1) {
+                visited.append(node.block)
+                next = child
+            } else {
+                next = nil
+            }
+        }
+        visited.forEach(add)
+
+        // The left neighbour: at every level, the subtree just before the
+        // position the key occupies or would occupy.
+        var depth = 0
+        next = rootCID
+        while let cid = next {
+            let node = try await load(cid, depth: depth)
+            depth += 1
+            add(node.block)
+            let index = node.firstLeafIndex(notLessThan: target)
+            if case let .tree(child)? = node.item(at: index - 1) {
+                next = child
+            } else {
+                next = nil
+            }
+        }
+
+        // The right neighbour.
+        depth = 0
+        next = rootCID
+        while let cid = next {
+            let node = try await load(cid, depth: depth)
+            depth += 1
+            add(node.block)
+            let index = node.firstLeafIndex(notLessThan: target)
+            next = nil
+            switch node.item(at: index) ?? node.item(at: index - 1) {
+            case nil:
+                break
+            case let .tree(child)?:
+                next = child
+            case let .leaf(key, _)?:
+                let neighbour = key == target ? node.item(at: index + 1) : node.item(at: index - 1)
+                if case let .tree(child)? = neighbour {
+                    next = child
+                }
+            }
+        }
+        return result
+    }
+
+    private static func guardDepth(_ depth: Int) throws {
+        // A well-formed tree has at most 129 layers; a longer descent is a
+        // cycle or a chain of empty nodes.
+        guard depth <= 129 else {
+            throw RepositoryMSTValidationError.invalidLayer
+        }
+    }
+}
+
+/// One decoded MST node as an interleaved list of subtrees and leaves, the
+/// shape the reference implementation's proof walks are written against.
+private struct ProofNode {
+    enum Item {
+        case tree(CID)
+        case leaf(key: Data, recordCID: CID)
+    }
+
+    let block: PublicRepositoryBlock
+    let items: [Item]
+
+    static func load(
+        _ cid: CID,
+        blocks: any PublicRepositoryBlockSource,
+        limits: PublicRepositoryLimits,
+        options: RepositoryMSTOptions
+    ) async throws -> ProofNode {
+        guard cid.blessedKind == .dagCBOR else {
+            throw RepositoryMSTValidationError.unsupportedCID
+        }
+        guard let bytes = try await blocks.block(for: cid) else {
+            throw RepositoryMSTValidationError.missingBlock
+        }
+        guard cid.matchesContent(bytes) else {
+            throw RepositoryMSTValidationError.blockCIDMismatch
+        }
+        let node = try RepositoryMSTCodec.decode(bytes, options: options)
+        guard node.entries.count <= limits.maximumMSTEntriesPerNode else {
+            throw RepositoryMSTValidationError.entryLimitExceeded
+        }
+        var items: [Item] = []
+        if let left = node.leftTreeCID { items.append(.tree(left)) }
+        for leaf in try RepositoryMSTCodec.reconstructedLeaves(from: node, options: options) {
+            items.append(.leaf(key: leaf.path.mstKeyBytes, recordCID: leaf.recordCID))
+            if let right = leaf.rightTreeCID { items.append(.tree(right)) }
+        }
+        return ProofNode(block: .init(cid: cid, bytes: bytes), items: items)
+    }
+
+    /// Index of the first leaf whose key is `>= key`, or `items.count`.
+    func firstLeafIndex(notLessThan key: Data) -> Int {
+        items.firstIndex {
+            if case let .leaf(leafKey, _) = $0 {
+                return !RepositoryMSTCodec.lexicographicallyPrecedes(leafKey, key)
+            }
+            return false
+        } ?? items.count
+    }
+
+    func item(at index: Int) -> Item? {
+        items.indices.contains(index) ? items[index] : nil
     }
 }

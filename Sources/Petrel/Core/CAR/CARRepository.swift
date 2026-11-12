@@ -10,6 +10,18 @@ import SwiftCBOR
 
 // MARK: - CARRepository
 
+/// A convenience reader that turns a repository export into decoded records.
+///
+/// It checks CAR framing and that every block hashes to its CID, and it
+/// requires MST keys to be in order. It does **not** verify the commit
+/// signature, the depth of keys in the tree, or that a path is a valid
+/// collection and record key, so it tells you what an archive contains, not
+/// that the archive is an authentic copy of an account's repository.
+///
+/// Use it to inspect or migrate data you already trust. To verify a
+/// repository, use `Repository` from the `PetrelRepo` product, which checks
+/// the signature (on either curve), the whole tree and every record, and
+/// reads archives of any size from disk.
 public enum CARRepository {
     // MARK: - Types
 
@@ -53,15 +65,11 @@ public enum CARRepository {
         var downgradedCount = 0
         var failedCount = 0
 
+        // `CARReader` refuses a header without roots, so this cannot be
+        // reached with an empty list; it stays a thrown error rather than a
+        // successful empty parse in case that ever changes.
         guard let commitRoot = reader.roots.first else {
-            return Stats(
-                blockCount: reader.rawBlockIndex.count,
-                recordCount: 0,
-                decodedCount: 0,
-                downgradedCount: 0,
-                failedCount: 0,
-                roots: reader.roots
-            )
+            throw CARReaderError.invalidHeader("Roots array is empty")
         }
 
         try traverser.walkRepository(commitCID: commitRoot) { path, recordCID in
@@ -119,11 +127,23 @@ public enum CARRepository {
     /// Decodes raw DAG-CBOR data into an `ATProtocolValueContainer`.
     /// Flow: CBOR bytes → SwiftCBOR parse → ATProtocolValueContainer.fromCBOR
     public static func decodeRecordCBOR(_ data: Data) throws -> ATProtocolValueContainer {
+        try decodeRecordCBOR(data, limits: .repositoryBlock)
+    }
+
+    /// Decodes raw DAG-CBOR data under explicit decode limits.
+    ///
+    /// - Parameters:
+    ///   - data: One record block.
+    ///   - limits: Depth, node-count and container bounds for the block.
+    public static func decodeRecordCBOR(
+        _ data: Data,
+        limits: DAGCBOR.PreflightLimits
+    ) throws -> ATProtocolValueContainer {
         guard !data.isEmpty else {
             throw CARReaderError.decodingFailed("Empty CBOR data")
         }
         do {
-            try DAGCBOR.decodeCBORPreflight(data)
+            try DAGCBOR.decodeCBORPreflight(data, limits: limits)
         } catch {
             throw CARReaderError.decodingFailed("CBOR preflight failed: \(error.localizedDescription)")
         }

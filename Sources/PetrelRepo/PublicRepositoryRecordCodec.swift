@@ -50,8 +50,12 @@ public struct PublicTypedBlobReference: Sendable, Equatable, Hashable {
 }
 
 public enum PublicRepositoryRecordCodec {
-    /// AT Protocol integers are limited to JavaScript's exactly representable
-    /// signed integer range even though DAG-CBOR itself can encode wider ints.
+    /// The largest integer every JSON implementation represents exactly.
+    ///
+    /// The data model's integer is a signed 64-bit value; staying within 53
+    /// bits is a best practice the specification recommends to *writers*.
+    /// This codec's writer follows it. Readers accept the full 64-bit range
+    /// unless ``RepositoryReadPolicy/requiresSafeIntegers`` is set.
     public static let maximumSafeInteger = 9_007_199_254_740_991
     public static let minimumSafeInteger = -9_007_199_254_740_991
 
@@ -62,13 +66,13 @@ public enum PublicRepositoryRecordCodec {
     /// content-addressed form used by the public blob endpoint. Unresolved
     /// typed values remain rejected.
     ///
-    /// Depth accounting mirrors ``prepare``'s encoder exactly: `depth` names
+    /// Depth accounting mirrors `prepare`'s encoder exactly: `depth` names
     /// the level a *container* occupies, the record object is level 1, and
     /// both objects and arrays advance it. Conversion used to advance only
     /// through arrays, which let this package-public API accept documents its
     /// own encoder would refuse. Nothing already durable can be refused by the
     /// stricter accounting: every stored record was either encoded through
-    /// ``prepare`` or decoded through `RepositoryRecordBlockValidator`, and
+    /// `prepare` or decoded through `RepositoryRecordBlockValidator`, and
     /// both cap object nesting at the same `maximumCBORNestingDepth`.
     public static func publicRecord(
         from value: ATProtocolValueContainer,
@@ -266,13 +270,14 @@ public enum PublicRepositoryRecordCodec {
         guard Set(fields.keys) == allowedKeys,
               fields["$type"] == .string("blob"),
               case let .link(cid)? = fields["ref"],
-              cid.codec == .raw,
-              cid.multihash.algorithm == Multihash.sha256Code,
-              cid.multihash.length == Multihash.sha256Length,
+              cid.blessedKind == .raw,
               case let .string(mimeType)? = fields["mimeType"],
               validBlobMIMEType(mimeType),
               case let .integer(size)? = fields["size"],
-              (0...PublicRepositoryLimits.requiredStreamingCARBytes).contains(size)
+              // The data model only requires a non-negative size. How large a
+              // blob a service accepts is that service's policy, enforced
+              // where blobs are uploaded, not where they are referenced.
+              size >= 0
         else {
             throw PublicRepositoryDomainError.invalidRecordType
         }
@@ -295,12 +300,18 @@ public enum PublicRepositoryRecordCodec {
     }
 
     private static func validatedLink(_ cid: CID) throws -> CID {
-        guard cid.multihash.algorithm == Multihash.sha256Code,
-              cid.multihash.length == Multihash.sha256Length,
-              cid.codec == .raw || cid.codec == .dagCBOR else {
+        guard cid.isBlessed else {
             throw PublicRepositoryDomainError.invalidRecordLink
         }
         return cid
+    }
+
+    /// Encodes any data-model value as canonical DAG-CBOR.
+    ///
+    /// The writer is strict, as the specification asks of writers: integers
+    /// stay within ±(2^53 − 1) and every link is a blessed CID.
+    static func encodeValue(_ value: PublicRecordValue, maximumDepth: Int) throws -> Data {
+        try DAGCBOR.encodeValue(encode(value, depth: 0, maximumDepth: maximumDepth))
     }
 
     public static func prepare(
@@ -417,14 +428,7 @@ public enum PublicRepositoryRecordCodec {
         case let .bytes(value):
             return value
         case let .link(cid):
-            let cidBytes = cid.bytes
-            guard cidBytes.count == 36,
-                  cidBytes[cidBytes.startIndex] == 0x01,
-                  cidBytes[cidBytes.startIndex + 1] == cid.codec.rawValue,
-                  (cid.codec == .raw || cid.codec == .dagCBOR),
-                  cid.multihash.algorithm == Multihash.sha256Code,
-                  cid.multihash.length == Multihash.sha256Length,
-                  cid.multihash.digest.count == 32 else {
+            guard cid.isBlessed else {
                 throw PublicRepositoryDomainError.invalidRecordLink
             }
             return ATProtoLink(cid: cid)

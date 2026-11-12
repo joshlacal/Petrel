@@ -442,9 +442,18 @@ final class PublicRepositoryDomainTests: XCTestCase {
         XCTAssertEqual(pinned.relevantByteCount, PublicRepositoryLimits.pinnedMaximumRelevantBlockBytes)
         XCTAssertEqual(pinned.maximumRelevantBytes, PublicRepositoryLimits.pinnedMaximumRelevantBlockBytes)
 
+        // The commit-diff budget is configurable, so a map may be given a
+        // larger one; only the archive ceiling is refused.
+        XCTAssertEqual(
+            try PublicRepositoryBlockMap(
+                blocks: [],
+                maximumRelevantBytes: PublicRepositoryLimits.pinnedMaximumRelevantBlockBytes + 1
+            ).maximumRelevantBytes,
+            PublicRepositoryLimits.pinnedMaximumRelevantBlockBytes + 1
+        )
         XCTAssertThrowsError(try PublicRepositoryBlockMap(
             blocks: [],
-            maximumRelevantBytes: PublicRepositoryLimits.pinnedMaximumRelevantBlockBytes + 1
+            maximumRelevantBytes: PublicRepositoryLimits.maximumPermittedCARBytes + 1
         )) {
             XCTAssertEqual($0 as? PublicRepositoryDomainError, .relevantBlockBudgetExceeded)
         }

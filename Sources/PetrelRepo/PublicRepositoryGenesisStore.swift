@@ -2,7 +2,7 @@ import Crypto
 import Foundation
 
 /// Public facts persisted for the deliberately narrow empty-repository
-/// substrate. The timestamp records when Swan made the immutable genesis
+/// substrate. The timestamp records when the host made the immutable genesis
 /// visible in the per-account repository database; it is not account-control
 /// state and must never be used as an authorization decision by itself.
 public struct PersistedPublicRepositoryGenesis: Sendable, Equatable {
