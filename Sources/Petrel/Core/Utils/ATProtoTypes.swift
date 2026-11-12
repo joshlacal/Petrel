@@ -122,6 +122,16 @@ extension ATProtocolError: LocalizedError {
 /// accepts both; pass ``Grammar/restricted`` to ``init(uriString:grammar:)`` or
 /// ``isValidATURI(_:grammar:)`` to accept the specification grammar only.
 ///
+/// Accepting both by default follows the Spaces reference implementation:
+/// `@atproto/syntax` `parseAtUriString` hands a URI whose first path segment is
+/// `space` to a separate, equally strict space parser, and Lexicon `at-uri`
+/// validation uses that same check, so a `format: at-uri` field may hold a space
+/// URI. The Spaces endpoints rely on it: `com.atproto.space.createRecord` and its
+/// siblings return the URI of a record inside a space in an `at-uri` field.
+/// Decoding (``init(from:)``) therefore uses the default grammar too. To hold a
+/// decoded value to the specification grammar, check ``isSpace``, or re-validate
+/// with `ATProtocolURI.isValidATURI(uri.uriString(), grammar: .restricted)`.
+///
 /// The string is kept exactly as written; ``normalized()`` returns the
 /// normalized form the specification describes.
 ///
