@@ -37,7 +37,7 @@ import PetrelRepo
 ///
 /// ```swift
 /// let fetcher = OAuthRemoteDocumentFetcher(
-///     policy: OAuthRemoteFetchPolicy(maximumBodyBytes: OAuthLexiconResolutionBudget.maximumCARBytes),
+///     policy: try OAuthRemoteFetchPolicy(), // 256 KiB body limit by default
 ///     transport: pinnedTransport
 /// )
 /// let lexicons = CachingOAuthLexiconResolver(

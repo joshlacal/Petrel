@@ -105,7 +105,10 @@ public struct OAuthAuthorizationServer: Sendable {
     ///   - clients: client discovery. Usually an ``OAuthClientMetadataLoader``.
     ///   - lexiconResolver: resolves `include:` permission sets. Without one,
     ///     a request that names a permission set is refused with
-    ///     `invalid_scope`.
+    ///     `invalid_scope`. The `PetrelOAuthServerLexicon` product provides
+    ///     `AuthenticatedOAuthLexiconResolver`, which verifies each set against
+    ///     its authority's signed repository; wrap it in
+    ///     ``CachingOAuthLexiconResolver``.
     ///   - interface: renders the Authorization Interface.
     ///   - clock: the time source.
     ///   - random: the source of codes, tokens and other opaque values.
