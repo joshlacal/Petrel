@@ -632,8 +632,8 @@ struct PLCDirectoryEndpointTests {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [StubPLCURLProtocol.self]
         let client = try PLCDirectoryClient(
-            configuration: .production(origin: URL(string: "https://plc.test")!, timeout: stubbedExchangeTimeout),
-            transport: URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
+            configuration: .stubbedProduction(origin: URL(string: "https://plc.test")!, timeout: stubbedExchangeTimeout),
+            transport: stubbedURLSessionTransport(configuration: configuration)
         )
         let log = try await client.fetchVerifiedAuditLog(did: did)
         #expect(log.entries.count == 3)

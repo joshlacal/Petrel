@@ -101,7 +101,8 @@ struct DIDResolutionHandleTests {
     func wellKnownResolves() async throws {
         let (http, dns) = fixtures()
         http.on("\(handle)/.well-known/atproto-did", body: alice)
-        let resolver = IdentityResolver.forTesting(http: http, dns: dns)
+        // The library's default options, so the default timeout is what reaches the request.
+        let resolver = IdentityResolver.forTesting(http: http, dns: dns, options: IdentityResolver.Options())
 
         #expect(try await resolver.resolveHandle(handle).didString() == alice)
 
@@ -245,7 +246,7 @@ struct DIDResolutionHandleTests {
     // stops a regression from hanging the run.
     @Test(
         "A DNS query that never answers is abandoned at the timeout and HTTPS answers",
-        .timeLimit(.minutes(1))
+        .timeLimit(.minutes(5))
     )
     func dnsTimeoutDoesNotBlockResolution() async throws {
         let (http, dns) = fixtures()

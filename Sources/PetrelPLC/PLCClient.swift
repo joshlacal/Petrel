@@ -376,8 +376,14 @@ public final class URLSessionPLCTransport: PLCHTTPTransport, @unchecked Sendable
         try self.init(maximumTimeout: maximumTimeout, configuration: configuration)
     }
 
-    init(maximumTimeout: TimeInterval = 10, configuration: URLSessionConfiguration) throws {
-        guard maximumTimeout > 0, maximumTimeout <= 30, maximumTimeout.isFinite else {
+    /// - Parameter timeoutCeiling: The largest `maximumTimeout` accepted. Only
+    ///   tests whose exchanges are answered in-process raise it above 30 s.
+    init(
+        maximumTimeout: TimeInterval = 10,
+        configuration: URLSessionConfiguration,
+        timeoutCeiling: TimeInterval = 30
+    ) throws {
+        guard maximumTimeout > 0, maximumTimeout <= timeoutCeiling, maximumTimeout.isFinite else {
             throw PetrelPLCError.malformed("PLC HTTP transport timeout is invalid")
         }
         self.maximumTimeout = maximumTimeout

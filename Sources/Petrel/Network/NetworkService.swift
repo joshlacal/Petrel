@@ -523,6 +523,9 @@ public actor NetworkService: NetworkServiceProtocol {
     #if DEBUG
         package nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
         package nonisolated(unsafe) static var dnsResolverOverride: (@Sendable (String) -> [String]?)?
+        /// Called with each delay, in seconds, the request loop waits before retrying an HTTP
+        /// error response.
+        package nonisolated(unsafe) static var retryDelayObserver: (@Sendable (Double) -> Void)?
         /// Called by `executeDataTask` after it creates and registers a task, before it starts it.
         package nonisolated(unsafe) static var dataTaskCreatedHook: (@Sendable (URLSessionTask, URLSession) -> Void)?
         package nonisolated(unsafe) static var webSocketTaskOverride: (@Sendable (URLRequest) -> any WebSocketTaskProtocol)?
@@ -1796,6 +1799,9 @@ public actor NetworkService: NetworkServiceProtocol {
                     LogManager.logInfo(
                         "Network Service - Waiting \(String(format: "%.1f", delaySeconds))s before retry \(retryCount)/\(maxRetries)"
                     )
+                    #if DEBUG
+                        Self.retryDelayObserver?(delaySeconds)
+                    #endif
                     try await Task.sleep(nanoseconds: UInt64(delaySeconds * 1_000_000_000))
                     continue // Go to next iteration of the while loop
 

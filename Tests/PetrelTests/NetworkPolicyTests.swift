@@ -114,7 +114,7 @@ struct NetworkPolicyTests {
                 redirectedBarrier.signal()
             }
 
-            try await redirectedBarrier.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
+            try await redirectedBarrier.waitUntilSignaled()
             let redirected = try #require(finalHolder.withLock { $0 })
             #expect(redirected.value(forHTTPHeaderField: "Authorization") == nil)
             #expect(redirected.value(forHTTPHeaderField: "DPoP") == nil)
@@ -140,7 +140,7 @@ struct NetworkPolicyTests {
                 privateHolder.withLock { $0 = req }
                 privateBarrier.signal()
             }
-            try await privateBarrier.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
+            try await privateBarrier.waitUntilSignaled()
             #expect(privateHolder.withLock { $0 } == nil)
 
             // 3. Cleartext redirect to remote destination must be refused (nil)
@@ -432,7 +432,7 @@ struct NetworkPolicyTests {
                 result.withLock { $0 = request }
                 barrier.signal()
             }
-            try await barrier.waitUntilSignaled(timeoutNanoseconds: 2_000_000_000)
+            try await barrier.waitUntilSignaled()
             let redirected = try #require(result.withLock { $0 })
             #expect(redirected.url == target.url)
             #expect(redirected.value(forHTTPHeaderField: "Authorization") == "Bearer secret_token")

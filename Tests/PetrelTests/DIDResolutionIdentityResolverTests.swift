@@ -361,9 +361,9 @@ struct DIDResolutionIdentityResolverTests {
     @Test("Cancellation is thrown as CancellationError, never turned into handle.invalid")
     func cancellationPropagates() async throws {
         let (http, dns) = fixtures()
-        dns.delay("_atproto.\(handle)", seconds: 30)
+        dns.delay("_atproto.\(handle)", seconds: 600)
         http.on("\(handle)/.well-known/atproto-did") { _ in
-            try await Task.sleep(nanoseconds: 30_000_000_000)
+            try await Task.sleep(nanoseconds: 600_000_000_000)
             return IdentityHTTPResponse(statusCode: 404, body: Data())
         }
         let resolver = IdentityResolver.forTesting(http: http, dns: dns)
@@ -592,7 +592,7 @@ struct DIDResolutionIdentityResolverTests {
     @Test("The disabled policy serves nothing from the cache")
     func disabledCache() async throws {
         let (http, dns) = fixtures()
-        let resolver = IdentityResolver.forTesting(http: http, dns: dns, options: .init(cachePolicy: .disabled))
+        let resolver = IdentityResolver.forTesting(http: http, dns: dns, options: .init(timeout: IdentityResolver.Options.stubbed.timeout, cachePolicy: .disabled))
 
         _ = try await resolver.resolveDIDDocument(alice)
         _ = try await resolver.resolveDIDDocument(alice)

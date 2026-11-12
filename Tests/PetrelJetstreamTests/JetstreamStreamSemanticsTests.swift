@@ -90,7 +90,7 @@ struct JetstreamStreamSemanticsTests {
     #expect(await factory.connectedURLs.count == 1)
   }
 
-  @Test("an info event before the first sequence number does not store a timestamp cursor", .timeLimit(.minutes(1)))
+  @Test("an info event before the first sequence number does not store a timestamp cursor", .timeLimit(.minutes(5)))
   func timestampCursorStaysOutOfPersistence() async throws {
     let timestamp: Int64 = 1_725_911_162_329_308
     let info = Data(#"{"$type":"message","payload":{"$type":"network.bsky.jetstream.subscribeEvents#info","name":"OutdatedCursor"}}"#.utf8)

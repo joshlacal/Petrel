@@ -20,7 +20,7 @@ import Testing
   .enabled("URLSession cannot open WebSockets on this platform") {
     await URLSessionWebSocketAvailability.shared.isAvailable()
   },
-  .timeLimit(.minutes(3))
+  .timeLimit(.minutes(5))
 )
 struct JetstreamLoopbackTests {
   static let fastBackoff = FirehoseBackoffConfiguration(initialDelay: 0.01, maxDelay: 0.05, multiplier: 2)

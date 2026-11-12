@@ -407,7 +407,7 @@ struct ModerationMuteWordsTests {
         let decision = try Moderation.moderatePost(
             post("Mute words!"),
             options: options(
-                mutedWords: [ModerationMock.mutedWord("words", expiresAt: Date().addingTimeInterval(1))]
+                mutedWords: [ModerationMock.mutedWord("words", expiresAt: Date().addingTimeInterval(60 * 60))]
             )
         )
         #expect(decision.causes.first?.type == .muteWord)

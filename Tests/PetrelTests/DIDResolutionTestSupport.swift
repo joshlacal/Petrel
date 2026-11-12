@@ -178,12 +178,21 @@ enum IdentityFixtures {
     }
 }
 
+extension IdentityResolver.Options {
+    /// The library defaults, except a timeout no CI stall can outlast. The resolver bounds
+    /// each DNS query with a real deadline even when a test double answers it, and runners
+    /// have frozen test processes for 87 to 129 s; tests about timeouts set their own.
+    static var stubbed: Self {
+        Self(timeout: 5 * 60)
+    }
+}
+
 extension IdentityResolver {
     /// A resolver wired to test doubles and, optionally, a hand-moved clock.
     static func forTesting(
         http: MockIdentityHTTP,
         dns: MockIdentityDNS,
-        options: Options = Options(),
+        options: Options = .stubbed,
         cache: (any IdentityCache)? = nil,
         clock: IdentityTestClock? = nil
     ) -> IdentityResolver {
