@@ -7,70 +7,212 @@
 
 import Foundation
 
-#if os(iOS) || os(macOS) || os(tvOS)
+#if canImport(ImageIO)
+    import CoreGraphics
     import ImageIO
+#endif
+#if os(iOS) || os(macOS) || os(tvOS)
     import UniformTypeIdentifiers
 #endif
 
+/// Why image metadata could not be removed.
+public enum ImageMetadataStrippingError: Error, Sendable, Equatable, CustomStringConvertible {
+    /// The data is declared as an image, but of a format this platform has no
+    /// way to strip. Nothing was removed; do not upload it as if it were clean.
+    /// The associated value is the media type that was declared.
+    case unsupportedImageFormat(String)
+
+    /// The data is declared as an image but its container is damaged,
+    /// truncated or not what it claims to be.
+    case malformedImage
+
+    public var description: String {
+        switch self {
+        case let .unsupportedImageFormat(mimeType):
+            return "Metadata cannot be removed from \(mimeType) images on this platform"
+        case .malformedImage:
+            return "The image is malformed, so its metadata cannot be removed safely"
+        }
+    }
+}
+
+/// Removes identifying metadata from images before they are uploaded.
+///
+/// Photos carry more than pixels: where they were taken (GPS), when, with
+/// which device, sometimes the owner's name, and thumbnails of the picture
+/// before it was cropped. ``stripMetadata(from:mimeType:)`` removes all of it
+/// and keeps what is needed to show the image correctly: the pixels, the
+/// colour profile and the orientation.
 public class ImageMetadataStripper {
-    public static func stripMetadata(from imageData: Data) -> Data? {
-        #if os(iOS) || os(macOS) || os(tvOS)
-            guard let source = CGImageSourceCreateWithData(imageData as CFData, nil) else {
-                LogManager.logError("ImageMetadataStripper - Failed to create image source")
-                return nil
-            }
+    /// The media types handled by lossless, pure-Swift container rewriting.
+    private static let containerTypes: Set<String> = [
+        "image/jpeg", "image/jpg", "image/pjpeg", "image/png", "image/apng", "image/webp", "image/gif",
+    ]
 
-            let mutableData = NSMutableData()
+    /// Removes metadata from image data, keeping its format.
+    ///
+    /// - JPEG, PNG, WebP and GIF are rewritten losslessly on every platform:
+    ///   metadata blocks are left out and the compressed image data is copied
+    ///   as it is, so the pixels do not change and nothing is re-encoded. The
+    ///   container is recognised from the data itself, so a mislabelled image
+    ///   of one of these formats is still stripped.
+    /// - Other image types (HEIC, HEIF, AVIF, TIFF, …) are decoded and written
+    ///   back in the same format by ImageIO on Apple platforms. Elsewhere they
+    ///   are refused with ``ImageMetadataStrippingError/unsupportedImageFormat(_:)``.
+    /// - Data whose media type is not `image/*` is returned unchanged.
+    ///
+    /// Removed: EXIF (including GPS and maker notes), XMP, IPTC, comments,
+    /// text chunks, timestamps, embedded thumbnails and anything appended
+    /// after the end of the image. Kept: pixels, ICC colour profile,
+    /// transparency, animation, pixel density, and the orientation (as an
+    /// EXIF block containing only that one value, when the image is rotated).
+    ///
+    /// The result always has the same media type as the input.
+    ///
+    /// - Parameters:
+    ///   - data: The file contents.
+    ///   - mimeType: The media type the data will be uploaded as. Matched
+    ///     case-insensitively; parameters after `;` are ignored.
+    /// - Returns: The data without metadata.
+    /// - Throws: ``ImageMetadataStrippingError``. On any error nothing was
+    ///   stripped and the data must be treated as still carrying metadata.
+    public static func stripMetadata(from data: Data, mimeType: String) throws -> Data {
+        let type = normalizedMediaType(mimeType)
+        guard type.hasPrefix("image/") else { return data }
 
-            guard let imageType = CGImageSourceGetType(source) else {
-                LogManager.logError("ImageMetadataStripper - Failed to get image type")
-                return nil
-            }
-
-            guard
-                let destination = CGImageDestinationCreateWithData(
-                    mutableData, imageType, 1, nil
-                )
-            else {
-                LogManager.logError("ImageMetadataStripper - Failed to create image destination")
-                return nil
-            }
-
-            guard let imageProperties = CGImageSourceCopyPropertiesAtIndex(source, 0, nil) as? [String: Any]
-            else {
-                LogManager.logError("ImageMetadataStripper - Failed to copy image properties")
-                return nil
-            }
-
-            var strippedProperties = imageProperties
-
-            // Remove EXIF data
-            strippedProperties[kCGImagePropertyExifDictionary as String] = nil
-
-            // Remove GPS data
-            strippedProperties[kCGImagePropertyGPSDictionary as String] = nil
-
-            // Remove TIFF data
-            strippedProperties[kCGImagePropertyTIFFDictionary as String] = nil
-
-            // Remove IPTC data
-            strippedProperties[kCGImagePropertyIPTCDictionary as String] = nil
-
-            CGImageDestinationAddImageFromSource(destination, source, 0, strippedProperties as CFDictionary)
-
-            guard CGImageDestinationFinalize(destination) else {
-                LogManager.logError("ImageMetadataStripper - Failed to finalize image destination")
-                return nil
-            }
-
-            return mutableData as Data
+        let bytes = [UInt8](data)
+        if let container = ImageContainerSurgery.sniff(bytes) {
+            return try Data(ImageContainerSurgery.strip(bytes, as: container))
+        }
+        guard !containerTypes.contains(type) else {
+            // Declared as a format we know how to walk, but the bytes are not that format.
+            throw ImageMetadataStrippingError.malformedImage
+        }
+        #if canImport(ImageIO)
+            return try reencodeWithoutMetadata(data, mimeType: type)
         #else
-            // On non-Apple platforms (such as Linux), ImageIO metadata stripping is unavailable.
-            // Fail closed by returning nil to prevent leaking unsanitized metadata.
-            LogManager.logError("ImageMetadataStripper - Metadata stripping not available on this platform")
+            throw ImageMetadataStrippingError.unsupportedImageFormat(type)
+        #endif
+    }
+
+    /// Removes metadata from image data whose format is recognised from the data itself.
+    ///
+    /// JPEG, PNG, WebP and GIF are rewritten losslessly in their own format;
+    /// other images are re-encoded in their own format by ImageIO on Apple
+    /// platforms. Prefer ``stripMetadata(from:mimeType:)``, which reports why
+    /// stripping failed and passes non-image data through.
+    ///
+    /// - Returns: The data without metadata, or `nil` when it is not an image
+    ///   this platform can strip. `nil` means the metadata is still there.
+    public static func stripMetadata(from imageData: Data) -> Data? {
+        let bytes = [UInt8](imageData)
+        if let container = ImageContainerSurgery.sniff(bytes) {
+            guard let stripped = try? ImageContainerSurgery.strip(bytes, as: container) else {
+                LogManager.logError("ImageMetadataStripper - Malformed image; metadata not removed")
+                return nil
+            }
+            return Data(stripped)
+        }
+        #if canImport(ImageIO)
+            guard let stripped = try? reencodeWithoutMetadata(imageData, mimeType: "image/*") else {
+                LogManager.logError("ImageMetadataStripper - Could not re-encode image without metadata")
+                return nil
+            }
+            return stripped
+        #else
+            // Fail closed: without ImageIO only the pure-Swift containers can be stripped.
+            LogManager.logError("ImageMetadataStripper - Metadata stripping not available for this format on this platform")
             return nil
         #endif
     }
+
+    private static func normalizedMediaType(_ mimeType: String) -> String {
+        let essence = mimeType.split(separator: ";", maxSplits: 1, omittingEmptySubsequences: false).first ?? ""
+        return essence.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
+    #if canImport(ImageIO)
+        /// Decodes every frame and writes it back in the same format with no
+        /// properties other than orientation.
+        ///
+        /// Nothing is copied from the source's metadata: the destination only
+        /// ever sees pixels (with their colour space) and the orientation.
+        private static func reencodeWithoutMetadata(_ data: Data, mimeType: String) throws -> Data {
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil),
+                  let type = CGImageSourceGetType(source)
+            else {
+                throw ImageMetadataStrippingError.malformedImage
+            }
+            let count = CGImageSourceGetCount(source)
+            guard count > 0 else { throw ImageMetadataStrippingError.malformedImage }
+
+            let output = NSMutableData()
+            guard let destination = CGImageDestinationCreateWithData(output, type, count, nil) else {
+                // ImageIO can read this format but not write it.
+                throw ImageMetadataStrippingError.unsupportedImageFormat(mimeType)
+            }
+            for index in 0 ..< count {
+                guard let image = CGImageSourceCreateImageAtIndex(source, index, nil) else {
+                    throw ImageMetadataStrippingError.malformedImage
+                }
+                var properties: [CFString: Any] = [kCGImageDestinationLossyCompressionQuality: 0.92]
+                if let sourceProperties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any],
+                   let orientation = sourceProperties[kCGImagePropertyOrientation]
+                {
+                    properties[kCGImagePropertyOrientation] = orientation
+                }
+                CGImageDestinationAddImage(destination, image, properties as CFDictionary)
+            }
+            guard CGImageDestinationFinalize(destination) else {
+                throw ImageMetadataStrippingError.unsupportedImageFormat(mimeType)
+            }
+
+            let result = output as Data
+            guard hasNoIdentifyingProperties(result) else {
+                // Never hand back data that still identifies its author.
+                throw ImageMetadataStrippingError.unsupportedImageFormat(mimeType)
+            }
+            return result
+        }
+
+        /// Confirms that re-encoded data carries no location, authorship or device properties.
+        private static func hasNoIdentifyingProperties(_ data: Data) -> Bool {
+            guard let source = CGImageSourceCreateWithData(data as CFData, nil) else { return false }
+            let forbiddenDictionaries = [
+                kCGImagePropertyGPSDictionary, kCGImagePropertyIPTCDictionary, kCGImagePropertyMakerAppleDictionary,
+            ]
+            let forbiddenTIFF = [
+                kCGImagePropertyTIFFMake, kCGImagePropertyTIFFModel, kCGImagePropertyTIFFArtist,
+                kCGImagePropertyTIFFCopyright, kCGImagePropertyTIFFDateTime, kCGImagePropertyTIFFHostComputer,
+                kCGImagePropertyTIFFImageDescription,
+            ]
+            let forbiddenExif = [
+                kCGImagePropertyExifDateTimeOriginal, kCGImagePropertyExifDateTimeDigitized,
+                kCGImagePropertyExifMakerNote, kCGImagePropertyExifUserComment, kCGImagePropertyExifLensMake,
+                kCGImagePropertyExifLensModel, kCGImagePropertyExifLensSerialNumber,
+                kCGImagePropertyExifBodySerialNumber, kCGImagePropertyExifCameraOwnerName,
+            ]
+            for index in 0 ..< CGImageSourceGetCount(source) {
+                guard let properties = CGImageSourceCopyPropertiesAtIndex(source, index, nil) as? [CFString: Any] else {
+                    continue
+                }
+                if forbiddenDictionaries.contains(where: { properties[$0] != nil }) {
+                    return false
+                }
+                if let tiff = properties[kCGImagePropertyTIFFDictionary] as? [CFString: Any],
+                   forbiddenTIFF.contains(where: { tiff[$0] != nil })
+                {
+                    return false
+                }
+                if let exif = properties[kCGImagePropertyExifDictionary] as? [CFString: Any],
+                   forbiddenExif.contains(where: { exif[$0] != nil })
+                {
+                    return false
+                }
+            }
+            return true
+        }
+    #endif
 
     // MARK: - MIME Type Detection
 

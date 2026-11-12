@@ -1,0 +1,164 @@
+[
+  {
+    "blurs": "content",
+    "severity": "alert",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  },
+  {
+    "blurs": "content",
+    "severity": "inform",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  },
+  {
+    "blurs": "content",
+    "severity": "none",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  },
+  {
+    "blurs": "media",
+    "severity": "alert",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  },
+  {
+    "blurs": "media",
+    "severity": "inform",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  },
+  {
+    "blurs": "media",
+    "severity": "none",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  },
+  {
+    "blurs": "none",
+    "severity": "alert",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  },
+  {
+    "blurs": "none",
+    "severity": "inform",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  },
+  {
+    "blurs": "none",
+    "severity": "none",
+    "account": {
+      "profileList": [
+        "filter"
+      ],
+      "contentList": [
+        "filter"
+      ]
+    },
+    "profile": {},
+    "post": {
+      "contentList": [
+        "filter"
+      ]
+    }
+  }
+]

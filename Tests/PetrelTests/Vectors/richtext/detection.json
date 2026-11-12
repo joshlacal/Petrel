@@ -1,0 +1,1141 @@
+{
+  "segments": [
+    {
+      "text": "no mention",
+      "segments": [
+        [
+          "no mention"
+        ]
+      ]
+    },
+    {
+      "text": "@handle.com middle end",
+      "segments": [
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ],
+        [
+          " middle end"
+        ]
+      ]
+    },
+    {
+      "text": "start @handle.com end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "start middle @handle.com",
+      "segments": [
+        [
+          "start middle "
+        ],
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ]
+      ]
+    },
+    {
+      "text": "@handle.com @handle.com @handle.com",
+      "segments": [
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ],
+        [
+          " "
+        ],
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ],
+        [
+          " "
+        ],
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ]
+      ]
+    },
+    {
+      "text": "@full123-chars.test",
+      "segments": [
+        [
+          "@full123-chars.test",
+          "did:fake:full123-chars.test"
+        ]
+      ]
+    },
+    {
+      "text": "not@right",
+      "segments": [
+        [
+          "not@right"
+        ]
+      ]
+    },
+    {
+      "text": "@handle.com!@#$chars",
+      "segments": [
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ],
+        [
+          "!@#$chars"
+        ]
+      ]
+    },
+    {
+      "text": "@handle.com\n@handle.com",
+      "segments": [
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ],
+        [
+          "\n"
+        ],
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ]
+      ]
+    },
+    {
+      "text": "parenthetical (@handle.com)",
+      "segments": [
+        [
+          "parenthetical ("
+        ],
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ],
+        [
+          ")"
+        ]
+      ]
+    },
+    {
+      "text": "👨‍👩‍👧‍👧 @handle.com 👨‍👩‍👧‍👧",
+      "segments": [
+        [
+          "👨‍👩‍👧‍👧 "
+        ],
+        [
+          "@handle.com",
+          "did:fake:handle.com"
+        ],
+        [
+          " 👨‍👩‍👧‍👧"
+        ]
+      ]
+    },
+    {
+      "text": "start https://middle.com end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "https://middle.com",
+          "https://middle.com"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "start https://middle.com/foo/bar end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "https://middle.com/foo/bar",
+          "https://middle.com/foo/bar"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "start https://middle.com/foo/bar?baz=bux end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "https://middle.com/foo/bar?baz=bux",
+          "https://middle.com/foo/bar?baz=bux"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "start https://middle.com/foo/bar?baz=bux#hash end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "https://middle.com/foo/bar?baz=bux#hash",
+          "https://middle.com/foo/bar?baz=bux#hash"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "https://start.com/foo/bar?baz=bux#hash middle end",
+      "segments": [
+        [
+          "https://start.com/foo/bar?baz=bux#hash",
+          "https://start.com/foo/bar?baz=bux#hash"
+        ],
+        [
+          " middle end"
+        ]
+      ]
+    },
+    {
+      "text": "start middle https://end.com/foo/bar?baz=bux#hash",
+      "segments": [
+        [
+          "start middle "
+        ],
+        [
+          "https://end.com/foo/bar?baz=bux#hash",
+          "https://end.com/foo/bar?baz=bux#hash"
+        ]
+      ]
+    },
+    {
+      "text": "https://newline1.com\nhttps://newline2.com",
+      "segments": [
+        [
+          "https://newline1.com",
+          "https://newline1.com"
+        ],
+        [
+          "\n"
+        ],
+        [
+          "https://newline2.com",
+          "https://newline2.com"
+        ]
+      ]
+    },
+    {
+      "text": "👨‍👩‍👧‍👧 https://middle.com 👨‍👩‍👧‍👧",
+      "segments": [
+        [
+          "👨‍👩‍👧‍👧 "
+        ],
+        [
+          "https://middle.com",
+          "https://middle.com"
+        ],
+        [
+          " 👨‍👩‍👧‍👧"
+        ]
+      ]
+    },
+    {
+      "text": "start middle.com end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "middle.com",
+          "https://middle.com"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "start middle.com/foo/bar end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "middle.com/foo/bar",
+          "https://middle.com/foo/bar"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "start middle.com/foo/bar?baz=bux end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "middle.com/foo/bar?baz=bux",
+          "https://middle.com/foo/bar?baz=bux"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "start middle.com/foo/bar?baz=bux#hash end",
+      "segments": [
+        [
+          "start "
+        ],
+        [
+          "middle.com/foo/bar?baz=bux#hash",
+          "https://middle.com/foo/bar?baz=bux#hash"
+        ],
+        [
+          " end"
+        ]
+      ]
+    },
+    {
+      "text": "start.com/foo/bar?baz=bux#hash middle end",
+      "segments": [
+        [
+          "start.com/foo/bar?baz=bux#hash",
+          "https://start.com/foo/bar?baz=bux#hash"
+        ],
+        [
+          " middle end"
+        ]
+      ]
+    },
+    {
+      "text": "start middle end.com/foo/bar?baz=bux#hash",
+      "segments": [
+        [
+          "start middle "
+        ],
+        [
+          "end.com/foo/bar?baz=bux#hash",
+          "https://end.com/foo/bar?baz=bux#hash"
+        ]
+      ]
+    },
+    {
+      "text": "newline1.com\nnewline2.com",
+      "segments": [
+        [
+          "newline1.com",
+          "https://newline1.com"
+        ],
+        [
+          "\n"
+        ],
+        [
+          "newline2.com",
+          "https://newline2.com"
+        ]
+      ]
+    },
+    {
+      "text": "a example.com/index.php php link",
+      "segments": [
+        [
+          "a "
+        ],
+        [
+          "example.com/index.php",
+          "https://example.com/index.php"
+        ],
+        [
+          " php link"
+        ]
+      ]
+    },
+    {
+      "text": "a trailing bsky.app: colon",
+      "segments": [
+        [
+          "a trailing "
+        ],
+        [
+          "bsky.app",
+          "https://bsky.app"
+        ],
+        [
+          ": colon"
+        ]
+      ]
+    },
+    {
+      "text": "not.. a..url ..here",
+      "segments": [
+        [
+          "not.. a..url ..here"
+        ]
+      ]
+    },
+    {
+      "text": "e.g.",
+      "segments": [
+        [
+          "e.g."
+        ]
+      ]
+    },
+    {
+      "text": "something-cool.jpg",
+      "segments": [
+        [
+          "something-cool.jpg"
+        ]
+      ]
+    },
+    {
+      "text": "website.com.jpg",
+      "segments": [
+        [
+          "website.com.jpg"
+        ]
+      ]
+    },
+    {
+      "text": "e.g./foo",
+      "segments": [
+        [
+          "e.g./foo"
+        ]
+      ]
+    },
+    {
+      "text": "website.com.jpg/foo",
+      "segments": [
+        [
+          "website.com.jpg/foo"
+        ]
+      ]
+    },
+    {
+      "text": "Classic article https://socket3.wordpress.com/2018/02/03/designing-windows-95s-user-interface/",
+      "segments": [
+        [
+          "Classic article "
+        ],
+        [
+          "https://socket3.wordpress.com/2018/02/03/designing-windows-95s-user-interface/",
+          "https://socket3.wordpress.com/2018/02/03/designing-windows-95s-user-interface/"
+        ]
+      ]
+    },
+    {
+      "text": "Classic article https://socket3.wordpress.com/2018/02/03/designing-windows-95s-user-interface/ ",
+      "segments": [
+        [
+          "Classic article "
+        ],
+        [
+          "https://socket3.wordpress.com/2018/02/03/designing-windows-95s-user-interface/",
+          "https://socket3.wordpress.com/2018/02/03/designing-windows-95s-user-interface/"
+        ],
+        [
+          " "
+        ]
+      ]
+    },
+    {
+      "text": "https://foo.com https://bar.com/whatever https://baz.com",
+      "segments": [
+        [
+          "https://foo.com",
+          "https://foo.com"
+        ],
+        [
+          " "
+        ],
+        [
+          "https://bar.com/whatever",
+          "https://bar.com/whatever"
+        ],
+        [
+          " "
+        ],
+        [
+          "https://baz.com",
+          "https://baz.com"
+        ]
+      ]
+    },
+    {
+      "text": "punctuation https://foo.com, https://bar.com/whatever; https://baz.com.",
+      "segments": [
+        [
+          "punctuation "
+        ],
+        [
+          "https://foo.com",
+          "https://foo.com"
+        ],
+        [
+          ", "
+        ],
+        [
+          "https://bar.com/whatever",
+          "https://bar.com/whatever"
+        ],
+        [
+          "; "
+        ],
+        [
+          "https://baz.com",
+          "https://baz.com"
+        ],
+        [
+          "."
+        ]
+      ]
+    },
+    {
+      "text": "parenthentical (https://foo.com)",
+      "segments": [
+        [
+          "parenthentical ("
+        ],
+        [
+          "https://foo.com",
+          "https://foo.com"
+        ],
+        [
+          ")"
+        ]
+      ]
+    },
+    {
+      "text": "except for https://foo.com/thing_(cool)",
+      "segments": [
+        [
+          "except for "
+        ],
+        [
+          "https://foo.com/thing_(cool)",
+          "https://foo.com/thing_(cool)"
+        ]
+      ]
+    }
+  ],
+  "tags": [
+    {
+      "text": "#a",
+      "tags": [
+        "a"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 2
+        }
+      ]
+    },
+    {
+      "text": "#a #b",
+      "tags": [
+        "a",
+        "b"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 2
+        },
+        {
+          "byteStart": 3,
+          "byteEnd": 5
+        }
+      ]
+    },
+    {
+      "text": "#1",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "#1a",
+      "tags": [
+        "1a"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 3
+        }
+      ]
+    },
+    {
+      "text": "#tag",
+      "tags": [
+        "tag"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 4
+        }
+      ]
+    },
+    {
+      "text": "body #tag",
+      "tags": [
+        "tag"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 9
+        }
+      ]
+    },
+    {
+      "text": "#tag body",
+      "tags": [
+        "tag"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 4
+        }
+      ]
+    },
+    {
+      "text": "body #tag body",
+      "tags": [
+        "tag"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 9
+        }
+      ]
+    },
+    {
+      "text": "body #1",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "body #1a",
+      "tags": [
+        "1a"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 8
+        }
+      ]
+    },
+    {
+      "text": "body #a1",
+      "tags": [
+        "a1"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 8
+        }
+      ]
+    },
+    {
+      "text": "#",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "#?",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "text #",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "text # text",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "body #thisisa64characterstring_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "tags": [
+        "thisisa64characterstring_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 70
+        }
+      ]
+    },
+    {
+      "text": "body #thisisa65characterstring_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaab",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "body #thisisa64characterstring_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa!",
+      "tags": [
+        "thisisa64characterstring_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 70
+        }
+      ]
+    },
+    {
+      "text": "its a #double#rainbow",
+      "tags": [
+        "double#rainbow"
+      ],
+      "indices": [
+        {
+          "byteStart": 6,
+          "byteEnd": 21
+        }
+      ]
+    },
+    {
+      "text": "##hashash",
+      "tags": [
+        "#hashash"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 9
+        }
+      ]
+    },
+    {
+      "text": "##",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "some #n0n3s@n5e!",
+      "tags": [
+        "n0n3s@n5e"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 15
+        }
+      ]
+    },
+    {
+      "text": "works #with,punctuation",
+      "tags": [
+        "with,punctuation"
+      ],
+      "indices": [
+        {
+          "byteStart": 6,
+          "byteEnd": 23
+        }
+      ]
+    },
+    {
+      "text": "strips trailing #punctuation, #like. #this!",
+      "tags": [
+        "punctuation",
+        "like",
+        "this"
+      ],
+      "indices": [
+        {
+          "byteStart": 16,
+          "byteEnd": 28
+        },
+        {
+          "byteStart": 30,
+          "byteEnd": 35
+        },
+        {
+          "byteStart": 37,
+          "byteEnd": 42
+        }
+      ]
+    },
+    {
+      "text": "strips #multi_trailing___...",
+      "tags": [
+        "multi_trailing"
+      ],
+      "indices": [
+        {
+          "byteStart": 7,
+          "byteEnd": 22
+        }
+      ]
+    },
+    {
+      "text": "works with #🦋 emoji, and #butter🦋fly",
+      "tags": [
+        "🦋",
+        "butter🦋fly"
+      ],
+      "indices": [
+        {
+          "byteStart": 11,
+          "byteEnd": 16
+        },
+        {
+          "byteStart": 28,
+          "byteEnd": 42
+        }
+      ]
+    },
+    {
+      "text": "#same #same #but #diff",
+      "tags": [
+        "same",
+        "same",
+        "but",
+        "diff"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 5
+        },
+        {
+          "byteStart": 6,
+          "byteEnd": 11
+        },
+        {
+          "byteStart": 12,
+          "byteEnd": 16
+        },
+        {
+          "byteStart": 17,
+          "byteEnd": 22
+        }
+      ]
+    },
+    {
+      "text": "this #️⃣tag should not be a tag",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "this ##️⃣tag should be a tag",
+      "tags": [
+        "#️⃣tag"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 16
+        }
+      ]
+    },
+    {
+      "text": "this #t\nag should be a tag",
+      "tags": [
+        "t"
+      ],
+      "indices": [
+        {
+          "byteStart": 5,
+          "byteEnd": 7
+        }
+      ]
+    },
+    {
+      "text": "no match (\\u200B): #​",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "no match (\\u200Ba): #​a",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "match (a\\u200Bb): #a​b",
+      "tags": [
+        "a"
+      ],
+      "indices": [
+        {
+          "byteStart": 18,
+          "byteEnd": 20
+        }
+      ]
+    },
+    {
+      "text": "match (ab\\u200B): #ab​",
+      "tags": [
+        "ab"
+      ],
+      "indices": [
+        {
+          "byteStart": 18,
+          "byteEnd": 21
+        }
+      ]
+    },
+    {
+      "text": "no match (\\u20e2tag): #⃢tag",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "no match (a\\u20e2b): #a⃢b",
+      "tags": [
+        "a"
+      ],
+      "indices": [
+        {
+          "byteStart": 21,
+          "byteEnd": 23
+        }
+      ]
+    },
+    {
+      "text": "match full width number sign (tag): ＃tag",
+      "tags": [
+        "tag"
+      ],
+      "indices": [
+        {
+          "byteStart": 36,
+          "byteEnd": 42
+        }
+      ]
+    },
+    {
+      "text": "match full width number sign (tag): ＃#️⃣tag",
+      "tags": [
+        "#️⃣tag"
+      ],
+      "indices": [
+        {
+          "byteStart": 36,
+          "byteEnd": 49
+        }
+      ]
+    },
+    {
+      "text": "no match 1?: #1?",
+      "tags": [],
+      "indices": []
+    }
+  ],
+  "cashtags": [
+    {
+      "text": "$AAPL",
+      "tags": [
+        "$AAPL"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 5
+        }
+      ]
+    },
+    {
+      "text": "$aapl",
+      "tags": [
+        "$AAPL"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 5
+        }
+      ]
+    },
+    {
+      "text": "$A",
+      "tags": [
+        "$A"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 2
+        }
+      ]
+    },
+    {
+      "text": "$a",
+      "tags": [
+        "$A"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 2
+        }
+      ]
+    },
+    {
+      "text": "$BTC $ETH",
+      "tags": [
+        "$BTC",
+        "$ETH"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 4
+        },
+        {
+          "byteStart": 5,
+          "byteEnd": 9
+        }
+      ]
+    },
+    {
+      "text": "$100",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "$GOOGL",
+      "tags": [
+        "$GOOGL"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 6
+        }
+      ]
+    },
+    {
+      "text": "$TOOLONG",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "check $LEGO now",
+      "tags": [
+        "$LEGO"
+      ],
+      "indices": [
+        {
+          "byteStart": 6,
+          "byteEnd": 11
+        }
+      ]
+    },
+    {
+      "text": "($GOOG)",
+      "tags": [
+        "$GOOG"
+      ],
+      "indices": [
+        {
+          "byteStart": 1,
+          "byteEnd": 6
+        }
+      ]
+    },
+    {
+      "text": "$AAPL.",
+      "tags": [
+        "$AAPL"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 5
+        }
+      ]
+    },
+    {
+      "text": "$AAPL, $MSFT!",
+      "tags": [
+        "$AAPL",
+        "$MSFT"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 5
+        },
+        {
+          "byteStart": 7,
+          "byteEnd": 12
+        }
+      ]
+    },
+    {
+      "text": "no$SPACE",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "$",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "$ AAPL",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "$123ABC",
+      "tags": [],
+      "indices": []
+    },
+    {
+      "text": "$ABC12",
+      "tags": [
+        "$ABC12"
+      ],
+      "indices": [
+        {
+          "byteStart": 0,
+          "byteEnd": 6
+        }
+      ]
+    },
+    {
+      "text": "$ABC123",
+      "tags": [],
+      "indices": []
+    }
+  ]
+}
