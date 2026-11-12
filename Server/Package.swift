@@ -12,15 +12,15 @@ let package = Package(
     .executable(name: "petrel-oauth-server-example", targets: ["petrel-oauth-server-example"]),
   ],
   dependencies: [
-    .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.25.0"),
+    .package(url: "https://github.com/hummingbird-project/hummingbird.git", from: "2.26.0"),
     .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.8.2"),
-    .package(url: "https://github.com/apple/swift-log.git", from: "1.0.0"),
-    .package(url: "https://github.com/apple/swift-crypto.git", from: "3.0.0"),
+    .package(url: "https://github.com/apple/swift-log.git", from: "1.15.1"),
+    .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1" ..< "6.0.0"),
     // Already in the graph through Hummingbird; named so the pinned transport
     // can use them directly.
-    .package(url: "https://github.com/apple/swift-nio.git", from: "2.81.0"),
-    .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.29.0"),
-    .package(url: "https://github.com/apple/swift-certificates.git", from: "1.0.0"),
+    .package(url: "https://github.com/apple/swift-nio.git", from: "2.105.0"),
+    .package(url: "https://github.com/apple/swift-nio-ssl.git", from: "2.37.6"),
+    .package(url: "https://github.com/apple/swift-certificates.git", from: "1.21.1"),
     .package(name: "Petrel", path: ".."),
   ],
   targets: [
