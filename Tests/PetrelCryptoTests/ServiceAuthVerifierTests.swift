@@ -1220,6 +1220,57 @@ struct ServiceAuthSupportTests {
         #expect(await upstream.refreshFlags == [false, true])
     }
 
+    /// Ordinary lookups block until released and return the old key; forced
+    /// refreshes return the rotated key at once.
+    actor RotatingGatedResolver: ServiceAuthKeyResolver {
+        let oldKey: ATProtoPublicKey
+        let newKey: ATProtoPublicKey
+        private(set) var ordinaryCalls = 0
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        init(oldKey: ATProtoPublicKey, newKey: ATProtoPublicKey) {
+            self.oldKey = oldKey
+            self.newKey = newKey
+        }
+
+        func signingKey(for did: String, forceRefresh: Bool) async throws -> ATProtoPublicKey {
+            try await signingKey(for: did, keyID: "#atproto", forceRefresh: forceRefresh)
+        }
+
+        func signingKey(for did: String, keyID: String, forceRefresh: Bool) async throws -> ATProtoPublicKey {
+            if forceRefresh { return newKey }
+            ordinaryCalls += 1
+            await withCheckedContinuation { waiters.append($0) }
+            return oldKey
+        }
+
+        func releaseOrdinary() {
+            for waiter in waiters { waiter.resume() }
+            waiters.removeAll()
+        }
+    }
+
+    @Test("Every caller sharing a slow ordinary fetch gets the key a faster forced refresh learned")
+    func sharedOrdinaryFetchSeesNewerRefresh() async throws {
+        let oldKey = K256Keypair.generate().publicKey
+        let newKey = K256Keypair.generate().publicKey
+        let upstream = RotatingGatedResolver(oldKey: oldKey, newKey: newKey)
+        let resolver = CachingServiceAuthKeyResolver(upstream: upstream, minimumRefreshInterval: 30)
+        let did = ServiceAuthFixture.issuer
+
+        let owner = Task { try await resolver.signingKey(for: did, forceRefresh: false) }
+        while await upstream.ordinaryCalls == 0 { await Task.yield() }
+        let joiner = Task { try await resolver.signingKey(for: did, forceRefresh: false) }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        #expect(try await resolver.signingKey(for: did, forceRefresh: true) == newKey)
+        await upstream.releaseOrdinary()
+
+        #expect(try await owner.value == newKey)
+        #expect(try await joiner.value == newKey)
+        #expect(await upstream.ordinaryCalls == 1)
+        #expect(try await resolver.signingKey(for: did, forceRefresh: false) == newKey)
+    }
+
     @Test("Callers sharing a failed fetch all see the error, and the next lookup retries")
     func cachingResolverSharesFailures() async throws {
         struct Offline: Error {}

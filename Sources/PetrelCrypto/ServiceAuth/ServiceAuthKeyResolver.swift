@@ -225,22 +225,34 @@ public actor CachingServiceAuthKeyResolver: ServiceAuthKeyResolver {
         let upstream = upstream
         let refresh = forceRefresh || entries[cacheKey] != nil
         let fetchKey = FetchKey(cacheKey: cacheKey, refresh: refresh)
+        // The task stores its result and hands every caller sharing it the
+        // reconciled key, not the raw upstream answer.
         let fetch = Task<ATProtoPublicKey, any Error> {
-            try await upstream.signingKey(for: did, keyID: keyID, forceRefresh: refresh)
+            let key = try await upstream.signingKey(for: did, keyID: keyID, forceRefresh: refresh)
+            return self.store(key, for: cacheKey, refreshed: refresh, requestedAt: now)
         }
         inFlight[fetchKey] = fetch
         let result = await fetch.result
         inFlight[fetchKey] = nil
-        let key = try result.get()
+        return try result.get()
+    }
+
+    /// Caches a fetched key and returns the key callers should use.
+    private func store(
+        _ key: ATProtoPublicKey,
+        for cacheKey: CacheKey,
+        refreshed: Bool,
+        requestedAt: Date
+    ) -> ATProtoPublicKey {
         // A refresh that started after this ordinary fetch and finished
         // first holds the newer key; do not replace it with a possibly stale one.
-        if !refresh, let newer = entries[cacheKey], newer.wasRefreshed, newer.fetchedAt >= now {
+        if !refreshed, let newer = entries[cacheKey], newer.wasRefreshed, newer.fetchedAt >= requestedAt {
             return newer.key
         }
         if entries[cacheKey] == nil, entries.count >= capacity {
             evictOldest()
         }
-        entries[cacheKey] = Entry(key: key, fetchedAt: clock(), wasRefreshed: refresh)
+        entries[cacheKey] = Entry(key: key, fetchedAt: clock(), wasRefreshed: refreshed)
         return key
     }
 
