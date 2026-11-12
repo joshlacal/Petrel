@@ -12,6 +12,9 @@ struct ServiceAuthIdentityResolverTests {
     static let labeler = "did:web:labeler.example.com"
     static let audience = "did:web:feed.example.com#bsky_fg"
     static let method = "app.bsky.feed.getFeedSkeleton"
+    /// Every token is minted and verified at this instant, so a stalled
+    /// runner cannot expire one between the two.
+    static let now = Date(timeIntervalSince1970: 1_700_000_000)
 
     static func method(_ did: String, _ fragment: String, _ key: ATProtoPublicKey) -> [String: String] {
         ["id": "\(did)\(fragment)", "type": "Multikey", "controller": did, "publicKeyMultibase": key.multikey]
@@ -24,7 +27,8 @@ struct ServiceAuthIdentityResolverTests {
         keyID: String? = nil
     ) async throws -> String {
         try await ServiceJWT.bearerAuthorization(ServiceJWT.mint(
-            issuer: issuer, audience: audience, lexiconMethod: lexiconMethod, signer: signer, keyID: keyID
+            issuer: issuer, audience: audience, lexiconMethod: lexiconMethod, signer: signer, keyID: keyID,
+            now: now
         ))
     }
 
@@ -45,7 +49,8 @@ struct ServiceAuthIdentityResolverTests {
         )
         let caller = try await verifier.verify(
             authorizationHeader: try await Self.mint(keypair),
-            method: .exactly("app.bsky.feed.getFeedSkeleton")
+            method: .exactly("app.bsky.feed.getFeedSkeleton"),
+            now: Self.now
         )
 
         #expect(caller.issuer == Self.account)
@@ -53,7 +58,7 @@ struct ServiceAuthIdentityResolverTests {
         #expect(caller.algorithm == curve.jwtAlgorithm)
         // A second request from the same account costs no further fetch.
         _ = try await verifier.verify(
-            authorizationHeader: try await Self.mint(keypair), method: .exactly(Self.method)
+            authorizationHeader: try await Self.mint(keypair), method: .exactly(Self.method), now: Self.now
         )
         #expect(http.requestCount(containing: "plc.directory") == 1)
     }
@@ -71,7 +76,7 @@ struct ServiceAuthIdentityResolverTests {
         let verifier = ServiceAuthVerifier(audience: .exactly(Self.audience), keyResolver: resolver)
 
         _ = try await verifier.verify(
-            authorizationHeader: try await Self.mint(oldKey), method: .exactly(Self.method)
+            authorizationHeader: try await Self.mint(oldKey), method: .exactly(Self.method), now: Self.now
         )
         #expect(http.requestCount(containing: "plc.directory") == 1)
 
@@ -80,7 +85,7 @@ struct ServiceAuthIdentityResolverTests {
             did: Self.account, verificationMethods: [Self.method(Self.account, "#atproto", newKey.publicKey)]
         ))
         let caller = try await verifier.verify(
-            authorizationHeader: try await Self.mint(newKey), method: .exactly(Self.method)
+            authorizationHeader: try await Self.mint(newKey), method: .exactly(Self.method), now: Self.now
         )
         #expect(caller.signingKey == newKey.publicKey)
         #expect(http.requestCount(containing: "plc.directory") == 2)
@@ -88,7 +93,7 @@ struct ServiceAuthIdentityResolverTests {
         // The retired key is refused, at the cost of one more refresh.
         await #expect(throws: ServiceAuthError.invalidSignature) {
             try await verifier.verify(
-                authorizationHeader: try await Self.mint(oldKey), method: .exactly(Self.method)
+                authorizationHeader: try await Self.mint(oldKey), method: .exactly(Self.method), now: Self.now
             )
         }
         #expect(http.requestCount(containing: "plc.directory") == 3)
@@ -115,13 +120,13 @@ struct ServiceAuthIdentityResolverTests {
         var configuration = ServiceAuthVerifier.Configuration(audience: .exactly(Self.audience))
         await #expect(throws: ServiceAuthError.keyNotAccepted(keyID: "#atproto_label")) {
             try await ServiceAuthVerifier(configuration: configuration, keyResolver: resolver)
-                .verify(authorizationHeader: token, method: .exactly("com.atproto.label.queryLabels"))
+                .verify(authorizationHeader: token, method: .exactly("com.atproto.label.queryLabels"), now: Self.now)
         }
         #expect(http.requests.isEmpty)
 
         configuration.acceptedKeyIDs.insert("#atproto_label")
         let caller = try await ServiceAuthVerifier(configuration: configuration, keyResolver: resolver)
-            .verify(authorizationHeader: token, method: .exactly("com.atproto.label.queryLabels"))
+            .verify(authorizationHeader: token, method: .exactly("com.atproto.label.queryLabels"), now: Self.now)
         #expect(caller.issuer == Self.labeler)
         #expect(caller.keyID == "#atproto_label")
         #expect(caller.signingKey == labelKey.publicKey)
@@ -143,7 +148,7 @@ struct ServiceAuthIdentityResolverTests {
 
         let error = await #expect(throws: ServiceAuthError.self) {
             try await verifier.verify(
-                authorizationHeader: try await Self.mint(keypair), method: .exactly(Self.method)
+                authorizationHeader: try await Self.mint(keypair), method: .exactly(Self.method), now: Self.now
             )
         }
         guard case let .keyResolutionFailed(did, keyID, _) = error else {
@@ -158,7 +163,7 @@ struct ServiceAuthIdentityResolverTests {
         http.on("plc.directory/\(Self.account)", body: IdentityFixtures.document(did: Self.account))
         let missingKey = await #expect(throws: ServiceAuthError.self) {
             try await verifier.verify(
-                authorizationHeader: try await Self.mint(keypair), method: .exactly(Self.method)
+                authorizationHeader: try await Self.mint(keypair), method: .exactly(Self.method), now: Self.now
             )
         }
         guard case .keyResolutionFailed = missingKey else {

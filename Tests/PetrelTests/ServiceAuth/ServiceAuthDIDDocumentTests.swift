@@ -152,7 +152,10 @@ struct ServiceAuthDIDDocumentTests {
                 // Requests proxied by a PDS may still carry the bare DID.
                 audience: .service(did: Self.serviceDID, id: "bsky_fg", acceptBareDID: true),
                 keyResolver: keys,
-                replayStore: InMemoryServiceAuthReplayStore()
+                // The article's store reads the wall clock. Pinned here, with
+                // `now` below, so a stalled runner cannot expire a token or
+                // its replay record mid-test.
+                replayStore: InMemoryServiceAuthReplayStore(clock: { ServiceAuthDIDDocumentTests.now })
             )
         }
 
@@ -161,7 +164,8 @@ struct ServiceAuthDIDDocumentTests {
             do {
                 let caller = try await verifier.verify(
                     authorizationHeader: authorizationHeader,
-                    method: .exactly("app.bsky.feed.getFeedSkeleton")
+                    method: .exactly("app.bsky.feed.getFeedSkeleton"),
+                    now: ServiceAuthDIDDocumentTests.now
                 )
                 return .success(caller.issuer)
             } catch {
@@ -185,7 +189,8 @@ struct ServiceAuthDIDDocumentTests {
                 issuer: Self.account,
                 audience: audience,
                 lexiconMethod: "app.bsky.feed.getFeedSkeleton",
-                signer: signer
+                signer: signer,
+                now: Self.now
             ))
         }
 
@@ -226,7 +231,8 @@ struct ServiceAuthDIDDocumentTests {
             issuer: "did:plc:zzzzzzzzzzzzzzzzzzzzzzzz",
             audience: "did:web:feed.example.com#bsky_fg",
             lexiconMethod: "app.bsky.feed.getFeedSkeleton",
-            signer: K256Keypair.generate()
+            signer: K256Keypair.generate(),
+            now: Self.now
         ))
         guard case let .failure(unresolved) = await feedGenerator.viewer(authorizationHeader: stranger),
               case .keyResolutionFailed = unresolved else {
