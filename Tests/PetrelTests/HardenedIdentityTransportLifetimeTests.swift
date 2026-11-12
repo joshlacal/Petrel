@@ -13,7 +13,9 @@ import Testing
 /// the task quietly). The window is narrow, so this test aims many requests at it: each one's
 /// DNS answer arrives at about its deadline, and its caller drops the transport at once. It
 /// checks that every abandoned request still ends and releases its transport (the fix holds the
-/// transport only for the request's lifetime, so it must not leak one).
+/// transport only for the request's lifetime, so it must not leak one). Under load this test
+/// also caught requests that never ended at all; `requestCancelledBeforeStartReturns` pins
+/// that cause down.
 ///
 /// Not run on Linux: there, cancelling a task while a `URLProtocol` test double is answering
 /// traps inside swift-corelibs-foundation (`TaskRegistry.swift:118`) whether or not the session
@@ -72,11 +74,56 @@ struct HardenedIdentityTransportLifetimeTests {
             }
 
             // Every abandoned request ends (against a valid session) and releases its transport.
-            let deadline = Date().addingTimeInterval(10)
-            while released.liveCount > 0, Date() < deadline {
-                try await Task.sleep(nanoseconds: 10_000_000)
+            // A request that never ends holds its transport forever, so the wait is woken by
+            // each release and only gives up, to fail rather than hang, long after it should
+            // have finished.
+            let allReleased = await released.waitUntilAllReleased(atMost: 60)
+            #expect(allReleased, "\(released.liveCount) transports still held by unfinished requests")
+        }
+    }
+
+    /// The race behind the flaky test above, made deterministic. A deadline (or any caller)
+    /// can cancel a request after its data task is created but before
+    /// `withTaskCancellationHandler` is entered; the handler then cancels the task before its
+    /// operation runs. URLSession reports a task cancelled before `resume()` as complete, on its
+    /// own queue. If that report arrived before the task was registered with the delegate it was
+    /// dropped, the continuation was never resumed, and the request (and whatever it held, such
+    /// as its transport) hung forever. The hook below forces that order every time.
+    @Test("A request cancelled before its data task starts still returns")
+    func requestCancelledBeforeStartReturns() async throws {
+        try await withSerializedStorageOverrideTest {
+            let delegate = HardenedURLSessionDelegate(allowsRedirects: false, limits: .default)
+            let session = URLSession(configuration: .ephemeral, delegate: delegate, delegateQueue: nil)
+            defer { session.invalidateAndCancel() }
+            NetworkService.dataTaskCreatedHook = { task, taskSession in
+                guard taskSession === session else { return }
+                // The caller is cancelled before the cancellation handler is installed...
+                withUnsafeCurrentTask { $0?.cancel() }
+                // ...and URLSession has already delivered the cancelled task's completion.
+                // (Bounded only so a platform that defers the report cannot hang the test.)
+                task.cancel()
+                let giveUp = Date().addingTimeInterval(5)
+                while task.state != .completed, Date() < giveUp {
+                    Thread.sleep(forTimeInterval: 0.001)
+                }
+                taskSession.delegateQueue.addOperations([BlockOperation {}], waitUntilFinished: true)
             }
-            #expect(released.liveCount == 0)
+            defer { NetworkService.dataTaskCreatedHook = nil }
+
+            // An address literal: no DNS lookup, and the task is cancelled before it connects.
+            let request = try URLRequest(url: #require(URL(string: "https://93.184.216.34/")))
+            let returned = Completion()
+            let call = Task {
+                defer { returned.signal() }
+                return try await NetworkService.executeDataTask(request, using: session, delegate: delegate)
+            }
+            let didReturn = await returned.wait(atMost: 10)
+            #expect(didReturn, "executeDataTask never returned after its task was cancelled")
+            guard didReturn else {
+                call.cancel()
+                return
+            }
+            await #expect(throws: (any Error).self) { try await call.value }
         }
     }
 }
@@ -99,6 +146,67 @@ private final class WeakTransports: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         return entries.count { $0.transport != nil }
+    }
+
+    /// Waits until every added transport has been released, rechecking each time any transport
+    /// is deinitialized. Returns `false` if `seconds` pass first.
+    func waitUntilAllReleased(atMost seconds: TimeInterval) async -> Bool {
+        let (releases, continuation) = AsyncStream<Void>.makeStream()
+        HardenedIdentityHTTPTransport.deinitHook = { continuation.yield() }
+        defer { HardenedIdentityHTTPTransport.deinitHook = nil }
+        let ceiling = Task {
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            continuation.finish()
+        }
+        defer { ceiling.cancel() }
+        // A release before the hook was installed is already reflected in the count.
+        if liveCount == 0 { return true }
+        for await _ in releases where liveCount == 0 {
+            return true
+        }
+        return liveCount == 0
+    }
+}
+
+/// A one-shot signal that can be awaited with an upper bound.
+private final class Completion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var isSignalled = false
+    private var waiter: CheckedContinuation<Bool, Never>?
+
+    func signal() {
+        lock.lock()
+        isSignalled = true
+        let waiter = self.waiter
+        self.waiter = nil
+        lock.unlock()
+        waiter?.resume(returning: true)
+    }
+
+    func wait(atMost seconds: TimeInterval) async -> Bool {
+        let ceiling = Task {
+            try? await Task.sleep(nanoseconds: UInt64(seconds * 1_000_000_000))
+            self.timeOut()
+        }
+        defer { ceiling.cancel() }
+        return await withCheckedContinuation { continuation in
+            lock.lock()
+            if isSignalled {
+                lock.unlock()
+                continuation.resume(returning: true)
+            } else {
+                waiter = continuation
+                lock.unlock()
+            }
+        }
+    }
+
+    private func timeOut() {
+        lock.lock()
+        let waiter = self.waiter
+        self.waiter = nil
+        lock.unlock()
+        waiter?.resume(returning: false)
     }
 }
 

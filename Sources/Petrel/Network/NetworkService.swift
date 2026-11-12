@@ -523,6 +523,8 @@ public actor NetworkService: NetworkServiceProtocol {
     #if DEBUG
         package nonisolated(unsafe) static var dnsResolutionHook: (@Sendable (String, @Sendable () -> Bool) -> Void)?
         package nonisolated(unsafe) static var dnsResolverOverride: (@Sendable (String) -> [String]?)?
+        /// Called by `executeDataTask` after it creates and registers a task, before it starts it.
+        package nonisolated(unsafe) static var dataTaskCreatedHook: (@Sendable (URLSessionTask, URLSession) -> Void)?
         package nonisolated(unsafe) static var webSocketTaskOverride: (@Sendable (URLRequest) -> any WebSocketTaskProtocol)?
     #endif
     private var authContinuityRevision: UInt64 = 0
@@ -1974,12 +1976,22 @@ public actor NetworkService: NetworkServiceProtocol {
         addresses = try await Self.resolveApprovedAddresses(host: host, isLocal: isLocal)
         #endif
         let task = targetSession.dataTask(with: request)
+        // Register before anything can cancel the task. URLSession reports a task cancelled
+        // before `resume()` as complete (asynchronously, and `resume()` does not undo it); if that
+        // report reached the delegate before the task was registered, it was dropped and the
+        // request never returned. The cancellation handler below runs before its operation when
+        // the caller is already cancelled, so the registration cannot happen inside it.
+        let completion = DataTaskCompletion()
+        delegate.contextManager.register(task, limits: limits) { result in
+            completion.finish(result)
+        }
+        delegate.contextManager.setApprovedAddresses(addresses, for: task)
+        #if DEBUG
+            dataTaskCreatedHook?(task, targetSession)
+        #endif
         let rawResult: (Data, URLResponse) = try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
-                delegate.contextManager.register(task, limits: limits) { result in
-                    continuation.resume(with: result)
-                }
-                delegate.contextManager.setApprovedAddresses(addresses, for: task)
+                completion.install(continuation)
                 task.resume()
                 onLaunch?()
                 if Task.isCancelled {
@@ -3109,5 +3121,39 @@ extension Result {
     var failure: Failure? {
         guard case let .failure(error) = self else { return nil }
         return error
+    }
+}
+
+/// The result of one data task, handed to the request awaiting it whichever arrives first: the
+/// delegate's completion or the request's continuation.
+final class DataTaskCompletion: @unchecked Sendable {
+    private let lock = NSLock()
+    private var continuation: CheckedContinuation<(Data, URLResponse), Error>?
+    private var result: Result<(Data, URLResponse), Error>?
+
+    /// Resumes `continuation` with the result: now if it has arrived, otherwise when it does.
+    func install(_ continuation: CheckedContinuation<(Data, URLResponse), Error>) {
+        lock.lock()
+        if let result {
+            lock.unlock()
+            continuation.resume(with: result)
+        } else {
+            self.continuation = continuation
+            lock.unlock()
+        }
+    }
+
+    /// Records the task's result; a second result is ignored.
+    func finish(_ result: Result<(Data, URLResponse), Error>) {
+        lock.lock()
+        guard self.result == nil else {
+            lock.unlock()
+            return
+        }
+        self.result = result
+        let continuation = self.continuation
+        self.continuation = nil
+        lock.unlock()
+        continuation?.resume(with: result)
     }
 }
