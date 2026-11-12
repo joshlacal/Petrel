@@ -386,7 +386,13 @@ final class PLCClientTests: XCTestCase {
         ]
         for response in cases {
             let transport = RecordingPLCTransport(responses: [response])
-            let client = try PLCDirectoryClient(configuration: .production(origin: URL(string: "https://plc.example.com")!), transport: transport)
+            let client = try PLCDirectoryClient(
+                configuration: .production(
+                    origin: URL(string: "https://plc.example.com")!,
+                    maximumAuditBytes: 512 * 1_024
+                ),
+                transport: transport
+            )
             await XCTAssertThrowsErrorAsync(try await client.fetchAudit(did: fixture.did))
         }
     }
@@ -602,7 +608,7 @@ final class PLCClientTests: XCTestCase {
         MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
 
         var streamContinuation: AsyncStream<Data>.Continuation?
         let stream = AsyncStream<Data> { continuation in
@@ -624,7 +630,7 @@ final class PLCClientTests: XCTestCase {
             url: URL(string: "https://mock.plc.test/oversized-stream")!,
             headers: [:],
             body: nil,
-            timeout: 5,
+            timeout: stubbedExchangeTimeout,
             maximumResponseBytes: 1_000
         )
 
@@ -640,7 +646,7 @@ final class PLCClientTests: XCTestCase {
 
         let chunk2 = Data(repeating: 0x42, count: 600)
         streamContinuation?.yield(chunk2)
-        await fulfillment(of: [stopExpectation], timeout: 2.0)
+        await fulfillment(of: [stopExpectation], timeout: stubbedExchangeTimeout)
         XCTAssertTrue(MockPLCHTTPURLProtocol.isStopLoadingCalled)
         XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 1)
         let chunk3 = Data(repeating: 0x43, count: 500)
@@ -660,7 +666,13 @@ final class PLCClientTests: XCTestCase {
             XCTFail("Unexpected error type: \(error)")
         }
 
-        XCTAssertEqual(transport.lastAcceptedBytes, 600)
+        // The bound is what matters: nothing past 1,000 bytes is ever kept.
+        // URLSession normally hands the delegate the two 600-byte chunks one
+        // at a time, so the first is kept and the second trips the bound.
+        // Under load it may coalesce them into a single 1,200-byte buffer,
+        // which is refused whole. Both are correct; a partial buffer is not.
+        let accepted = transport.lastAcceptedBytes
+        XCTAssertTrue(accepted == 600 || accepted == 0, "accepted \(accepted) bytes")
         XCTAssertEqual(MockPLCHTTPURLProtocol.chunksDeliveredAfterStop, 0)
         XCTAssertEqual(MockPLCHTTPURLProtocol.bytesDeliveredAfterStop, 0)
         XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 1)
@@ -669,7 +681,7 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportSingleCallbackExceedingLimitRejectsWithoutBuffering() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
 
         MockPLCHTTPURLProtocol.handler = { request in
             let response = HTTPURLResponse(
@@ -686,7 +698,7 @@ final class PLCClientTests: XCTestCase {
             url: URL(string: "https://mock.plc.test/large-single-chunk")!,
             headers: [:],
             body: nil,
-            timeout: 5,
+            timeout: stubbedExchangeTimeout,
             maximumResponseBytes: 1_000
         )
 
@@ -718,7 +730,7 @@ final class PLCClientTests: XCTestCase {
 
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
 
         MockPLCHTTPURLProtocol.handler = { request in
             let response = HTTPURLResponse(
@@ -735,7 +747,7 @@ final class PLCClientTests: XCTestCase {
             url: URL(string: "https://mock.plc.test/pre-cancelled")!,
             headers: [:],
             body: nil,
-            timeout: 5,
+            timeout: stubbedExchangeTimeout,
             maximumResponseBytes: 1_000
         )
 
@@ -783,7 +795,7 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportSuccessfulRequest() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
 
         let testBody = Data("{\"status\":\"ok\"}".utf8)
         MockPLCHTTPURLProtocol.handler = { request in
@@ -805,7 +817,7 @@ final class PLCClientTests: XCTestCase {
             url: URL(string: "https://mock.plc.test/status")!,
             headers: ["X-Custom-Header": "custom-value"],
             body: Data("{\"hello\":\"world\"}".utf8),
-            timeout: 5,
+            timeout: stubbedExchangeTimeout,
             maximumResponseBytes: 1_000
         )
 
@@ -821,7 +833,7 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportDisallowsRedirects() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
 
         MockPLCHTTPURLProtocol.handler = { request in
             let response = HTTPURLResponse(
@@ -841,7 +853,7 @@ final class PLCClientTests: XCTestCase {
             url: URL(string: "https://mock.plc.test/redirect")!,
             headers: [:],
             body: nil,
-            timeout: 5,
+            timeout: stubbedExchangeTimeout,
             maximumResponseBytes: 1_000
         )
 
@@ -859,7 +871,7 @@ final class PLCClientTests: XCTestCase {
         MockPLCHTTPURLProtocol.stopExpectation = stopExpectation
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
 
         let cancelGate = CancelGate()
 
@@ -881,7 +893,7 @@ final class PLCClientTests: XCTestCase {
             url: URL(string: "https://mock.plc.test/cancel")!,
             headers: [:],
             body: nil,
-            timeout: 5,
+            timeout: stubbedExchangeTimeout,
             maximumResponseBytes: 1_000
         )
 
@@ -901,7 +913,7 @@ final class PLCClientTests: XCTestCase {
             XCTFail("Expected CancellationError, got \(error)")
         }
 
-        await fulfillment(of: [stopExpectation], timeout: 2.0)
+        await fulfillment(of: [stopExpectation], timeout: stubbedExchangeTimeout)
         XCTAssertTrue(MockPLCHTTPURLProtocol.isStopLoadingCalled)
         XCTAssertEqual(MockPLCHTTPURLProtocol.stopCallCount, 1)
         XCTAssertEqual(transport.lastAcceptedBytes, 0)
@@ -910,7 +922,7 @@ final class PLCClientTests: XCTestCase {
     func testURLSessionPLCTransportRejectsContentLengthExceedingBound() async throws {
         let configuration = URLSessionConfiguration.ephemeral
         configuration.protocolClasses = [MockPLCHTTPURLProtocol.self]
-        let transport = try URLSessionPLCTransport(maximumTimeout: 5, configuration: configuration)
+        let transport = try URLSessionPLCTransport(maximumTimeout: stubbedExchangeTimeout, configuration: configuration)
 
         MockPLCHTTPURLProtocol.handler = { request in
             let response = HTTPURLResponse(
@@ -930,7 +942,7 @@ final class PLCClientTests: XCTestCase {
             url: URL(string: "https://mock.plc.test/large-content-length")!,
             headers: [:],
             body: nil,
-            timeout: 5,
+            timeout: stubbedExchangeTimeout,
             maximumResponseBytes: 1_000
         )
 
@@ -946,6 +958,28 @@ final class PLCClientTests: XCTestCase {
         } catch {
             XCTFail("Unexpected error type: \(error)")
         }
+    }
+
+    func testURLSessionPLCTransportReportsATimeout() async throws {
+        // A real loopback socket that accepts connections into its backlog
+        // and never answers, so the platform's own URL loading (CFNetwork on
+        // Apple platforms, libcurl on Linux) has to enforce the request's
+        // timeout. A URLProtocol stub cannot stand in here: Linux Foundation
+        // never times out a custom protocol.
+        let listener = try SilentLoopbackListener()
+        defer { listener.close() }
+        let transport = try URLSessionPLCTransport(maximumTimeout: 1)
+        let started = Date()
+        do {
+            _ = try await transport.execute(PLCHTTPRequest(
+                method: .get, url: listener.url.appendingPathComponent("did"), headers: [:], body: nil,
+                timeout: 1, maximumResponseBytes: 1_000
+            ))
+            XCTFail("Expected the request to time out")
+        } catch let error as PetrelPLCError {
+            XCTAssertEqual(error, .unavailable("PLC HTTP request timed out"))
+        }
+        XCTAssertLessThan(Date().timeIntervalSince(started), stubbedExchangeTimeout)
     }
 
     func testURLSessionPLCTransportValidatesRequestBounds() async throws {
@@ -967,9 +1001,10 @@ final class PLCClientTests: XCTestCase {
             method: .get, url: validURL, headers: [:], body: nil, timeout: 5, maximumResponseBytes: 0
         )))
 
-        // maximumResponseBytes > 1_048_576
+        // maximumResponseBytes above the transport ceiling
         await XCTAssertThrowsErrorAsync(try await transport.execute(PLCHTTPRequest(
-            method: .get, url: validURL, headers: [:], body: nil, timeout: 5, maximumResponseBytes: 1_048_577
+            method: .get, url: validURL, headers: [:], body: nil, timeout: 5,
+            maximumResponseBytes: PLCClientConfiguration.maximumResponseBytesCeiling + 1
         )))
 
         // Body > 32KB
@@ -1335,21 +1370,28 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
                     loaderTask = Task.detached {
                         let proto = protoTransfer.value
                         for await chunk in stream {
-                            let stoppedDuringStream = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
-                            guard !stoppedDuringStream else {
+                            // The stop check and the hand-off to the client
+                            // are one critical section with `stopLoading`,
+                            // so a chunk is either handed over before the
+                            // stop or dropped; it cannot straddle it. A
+                            // chunk dequeued after the stop is dropped and
+                            // is not a delivery.
+                            let delivered = proto.instanceLock.withLock { () -> Bool in
+                                guard !proto.isStopped, !Task.isCancelled else { return false }
                                 Self.lock.withLock {
-                                    Self._chunksDeliveredAfterStop += 1
-                                    Self._bytesDeliveredAfterStop += chunk.count
+                                    if Self._isStopLoadingCalled {
+                                        Self._chunksDeliveredAfterStop += 1
+                                        Self._bytesDeliveredAfterStop += chunk.count
+                                    } else {
+                                        Self._chunksDeliveredBeforeStop += 1
+                                        Self._bytesDeliveredBeforeStop += chunk.count
+                                    }
                                 }
-                                Self.recordChunkDelivered()
-                                break
+                                clientTransfer.value?.urlProtocol(proto, didLoad: chunk)
+                                return true
                             }
-                            Self.lock.withLock {
-                                Self._chunksDeliveredBeforeStop += 1
-                                Self._bytesDeliveredBeforeStop += chunk.count
-                            }
-                            clientTransfer.value?.urlProtocol(proto, didLoad: chunk)
                             Self.recordChunkDelivered()
+                            guard delivered else { break }
                         }
 
                         let stoppedAfterStream = proto.instanceLock.withLock { proto.isStopped || Task.isCancelled }
@@ -1396,6 +1438,18 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
     }
 
     override func stopLoading() {
+        // Stop the loader before telling anyone the stop happened: a test
+        // released by the expectation below may feed the stream at once,
+        // and by then nothing more may reach the client.
+        let taskToCancel = instanceLock.withLock { () -> Task<Void, Never>? in
+            guard !isStopped else { return nil }
+            isStopped = true
+            let task = loaderTask
+            loaderTask = nil
+            return task
+        }
+        taskToCancel?.cancel()
+
         let (exp, cont) = Self.lock.withLock { () -> (XCTestExpectation?, CheckedContinuation<Void, Never>?) in
             Self._stopCallCount += 1
             Self._isStopLoadingCalled = true
@@ -1407,15 +1461,6 @@ final class MockPLCHTTPURLProtocol: URLProtocol, @unchecked Sendable {
 
         exp?.fulfill()
         cont?.resume()
-
-        let taskToCancel = instanceLock.withLock { () -> Task<Void, Never>? in
-            guard !isStopped else { return nil }
-            isStopped = true
-            let task = loaderTask
-            loaderTask = nil
-            return task
-        }
-
-        taskToCancel?.cancel()
     }
 }
+

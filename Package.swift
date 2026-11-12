@@ -35,6 +35,10 @@ let package = Package(
             targets: ["PetrelPLC"]
         ),
         .library(
+            name: "PetrelPLCPDS",
+            targets: ["PetrelPLCPDS"]
+        ),
+        .library(
             name: "PetrelJetstream",
             targets: ["PetrelJetstream"]
         ),
@@ -194,6 +198,16 @@ let package = Package(
                 .swiftLanguageMode(.v6),
             ]
         ),
+        .target(
+            name: "PetrelPLCPDS",
+            dependencies: [
+                "Petrel",
+                "PetrelPLC",
+            ],
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
+        ),
         .executableTarget(
             name: "PetrelLoad",
             dependencies: ["Petrel"]
@@ -250,7 +264,8 @@ let package = Package(
         ),
         .testTarget(
             name: "PetrelPLCTests",
-            dependencies: ["PetrelPLC", "PetrelCrypto", "PetrelCore"]
+            dependencies: ["PetrelPLC", "PetrelPLCPDS", "Petrel", "PetrelCrypto", "PetrelCore"],
+            resources: [.copy("Vectors")]
         ),
         .testTarget(
             name: "PetrelOAuthScopesTests",

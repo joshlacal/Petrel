@@ -3,23 +3,42 @@ import Foundation
 import PetrelCore
 import PetrelCrypto
 
+/// One entry of a PLC operation's `services` map.
 public struct PLCService: Codable, Sendable, Equatable {
+    /// The service type, for example `AtprotoPersonalDataServer`.
     public let type: String
+    /// The service URL.
     public let endpoint: String
 
+    /// Creates a service entry.
     public init(type: String, endpoint: String) {
         self.type = type
         self.endpoint = endpoint
     }
 }
 
+/// A `plc_operation` that has not been signed yet.
+///
+/// The initializer applies the rules for *writing* an operation
+/// (``PLCOperationLimits/specification``): 1–5 distinct P-256 or K-256
+/// rotation keys, at most 10 verification methods each a syntactically valid
+/// `did:key`, a canonical `prev` CID, and the 7,500-byte DAG-CBOR limit.
+/// Operations read from a directory are held to looser rules; see
+/// ``PLCOperationCodec/decodeSignedJSON(_:)``.
 public struct PLCUnsignedRegularOperation: Sendable, Equatable {
+    /// Priority-ordered rotation keys, as `did:key` strings.
     public let rotationKeys: [String]
+    /// Verification method id (no `#`) to `did:key`.
     public let verificationMethods: [String: String]
+    /// Priority-ordered aliases, for atproto `at://<handle>`.
     public let alsoKnownAs: [String]
+    /// Service id (no `#`) to service.
     public let services: [String: PLCService]
+    /// CID of the operation this one follows, or `nil` for a genesis operation.
     public let prev: String?
 
+    /// - Throws: ``PetrelPLCError/malformed(_:)`` or
+    ///   ``PetrelPLCError/invalidIdentifier(_:)`` when a write rule is broken.
     public init(
         rotationKeys: [String],
         verificationMethods: [String: String],
@@ -32,197 +51,317 @@ public struct PLCUnsignedRegularOperation: Sendable, Equatable {
         self.alsoKnownAs = alsoKnownAs
         self.services = services
         self.prev = prev
-        try PLCOperationCodec.validate(self)
+        try PLCOperationCodec.validate(
+            rotationKeys: rotationKeys,
+            verificationMethods: verificationMethods,
+            alsoKnownAs: alsoKnownAs,
+            services: services,
+            prev: prev,
+            limits: .specification
+        )
+        guard try PLCOperationCodec.encodeSigningBytes(.regular(self)).count
+            <= PLCOperationLimits.specification.maximumDAGCBORBytes else {
+            throw PetrelPLCError.malformed("PLC operation exceeds 7,500 DAG-CBOR bytes")
+        }
     }
 }
 
+/// A `plc_tombstone` that has not been signed yet.
 public struct PLCUnsignedTombstoneOperation: Sendable, Equatable {
+    /// CID of the operation being deactivated.
     public let prev: String
 
+    /// - Throws: ``PetrelPLCError/invalidIdentifier(_:)`` unless `prev` is a
+    ///   canonical base32 CIDv1 with the `dag-cbor` codec and a SHA-256 hash.
     public init(prev: String) throws {
         try PLCOperationCodec.validatePreviousCID(prev)
         self.prev = prev
     }
 }
 
+/// An operation ready to be signed.
 public enum PLCUnsignedOperation: Sendable, Equatable {
+    /// A `plc_operation`: creates or updates an identity.
     case regular(PLCUnsignedRegularOperation)
+    /// A `plc_tombstone`: deactivates an identity.
     case tombstone(PLCUnsignedTombstoneOperation)
-}
 
-public struct PLCSignedRegularOperation: Sendable, Equatable {
-    public let rotationKeys: [String]
-    public let verificationMethods: [String: String]
-    public let alsoKnownAs: [String]
-    public let services: [String: PLCService]
-    public let prev: String?
-    public let signature: String
+    /// The DAG-CBOR bytes a rotation key signs: the operation without a
+    /// `sig` field.
+    ///
+    /// Use this with ``PLCOperationCodec/attach(signature:to:)`` when the
+    /// signature is produced somewhere `ATProtoSigner` cannot reach, such as
+    /// an air-gapped machine.
+    public var signingDAGCBOR: Data {
+        get throws { try PLCOperationCodec.encodeSigningBytes(self) }
+    }
 
-    fileprivate var unsigned: PLCUnsignedRegularOperation {
-        get throws {
-            try .init(
-                rotationKeys: rotationKeys,
-                verificationMethods: verificationMethods,
-                alsoKnownAs: alsoKnownAs,
-                services: services,
-                prev: prev
-            )
+    /// CID of the operation this one follows, or `nil` for a genesis operation.
+    public var prev: String? {
+        switch self {
+        case let .regular(operation): operation.prev
+        case let .tombstone(operation): operation.prev
         }
     }
 }
 
+/// A signed `plc_operation`.
+///
+/// Values of this type come from ``PLCOperationCodec`` — by signing, or by
+/// decoding what a directory returned — and are not validated against the
+/// write rules: historical operations in the public directory carry
+/// duplicate rotation keys, empty `verificationMethods` and non-ECDSA
+/// verification keys.
+public struct PLCSignedRegularOperation: Sendable, Equatable {
+    /// Priority-ordered rotation keys, as `did:key` strings.
+    public let rotationKeys: [String]
+    /// Verification method id (no `#`) to `did:key`.
+    public let verificationMethods: [String: String]
+    /// Priority-ordered aliases.
+    public let alsoKnownAs: [String]
+    /// Service id (no `#`) to service.
+    public let services: [String: PLCService]
+    /// CID of the operation this one follows, or `nil` for a genesis operation.
+    public let prev: String?
+    /// The `sig` field: base64url, no padding, of the 64-byte signature.
+    public let signature: String
+}
+
+/// A signed `plc_tombstone`.
 public struct PLCSignedTombstoneOperation: Sendable, Equatable {
+    /// CID of the operation being deactivated.
     public let prev: String
+    /// The `sig` field: base64url, no padding, of the 64-byte signature.
+    public let signature: String
+}
+
+/// A signed operation in the deprecated `create` format.
+///
+/// Only genesis operations exist in this format, and only for identities
+/// registered before the format changed in March 2023. Their DIDs are the
+/// hash of these exact fields, so the format has to be read and verified
+/// forever, but it must not be used for new identities and
+/// ``PLCDirectoryClient`` refuses to submit one.
+///
+/// ``rotationKeys``, ``verificationMethods``, ``alsoKnownAs`` and
+/// ``services`` give the same data in the modern shape, the way the
+/// reference implementation's `normalizeOp` does.
+public struct PLCSignedLegacyCreateOperation: Sendable, Equatable {
+    /// The atproto signing key, as a `did:key`.
+    public let signingKey: String
+    /// The recovery key, as a `did:key`. Outranks ``signingKey``.
+    public let recoveryKey: String
+    /// The bare handle, without an `at://` prefix.
+    public let handle: String
+    /// The PDS URL exactly as registered. A handful of early operations
+    /// carry a bare `host:port` here; ``services`` adds the scheme.
+    public let service: String
+    /// The `sig` field: base64url, no padding, of the 64-byte signature.
     public let signature: String
 
-    fileprivate var unsigned: PLCUnsignedTombstoneOperation {
-        get throws { try .init(prev: prev) }
+    /// `[recoveryKey, signingKey]`: the recovery key has the higher authority.
+    public var rotationKeys: [String] { [recoveryKey, signingKey] }
+
+    /// `["atproto": signingKey]`.
+    public var verificationMethods: [String: String] { ["atproto": signingKey] }
+
+    /// The handle as an `at://` URI.
+    public var alsoKnownAs: [String] { [PLCATProfile.atURI(forHandle: handle)] }
+
+    /// The PDS as an `atproto_pds` service, with `https://` added when the
+    /// registered value has no scheme.
+    public var services: [String: PLCService] {
+        [
+            PLCATProfile.pdsServiceID: PLCService(
+                type: PLCATProfile.pdsServiceType,
+                endpoint: PLCATProfile.withHTTPScheme(service)
+            ),
+        ]
     }
 }
 
+/// A signed operation of any of the three kinds a PLC directory stores.
 public enum PLCSignedOperation: Sendable, Equatable {
+    /// A `plc_operation`: creates or updates an identity.
     case regularOperation(PLCSignedRegularOperation)
+    /// A `plc_tombstone`: deactivates an identity.
     case tombstoneOperation(PLCSignedTombstoneOperation)
+    /// The deprecated `create` genesis format.
+    case legacyCreateOperation(PLCSignedLegacyCreateOperation)
 
+    /// The payload if this is a `plc_operation`. `nil` for a tombstone and
+    /// for a legacy `create`; use ``documentData(did:)`` to read the state of
+    /// either non-tombstone kind.
     public var regular: PLCSignedRegularOperation? {
         guard case let .regularOperation(operation) = self else { return nil }
         return operation
     }
 
+    /// The payload if this is a legacy `create` operation.
+    public var legacyCreate: PLCSignedLegacyCreateOperation? {
+        guard case let .legacyCreateOperation(operation) = self else { return nil }
+        return operation
+    }
+
+    /// Whether this is a `plc_tombstone`.
+    public var isTombstone: Bool {
+        if case .tombstoneOperation = self { return true }
+        return false
+    }
+
+    /// CID of the operation this one follows, or `nil` for a genesis operation.
     public var prev: String? {
         switch self {
         case let .regularOperation(operation): operation.prev
         case let .tombstoneOperation(operation): operation.prev
+        case .legacyCreateOperation: nil
         }
     }
 
+    /// The `sig` field.
+    public var signature: String {
+        switch self {
+        case let .regularOperation(operation): operation.signature
+        case let .tombstoneOperation(operation): operation.signature
+        case let .legacyCreateOperation(operation): operation.signature
+        }
+    }
+
+    /// The rotation keys that may sign the operation that follows this one,
+    /// in priority order. `nil` for a tombstone, which nothing may follow.
+    /// A legacy `create` yields `[recoveryKey, signingKey]`.
+    public var rotationKeys: [String]? {
+        switch self {
+        case let .regularOperation(operation): operation.rotationKeys
+        case .tombstoneOperation: nil
+        case let .legacyCreateOperation(operation): operation.rotationKeys
+        }
+    }
+
+    /// The identity state this operation establishes, in the shape
+    /// `GET /:did/data` returns. `nil` for a tombstone.
+    public func documentData(did: String) -> PLCDocumentData? {
+        switch self {
+        case let .regularOperation(operation):
+            PLCDocumentData(
+                did: did,
+                rotationKeys: operation.rotationKeys,
+                verificationMethods: operation.verificationMethods,
+                alsoKnownAs: operation.alsoKnownAs,
+                services: operation.services
+            )
+        case .tombstoneOperation:
+            nil
+        case let .legacyCreateOperation(operation):
+            PLCDocumentData(
+                did: did,
+                rotationKeys: operation.rotationKeys,
+                verificationMethods: operation.verificationMethods,
+                alsoKnownAs: operation.alsoKnownAs,
+                services: operation.services
+            )
+        }
+    }
+
+    /// The DAG-CBOR bytes the signature covers: the operation in its own
+    /// format, without the `sig` field.
     public var signingDAGCBOR: Data {
-        get throws {
-            switch self {
-            case let .regularOperation(operation):
-                try PLCOperationCodec.encodeSigningBytes(.regular(operation.unsigned))
-            case let .tombstoneOperation(operation):
-                try PLCOperationCodec.encodeSigningBytes(.tombstone(operation.unsigned))
-            }
-        }
+        get throws { try PLCOperationCodec.encode(self, includingSignature: false) }
     }
 
+    /// The DAG-CBOR bytes that are hashed for the operation's CID and, for a
+    /// genesis operation, for the DID.
     public var canonicalDAGCBOR: Data {
-        get throws { try PLCOperationCodec.encodeSigned(self) }
+        get throws { try PLCOperationCodec.encode(self, includingSignature: true) }
     }
 
+    /// The operation as JSON with sorted keys, the form `POST /:did` takes.
     public var canonicalJSON: Data {
         get throws { try PLCOperationCodec.encodeSignedJSON(self) }
     }
 
+    /// CIDv1 (`dag-cbor`, SHA-256) of ``canonicalDAGCBOR``. This is what the
+    /// next operation names in `prev`.
     public var cid: CID {
-        get throws { CID.fromDAGCBOR(try canonicalDAGCBOR) }
+        get throws { try CID.fromDAGCBOR(canonicalDAGCBOR) }
     }
 }
 
-public enum PLCATProfile {
-    public static func regularOperation(
-        handle: String,
-        signingPublicKey: P256.Signing.PublicKey,
-        rotationPublicKeys: [P256.Signing.PublicKey],
-        pdsOrigin: URL,
-        prev: String?
-    ) throws -> PLCUnsignedRegularOperation {
-        let canonicalHandle = try AccountIdentifiers.canonicalHandle(handle)
-        let origin = try canonicalPDSOrigin(pdsOrigin)
-        return try PLCUnsignedRegularOperation(
-            rotationKeys: rotationPublicKeys.map { P256DIDKey(publicKey: $0).value },
-            verificationMethods: ["atproto": P256DIDKey(publicKey: signingPublicKey).value],
-            alsoKnownAs: ["at://\(canonicalHandle)"],
-            services: [
-                "atproto_pds": .init(
-                    type: "AtprotoPersonalDataServer",
-                    endpoint: origin
-                ),
-            ],
-            prev: prev
-        )
-    }
+/// Encoding, signing, hashing and verification of PLC operations.
+public enum PLCOperationCodec {
+    /// The specification's limit on an operation's DAG-CBOR size.
+    public static let maximumDAGCBORBytes = PLCOperationLimits.specification.maximumDAGCBORBytes
 
-    /// Validates and canonicalizes the PDS service origin carried by a PLC
-    /// operation. Exposed so operator surfaces can reject malformed input
-    /// before opening durable storage or creating key envelopes.
-    public static func canonicalPDSOrigin(_ url: URL) throws -> String {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
-              let scheme = components.scheme?.lowercased(),
-              let host = components.host,
-              !host.isEmpty,
-              components.user == nil,
-              components.password == nil,
-              components.query == nil,
-              components.fragment == nil,
-              components.path.isEmpty || components.path == "/" else {
-            throw PetrelPLCError.malformed("PLC PDS endpoint must be an origin")
+    /// The largest JSON document ``decodeSignedJSON(_:)`` will parse.
+    public static let maximumOperationJSONBytes = 64 * 1_024
+
+    // MARK: Signing
+
+    /// Signs an operation with any AT Protocol signer: an in-memory
+    /// `K256Keypair` or `P256Keypair`, a Secure Enclave key, or an
+    /// `ATProtoExternalSigner` wrapping a KMS or hardware token.
+    ///
+    /// The signature must come back as 64 bytes `r || s` with low-S, which
+    /// is the `ATProtoSigner` contract; anything else is refused rather than
+    /// repaired. When the signer also exposes its public key, the signature
+    /// is checked against it before it is used.
+    ///
+    /// The signer has to be a rotation key of the operation named in `prev`
+    /// (or, for a genesis operation, of the operation itself). That is the
+    /// directory's rule and is not checked here, because this function does
+    /// not see the previous operation; ``PLCDirectoryClient`` checks it.
+    ///
+    /// - Throws: Whatever the signer throws; ``PetrelPLCError/malformed(_:)``
+    ///   for a non-canonical signature; ``PetrelPLCError/unauthorized(_:)``
+    ///   if the signature does not verify against the signer's own key.
+    public static func sign(
+        _ operation: PLCUnsignedOperation,
+        with signer: any ATProtoSigner
+    ) async throws -> PLCSignedOperation {
+        let signingBytes = try encodeSigningBytes(operation)
+        let signature = try await signer.sign(signingBytes)
+        guard ATProtoSignature.isCanonical(signature, curve: signer.curve) else {
+            throw PetrelPLCError.malformed(
+                "PLC signer returned a signature that is not 64-byte low-S"
+            )
         }
-        let isLiteralLoopback = scheme == "http" && isLoopbackLiteral(host)
-        guard scheme == "https" || isLiteralLoopback else {
-            throw PetrelPLCError.malformed("PLC PDS endpoint must use HTTPS")
-        }
-        if scheme == "https", components.port != nil, components.port != 443 {
-            throw PetrelPLCError.malformed("PLC PDS endpoint port is invalid")
-        }
-        if isLiteralLoopback {
-            guard let port = components.port, (1 ... 65_535).contains(port) else {
-                throw PetrelPLCError.malformed("PLC lab PDS endpoint requires an explicit port")
+        if let keypair = signer as? any ATProtoKeypair {
+            guard keypair.publicKey.isValidSignature(signature, for: signingBytes) else {
+                throw PetrelPLCError.unauthorized(
+                    "PLC signer returned a signature that does not verify against its public key"
+                )
             }
         }
-        var normalized = components
-        normalized.path = ""
-        guard let value = normalized.url?.absoluteString, !value.hasSuffix("/") else {
-            throw PetrelPLCError.malformed("PLC PDS endpoint is malformed")
-        }
-        return value
-    }
-}
-
-public enum PLCOperationCodec {
-    public static let maximumDAGCBORBytes = 7_500
-
-    /// Reconstructs the one regular `prev: null` operation shape persisted by
-    /// account preparation. Validation here is the same Task 13 codec path
-    /// used for decoded and freshly signed PLC operations.
-    public static func reconstructGenesis(
-        signingDIDKey: String,
-        rotationDIDKey: String,
-        canonicalHandle: String,
-        pdsOrigin: String,
-        signature: String
-    ) throws -> PLCSignedOperation {
-        let unsigned = try PLCUnsignedRegularOperation(
-            rotationKeys: [rotationDIDKey],
-            verificationMethods: ["atproto": signingDIDKey],
-            alsoKnownAs: ["at://\(canonicalHandle)"],
-            services: [
-                "atproto_pds": PLCService(
-                    type: "AtprotoPersonalDataServer",
-                    endpoint: pdsOrigin
-                ),
-            ],
-            prev: nil
-        )
-        let operation = PLCSignedOperation.regularOperation(.init(
-            rotationKeys: unsigned.rotationKeys,
-            verificationMethods: unsigned.verificationMethods,
-            alsoKnownAs: unsigned.alsoKnownAs,
-            services: unsigned.services,
-            prev: nil,
-            signature: signature
-        ))
-        try validateSigned(operation)
-        return operation
+        return try attach(signature: signature, to: operation)
     }
 
+    /// Signs an operation with an in-memory Swift Crypto P-256 key.
     public static func sign(
         _ operation: PLCUnsignedOperation,
         using key: P256.Signing.PrivateKey
     ) throws -> PLCSignedOperation {
         let signingBytes = try encodeSigningBytes(operation)
-        let signature = try P256WireSignature.sign(signingBytes, using: key)
+        let signature = try P256Keypair(key).sign(signingBytes)
+        return try attach(signature: signature, to: operation)
+    }
+
+    /// Combines an operation with a signature produced elsewhere over
+    /// ``PLCUnsignedOperation/signingDAGCBOR``.
+    ///
+    /// - Parameters:
+    ///   - signature: 64 bytes `r || s`, low-S. DER and high-S are refused;
+    ///     convert a trusted local signer's output with
+    ///     `ATProtoSignature.canonicalize(_:curve:)` first.
+    ///   - operation: The operation whose ``PLCUnsignedOperation/signingDAGCBOR``
+    ///     was signed.
+    /// - Throws: ``PetrelPLCError/malformed(_:)``.
+    public static func attach(
+        signature: Data,
+        to operation: PLCUnsignedOperation
+    ) throws -> PLCSignedOperation {
+        guard isCanonicalOnASupportedCurve(signature) else {
+            throw PetrelPLCError.malformed("PLC operation signature is not canonical")
+        }
         let encoded = signature.plcBase64URL
         let signed: PLCSignedOperation
         switch operation {
@@ -238,83 +377,147 @@ public enum PLCOperationCodec {
         case let .tombstone(value):
             signed = .tombstoneOperation(.init(prev: value.prev, signature: encoded))
         }
-        try validateSigned(signed)
+        try validateForSubmission(signed, limits: .specification)
         return signed
     }
 
+    /// Reconstructs a regular `prev: null` operation from its stored parts
+    /// and an existing signature, applying the write rules.
+    public static func reconstructGenesis(
+        signingDIDKey: String,
+        rotationDIDKey: String,
+        canonicalHandle: String,
+        pdsOrigin: String,
+        signature: String
+    ) throws -> PLCSignedOperation {
+        let unsigned = try PLCUnsignedRegularOperation(
+            rotationKeys: [rotationDIDKey],
+            verificationMethods: ["atproto": signingDIDKey],
+            alsoKnownAs: ["at://\(canonicalHandle)"],
+            services: [
+                PLCATProfile.pdsServiceID: PLCService(
+                    type: PLCATProfile.pdsServiceType,
+                    endpoint: pdsOrigin
+                ),
+            ],
+            prev: nil
+        )
+        return try attach(signature: decodeCanonicalSignature(signature), to: .regular(unsigned))
+    }
+
+    // MARK: Identity
+
+    /// Derives the DID of a genesis operation:
+    /// `did:plc:` + the first 24 characters of
+    /// base32(SHA-256(DAG-CBOR(signed operation))).
+    ///
+    /// Works for a regular genesis operation and for a legacy `create`,
+    /// which is hashed in its own format.
+    ///
+    /// - Throws: ``PetrelPLCError/malformed(_:)`` for a tombstone or an
+    ///   operation whose `prev` is not null.
     public static func genesisDID(for operation: PLCSignedOperation) throws -> String {
-        guard operation.prev == nil, operation.regular != nil else {
-            throw PetrelPLCError.malformed("PLC genesis must be a regular operation with null prev")
+        guard operation.prev == nil, !operation.isTombstone else {
+            throw PetrelPLCError.malformed(
+                "PLC genesis must be a regular or legacy create operation with null prev"
+            )
         }
-        let digest = Data(SHA256.hash(data: try operation.canonicalDAGCBOR))
+        let digest = try Data(SHA256.hash(data: operation.canonicalDAGCBOR))
         return "did:plc:" + String(base32Encode(digest).prefix(24))
     }
 
+    /// Checks that `operation` is the genesis of `expectedDID`: the DID is
+    /// the operation's hash, and the operation is signed by one of its own
+    /// rotation keys.
+    ///
+    /// - Throws: ``PetrelPLCError/unauthorized(_:)`` when either check fails.
     public static func verifyGenesis(
         _ operation: PLCSignedOperation,
         expectedDID: String
     ) throws {
         try validateCanonicalDID(expectedDID)
         guard try genesisDID(for: operation) == expectedDID,
-              let regular = operation.regular else {
+              let rotationKeys = operation.rotationKeys else {
             throw PetrelPLCError.unauthorized("PLC genesis DID does not match operation")
         }
-        _ = try verify(operation, authorizedRotationKeys: regular.rotationKeys)
+        _ = try verify(operation, authorizedRotationKeys: rotationKeys)
     }
 
+    /// Verifies an operation's signature against the rotation keys that were
+    /// in force when it was submitted: the keys of the operation named in
+    /// `prev`, or the operation's own keys for a genesis operation.
+    ///
+    /// Signature encoding is enforced strictly, as the specification
+    /// requires: base64url without padding and with zero trailing bits,
+    /// exactly 64 bytes, low-S on the curve of the key being tried. The key
+    /// list is taken as it is: duplicates and unparseable entries occur in
+    /// historical operations and simply never match.
+    ///
+    /// - Returns: The index in `authorizedRotationKeys` of the first key the
+    ///   signature verifies against. A lower index is a higher authority.
+    /// - Throws: ``PetrelPLCError/unauthorized(_:)`` if no key matches;
+    ///   ``PetrelPLCError/malformed(_:)`` if the signature is not canonically
+    ///   encoded.
     public static func verify(
         _ operation: PLCSignedOperation,
         authorizedRotationKeys: [String]
     ) throws -> Int {
-        try validateSigned(operation)
-        guard Set(authorizedRotationKeys).count == authorizedRotationKeys.count,
-              !authorizedRotationKeys.isEmpty,
-              authorizedRotationKeys.count <= 5 else {
-            throw PetrelPLCError.malformed("PLC authorized rotation keys are invalid")
-        }
-        let signatureText: String
-        switch operation {
-        case let .regularOperation(value): signatureText = value.signature
-        case let .tombstoneOperation(value): signatureText = value.signature
-        }
-        let signatureBytes = try decodeCanonicalSignature(signatureText)
+        try verifyReturningKey(operation, authorizedRotationKeys: authorizedRotationKeys).index
+    }
+
+    /// As ``verify(_:authorizedRotationKeys:)``, also reporting the key.
+    static func verifyReturningKey(
+        _ operation: PLCSignedOperation,
+        authorizedRotationKeys: [String]
+    ) throws -> (index: Int, key: ATProtoPublicKey) {
+        let signature = try decodeCanonicalSignature(operation.signature)
         let signingBytes = try operation.signingDAGCBOR
         for (index, keyText) in authorizedRotationKeys.enumerated() {
-            let key = try PLCDIDKeyCodec.decode(keyText)
-            switch key {
-            case let .p256(p256Key):
-                let signature = try P256WireSignature.decodeCanonical(signatureBytes)
-                if p256Key.isValidSignature(signature, for: signingBytes) {
-                    return index
-                }
-            case .secp256k1:
-                guard ATProtoJWTVerificationKey.isCanonicalSecp256k1Signature(signatureBytes) else {
-                    throw PetrelPLCError.unauthorized("PLC operation signature is not low-S")
-                }
-                if (try? key.verify(signature: signatureBytes, signingInput: signingBytes, algorithm: "ES256K")) == true {
-                    return index
-                }
+            guard let key = try? ATProtoPublicKey(didKey: keyText) else { continue }
+            if key.isValidSignature(signature, for: signingBytes, options: .strict) {
+                return (index, key)
             }
         }
         throw PetrelPLCError.unauthorized("PLC operation signature is invalid")
     }
 
+    // MARK: Decoding
+
+    /// Decodes one signed operation from JSON, in any of the three formats.
+    ///
+    /// This is the *read* path and accepts everything the public directory
+    /// serves. Structure is strict (exact field sets, as the reference
+    /// implementation's schemas are) and so is signature encoding, but field
+    /// contents are not held to the write rules: rotation keys may repeat,
+    /// `verificationMethods` may be empty or hold any `did:key`. Use
+    /// ``validateForSubmission(_:limits:)`` to apply the write rules.
+    ///
+    /// - Throws: ``PetrelPLCError/malformed(_:)``.
     public static func decodeSignedJSON(_ data: Data) throws -> PLCSignedOperation {
-        guard !data.isEmpty, data.count <= 32 * 1_024 else {
+        guard !data.isEmpty, data.count <= maximumOperationJSONBytes else {
             throw PetrelPLCError.malformed("PLC operation JSON exceeds its bound")
         }
         try StrictJSON.validate(data)
-        guard let object = try JSONSerialization.jsonObject(with: data) as? [String: Any],
+        guard let object = try? JSONSerialization.jsonObject(with: data) else {
+            throw PetrelPLCError.malformed("PLC operation JSON is malformed")
+        }
+        return try decodeSigned(jsonObject: object)
+    }
+
+    /// Decodes an operation from an already-parsed JSON value. The caller is
+    /// responsible for having run ``StrictJSON`` over the source bytes.
+    static func decodeSigned(jsonObject: Any) throws -> PLCSignedOperation {
+        guard let object = jsonObject as? [String: Any],
               let type = object["type"] as? String else {
             throw PetrelPLCError.malformed("PLC operation JSON is malformed")
         }
         let operation: PLCSignedOperation
         switch type {
         case "plc_operation":
-            let expected = Set([
+            let expected: Set<String> = [
                 "type", "rotationKeys", "verificationMethods", "alsoKnownAs",
                 "services", "prev", "sig",
-            ])
+            ]
             guard Set(object.keys) == expected,
                   let rotationKeys = object["rotationKeys"] as? [String],
                   let verificationMethods = object["verificationMethods"] as? [String: String],
@@ -331,29 +534,12 @@ public enum PLCOperationCodec {
             } else {
                 throw PetrelPLCError.malformed("PLC operation prev is malformed")
             }
-            var services = [String: PLCService]()
-            for (name, rawService) in rawServices {
-                guard let service = rawService as? [String: Any],
-                      Set(service.keys) == ["type", "endpoint"],
-                      let serviceType = service["type"] as? String,
-                      let endpoint = service["endpoint"] as? String else {
-                    throw PetrelPLCError.malformed("PLC operation service is malformed")
-                }
-                services[name] = .init(type: serviceType, endpoint: endpoint)
-            }
-            let unsigned = try PLCUnsignedRegularOperation(
+            operation = try .regularOperation(.init(
                 rotationKeys: rotationKeys,
                 verificationMethods: verificationMethods,
                 alsoKnownAs: alsoKnownAs,
-                services: services,
-                prev: prev
-            )
-            operation = .regularOperation(.init(
-                rotationKeys: unsigned.rotationKeys,
-                verificationMethods: unsigned.verificationMethods,
-                alsoKnownAs: unsigned.alsoKnownAs,
-                services: unsigned.services,
-                prev: unsigned.prev,
+                services: decodeServices(rawServices),
+                prev: prev,
                 signature: signature
             ))
         case "plc_tombstone":
@@ -362,48 +548,171 @@ public enum PLCOperationCodec {
                   let signature = object["sig"] as? String else {
                 throw PetrelPLCError.malformed("PLC tombstone JSON is malformed")
             }
-            _ = try PLCUnsignedTombstoneOperation(prev: prev)
             operation = .tombstoneOperation(.init(prev: prev, signature: signature))
+        case "create":
+            let expected: Set<String> = [
+                "type", "signingKey", "recoveryKey", "handle", "service", "prev", "sig",
+            ]
+            guard Set(object.keys) == expected,
+                  let signingKey = object["signingKey"] as? String,
+                  let recoveryKey = object["recoveryKey"] as? String,
+                  let handle = object["handle"] as? String,
+                  let service = object["service"] as? String,
+                  object["prev"] is NSNull,
+                  let signature = object["sig"] as? String else {
+                throw PetrelPLCError.malformed("PLC legacy create operation JSON is malformed")
+            }
+            operation = .legacyCreateOperation(.init(
+                signingKey: signingKey,
+                recoveryKey: recoveryKey,
+                handle: handle,
+                service: service,
+                signature: signature
+            ))
         default:
             throw PetrelPLCError.malformed("PLC operation type is unsupported")
         }
-        try validateSigned(operation)
+        // A signature that is not canonical on either curve can never verify,
+        // so it is reported as a malformed operation rather than later as a
+        // failed verification.
+        guard try isCanonicalOnASupportedCurve(decodeCanonicalSignature(operation.signature)) else {
+            throw PetrelPLCError.malformed("PLC operation signature is not canonical")
+        }
         return operation
     }
 
-    fileprivate static func validate(_ operation: PLCUnsignedRegularOperation) throws {
-        guard (1 ... 5).contains(operation.rotationKeys.count),
-              Set(operation.rotationKeys).count == operation.rotationKeys.count else {
-            throw PetrelPLCError.malformed("PLC operation must contain 1...5 unique rotation keys")
+    static func decodeServices(_ rawServices: [String: Any]) throws -> [String: PLCService] {
+        var services = [String: PLCService]()
+        for (name, rawService) in rawServices {
+            guard let service = rawService as? [String: Any],
+                  Set(service.keys) == ["type", "endpoint"],
+                  let serviceType = service["type"] as? String,
+                  let endpoint = service["endpoint"] as? String else {
+                throw PetrelPLCError.malformed("PLC operation service is malformed")
+            }
+            services[name] = .init(type: serviceType, endpoint: endpoint)
         }
-        try operation.rotationKeys.forEach { _ = try PLCDIDKeyCodec.decode($0) }
-        guard !operation.verificationMethods.isEmpty,
-              operation.verificationMethods.count <= 32,
-              operation.alsoKnownAs.count <= 32,
-              operation.services.count <= 32 else {
-            throw PetrelPLCError.malformed("PLC operation map or array bound is invalid")
+        return services
+    }
+
+    // MARK: Write validation
+
+    /// Applies the rules for *submitting* an operation to a directory.
+    ///
+    /// A tombstone only needs a canonical `prev`. A regular operation must
+    /// satisfy `limits`. A legacy `create` is always refused: the
+    /// specification forbids the deprecated format for new identities and
+    /// the directory does not accept it.
+    ///
+    /// - Parameters:
+    ///   - operation: The signed operation about to be sent.
+    ///   - limits: ``PLCOperationLimits/specification`` by default; pass
+    ///     ``PLCOperationLimits/referenceDirectory`` to also apply the
+    ///     tighter limits the reference directory server enforces.
+    /// - Throws: ``PetrelPLCError/malformed(_:)`` or
+    ///   ``PetrelPLCError/invalidIdentifier(_:)``.
+    public static func validateForSubmission(
+        _ operation: PLCSignedOperation,
+        limits: PLCOperationLimits = .specification
+    ) throws {
+        switch operation {
+        case let .regularOperation(value):
+            try validate(
+                rotationKeys: value.rotationKeys,
+                verificationMethods: value.verificationMethods,
+                alsoKnownAs: value.alsoKnownAs,
+                services: value.services,
+                prev: value.prev,
+                limits: limits
+            )
+        case let .tombstoneOperation(value):
+            try validatePreviousCID(value.prev)
+        case .legacyCreateOperation:
+            throw PetrelPLCError.malformed(
+                "the legacy create operation format cannot be submitted; build a plc_operation"
+            )
         }
-        for (name, value) in operation.verificationMethods {
-            try validateMapName(name)
-            _ = try PLCDIDKeyCodec.decode(value)
+        guard try isCanonicalOnASupportedCurve(decodeCanonicalSignature(operation.signature)) else {
+            throw PetrelPLCError.malformed("PLC operation signature is not canonical")
         }
-        for alias in operation.alsoKnownAs {
-            try validateWireString(alias, field: "alsoKnownAs")
-        }
-        for (name, service) in operation.services {
-            try validateMapName(name)
-            try validateWireString(service.type, field: "service type")
-            try validateWireString(service.endpoint, field: "service endpoint")
-        }
-        if let prev = operation.prev {
-            try validatePreviousCID(prev)
-        }
-        guard try encodeSigningBytes(.regular(operation)).count <= maximumDAGCBORBytes else {
-            throw PetrelPLCError.malformed("PLC operation exceeds 7,500 DAG-CBOR bytes")
+        guard try encode(operation, includingSignature: true).count <= limits.maximumDAGCBORBytes else {
+            throw PetrelPLCError.malformed(
+                "PLC operation exceeds \(limits.maximumDAGCBORBytes) DAG-CBOR bytes"
+            )
         }
     }
 
-    fileprivate static func validatePreviousCID(_ value: String) throws {
+    static func validate(
+        rotationKeys: [String],
+        verificationMethods: [String: String],
+        alsoKnownAs: [String],
+        services: [String: PLCService],
+        prev: String?,
+        limits: PLCOperationLimits
+    ) throws {
+        guard !rotationKeys.isEmpty,
+              rotationKeys.count <= limits.maximumRotationKeys,
+              Set(rotationKeys).count == rotationKeys.count else {
+            throw PetrelPLCError.malformed(
+                "PLC operation must contain 1...\(limits.maximumRotationKeys) unique rotation keys"
+            )
+        }
+        for key in rotationKeys {
+            guard key.utf8.count <= limits.maximumDIDKeyLength,
+                  (try? ATProtoPublicKey(didKey: key)) != nil else {
+                throw PetrelPLCError.invalidIdentifier(
+                    "PLC rotation key must be a P-256 or K-256 did:key"
+                )
+            }
+        }
+        guard verificationMethods.count <= limits.maximumVerificationMethods else {
+            throw PetrelPLCError.malformed(
+                "PLC operation may contain at most \(limits.maximumVerificationMethods) verification methods"
+            )
+        }
+        for (name, value) in verificationMethods {
+            try validateMapName(name, maximumLength: limits.maximumIdentifierLength)
+            guard value.utf8.count <= limits.maximumDIDKeyLength, isSyntacticDIDKey(value) else {
+                throw PetrelPLCError.invalidIdentifier(
+                    "PLC verification method must be a did:key with a base58btc multibase value"
+                )
+            }
+        }
+        guard alsoKnownAs.count <= limits.maximumAlsoKnownAs else {
+            throw PetrelPLCError.malformed(
+                "PLC operation may contain at most \(limits.maximumAlsoKnownAs) alsoKnownAs entries"
+            )
+        }
+        if !limits.allowsDuplicateAlsoKnownAs, Set(alsoKnownAs).count != alsoKnownAs.count {
+            throw PetrelPLCError.malformed("PLC operation alsoKnownAs entries must be unique")
+        }
+        for alias in alsoKnownAs {
+            try validateWireString(
+                alias, field: "alsoKnownAs", maximumLength: limits.maximumAlsoKnownAsLength
+            )
+        }
+        guard services.count <= limits.maximumServices else {
+            throw PetrelPLCError.malformed(
+                "PLC operation may contain at most \(limits.maximumServices) services"
+            )
+        }
+        for (name, service) in services {
+            try validateMapName(name, maximumLength: limits.maximumIdentifierLength)
+            try validateWireString(
+                service.type, field: "service type", maximumLength: limits.maximumServiceTypeLength
+            )
+            try validateWireString(
+                service.endpoint,
+                field: "service endpoint",
+                maximumLength: limits.maximumServiceEndpointLength
+            )
+        }
+        if let prev {
+            try validatePreviousCID(prev)
+        }
+    }
+
+    static func validatePreviousCID(_ value: String) throws {
         do {
             let cid = try CID.parse(value)
             guard cid.string == value,
@@ -420,46 +729,6 @@ public enum PLCOperationCodec {
         }
     }
 
-    fileprivate static func encodeSigningBytes(_ operation: PLCUnsignedOperation) throws -> Data {
-        switch operation {
-        case let .regular(value):
-            return try DAGCBOR.encodeValue(regularMap(value, signature: nil))
-        case let .tombstone(value):
-            return try DAGCBOR.encodeValue(OrderedCBORMap(entries: [
-                (key: "type", value: "plc_tombstone"),
-                (key: "prev", value: value.prev),
-            ]))
-        }
-    }
-
-    fileprivate static func encodeSigned(_ operation: PLCSignedOperation) throws -> Data {
-        switch operation {
-        case let .regularOperation(value):
-            return try DAGCBOR.encodeValue(regularMap(try value.unsigned, signature: value.signature))
-        case let .tombstoneOperation(value):
-            return try DAGCBOR.encodeValue(OrderedCBORMap(entries: [
-                (key: "type", value: "plc_tombstone"),
-                (key: "prev", value: value.prev),
-                (key: "sig", value: value.signature),
-            ]))
-        }
-    }
-
-    fileprivate static func encodeSignedJSON(_ operation: PLCSignedOperation) throws -> Data {
-        let object: [String: Any]
-        switch operation {
-        case let .regularOperation(value):
-            object = regularJSONObject(value)
-        case let .tombstoneOperation(value):
-            object = [
-                "type": "plc_tombstone",
-                "prev": value.prev,
-                "sig": value.signature,
-            ]
-        }
-        return try JSONSerialization.data(withJSONObject: object, options: [.sortedKeys])
-    }
-
     static func validateCanonicalDID(_ did: String) throws {
         guard did.utf8.count == 32,
               did.hasPrefix("did:plc:"),
@@ -471,52 +740,133 @@ public enum PLCOperationCodec {
         }
     }
 
-    private static func validateSigned(_ operation: PLCSignedOperation) throws {
-        let signature: String
-        let rotationKeys: [String]?
-        switch operation {
-        case let .regularOperation(value):
-            _ = try value.unsigned
-            signature = value.signature
-            rotationKeys = value.rotationKeys
-        case let .tombstoneOperation(value):
-            _ = try value.unsigned
-            signature = value.signature
-            rotationKeys = nil
-        }
-        let signatureBytes = try decodeCanonicalSignature(signature)
-        if let rotationKeys {
-            guard rotationKeys.contains(where: {
-                guard let key = try? PLCDIDKeyCodec.decode($0) else { return false }
-                switch key {
-                case .p256:
-                    return (try? P256WireSignature.decodeCanonical(signatureBytes)) != nil
-                case .secp256k1:
-                    return ATProtoJWTVerificationKey.isCanonicalSecp256k1Signature(signatureBytes)
-                }
-            }) else {
-                throw PetrelPLCError.malformed("PLC operation signature is not canonical")
-            }
-        }
-        guard try encodeSigned(operation).count <= maximumDAGCBORBytes else {
-            throw PetrelPLCError.malformed("PLC operation exceeds 7,500 DAG-CBOR bytes")
+    /// The specification's syntax rule for a verification method key:
+    /// `did:key:` followed by a base58btc multibase string. No key type is
+    /// excluded.
+    static func isSyntacticDIDKey(_ value: String) -> Bool {
+        let prefix = "did:key:z"
+        guard value.hasPrefix(prefix) else { return false }
+        let body = value.dropFirst(prefix.count)
+        return !body.isEmpty && body.utf8.allSatisfy { base58Alphabet.contains($0) }
+    }
+
+    private static let base58Alphabet = Set(
+        "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".utf8
+    )
+
+    private static func validateMapName(_ value: String, maximumLength: Int) throws {
+        guard !value.isEmpty, value.utf8.count <= maximumLength,
+              value.utf8.allSatisfy({ $0 >= 0x21 && $0 <= 0x7e }) else {
+            throw PetrelPLCError.malformed("PLC operation map key is invalid")
         }
     }
 
-    private static func decodeCanonicalSignature(_ value: String) throws -> Data {
-        guard let decoded = Data(plcBase64URL: value),
-              decoded.count == P256WireSignature.rawByteCount,
-              decoded.plcBase64URL == value else {
-            throw PetrelPLCError.malformed("PLC operation signature encoding is invalid")
+    private static func validateWireString(
+        _ value: String, field: String, maximumLength: Int
+    ) throws {
+        guard !value.isEmpty, value.utf8.count <= maximumLength,
+              !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
+            throw PetrelPLCError.malformed("PLC operation \(field) is invalid")
         }
-        return decoded
+    }
+
+    // MARK: Encoding
+
+    static func encodeSigningBytes(_ operation: PLCUnsignedOperation) throws -> Data {
+        switch operation {
+        case let .regular(value):
+            return try DAGCBOR.encodeValue(regularMap(
+                rotationKeys: value.rotationKeys,
+                verificationMethods: value.verificationMethods,
+                alsoKnownAs: value.alsoKnownAs,
+                services: value.services,
+                prev: value.prev,
+                signature: nil
+            ))
+        case let .tombstone(value):
+            return try DAGCBOR.encodeValue(tombstoneMap(prev: value.prev, signature: nil))
+        }
+    }
+
+    static func encode(_ operation: PLCSignedOperation, includingSignature: Bool) throws -> Data {
+        switch operation {
+        case let .regularOperation(value):
+            return try DAGCBOR.encodeValue(regularMap(
+                rotationKeys: value.rotationKeys,
+                verificationMethods: value.verificationMethods,
+                alsoKnownAs: value.alsoKnownAs,
+                services: value.services,
+                prev: value.prev,
+                signature: includingSignature ? value.signature : nil
+            ))
+        case let .tombstoneOperation(value):
+            return try DAGCBOR.encodeValue(tombstoneMap(
+                prev: value.prev,
+                signature: includingSignature ? value.signature : nil
+            ))
+        case let .legacyCreateOperation(value):
+            var entries: [(key: String, value: Any)] = [
+                (key: "type", value: "create"),
+                (key: "signingKey", value: value.signingKey),
+                (key: "recoveryKey", value: value.recoveryKey),
+                (key: "handle", value: value.handle),
+                (key: "service", value: value.service),
+                (key: "prev", value: NSNull()),
+            ]
+            if includingSignature {
+                entries.append((key: "sig", value: value.signature))
+            }
+            return try DAGCBOR.encodeValue(OrderedCBORMap(entries: entries))
+        }
+    }
+
+    static func encodeSignedJSON(_ operation: PLCSignedOperation) throws -> Data {
+        try JSONSerialization.data(withJSONObject: jsonObject(operation), options: [.sortedKeys])
+    }
+
+    static func jsonObject(_ operation: PLCSignedOperation) -> [String: Any] {
+        switch operation {
+        case let .regularOperation(value):
+            return [
+                "type": "plc_operation",
+                "rotationKeys": value.rotationKeys,
+                "verificationMethods": value.verificationMethods,
+                "alsoKnownAs": value.alsoKnownAs,
+                "services": value.services.mapValues { [
+                    "type": $0.type,
+                    "endpoint": $0.endpoint,
+                ] },
+                "prev": value.prev ?? NSNull(),
+                "sig": value.signature,
+            ]
+        case let .tombstoneOperation(value):
+            return [
+                "type": "plc_tombstone",
+                "prev": value.prev,
+                "sig": value.signature,
+            ]
+        case let .legacyCreateOperation(value):
+            return [
+                "type": "create",
+                "signingKey": value.signingKey,
+                "recoveryKey": value.recoveryKey,
+                "handle": value.handle,
+                "service": value.service,
+                "prev": NSNull(),
+                "sig": value.signature,
+            ]
+        }
     }
 
     private static func regularMap(
-        _ operation: PLCUnsignedRegularOperation,
+        rotationKeys: [String],
+        verificationMethods: [String: String],
+        alsoKnownAs: [String],
+        services: [String: PLCService],
+        prev: String?,
         signature: String?
     ) -> OrderedCBORMap {
-        let serviceValues: [String: Any] = operation.services.mapValues { service in
+        let serviceValues: [String: Any] = services.mapValues { service in
             OrderedCBORMap(entries: [
                 (key: "type", value: service.type),
                 (key: "endpoint", value: service.endpoint),
@@ -524,11 +874,11 @@ public enum PLCOperationCodec {
         }
         var entries: [(key: String, value: Any)] = [
             (key: "type", value: "plc_operation"),
-            (key: "rotationKeys", value: operation.rotationKeys),
-            (key: "verificationMethods", value: operation.verificationMethods),
-            (key: "alsoKnownAs", value: operation.alsoKnownAs),
+            (key: "rotationKeys", value: rotationKeys),
+            (key: "verificationMethods", value: verificationMethods),
+            (key: "alsoKnownAs", value: alsoKnownAs),
             (key: "services", value: serviceValues),
-            (key: "prev", value: operation.prev ?? NSNull()),
+            (key: "prev", value: prev ?? NSNull()),
         ]
         if let signature {
             entries.append((key: "sig", value: signature))
@@ -536,197 +886,40 @@ public enum PLCOperationCodec {
         return OrderedCBORMap(entries: entries)
     }
 
-    private static func regularJSONObject(_ operation: PLCSignedRegularOperation) -> [String: Any] {
-        [
-            "type": "plc_operation",
-            "rotationKeys": operation.rotationKeys,
-            "verificationMethods": operation.verificationMethods,
-            "alsoKnownAs": operation.alsoKnownAs,
-            "services": operation.services.mapValues { [
-                "type": $0.type,
-                "endpoint": $0.endpoint,
-            ] },
-            "prev": operation.prev ?? NSNull(),
-            "sig": operation.signature,
+    private static func tombstoneMap(prev: String, signature: String?) -> OrderedCBORMap {
+        var entries: [(key: String, value: Any)] = [
+            (key: "type", value: "plc_tombstone"),
+            (key: "prev", value: prev),
         ]
+        if let signature {
+            entries.append((key: "sig", value: signature))
+        }
+        return OrderedCBORMap(entries: entries)
     }
 
-    private static func validateMapName(_ value: String) throws {
-        guard !value.isEmpty, value.utf8.count <= 128,
-              value.utf8.allSatisfy({ $0 >= 0x21 && $0 <= 0x7e }) else {
-            throw PetrelPLCError.malformed("PLC operation map key is invalid")
+    // MARK: Signatures
+
+    /// Decodes a `sig` field under the specification's encoding rules:
+    /// base64url alphabet, no padding, zero trailing bits, exactly 64 bytes.
+    static func decodeCanonicalSignature(_ value: String) throws -> Data {
+        guard let decoded = Data(plcBase64URL: value),
+              decoded.count == ATProtoSignature.compactByteCount,
+              decoded.plcBase64URL == value else {
+            throw PetrelPLCError.malformed("PLC operation signature encoding is invalid")
         }
+        return decoded
     }
 
-    private static func validateWireString(_ value: String, field: String) throws {
-        guard !value.isEmpty, value.utf8.count <= 2_048,
-              !value.unicodeScalars.contains(where: { CharacterSet.controlCharacters.contains($0) }) else {
-            throw PetrelPLCError.malformed("PLC operation \(field) is invalid")
-        }
-    }
-}
-
-enum StrictJSON {
-    static func validate(_ data: Data) throws {
-        var parser = Parser(bytes: Array(data))
-        try parser.parseValue()
-        parser.skipWhitespace()
-        guard parser.index == parser.bytes.count else {
-            throw PetrelPLCError.malformed("PLC JSON has trailing data")
-        }
-    }
-
-    private struct Parser {
-        static let maximumNestingDepth = 64
-
-        let bytes: [UInt8]
-        var index = 0
-
-        mutating func parseValue(nestingDepth: Int = 0) throws {
-            skipWhitespace()
-            guard index < bytes.count else { throw malformed() }
-            switch bytes[index] {
-            case UInt8(ascii: "{"):
-                let nestedDepth = try nextNestingDepth(after: nestingDepth)
-                try parseObject(nestingDepth: nestedDepth)
-            case UInt8(ascii: "["):
-                let nestedDepth = try nextNestingDepth(after: nestingDepth)
-                try parseArray(nestingDepth: nestedDepth)
-            case UInt8(ascii: "\""): _ = try parseString()
-            case UInt8(ascii: "t"): try consume("true")
-            case UInt8(ascii: "f"): try consume("false")
-            case UInt8(ascii: "n"): try consume("null")
-            case UInt8(ascii: "-"), UInt8(ascii: "0") ... UInt8(ascii: "9"): try parseNumber()
-            default: throw malformed()
-            }
-        }
-
-        mutating func parseObject(nestingDepth: Int) throws {
-            index += 1
-            skipWhitespace()
-            if consumeIf(UInt8(ascii: "}")) { return }
-            var keys = Set<String>()
-            while true {
-                skipWhitespace()
-                let key = try parseString()
-                guard keys.insert(key).inserted else {
-                    throw PetrelPLCError.malformed("PLC JSON contains a duplicate map key")
-                }
-                skipWhitespace()
-                guard consumeIf(UInt8(ascii: ":")) else { throw malformed() }
-                try parseValue(nestingDepth: nestingDepth)
-                skipWhitespace()
-                if consumeIf(UInt8(ascii: "}")) { return }
-                guard consumeIf(UInt8(ascii: ",")) else { throw malformed() }
-            }
-        }
-
-        mutating func parseArray(nestingDepth: Int) throws {
-            index += 1
-            skipWhitespace()
-            if consumeIf(UInt8(ascii: "]")) { return }
-            while true {
-                try parseValue(nestingDepth: nestingDepth)
-                skipWhitespace()
-                if consumeIf(UInt8(ascii: "]")) { return }
-                guard consumeIf(UInt8(ascii: ",")) else { throw malformed() }
-            }
-        }
-
-        func nextNestingDepth(after currentDepth: Int) throws -> Int {
-            guard currentDepth < Self.maximumNestingDepth else {
-                throw PetrelPLCError.malformed("PLC JSON exceeds maximum nesting depth")
-            }
-            return currentDepth + 1
-        }
-
-        mutating func parseString() throws -> String {
-            guard consumeIf(UInt8(ascii: "\"")) else { throw malformed() }
-            let start = index
-            var escaped = false
-            while index < bytes.count {
-                let byte = bytes[index]
-                if byte == UInt8(ascii: "\""), !escaped {
-                    let range = start ..< index
-                    index += 1
-                    guard let raw = String(bytes: bytes[range], encoding: .utf8),
-                          let quoted = "\"\(raw)\"".data(using: .utf8),
-                          let decoded = try JSONSerialization.jsonObject(
-                              with: quoted,
-                              options: [.fragmentsAllowed]
-                          ) as? String else {
-                        throw malformed()
-                    }
-                    return decoded
-                }
-                if byte < 0x20 { throw malformed() }
-                if escaped {
-                    escaped = false
-                } else if byte == UInt8(ascii: "\\") {
-                    escaped = true
-                }
-                index += 1
-            }
-            throw malformed()
-        }
-
-        mutating func parseNumber() throws {
-            let start = index
-            while index < bytes.count,
-                  bytes[index] == UInt8(ascii: "-") ||
-                  bytes[index] == UInt8(ascii: "+") ||
-                  bytes[index] == UInt8(ascii: ".") ||
-                  bytes[index] == UInt8(ascii: "e") ||
-                  bytes[index] == UInt8(ascii: "E") ||
-                  (bytes[index] >= UInt8(ascii: "0") && bytes[index] <= UInt8(ascii: "9")) {
-                index += 1
-            }
-            guard index > start else { throw malformed() }
-        }
-
-        mutating func consume(_ literal: StaticString) throws {
-            let expected = Array(String(describing: literal).utf8)
-            guard index + expected.count <= bytes.count,
-                  Array(bytes[index ..< index + expected.count]) == expected else {
-                throw malformed()
-            }
-            index += expected.count
-        }
-
-        mutating func skipWhitespace() {
-            while index < bytes.count, [0x20, 0x09, 0x0a, 0x0d].contains(bytes[index]) {
-                index += 1
-            }
-        }
-
-        mutating func consumeIf(_ byte: UInt8) -> Bool {
-            guard index < bytes.count, bytes[index] == byte else { return false }
-            index += 1
-            return true
-        }
-
-        private func malformed() -> PetrelPLCError {
-            .malformed("PLC JSON is malformed")
-        }
+    /// Whether 64 signature bytes hold in-range scalars with low-S on P-256
+    /// or on K-256. Which curve applies is only known once a key is tried.
+    static func isCanonicalOnASupportedCurve(_ signature: Data) -> Bool {
+        ATProtoKeyCurve.allCases.contains { ATProtoSignature.isCanonical(signature, curve: $0) }
     }
 }
 
-private func isLoopbackLiteral(_ host: String) -> Bool {
-    let canonical = host.trimmingCharacters(in: CharacterSet(charactersIn: "[]"))
-    if canonical == "::1" { return true }
-    let parts = canonical.split(separator: ".", omittingEmptySubsequences: false)
-    guard parts.count == 4,
-          let first = UInt8(parts[0]),
-          parts.allSatisfy({ part in
-              guard let value = UInt8(part) else { return false }
-              return String(value) == part
-          }) else {
-        return false
-    }
-    return first == 127
-}
-
-private extension Data {
+extension Data {
+    /// Decodes unpadded base64url. Returns `nil` for padding or any
+    /// character outside the URL-safe alphabet.
     init?(plcBase64URL value: String) {
         guard !value.isEmpty,
               !value.contains("="),
@@ -745,6 +938,7 @@ private extension Data {
         self.init(base64Encoded: padded)
     }
 
+    /// Unpadded base64url.
     var plcBase64URL: String {
         base64EncodedString()
             .replacingOccurrences(of: "+", with: "-")
