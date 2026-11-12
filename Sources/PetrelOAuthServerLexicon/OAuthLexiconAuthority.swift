@@ -43,7 +43,7 @@ public protocol OAuthLexiconAuthorityResolving: Sendable {
     /// - Throws: ``OAuthLexiconAuthorityError`` when the document cannot be
     ///   used, `CancellationError` when cancelled. Any other error is reported
     ///   by ``AuthenticatedOAuthLexiconResolver`` as
-    ///   ``OAuthLexiconResolverFailure/authorityDocumentUnavailable``.
+    ///   `OAuthLexiconResolverFailure/authorityDocumentUnavailable`.
     func resolveAuthority(did: String) async throws -> OAuthLexiconAuthority
 }
 
@@ -94,7 +94,7 @@ public struct IdentityOAuthLexiconAuthorityResolver: OAuthLexiconAuthorityResolv
 }
 
 /// An `IdentityHTTPTransport` that sends DID document requests through an
-/// ``OAuthRemoteDocumentFetcher``.
+/// `OAuthRemoteDocumentFetcher`.
 ///
 /// A `did:web` document is served from a host its owner chooses, so fetching it
 /// is the same server-side request forgery risk as fetching client metadata.

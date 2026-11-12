@@ -6,7 +6,7 @@ import PetrelOAuthScopes
 import PetrelOAuthServer
 import PetrelRepo
 
-/// The network ``OAuthLexiconResolving``: all fifteen steps the protocol lists,
+/// The network `OAuthLexiconResolving`: all fifteen steps the protocol lists,
 /// including the repository proof.
 ///
 /// This ports the reference implementation's `LexResolver`
@@ -26,13 +26,13 @@ import PetrelRepo
 /// trusted on its own.
 ///
 /// Every network fetch, including `did:web` documents, goes through one
-/// ``OAuthRemoteDocumentFetcher``. It enforces the server's outbound policy:
+/// `OAuthRemoteDocumentFetcher`. It enforces the server's outbound policy:
 /// HTTPS, public addresses only, a pinned connection, no redirects, bounded time
 /// and size. Its body limit must be at most
-/// ``OAuthLexiconResolutionBudget/maximumCARBytes``, which bounds the parsing,
+/// `OAuthLexiconResolutionBudget/maximumCARBytes`, which bounds the parsing,
 /// tree walking and signature work a response can cause.
 ///
-/// Wrap it in ``CachingOAuthLexiconResolver`` for the specification's cache
+/// Wrap it in `CachingOAuthLexiconResolver` for the specification's cache
 /// lifetimes:
 ///
 /// ```swift
@@ -69,7 +69,7 @@ public struct AuthenticatedOAuthLexiconResolver: OAuthLexiconResolving {
     /// - Parameters:
     ///   - fetcher: performs `com.atproto.sync.getRecord`, and by default the
     ///     DID document fetches too. Its policy's body limit must be at most
-    ///     ``OAuthLexiconResolutionBudget/maximumCARBytes``.
+    ///     `OAuthLexiconResolutionBudget/maximumCARBytes`.
     ///   - dns: looks up `_lexicon.<authority>`. Defaults to the system
     ///     resolver.
     ///   - authorities: resolves the authority DID (steps 5 and 6). Defaults to
@@ -115,7 +115,7 @@ public struct AuthenticatedOAuthLexiconResolver: OAuthLexiconResolving {
     ///
     /// - Returns: `.resolved` with the document, its `at://` URI and the CID the
     ///   proof ended at, or `.unresolvable` for any failure listed in
-    ///   ``OAuthLexiconResolverFailure``.
+    ///   `OAuthLexiconResolverFailure`.
     /// - Throws: `CancellationError`, and nothing else.
     public func resolve(_ nsid: String) async throws -> OAuthLexiconResolution {
         do {
@@ -126,7 +126,7 @@ public struct AuthenticatedOAuthLexiconResolver: OAuthLexiconResolving {
         }
     }
 
-    /// Runs the fifteen steps, throwing the ``OAuthLexiconResolverFailure``
+    /// Runs the fifteen steps, throwing the `OAuthLexiconResolverFailure`
     /// that stopped them. Exposed for tests and diagnostics.
     func performResolution(_ nsid: String) async throws -> OAuthLexiconResolution {
         // Step 1.
@@ -388,7 +388,7 @@ public struct AuthenticatedOAuthLexiconResolver: OAuthLexiconResolving {
 /// A resolver was configured in a way that would remove one of its limits.
 public enum OAuthLexiconResolverConfigurationError: Error, Sendable, Equatable {
     /// The fetcher's policy admits responses larger than
-    /// ``OAuthLexiconResolutionBudget/maximumCARBytes``. That cap bounds the CPU
+    /// `OAuthLexiconResolutionBudget/maximumCARBytes`. That cap bounds the CPU
     /// a proof can cost, and the fetcher is what enforces it.
     case fetchPolicyTooPermissive(maximumBodyBytes: Int)
 }

@@ -1,0 +1,15 @@
+{
+  "$comment": "Overlay manifest for custom xyz.statusphere.* lexicons. Run from the Petrel repo root: python3 run.py --manifest Examples/StatusphereOverlay/petrel-manifest.json --language swift",
+  "package": {
+    "kind": "overlay",
+    "name": "PetrelStatusphere",
+    "core_namespace_roots": []
+  },
+  "lexicons": {
+    "emit": ["Examples/StatusphereOverlay/lexicons"],
+    "reference": ["generator/lexicons"]
+  },
+  "swift": {
+    "output": "Examples/StatusphereOverlay/Sources/PetrelStatusphere/Generated"
+  }
+}

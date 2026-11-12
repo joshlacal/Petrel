@@ -36,23 +36,27 @@ Put your Lexicons in the package and describe the run in `lexgen.json`:
   generating them. `petrel:core` is the set bundled with Petrel, so
   `{"type": "ref", "ref": "com.atproto.repo.strongRef"}` resolves to Petrel's
   `ComAtprotoRepoStrongRef`.
-- `swift.output` is where the sources go. The directory is owned by the
-  generator: files it did not write are removed.
+- `swift.output` is where the sources go. On each run the generator deletes
+  the Swift files there that carry its generated-file header but that it no
+  longer writes; other files are left alone.
 
 All paths are relative to the package directory.
 
 ## Run the generator
 
-Petrel ships the generator as a SwiftPM command plugin. From your package:
+Petrel ships the generator as the SwiftPM command plugin `PetrelLexgen`.
+From a package that depends on Petrel:
 
 ```sh
 swift package --allow-writing-to-package-directory --allow-network-connections all:443 \
     petrel-lexgen --manifest lexgen.json
 ```
 
-The plugin needs Python 3 on `PATH` (or `--python <path>`). On first use it
-installs the generator's three Python dependencies into its own work directory,
-which is what the network permission is for; later runs need no network.
+`--manifest` defaults to `lexgen.json`; `--verbose` prints the generator's
+output. The plugin needs Python 3 on `PATH` (or `--python <path>`). On first use
+it creates a virtual environment in its own work directory and installs the
+generator's three Python dependencies (jinja2, aiofiles, orjson) into it, which
+is what the network permission is for; later runs need no network.
 
 Without the plugin, run the generator from a Petrel checkout:
 
@@ -67,22 +71,34 @@ deterministic, so the diff shows exactly what changed.
 
 ## Use the generated API
 
+For example, the `PetrelOzone` product (`tools.ozone.*`, generated from `generator/manifests/petrel-ozone.json`) registers its decoders once at startup and exposes typed namespaces and errors directly on `ATProtoClient`:
+
+<!-- compile-example: custom-lexicons-overlay-usage -->
 ```swift
 import Petrel
+import PetrelOzone
 
-// Once, at startup: lets Pins types decode inside untyped data such as the
-// `value` of com.atproto.repo.getRecord.
-PinsLexicons.register()
+func inspectOzoneEvent(
+    client: ATProtoClient,
+    templateInput: ToolsOzoneCommunicationCreateTemplate.Input
+) async throws {
+    // Once, at startup: lets overlay types decode inside untyped data such as
+    // the `value` of com.atproto.repo.getRecord.
+    PetrelOzoneLexicons.register()
 
-let (_, output) = try await client.com.example.pins.listPins(
-    input: .init(actor: ATIdentifier(string: "alice.example.com"), limit: 10)
-)
-let notes = output?.pins.compactMap(\.record.note) ?? []
+    let (_, event) = try await client.tools.ozone.moderation.getEvent(
+        input: .init(id: 42)
+    )
+    _ = event?.createdBy
 
-do {
-    _ = try await client.com.example.pins.listPins(input: parameters)
-} catch let error as ATProtoError<ComExamplePinsListPins.Error> {
-    // .actorNotFound, as declared in the Lexicon
+    do {
+        _ = try await client.tools.ozone.communication.createTemplate(input: templateInput)
+    } catch let error as ATProtoError<ToolsOzoneCommunicationCreateTemplate.Error> {
+        switch error.error {
+        case .duplicateTemplateName:
+            break
+        }
+    }
 }
 ```
 
@@ -97,6 +113,7 @@ Every part of Lexicon version 1:
 | `record` | struct with `typeIdentifier` and `recordKeyType`; writes `$type` |
 | `object` (named or inline) | struct; inline objects become nested structs |
 | `query`, `procedure` | async method; `Parameters`, `Input`, `Output`, `Error` |
+| `query` with output encoding `text/event-stream` | method returning `AsyncThrowingStream<Output, Error>`, one `Output` per server-sent event |
 | `subscription` | method returning `AsyncThrowingStream<Message, Error>` |
 | `permission-set` | `permissionSet` constant with `includeScope(audience:)` |
 | `token` | string constant holding `nsid#name` |
@@ -105,6 +122,11 @@ Every part of Lexicon version 1:
 | `string` | `String`, or a typed value for each `format` (`DID`, `Handle`, `ATProtocolURI`, `CIDString`, `ATProtocolDate`, …); `enum` and named `knownValues` become types |
 | `integer`, `boolean`, `bytes`, `cid-link`, `blob`, `unknown`, `array` | `Int`, `Bool`, `Bytes`, `ATProtoLink`, `Blob`, `ATProtocolValueContainer`, `[T]` |
 | `required`, `nullable` | non-optional, optional, and `ATProtoNullable<T>?` for optional and nullable |
+
+A query parameter's Lexicon `default` becomes its initializer default, so it is
+sent unless you pass `nil`. A query with an optional string `cursor` parameter
+and a `cursor` in its output gets the ``XRPCCursorPaginatedParameters`` and
+``XRPCCursorPaginatedOutput`` conformances, so ``XRPCPages`` can page through it.
 
 NSIDs of any length map to nested namespaces
 (`fm.example.alpha.feed.getPlay` is `client.fm.example.alpha.feed.getPlay`).
@@ -125,3 +147,7 @@ catalog), the manifest and the generated sources, and
 `Tests/PetrelLexiconFixtureTests` exercises them. The `PetrelOzone` product
 (`tools.ozone.*`) is generated the same way, from
 `generator/manifests/petrel-ozone.json`.
+
+For an end-to-end walkthrough using the standalone `petrel-gen` CLI (`@petrel/core-lexicons`),
+`PetrelCodegenPlugin`, Swift + Kotlin overlay generation, and OAuth collection scopes, see
+<doc:CustomLexiconsAndOverlays> and [`Examples/StatusphereOverlay`](https://github.com/joshlacal/Petrel/tree/main/Examples/StatusphereOverlay).

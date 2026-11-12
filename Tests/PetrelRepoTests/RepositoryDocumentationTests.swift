@@ -5,8 +5,11 @@ import PetrelRepo
 import Testing
 
 /// The examples of `Sources/PetrelRepo/PetrelRepo.docc/Repositories.md`,
-/// compiled and run. `articleMatchesTheseTests` checks that every Swift block
-/// in the article appears here line for line, so the two cannot drift.
+/// compiled and run. `articleMatchesTheseTests` checks that the statements of
+/// every Swift block in the article appear here in the same order, so the two
+/// cannot drift. The article wraps each example in a function so that the
+/// documentation validator can typecheck it on its own; the wrapper (imports,
+/// signature, closing brace, `_ =` and `return` lines) is not compared.
 @Suite("Documentation examples (Repositories.md)")
 struct RepositoryDocumentationTests {
     private let did = "did:plc:ewvi7nxzyoun6zhxrhs64oiz"
@@ -163,7 +166,7 @@ struct RepositoryDocumentationTests {
         )
     }
 
-    @Test("every Swift block in the article appears in this file, line for line")
+    @Test("every Swift block in the article appears in this file, in order")
     func articleMatchesTheseTests() throws {
         let testFile = URL(fileURLWithPath: #filePath)
         let root = testFile.deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -198,13 +201,30 @@ struct RepositoryDocumentationTests {
                 for line in block { #expect(source.contains(line), "\(line)") }
                 continue
             }
-            let first = try #require(block.first)
-            let found = source.indices.contains { start in
-                source[start] == first
-                    && start + block.count <= source.count
-                    && Array(source[start ..< start + block.count]) == block
+            for line in block where line.hasPrefix("import ") {
+                #expect(source.contains(line), "\(line)")
             }
-            #expect(found, "article block starting `\(first)` is not in the tests")
+            let statements = exampleStatements(block)
+            let first = try #require(statements.first)
+            // Every statement of the example, in the same order as in this file.
+            var remaining = statements[...]
+            for line in source where remaining.first == line {
+                remaining.removeFirst()
+            }
+            #expect(remaining.isEmpty, "article block starting `\(first)` is not in the tests: missing `\(remaining.first ?? "")`")
         }
+    }
+
+    /// The lines of an article example without its typechecking wrapper:
+    /// imports, the `func` signature (up to the line that opens its body),
+    /// the closing brace, and `_ =` / `return` lines.
+    private func exampleStatements(_ block: [String]) -> [String] {
+        var lines = block.filter { !$0.hasPrefix("import ") }
+        if lines.first?.hasPrefix("func ") == true,
+           let bodyStart = lines.firstIndex(where: { $0.hasSuffix("{") }) {
+            lines.removeSubrange(...bodyStart)
+            if lines.last == "}" { lines.removeLast() }
+        }
+        return lines.filter { !$0.hasPrefix("_ = ") && !$0.hasPrefix("return ") }
     }
 }

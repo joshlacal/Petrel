@@ -1,0 +1,60 @@
+[build-system]
+requires = ["setuptools>=68.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "petrel-gen"
+version = "2.0.0"
+description = "Schema-first AT Protocol Lexicon compiler for Swift 6 and Kotlin (Petrel SDK)"
+readme = "CODEGEN.md"
+requires-python = ">=3.10"
+license = "MIT"
+authors = [
+    { name = "Josh LaCalamito" }
+]
+keywords = ["atproto", "bluesky", "lexicon", "codegen", "swift", "kotlin", "petrel"]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Code Generators",
+]
+dependencies = [
+    "jinja2>=3.1",
+    "aiofiles>=23.0",
+    "orjson>=3.9",
+]
+
+[project.urls]
+Homepage = "https://github.com/joshlacal/Petrel"
+Repository = "https://github.com/joshlacal/Petrel"
+Documentation = "https://github.com/joshlacal/Petrel/blob/main/CODEGEN.md"
+
+[project.scripts]
+petrel-gen = "generator.cli:cli_main"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["generator"]
+
+[tool.setuptools.package-data]
+generator = [
+    "templates/*.jinja",
+    "templates/**/*.jinja",
+    "lexicons/*.json",
+    "lexicons/**/*.json",
+    "manifests/*.json",
+    "provenance/*.json",
+    "package-graph.json",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["generator/tests"]
+pythonpath = ["generator"]

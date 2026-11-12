@@ -23,15 +23,22 @@ throws ``LexiconSchemaError`` and is not added.
 
 <!-- Mirrors DocumentationSnippetTests.documentationValidateRecord -->
 
+<!-- compile-example: lexicon-validate-record -->
 ```swift
-var catalog = LexiconCatalog()
-try catalog.add(json: schemaJSON)
+import Foundation
+import PetrelLexicon
 
-let record = try LexValue.record(json: Data(#"""
-{ "$type": "com.example.note", "text": "hello", "createdAt": "2026-01-01T00:00:00.000Z" }
-"""#.utf8))
+// `schemaJSON` is the Lexicon document for com.example.note.
+func validateNote(schemaJSON: Data) throws {
+    var catalog = LexiconCatalog()
+    try catalog.add(json: schemaJSON)
 
-try catalog.validateRecord(record, collection: "com.example.note", recordKey: "3jzfcijpj2z2a")
+    let record = try LexValue.record(json: Data(#"""
+    { "$type": "com.example.note", "text": "hello", "createdAt": "2026-01-01T00:00:00.000Z" }
+    """#.utf8))
+
+    try catalog.validateRecord(record, collection: "com.example.note", recordKey: "3jzfcijpj2z2a")
+}
 ```
 
 `validateRecord` requires an object whose `$type` is exactly the collection,
@@ -51,9 +58,16 @@ searched.
 
 <!-- Mirrors DocumentationSnippetTests.documentationLoadDirectory -->
 
+<!-- compile-example: lexicon-load-directory -->
 ```swift
-var catalog = LexiconCatalog()
-try catalog.add(contentsOfDirectory: lexiconsDirectory)
+import Foundation
+import PetrelLexicon
+
+func loadCatalog(lexiconsDirectory: URL) throws -> LexiconCatalog {
+    var catalog = LexiconCatalog()
+    try catalog.add(contentsOfDirectory: lexiconsDirectory)
+    return catalog
+}
 ```
 
 ## Read the issues
@@ -63,23 +77,30 @@ pointer into the value and a stable reason code.
 
 <!-- Mirrors DocumentationSnippetTests.documentationReadIssues -->
 
+<!-- compile-example: lexicon-read-issues -->
 ```swift
-let record: LexValue = [
-    "$type": "com.example.note",
-    "text": "hello",
-    "createdAt": "yesterday",
-    "langs": ["en", "not a language"],
-]
+import PetrelLexicon
 
-var report: [String] = []
-do {
-    try catalog.validateRecord(record, collection: "com.example.note")
-} catch let error as LexiconValidationError {
-    for issue in error.issues {
-        report.append("\(issue.path): \(issue.code.rawValue)")
+// `catalog` holds the com.example.note schema.
+func describeProblems(catalog: LexiconCatalog) throws -> [String] {
+    let record: LexValue = [
+        "$type": "com.example.note",
+        "text": "hello",
+        "createdAt": "yesterday",
+        "langs": ["en", "not a language"],
+    ]
+
+    var report: [String] = []
+    do {
+        try catalog.validateRecord(record, collection: "com.example.note")
+    } catch let error as LexiconValidationError {
+        for issue in error.issues {
+            report.append("\(issue.path): \(issue.code.rawValue)")
+        }
     }
+    // report == ["/createdAt: stringFormatMismatch", "/langs/1: stringFormatMismatch"]
+    return report
 }
-// report == ["/createdAt: stringFormatMismatch", "/langs/1: stringFormatMismatch"]
 ```
 
 ## Unknown Lexicon versus invalid data
@@ -91,18 +112,25 @@ different outcome from "the data is wrong", so the first is a
 
 <!-- Mirrors DocumentationSnippetTests.documentationOptimisticValidation -->
 
+<!-- compile-example: lexicon-optimistic-validation -->
 ```swift
+import PetrelLexicon
+
 enum Outcome { case valid, unknownLexicon, invalid }
-let outcome: Outcome
-do {
-    try catalog.validateRecord(record, collection: "org.unknown.thing")
-    outcome = .valid
-} catch LexiconCatalogError.definitionNotFound {
-    // No schema for this collection: an "optimistic" writer accepts
-    // the record, a "required" one refuses it.
-    outcome = .unknownLexicon
-} catch {
-    outcome = .invalid
+
+func check(_ record: LexValue, catalog: LexiconCatalog) -> Outcome {
+    let outcome: Outcome
+    do {
+        try catalog.validateRecord(record, collection: "org.unknown.thing")
+        outcome = .valid
+    } catch LexiconCatalogError.definitionNotFound {
+        // No schema for this collection: an "optimistic" writer accepts
+        // the record, a "required" one refuses it.
+        outcome = .unknownLexicon
+    } catch {
+        outcome = .invalid
+    }
+    return outcome
 }
 ```
 
@@ -120,20 +148,27 @@ second key is neither a link nor an ordinary object.
 
 <!-- Mirrors DocumentationSnippetTests.documentationStrictParsing -->
 
+<!-- compile-example: lexicon-strict-parsing -->
 ```swift
-// A float is not part of the data model.
-do {
-    _ = try LexValue(json: Data(#"{"ratio": 0.5}"#.utf8))
-} catch let error as LexValueError {
-    // error.code == .floatNotAllowed, error.path == "/ratio"
-}
+import Foundation
+import PetrelLexicon
 
-// Links and bytes come out typed.
-let value = try LexValue(json: Data(#"""
-{"ref": {"$link": "bafyreidfayvfuwqa7qlnopdjiqrxzs6blmoeu4rujcjtnci5beludirz2a"}, "sig": {"$bytes": "aGVsbG8"}}
-"""#.utf8))
-value["ref"]?.cidValue?.codec   // .dagCBOR
-value["sig"]?.bytesValue        // 5 bytes: "hello"
+func strictParsing() throws {
+    // A float is not part of the data model.
+    do {
+        _ = try LexValue(json: Data(#"{"ratio": 0.5}"#.utf8))
+    } catch let error as LexValueError {
+        assert(error.code == .floatNotAllowed && error.path == "/ratio")
+    }
+
+    // Links and bytes come out typed.
+    let value = try LexValue(json: Data(#"""
+    {"ref": {"$link": "bafyreidfayvfuwqa7qlnopdjiqrxzs6blmoeu4rujcjtnci5beludirz2a"}, "sig": {"$bytes": "aGVsbG8"}}
+    """#.utf8))
+    let link = value["ref"]?.cidValue       // a CID with codec .dagCBOR
+    let bytes = value["sig"]?.bytesValue    // 5 bytes: "hello"
+    _ = (link, bytes)
+}
 ```
 
 Two rules are deliberately opt-in, through `LexValue.ParseOptions`, because
@@ -153,11 +188,17 @@ PDS would compute for the same record.
 
 <!-- Mirrors DocumentationSnippetTests.documentationCanonicalBytes -->
 
+<!-- compile-example: lexicon-canonical-bytes -->
 ```swift
-let record: LexValue = ["$type": "com.example.note", "text": "hello", "createdAt": "2026-01-01T00:00:00.000Z"]
+import PetrelLexicon
 
-let bytes = try record.dagCBOR()
-let cid = try record.cid()
+func canonicalForm() throws {
+    let record: LexValue = ["$type": "com.example.note", "text": "hello", "createdAt": "2026-01-01T00:00:00.000Z"]
+
+    let bytes = try record.dagCBOR()
+    let cid = try record.cid()
+    _ = (bytes, cid)
+}
 ```
 
 ## Validate what Petrel's typed API produces
@@ -168,37 +209,51 @@ strict parser, so a typed value is held to the same rules as wire data.
 
 <!-- Mirrors DocumentationSnippetTests.documentationTypedRecord -->
 
+<!-- compile-example: lexicon-typed-record -->
 ```swift
-let post = AppBskyFeedPost(
-    text: "hello",
-    createdAt: ATProtocolDate(date: Date(timeIntervalSince1970: 1_767_225_600))
-)
+import Foundation
+import Petrel
+import PetrelLexicon
 
-let record = try LexValue(encoding: post)
-// record.type == "app.bsky.feed.post"
+func postAsLexValue() throws -> LexValue {
+    let post = AppBskyFeedPost(
+        text: "hello",
+        createdAt: ATProtocolDate(date: Date(timeIntervalSince1970: 1_767_225_600))
+    )
+
+    let record = try LexValue(encoding: post)
+    // record.type == "app.bsky.feed.post"
+    return record
+}
 ```
 
 ### The Lexicons Petrel is built from
 
 The schemas behind Petrel's generated types are compiled into this module.
 ``LexiconCatalog/bundled()`` returns them as a catalog, and
-``LexiconCatalog/validateRecord(_:recordKey:options:)-(ATProtocolValue,_,_)`` takes a
+``LexiconCatalog/validateRecord(_:recordKey:options:)`` takes a
 generated value directly: the type's `typeIdentifier` names the schema. This is
 how to enforce what the Swift types do not carry — a post's `text` is a
 `String`, and only its Lexicon says it may hold at most 300 graphemes.
 
 <!-- Mirrors BundledCatalogTests.validGeneratedRecordPasses and constraintViolationsAreReported -->
 
+<!-- compile-example: lexicon-bundled-catalog -->
 ```swift
-let catalog = try LexiconCatalog.bundled()
+import Petrel
+import PetrelLexicon
 
-try catalog.validateRecord(post)                       // an AppBskyFeedPost
-try catalog.validateRecord(post, recordKey: "3jwdwj2ctlk26")
+func checkPosts(post: AppBskyFeedPost, tooLongPost: AppBskyFeedPost) throws {
+    let catalog = try LexiconCatalog.bundled()
 
-do {
-    try catalog.validateRecord(tooLongPost)
-} catch let error as LexiconValidationError {
-    // error.contains(.stringTooManyGraphemes, at: "/text") == true
+    try catalog.validateRecord(post)
+    try catalog.validateRecord(post, recordKey: "3jwdwj2ctlk26")
+
+    do {
+        try catalog.validateRecord(tooLongPost)
+    } catch let error as LexiconValidationError {
+        assert(error.contains(.stringTooManyGraphemes, at: "/text"))
+    }
 }
 ```
 
@@ -216,16 +271,24 @@ is returned.
 
 <!-- Mirrors DocumentationSnippetTests.documentationXRPCParameters -->
 
+<!-- compile-example: lexicon-xrpc-parameters -->
 ```swift
-let url = "https://example.com/xrpc/com.example.search?q=cats&tag=a&tag=b"
-let queryItems = URLComponents(string: url)?.queryItems ?? []
-let parameters = try catalog.validateXRPCParameters(queryItems, nsid: "com.example.search")
-// parameters["q"] == "cats", parameters["limit"] == 25 (the default), parameters["tag"] == ["a", "b"]
+import Foundation
+import PetrelLexicon
 
-try catalog.validateXRPCOutput(
-    ["hits": ["at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/com.example.note/3jzfcijpj2z2a"]],
-    nsid: "com.example.search"
-)
+// `catalog` holds the com.example.search query schema.
+func checkSearch(catalog: LexiconCatalog) throws {
+    let url = "https://example.com/xrpc/com.example.search?q=cats&tag=a&tag=b"
+    let queryItems = URLComponents(string: url)?.queryItems ?? []
+    let parameters = try catalog.validateXRPCParameters(queryItems, nsid: "com.example.search")
+    // parameters["q"] == "cats", parameters["limit"] == 25 (the default), parameters["tag"] == ["a", "b"]
+    _ = parameters
+
+    try catalog.validateXRPCOutput(
+        ["hits": ["at://did:plc:ewvi7nxzyoun6zhxrhs64oiz/com.example.note/3jzfcijpj2z2a"]],
+        nsid: "com.example.search"
+    )
+}
 ```
 
 `validateXRPCInput` does the same for a procedure's request body. An endpoint
@@ -239,11 +302,17 @@ alongside the body.
 
 <!-- Mirrors DocumentationSnippetTests.documentationSubscriptionMessage -->
 
+<!-- compile-example: lexicon-subscription-message -->
 ```swift
-// An event-stream frame is a header ({"op": 1, "t": "#tick"}) followed
-// by a body that has no `$type` of its own.
-let body: LexValue = ["seq": 42]
-try catalog.validateSubscriptionMessage(body, nsid: "com.example.stream", type: "#tick")
+import PetrelLexicon
+
+// `catalog` holds the com.example.stream subscription schema.
+func checkTick(catalog: LexiconCatalog) throws {
+    // An event-stream frame is a header ({"op": 1, "t": "#tick"}) followed
+    // by a body that has no `$type` of its own.
+    let body: LexValue = ["seq": 42]
+    try catalog.validateSubscriptionMessage(body, nsid: "com.example.stream", type: "#tick")
+}
 ```
 
 ## Permission sets
@@ -258,20 +327,26 @@ collection or endpoint outside the namespace of the set's own NSID.
 
 <!-- Mirrors DocumentationSnippetTests.documentationPermissionSet -->
 
+<!-- compile-example: lexicon-permission-set -->
 ```swift
-var granted: [String] = []
+import PetrelLexicon
 
-guard case let .permissionSet(set)? = catalog.definition("com.example.calendar.authBasic") else { return }
+func describeGrants(catalog: LexiconCatalog) -> [String] {
+    var granted: [String] = []
 
-for grant in set.grants(publishedAs: "com.example.calendar.authBasic") {
-    switch grant {
-    case let .repo(collections, actions):
-        // Write access to `collections`, limited to `actions` when not nil.
-        granted.append("repo \(collections) \(actions ?? ["create", "update", "delete"])")
-    case let .rpc(methods, inheritAudience):
-        // Calls to `methods`, against any audience or the inherited one.
-        granted.append("rpc \(methods) \(inheritAudience ? "inherited audience" : "any audience")")
+    guard case let .permissionSet(set)? = catalog.definition("com.example.calendar.authBasic") else { return [] }
+
+    for grant in set.grants(publishedAs: "com.example.calendar.authBasic") {
+        switch grant {
+        case let .repo(collections, actions):
+            // Write access to `collections`, limited to `actions` when not nil.
+            granted.append("repo \(collections) \(actions ?? ["create", "update", "delete"])")
+        case let .rpc(methods, inheritAudience):
+            // Calls to `methods`, against any audience or the inherited one.
+            granted.append("rpc \(methods) \(inheritAudience ? "inherited audience" : "any audience")")
+        }
     }
+    return granted
 }
 ```
 

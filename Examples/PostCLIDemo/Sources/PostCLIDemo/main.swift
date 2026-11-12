@@ -31,7 +31,8 @@ struct PostCLIDemo {
                     redirectUri: "https://client.example.com/callback",
                     scope: "atproto transition:generic"
                 ),
-                namespace: "com.example.postcli"
+                namespace: "com.example.postcli",
+                authMode: .legacy
             )
 
             // Get credentials from user

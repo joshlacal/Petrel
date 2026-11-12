@@ -11,15 +11,14 @@ Petrel/
 ├── Package.swift              # Root Swift package: library products below
 ├── Sources/                   # One directory per Swift target
 ├── Tests/                     # One test target per product, plus release consumers
-├── Plugins/PetrelLexgen/      # `swift package petrel-lexgen` command plugin
-├── Server/                    # Nested Swift package (Hummingbird/NIO), not a root dependency
-├── generator/                 # Python Lexicon code generator (Swift + Kotlin)
+├── Plugins/                   # `PetrelLexgen` (`petrel-lexgen`) and `PetrelCodegenPlugin` (`petrel-codegen`) command plugins
+├── Server/                    # Nested Swift package (example OAuth server + CAB daemon), not a root dependency
+├── generator/                 # Python Lexicon code generator (`petrel-gen`, Swift + Kotlin)
 ├── kotlin/                    # Generated Kotlin bindings and runtime (Gradle)
-├── Examples/                  # Example programs
+├── Examples/                  # Example programs and standalone starter packages
 ├── Scripts/                   # CI, release and maintenance scripts (Scripts/tests: their tests)
 ├── docs/                      # Release notes, API-compatibility reviews, protocol contracts
-├── tools/ref-client/          # TypeScript reference client used for interop checks
-└── atproto/                   # Git submodule (atproto fork); not needed to build or test
+└── tools/ref-client/          # TypeScript reference client used for interop checks
 ```
 
 ## Library products (root package)
@@ -37,12 +36,15 @@ Petrel/
 | `PetrelOAuthScopes` | `Sources/PetrelOAuthScopes` | The OAuth scope and permission grammar shared by clients and servers. |
 | `PetrelOAuthServer` | `Sources/PetrelOAuthServer` | Framework-agnostic OAuth authorization server and resource-server verifier. |
 | `PetrelOAuthServerLexicon` | `Sources/PetrelOAuthServerLexicon` | Authenticated Lexicon resolver for `include:` permission sets (DNS, DID document, signed-repository proof). |
+| `PetrelOAuthServerNIO` | `Sources/PetrelOAuthServerNIO` | Address-pinning SwiftNIO remote document transport for `PetrelOAuthServer` (enabled by package trait `OAuthServerNIO`). |
+| `PetrelOAuthServerHummingbird` | `Sources/PetrelOAuthServerHummingbird` | Hummingbird HTTP adapter for `PetrelOAuthServer` (enabled by package trait `OAuthServerHummingbird`, which implies `OAuthServerNIO`). |
 | `PetrelOzone` | `Sources/PetrelOzone` | Generated `tools.ozone` moderation-service API. |
 | `PetrelLexicon` | `Sources/PetrelLexicon` | Runtime Lexicon schemas: parsing, data validation, network resolution. |
 
-Other root targets: `PetrelLoad` (executable load/concurrency harness), `CLibSecret` and
+Other root targets: `PetrelLoad` (internal load/concurrency harness target), `CLibSecret` and
 `CLibSecretShim` (libsecret bridge, Linux only), `CPetrelBLAKE3` (vendored BLAKE3 C sources),
-`FirehoseDemo` (example executable in `Examples/`) and the `PetrelLexgen` plugin.
+`FirehoseDemo` (example executable in `Examples/`), and the `PetrelLexgen` and
+`PetrelCodegenPlugin` command plugins.
 
 Each product has a DocC catalog at `Sources/<Product>/<Product>.docc`.
 
@@ -73,11 +75,11 @@ interop vectors are vendored under `Tests/<Target>/Vectors/`.
 
 ## `Server/` package
 
-A separate package so the root package never depends on Hummingbird or NIO:
+A separate package for runnable server executables and the Client Assertion Backend (fetching
+`PetrelOAuthServerHummingbird` and `PetrelOAuthServerNIO` from the root package via package traits):
 
-- `PetrelOAuthServerHummingbird`: HTTP adapter for `PetrelOAuthServer`, including the
-  address-pinning NIO transport used for client-metadata fetches.
-- `petrel-oauth-server-example`: runnable example authorization server.
+- `petrel-oauth-server-example`: runnable example authorization server built on
+  `PetrelOAuthServerHummingbird`.
 - `PetrelCABServerCore`, `petrel-cab-server`, `petrel-cab-demo`: the Client Assertion Backend
   for confidential OAuth clients (`AuthMode.cab`).
 
