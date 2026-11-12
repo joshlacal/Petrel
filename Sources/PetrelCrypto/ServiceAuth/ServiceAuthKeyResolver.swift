@@ -124,7 +124,16 @@ public struct ClosureServiceAuthKeyResolver: ServiceAuthKeyResolver {
 /// forced refresh from the upstream resolver at most once per
 /// `minimumRefreshInterval` for a given DID and key, and otherwise returns
 /// what it already has. Concurrent lookups of the same key while a fetch is
-/// outstanding share that fetch, and its result or error.
+/// outstanding share that fetch, and its result or error; a forced refresh
+/// only shares a fetch that is itself a refresh.
+///
+/// A key cached from an ordinary lookup may come from upstream's own cache
+/// and predate a key rotation, so the first forced refresh after it always
+/// goes upstream. Only a key that was itself read with a forced refresh
+/// rate-limits the next one. The residual window: an issuer that rotates
+/// its key within `minimumRefreshInterval` after a forced refresh of that
+/// key (for example one triggered by a forged token) is refused until the
+/// interval has passed.
 ///
 /// Wrap resolvers that do not cache themselves. A resolver that already
 /// caches and throttles can be given to ``ServiceAuthVerifier`` directly.
@@ -132,6 +141,13 @@ public actor CachingServiceAuthKeyResolver: ServiceAuthKeyResolver {
     private struct Entry {
         let key: ATProtoPublicKey
         let fetchedAt: Date
+        /// Whether upstream was asked to bypass its own cache for this key.
+        let wasRefreshed: Bool
+    }
+
+    private struct FetchKey: Hashable {
+        let cacheKey: CacheKey
+        let refresh: Bool
     }
 
     private struct CacheKey: Hashable {
@@ -145,7 +161,7 @@ public actor CachingServiceAuthKeyResolver: ServiceAuthKeyResolver {
     private let capacity: Int
     private let clock: @Sendable () -> Date
     private var entries: [CacheKey: Entry] = [:]
-    private var inFlight: [CacheKey: Task<ATProtoPublicKey, any Error>] = [:]
+    private var inFlight: [FetchKey: Task<ATProtoPublicKey, any Error>] = [:]
 
     /// - Parameters:
     ///   - upstream: The resolver that actually reads DID documents.
@@ -183,31 +199,48 @@ public actor CachingServiceAuthKeyResolver: ServiceAuthKeyResolver {
             let age = now.timeIntervalSince(entry.fetchedAt)
             let fresh = age >= 0 && age < timeToLive
             let recentlyFetched = age >= 0 && age < minimumRefreshInterval
-            if recentlyFetched || (fresh && !forceRefresh) {
+            if fresh && !forceRefresh {
+                return entry.key
+            }
+            // The rate limit: a key read from upstream with a refresh moments
+            // ago is the newest there is. One read without a refresh may be
+            // upstream's stale copy, so it does not hold back a forced refresh.
+            if recentlyFetched && (!forceRefresh || entry.wasRefreshed) {
                 return entry.key
             }
         }
         // Callers arriving while a fetch for this key is outstanding share
         // it; otherwise a burst of requests would each pass the checks above
-        // before the first fetch returns, and each go upstream.
-        if let pending = inFlight[cacheKey] {
+        // before the first fetch returns, and each go upstream. A forced
+        // refresh must not settle for a fetch that may be served from
+        // upstream's cache.
+        let refreshing = inFlight[FetchKey(cacheKey: cacheKey, refresh: true)]
+        if let pending = forceRefresh
+            ? refreshing
+            : refreshing ?? inFlight[FetchKey(cacheKey: cacheKey, refresh: false)] {
             return try await pending.value
         }
         // A stale or distrusted entry here means upstream's own cache, if it
         // has one, is no better: ask it to re-read the DID document.
         let upstream = upstream
         let refresh = forceRefresh || entries[cacheKey] != nil
+        let fetchKey = FetchKey(cacheKey: cacheKey, refresh: refresh)
         let fetch = Task<ATProtoPublicKey, any Error> {
             try await upstream.signingKey(for: did, keyID: keyID, forceRefresh: refresh)
         }
-        inFlight[cacheKey] = fetch
+        inFlight[fetchKey] = fetch
         let result = await fetch.result
-        inFlight[cacheKey] = nil
+        inFlight[fetchKey] = nil
         let key = try result.get()
+        // A refresh that started after this ordinary fetch and finished
+        // first holds the newer key; do not replace it with a possibly stale one.
+        if !refresh, let newer = entries[cacheKey], newer.wasRefreshed, newer.fetchedAt >= now {
+            return newer.key
+        }
         if entries[cacheKey] == nil, entries.count >= capacity {
             evictOldest()
         }
-        entries[cacheKey] = Entry(key: key, fetchedAt: clock())
+        entries[cacheKey] = Entry(key: key, fetchedAt: clock(), wasRefreshed: refresh)
         return key
     }
 
