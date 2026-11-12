@@ -50,8 +50,9 @@ public protocol OAuthLexiconAuthorityResolving: Sendable {
 // MARK: - IdentityResolver-backed authorities
 
 /// Steps 5 and 6 through Petrel's `IdentityResolver`: `did:plc` and
-/// hostname-level `did:web`, the document's `id` checked against the DID, and
-/// the identity layer's cache.
+/// hostname-level `did:web`, with the document's `id` checked against the DID.
+/// The identity layer's cache is bypassed: every call fetches the document,
+/// and the caller decides how long to keep the result.
 public struct IdentityOAuthLexiconAuthorityResolver: OAuthLexiconAuthorityResolving {
     private let identity: IdentityResolver
 
@@ -71,7 +72,11 @@ public struct IdentityOAuthLexiconAuthorityResolver: OAuthLexiconAuthorityResolv
     public func resolveAuthority(did: String) async throws -> OAuthLexiconAuthority {
         let document: DIDDocument
         do {
-            document = try await identity.resolveDIDDocument(did)
+            // Always fetched: ``AuthenticatedOAuthLexiconResolver`` keeps the
+            // result for five minutes, and a second, longer-lived identity
+            // cache underneath would keep a rotated key or a moved PDS in use
+            // after that cache had expired.
+            document = try await identity.resolveDIDDocument(did, forceRefresh: true)
         } catch is CancellationError {
             throw CancellationError()
         } catch {

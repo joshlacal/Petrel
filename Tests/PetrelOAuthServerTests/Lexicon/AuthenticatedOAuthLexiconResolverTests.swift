@@ -212,26 +212,30 @@ struct AuthenticatedOAuthLexiconResolverTests {
     @Test("by default the DID document comes from the PLC directory through the same pinned fetcher")
     func identityAuthority() async throws {
         let scenario = try await LexiconResolverScenario()
-        let key = try ATProtoPublicKey(P256.Signing.PublicKey(x963Representation: scenario.fixture.documentPublicKeyX963))
         let did = LexiconResolverScenario.did
-        let document: [String: Any] = [
-            "id": did,
-            "verificationMethod": [[
-                "id": "\(did)#atproto", "type": "Multikey", "controller": did, "publicKeyMultibase": key.multikey,
-            ]],
-            "service": [[
-                "id": "#atproto_pds", "type": "AtprotoPersonalDataServer", "serviceEndpoint": LexiconResolverScenario.pds,
-            ]],
-        ]
-        scenario.transport.serve(
-            "https://plc.directory/\(did)",
-            .init(contentType: "application/did+ld+json", body: try JSONSerialization.data(withJSONObject: document))
+        func serveDocument(_ x963: Data) throws {
+            let key = try ATProtoPublicKey(P256.Signing.PublicKey(x963Representation: x963))
+            let document: [String: Any] = [
+                "id": did,
+                "verificationMethod": [[
+                    "id": "\(did)#atproto", "type": "Multikey", "controller": did, "publicKeyMultibase": key.multikey,
+                ]],
+                "service": [[
+                    "id": "#atproto_pds", "type": "AtprotoPersonalDataServer", "serviceEndpoint": LexiconResolverScenario.pds,
+                ]],
+            ]
+            scenario.transport.serve(
+                "https://plc.directory/\(did)",
+                .init(contentType: "application/did+ld+json", body: try JSONSerialization.data(withJSONObject: document))
+            )
+        }
+        try serveDocument(scenario.fixture.documentPublicKeyX963)
+        let fetcher = OAuthRemoteDocumentFetcher(
+            policy: try OAuthRemoteFetchPolicy(), resolver: StubResolver(), transport: scenario.transport
         )
-        let fetcher = try OAuthRemoteDocumentFetcher(
-            policy: OAuthRemoteFetchPolicy(), resolver: StubResolver(), transport: scenario.transport
-        )
+        let clock = TestClock()
         let resolver = try AuthenticatedOAuthLexiconResolver(
-            fetcher: fetcher, dns: scenario.dns, authorities: nil, clock: TestClock(), deadlines: .relaxed
+            fetcher: fetcher, dns: scenario.dns, authorities: nil, clock: clock, deadlines: .relaxed
         )
         let resolution = try await resolver.resolve(LexiconResolverScenario.nsid)
         guard case .resolved(.permissionSet, _, _) = resolution else {
@@ -243,6 +247,21 @@ struct AuthenticatedOAuthLexiconResolverTests {
         // A second NSID under the same authority reuses the cached DID document.
         _ = try await resolver.resolve(LexiconResolverScenario.nsid)
         #expect(scenario.transport.requests.filter { $0.hasPrefix("https://plc.directory/") }.count == 1)
+
+        // The authority rotates its signing key. Once the five-minute
+        // authority cache lapses, the new document is fetched, not an
+        // identity-layer copy of the old one.
+        let rotated = try await PublicRepositoryProofFixtureBuilder.build()
+        try serveDocument(rotated.documentPublicKeyX963)
+        scenario.transport.serve(LexiconResolverScenario.getRecordURL, .init(contentType: "application/vnd.ipld.car", body: rotated.carBytes))
+        clock.advance(OAuthLexiconResolutionBudget.refreshThresholdSeconds + 1)
+        let afterRotation = try await resolver.resolve(LexiconResolverScenario.nsid)
+        guard case let .resolved(_, _, cid) = afterRotation else {
+            Issue.record("\(afterRotation)")
+            return
+        }
+        #expect(cid == rotated.recordCID.string)
+        #expect(scenario.transport.requests.filter { $0.hasPrefix("https://plc.directory/") }.count == 2)
     }
 
     @Test("secp256k1 commit signatures verify under the document's key, and only that key")
