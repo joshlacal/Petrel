@@ -83,6 +83,12 @@ records. Pass ``RepositoryOptions`` to tighten them, or to switch from the
 tolerant ``RepositoryReadPolicy/dataModel`` policy to
 ``RepositoryReadPolicy/strict``.
 
+The same limits bound writes. ``Repository/commit(_:signer:revision:expectedCommitCID:)``
+measures the tree it is about to sign and throws
+``RepositoryError/limitExceeded(_:limit:)`` instead of signing a commit whose
+repository would have more records or MST nodes than allowed, or whose export
+would break the CAR block or byte budget.
+
 ## Verify a record proof
 
 `com.atproto.sync.getRecord` returns a small CAR: the signed commit, the MST

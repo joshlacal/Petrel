@@ -36,6 +36,7 @@ piece of the machinery on its own: a firehose consumer verifying commit diffs
 - ``RepositoryCommit``
 - ``RepositoryOptions``
 - ``RepositoryError``
+- ``RepositoryLimitKind``
 
 ### Authenticating commits
 

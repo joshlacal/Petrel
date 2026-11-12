@@ -106,10 +106,11 @@ public enum RepositoryError: Error, Sendable, Equatable {
     case invalidWrites(PublicRepositoryDomainError)
     /// A DID document does not carry a usable `#atproto` signing key.
     case signingKeyNotFound
-    /// A commit would leave more live records than
-    /// ``PublicRepositoryLimits/maximumRepositoryRecords`` allows. Nothing
-    /// was signed or written.
-    case recordLimitExceeded(limit: Int)
+    /// A commit would leave a repository that its own options refuse to
+    /// verify, export or reopen: more records or MST nodes than allowed, or
+    /// an export over the CAR block or byte budget. Nothing was signed or
+    /// written.
+    case limitExceeded(RepositoryLimitKind, limit: Int)
 }
 
 /// One record read from a repository.
@@ -290,6 +291,9 @@ public struct Repository: Sendable {
     /// Counts from the full verification done when the repository was
     /// opened. `nil` if it was opened without walking the tree.
     public let statistics: RepositoryStatistics?
+    /// Exact whole-repository size, tracked across commits. `nil` until the
+    /// tree has been walked once.
+    let footprint: RepositoryFootprint?
 
     /// The account DID.
     public var did: String { commit.did }
@@ -300,12 +304,14 @@ public struct Repository: Sendable {
         commit: RepositoryCommit,
         store: any RepositoryBlockStore,
         options: RepositoryOptions,
-        statistics: RepositoryStatistics?
+        statistics: RepositoryStatistics?,
+        footprint: RepositoryFootprint? = nil
     ) {
         self.commit = commit
         self.store = store
         self.options = options
         self.statistics = statistics
+        self.footprint = footprint
     }
 
     // MARK: Opening
@@ -424,8 +430,11 @@ public struct Repository: Sendable {
         )
         let unverified = Repository(commit: commit, store: store, options: options, statistics: nil)
         guard verifiesTree else { return unverified }
-        let statistics = try await unverified.verify()
-        return Repository(commit: commit, store: store, options: options, statistics: statistics)
+        let measured = try await unverified.measure()
+        return Repository(
+            commit: commit, store: store, options: options,
+            statistics: measured.statistics, footprint: measured.footprint
+        )
     }
 
     /// Creates a new, empty repository: an empty tree and a signed first
@@ -477,7 +486,8 @@ public struct Repository: Sendable {
             options: options,
             statistics: RepositoryStatistics(
                 recordCount: 0, mstNodeCount: 1, rootLayer: 0, unverifiableRecordCount: 0
-            )
+            ),
+            footprint: .empty(rootCID: dataCID, rootByteCount: emptyTree.count)
         )
     }
 
@@ -528,20 +538,108 @@ public struct Repository: Sendable {
     /// the repository. Memory use is proportional to the tree's depth.
     @discardableResult
     public func verify() async throws -> RepositoryStatistics {
-        var unverifiable = 0
-        let summary = try await walk(range: .all) { leaf in
-            guard leaf.recordCID.blessedKind == .dagCBOR else {
-                unverifiable += 1
-                return
-            }
-            _ = try await self.loadRecord(at: leaf.path, cid: leaf.recordCID)
+        try await measure().statistics
+    }
+
+    /// ``verify()``, also measuring the tree as an export would write it.
+    func measure() async throws -> (statistics: RepositoryStatistics, footprint: RepositoryFootprint) {
+        var exported = 0
+        var framedBytes = 0
+        let summary = try await walk(range: .all, onNode: { node in
+            framedBytes += RepositoryFootprint.framedSize(cid: node.cid, byteCount: node.bytes.count)
+        }) { leaf in
+            guard leaf.recordCID.blessedKind == .dagCBOR else { return }
+            let record = try await self.loadRecord(at: leaf.path, cid: leaf.recordCID)
+            exported += 1
+            framedBytes += RepositoryFootprint.framedSize(cid: record.cid, byteCount: record.bytes.count)
         }
-        return RepositoryStatistics(
+        let statistics = RepositoryStatistics(
             recordCount: summary.recordCount,
             mstNodeCount: summary.nodeCount,
             rootLayer: summary.rootLayer,
-            unverifiableRecordCount: unverifiable
+            unverifiableRecordCount: summary.recordCount - exported
         )
+        let footprint = RepositoryFootprint(
+            records: summary.recordCount,
+            mstNodes: summary.nodeCount,
+            exportedRecords: exported,
+            framedBlockBytes: framedBytes
+        )
+        return (statistics, footprint)
+    }
+
+    /// The footprint after `mutation`, from the footprint before it.
+    ///
+    /// Work is proportional to the nodes the mutation replaced: new nodes
+    /// are counted from the mutation, and the old nodes they replace are
+    /// found by walking the old tree only below nodes absent from the new
+    /// one. An old node stays in the new tree only as the new root or as the
+    /// child of a new node, because a node's CID fixes its parent's content.
+    private func footprint(
+        after mutation: UnsignedPublicRepositoryMutation,
+        from base: RepositoryFootprint
+    ) async throws -> RepositoryFootprint {
+        var result = base
+        let mstOptions = options.policy.mstOptions
+        func children(of bytes: Data) throws -> [CID] {
+            let node: RepositoryMSTNode
+            do {
+                node = try RepositoryMSTCodec.decode(bytes, options: mstOptions)
+            } catch let error as RepositoryMSTValidationError {
+                throw RepositoryError.tree(error)
+            }
+            return ([node.leftTreeCID] + node.entries.map(\.rightTreeCID)).compactMap { $0 }
+        }
+
+        let newCIDs = mutation.newNodes.cids
+        var kept: Set<CID> = []
+        if !newCIDs.contains(mutation.rootCID) {
+            kept.insert(mutation.rootCID)
+        }
+        for block in mutation.newNodes.orderedBlocks {
+            result.mstNodes += 1
+            result.framedBlockBytes += RepositoryFootprint.framedSize(cid: block.cid, byteCount: block.bytes.count)
+            for child in try children(of: block.bytes) where !newCIDs.contains(child) {
+                kept.insert(child)
+            }
+        }
+        var removed = [commit.dataCID]
+        while let cid = removed.popLast() {
+            guard !kept.contains(cid) else { continue }
+            guard let bytes = try await store.block(for: cid) else {
+                throw RepositoryError.tree(.missingBlock)
+            }
+            result.mstNodes -= 1
+            result.framedBlockBytes -= RepositoryFootprint.framedSize(cid: cid, byteCount: bytes.count)
+            removed.append(contentsOf: try children(of: bytes))
+        }
+
+        var recordSizes: [CID: Int] = [:]
+        for block in mutation.recordBlocks { recordSizes[block.cid] = block.bytes.count }
+        for change in mutation.recordResults {
+            switch change.action {
+            case .create: result.records += 1
+            case .delete: result.records -= 1
+            case .update: break
+            }
+            // A streamable export writes one block per path with a blessed
+            // link, so record blocks are counted per path.
+            if let previous = change.previousRecordCID, previous.blessedKind == .dagCBOR {
+                guard let bytes = try await store.block(for: previous) else {
+                    throw RepositoryError.missingRecordBlock(path: change.path.mstKey)
+                }
+                result.exportedRecords -= 1
+                result.framedBlockBytes -= RepositoryFootprint.framedSize(cid: previous, byteCount: bytes.count)
+            }
+            if let cid = change.recordCID {
+                guard let size = recordSizes[cid] else {
+                    throw RepositoryError.missingRecordBlock(path: change.path.mstKey)
+                }
+                result.exportedRecords += 1
+                result.framedBlockBytes += RepositoryFootprint.framedSize(cid: cid, byteCount: size)
+            }
+        }
+        return result
     }
 
     // MARK: Reading
@@ -600,13 +698,6 @@ public struct Repository: Sendable {
         try await walk(range: try Self.range(collection: collection)) { leaf in
             try await body(leaf.path, leaf.recordCID)
         }
-    }
-
-    /// Counts leaves without reading record blocks.
-    private func liveRecordCount() async throws -> Int {
-        var count = 0
-        try await forEachRecordReference { _, _ in count += 1 }
-        return count
     }
 
     /// Every record of one collection, in record-key order.
@@ -744,7 +835,12 @@ public struct Repository: Sendable {
     ///     advanced past it; revisions never repeat or go backwards.
     ///   - expectedCommitCID: Refuse to write unless the repository is at
     ///     this commit (compare-and-swap).
-    /// - Throws: ``RepositoryError``.
+    /// - Throws: ``RepositoryError``;
+    ///   ``RepositoryError/limitExceeded(_:limit:)`` before signing when the
+    ///   resulting repository would break a whole-repository limit in
+    ///   ``RepositoryOptions/limits``. The check costs time proportional to
+    ///   the nodes the commit replaces, except on a repository opened without
+    ///   walking its tree, where the first commit walks it once.
     public func commit(
         _ writes: [PublicRepositoryWrite],
         signer: any ATProtoSigner,
@@ -773,29 +869,17 @@ public struct Repository: Sendable {
             throw RepositoryError.invalidWrites(error)
         }
 
-        // The engine refuses a create on an existing path and a delete of a
-        // missing one, so the batch alone gives the exact change in count.
-        // Checked before signing: a commit the repository's own limits
-        // cannot read back must never be persisted.
-        let addedRecords = writes.reduce(0) { total, write in
-            switch write {
-            case .create: return total + 1
-            case .delete: return total - 1
-            case .update: return total
-            }
+        // Every whole-repository limit the read paths enforce is checked on
+        // the finished tree before the signer runs: a commit that its own
+        // options could not verify, export or reopen is never signed or
+        // persisted.
+        let base: RepositoryFootprint
+        if let footprint {
+            base = footprint
+        } else {
+            base = try await measure().footprint
         }
-        if addedRecords > 0 {
-            let limit = options.limits.maximumRepositoryRecords
-            let current: Int
-            if let known = statistics?.recordCount {
-                current = known
-            } else {
-                current = try await liveRecordCount()
-            }
-            guard current + addedRecords <= limit else {
-                throw RepositoryError.recordLimitExceeded(limit: limit)
-            }
-        }
+        var nextFootprint = base
 
         let mutation: PreparedPublicRepositoryMutation
         do {
@@ -807,8 +891,14 @@ public struct Repository: Sendable {
                 batch: batch,
                 limits: options.limits,
                 signer: ATProtoRepositoryCommitSigner(signer),
+                signingGeneration: 1,
                 mstOptions: options.policy.mstOptions
-            )
+            ) { unsigned in
+                nextFootprint = try await self.footprint(after: unsigned, from: base)
+                try nextFootprint.check(
+                    options.limits, commitCID: commit.cid, commitByteCount: unsigned.commitByteCount
+                )
+            }
         } catch let error as PublicRepositoryEngineError {
             throw RepositoryError.write(error)
         }
@@ -825,13 +915,6 @@ public struct Repository: Sendable {
         let diffBlocks = [commitBlock]
             + mutation.relevantBlocks.orderedBlocks.filter { $0.cid != commitBlock.cid }
 
-        let recordDelta = mutation.recordResults.reduce(0) { total, result in
-            switch result.action {
-            case .create: return total + 1
-            case .delete: return total - 1
-            case .update: return total
-            }
-        }
         let next = Repository(
             commit: RepositoryCommit(
                 cid: mutation.signedCommit.commitCID,
@@ -845,16 +928,17 @@ public struct Repository: Sendable {
             ),
             store: store,
             options: options,
-            // Node count and root layer are not tracked across writes; call
-            // `verify()` for fresh figures.
+            // Counts are exact; the root layer is not tracked across writes.
+            // Call `verify()` for a fresh root layer.
             statistics: statistics.map {
                 RepositoryStatistics(
-                    recordCount: $0.recordCount + recordDelta,
-                    mstNodeCount: $0.mstNodeCount,
+                    recordCount: nextFootprint.records,
+                    mstNodeCount: nextFootprint.mstNodes,
                     rootLayer: $0.rootLayer,
-                    unverifiableRecordCount: $0.unverifiableRecordCount
+                    unverifiableRecordCount: nextFootprint.records - nextFootprint.exportedRecords
                 )
-            }
+            },
+            footprint: nextFootprint
         )
         return RepositoryCommitResult(
             repository: next,

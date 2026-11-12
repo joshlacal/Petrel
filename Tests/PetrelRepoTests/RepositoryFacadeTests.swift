@@ -254,7 +254,7 @@ struct RepositoryFacadeTests {
         let one = try await empty.commit([try create(posts, "a", "a")], signer: signer).repository
 
         // Known count (statistics carried from create).
-        await #expect(throws: RepositoryError.recordLimitExceeded(limit: 2)) {
+        await #expect(throws: RepositoryError.limitExceeded(.records, limit: 2)) {
             try await one.commit(
                 [try self.create(self.posts, "b", "b"), try self.create(self.posts, "c", "c")], signer: signer
             )
@@ -265,7 +265,7 @@ struct RepositoryFacadeTests {
             options: options, verifiesTree: false
         )
         #expect(reopened.statistics == nil)
-        await #expect(throws: RepositoryError.recordLimitExceeded(limit: 2)) {
+        await #expect(throws: RepositoryError.limitExceeded(.records, limit: 2)) {
             try await reopened.commit(
                 [try self.create(self.posts, "b", "b"), try self.create(self.posts, "c", "c")], signer: signer
             )

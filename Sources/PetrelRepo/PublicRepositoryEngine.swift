@@ -119,6 +119,20 @@ public struct PreparedPublicRepositoryMutation: Sendable, Equatable {
     }
 }
 
+/// The finished tree of a mutation, before its commit is signed.
+struct UnsignedPublicRepositoryMutation {
+    /// The new MST root.
+    let rootCID: CID
+    /// MST nodes in the new tree and not in the previous one.
+    let newNodes: PublicRepositoryBlockMap
+    /// Created and updated record blocks.
+    let recordBlocks: [PublicRepositoryBlock]
+    /// One result per write, with the previous record CID.
+    let recordResults: [PublicRepositoryMutationRecordResult]
+    /// Exact size of the signed commit block that will follow.
+    let commitByteCount: Int
+}
+
 /// Applies record writes to a repository and produces the next signed commit.
 public enum PublicRepositoryEngine {
     /// Applies `batch` on top of `currentState` and signs the result.
@@ -152,6 +166,35 @@ public enum PublicRepositoryEngine {
         signer: any PublicRepositoryCommitSigner,
         signingGeneration: UInt64 = 1,
         mstOptions: RepositoryMSTOptions = .strict
+    ) async throws -> PreparedPublicRepositoryMutation {
+        try await apply(
+            repositoryDID: repositoryDID,
+            currentState: currentState,
+            blocks: blocks,
+            revision: revision,
+            batch: batch,
+            limits: limits,
+            signer: signer,
+            signingGeneration: signingGeneration,
+            mstOptions: mstOptions,
+            beforeSigning: { _ in }
+        )
+    }
+
+    /// ``apply(repositoryDID:currentState:blocks:revision:batch:limits:signer:signingGeneration:mstOptions:)``
+    /// with a check that runs on the finished tree before the signer is
+    /// called. Throwing from `beforeSigning` aborts the write unsigned.
+    static func apply(
+        repositoryDID: String,
+        currentState: PublicRepositoryState,
+        blocks: any PublicRepositoryBlockSource,
+        revision: String,
+        batch: PublicRepositoryWriteBatch,
+        limits: PublicRepositoryLimits,
+        signer: any PublicRepositoryCommitSigner,
+        signingGeneration: UInt64,
+        mstOptions: RepositoryMSTOptions,
+        beforeSigning: (UnsignedPublicRepositoryMutation) async throws -> Void
     ) async throws -> PreparedPublicRepositoryMutation {
         guard repositoryDID == currentState.did else {
             throw PublicRepositoryEngineError.repositoryDIDMismatch
@@ -337,6 +380,14 @@ public enum PublicRepositoryEngine {
             <= limits.maximumRelevantBlockBytes - commitByteCount else {
             throw PublicRepositoryEngineError.relevantBlockBudgetExceeded
         }
+
+        try await beforeSigning(UnsignedPublicRepositoryMutation(
+            rootCID: materialized.rootCID,
+            newNodes: materialized.newBlocks,
+            recordBlocks: preparedRecordBlocks,
+            recordResults: recordResults,
+            commitByteCount: commitByteCount
+        ))
 
         let signedCommit: PreparedPublicRepositorySignedCommit
         do {
