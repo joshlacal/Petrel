@@ -48,6 +48,36 @@ let package = Package(
 )
 ```
 
+## Explicit credential storage for command-line clients
+
+On Apple platforms the existing initializer uses Apple Keychain. A command-line
+client can instead select its existing encrypted credential directory for one
+client instance. Pass the same durable AES key previously used for that directory
+as `masterKey: Data`, or provide its Base64 value through `PETREL_MASTER_KEY`.
+
+<!-- compile-example: readme-encrypted-credentials -->
+```swift
+import Foundation
+import Petrel
+
+func legacyClient(directory: URL, namespace: String, oauthConfig: OAuthConfig) async throws -> ATProtoClient {
+    let credentials = try CredentialStorageConfiguration.encryptedFiles(directory: directory)
+    return try await ATProtoClient(
+        oauthConfig: oauthConfig,
+        namespace: namespace,
+        authMode: .legacy,
+        credentialStorage: credentials
+    )
+}
+```
+
+This preserves the existing AES-GCM combined ciphertext and Base64URL filenames.
+Missing or malformed keys, unreadable existing credentials, symlinks, and temporary
+directories fail before the client is created. The factory creates a missing
+owner-only directory; it does not generate a key or migrate data between stores.
+A client configured this way has its own storage route and never changes another
+client's backend. Keychain access groups are unsupported for encrypted files.
+
 ## OAuth quick start
 
 OAuth is the recommended authentication mode for production applications. The

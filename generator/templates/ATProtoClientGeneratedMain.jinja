@@ -173,8 +173,32 @@ public actor ATProtoClient {
         bskyChatDID: String = "did:web:api.bsky.chat#bsky_chat",
         accessGroup: String? = nil
     ) async throws {
+        try await self.init(
+            baseURL: baseURL, oauthConfig: oauthConfig, namespace: namespace,
+            authMode: authMode, gatewayURL: gatewayURL, userAgent: userAgent,
+            didResolver: didResolver, bskyAppViewDID: bskyAppViewDID,
+            bskyChatDID: bskyChatDID, accessGroup: accessGroup,
+            credentialStorage: .platformDefault
+        )
+    }
+
+    /// Initializes an authenticated client with instance-scoped credential storage.
+    /// The default initializer retains the existing platform storage behavior.
+    public init(
+        baseURL: URL = ATProtoClient.defaultBaseURL,
+        oauthConfig: OAuthConfig,
+        namespace: String,
+        authMode: AuthMode = .publicOAuth,
+        gatewayURL: URL? = nil,
+        userAgent: String? = nil,
+        didResolver: (any DIDResolving)? = nil,
+        bskyAppViewDID: String = "did:web:api.bsky.app#bsky_appview",
+        bskyChatDID: String = "did:web:api.bsky.chat#bsky_chat",
+        accessGroup: String? = nil,
+        credentialStorage: CredentialStorageConfiguration
+    ) async throws {
         // Initialize storage first — use locals then assign to optional properties
-        let theStorage = KeychainStorage(namespace: namespace, accessGroup: accessGroup)
+        let theStorage = try KeychainStorage(namespace: namespace, accessGroup: accessGroup, credentialStorage: credentialStorage)
         self.storage = theStorage
         self.oauthConfig = oauthConfig
         self.authMode = authMode
