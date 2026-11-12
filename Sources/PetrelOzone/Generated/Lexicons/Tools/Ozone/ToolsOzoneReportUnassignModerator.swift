@@ -98,7 +98,7 @@ public extension ATProtoClient.Tools.Ozone.Report {
             throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ToolsOzoneReportUnassignModerator.Error.self)
         }
 
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
 

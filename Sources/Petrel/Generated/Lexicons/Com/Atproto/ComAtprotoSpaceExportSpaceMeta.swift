@@ -108,7 +108,7 @@ public extension ATProtoClient.Com.Atproto.Space {
             throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: ComAtprotoSpaceExportSpaceMeta.Error.self)
         }
 
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
             throw NetworkError.invalidContentType(expected: "application/octet-stream", actual: "nil")
         }
 

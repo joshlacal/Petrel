@@ -166,8 +166,10 @@ class KotlinStrictRefByteStabilityTests(unittest.TestCase):
             ),
             # Re-pinned by the sdk-green generator pass: typed XRPC errors on every endpoint,
             # undeclared-field round trip (extraFields) and the shared object template.
+            # Re-pinned again when the output Content-Type check moved to
+            # value(forHTTPHeaderField:) (case-insensitive); that line is the only change.
             "blue.catbird.test.ordinaryProcedure": (
-                "33b2021aaeae016831e86ee6d2b1c81be15cb6488cb3e759a3b51f3eadaebb11"
+                "e12ad62c091e4c2fc77e8c8eded72d9c7552b6b9d42381da619a272734f22068"
             ),
             "blue.catbird.test.ordinaryRecord": (
                 "15e04b341cd7fd68eee2c980d4df28fa682e58419174faca613cd411755854ff"

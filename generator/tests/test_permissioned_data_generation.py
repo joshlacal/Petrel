@@ -292,10 +292,11 @@ class PermissionedDataGenerationTests(unittest.TestCase):
 
         self.assertEqual(ordinary, explicit_false)
         # Re-pinned by the sdk-green generator pass (typed XRPC errors on every endpoint,
-        # extraFields, shared object template).
+        # extraFields, shared object template), and again when the output Content-Type
+        # check moved to value(forHTTPHeaderField:); that line is the only change.
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "ab948811008abaaf9edb5c350a647eecdb915599ce58c987f29546b49b7413f6",
+            "c2a24a611bb7ea70c2aa305dd5d3ca3d2e61961f6e44e7735bcc99e531b1f3eb",
         )
 
     def test_server_contract_flag_false_preserves_direct_input_bytes(self):

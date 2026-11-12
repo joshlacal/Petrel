@@ -109,7 +109,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
         {% if output_encoding == "*/*" %}
         // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
         {% else %}
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
             throw NetworkError.invalidContentType(expected: "{{ output_encoding | escapeStringLiteral }}", actual: "nil")
         }
 

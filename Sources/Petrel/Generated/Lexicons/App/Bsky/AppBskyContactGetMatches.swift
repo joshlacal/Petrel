@@ -117,7 +117,7 @@ public extension ATProtoClient.App.Bsky.Contact {
             throw ATProtoErrorParser.xrpcError(data: responseData, response: response, declaredErrors: AppBskyContactGetMatches.Error.self)
         }
 
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
 

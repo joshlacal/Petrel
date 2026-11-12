@@ -201,6 +201,59 @@ final class GeneratedXRPCCallTests: XCTestCase {
         XCTAssertEqual(output?.feed.count, 0)
     }
 
+    /// HTTP/2 servers send lowercase header names, and swift-corelibs-foundation does not
+    /// canonicalize `allHeaderFields`, so an exact-case `"Content-Type"` lookup missed them.
+    func testQueryAcceptsALowercaseContentTypeHeader() async throws {
+        XRPCStubURLProtocol.install(
+            status: 200,
+            body: #"{"feed":[],"cursor":"abc"}"#,
+            headers: ["content-type": "application/json; charset=utf-8"]
+        )
+
+        let (status, output) = try await client().bsky.feed.getTimeline(input: .init())
+
+        XCTAssertEqual(status, 200)
+        XCTAssertEqual(output?.cursor, "abc")
+    }
+
+    func testProcedureAcceptsALowercaseContentTypeHeader() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: "{}", headers: ["content-type": "application/json"])
+
+        let (status, output) = try await client().bsky.feed.sendInteractions(input: .init(interactions: []))
+
+        XCTAssertEqual(status, 200)
+        XCTAssertNotNil(output)
+    }
+
+    /// swift-corelibs-foundation title-cases every response header name
+    /// (`Atproto-Content-Labelers`), so an exact lowercase lookup found nothing on Linux.
+    func testContentLabelersHeaderIsReadWhateverItsCase() async throws {
+        let service = NetworkService(baseURL: baseURL)
+        for name in ["atproto-content-labelers", "Atproto-Content-Labelers", "ATPROTO-CONTENT-LABELERS"] {
+            let response = try XCTUnwrap(HTTPURLResponse(
+                url: baseURL,
+                statusCode: 200,
+                httpVersion: "HTTP/2",
+                headerFields: [name: "did:plc:alpha;redact, did:plc:beta"]
+            ))
+            let labelers = await service.extractContentLabelers(from: response)
+            XCTAssertEqual(labelers.map(\.did), ["did:plc:alpha", "did:plc:beta"], name)
+            XCTAssertEqual(labelers.map(\.redact), [true, false], name)
+        }
+    }
+
+    func testLowercaseContentTypeIsStillCheckedAgainstTheOutputEncoding() async throws {
+        XRPCStubURLProtocol.install(status: 200, body: "<html></html>", headers: ["content-type": "text/html"])
+
+        do {
+            _ = try await client().bsky.feed.getTimeline(input: .init())
+            XCTFail("a text/html body must not be decoded as JSON")
+        } catch let NetworkError.invalidContentType(expected, actual) {
+            XCTAssertEqual(expected, "application/json")
+            XCTAssertEqual(actual, "text/html")
+        }
+    }
+
     // MARK: - Query string (v-2)
 
     /// `URLComponents` leaves `+` literal; servers that parse the query as form data read it
@@ -666,7 +719,9 @@ final class XRPCStubURLProtocol: URLProtocol {
 
     static func install(status: Int, body: String, headers: [String: String] = [:]) {
         var merged = ["Content-Type": "application/json"]
-        merged.merge(headers) { _, new in new }
+        for (name, value) in headers {
+            merged.setHTTPHeader(name, value)
+        }
         lock.withLock {
             stub = Stub(status: status, body: Data(body.utf8), headers: merged)
             recordedRequest = nil

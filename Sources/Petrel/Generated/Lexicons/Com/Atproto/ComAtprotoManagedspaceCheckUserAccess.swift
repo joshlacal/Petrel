@@ -111,7 +111,7 @@ public extension ATProtoClient.Com.Atproto.Managedspace {
             throw ATProtoErrorParser.xrpcError(data: responseData, response: response)
         }
 
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
             throw NetworkError.invalidContentType(expected: "application/json", actual: "nil")
         }
 

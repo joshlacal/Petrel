@@ -61,9 +61,9 @@ extension ATProtoClient.{{ template_namespace_name }} {
                         return
                     }
 
-                    guard let contentType = httpResponse.allHeaderFields["Content-Type"] as? String,
+                    guard let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type"),
                           contentType.lowercased().contains("text/event-stream") else {
-                        continuation.finish(throwing: NetworkError.invalidContentType(expected: "text/event-stream", actual: httpResponse.allHeaderFields["Content-Type"] as? String ?? "nil"))
+                        continuation.finish(throwing: NetworkError.invalidContentType(expected: "text/event-stream", actual: httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "nil"))
                         return
                     }
 
@@ -159,7 +159,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
         {% if output_encoding == "*/*" %}
         // Wildcard encoding ("*/*") — accept any Content-Type, including a missing one.
         {% else %}
-        guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
+        guard let contentType = response.value(forHTTPHeaderField: "Content-Type") else {
             throw NetworkError.invalidContentType(expected: "{{ output_encoding | escapeStringLiteral }}", actual: "nil")
         }
 
