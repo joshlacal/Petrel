@@ -559,6 +559,52 @@ final class GeneratedXRPCCallTests: XCTestCase {
         XCTAssertNil(removed)
     }
 
+    /// The explicit options of an untyped call win over an enclosing scope as a whole: an
+    /// explicit `atproto-proxy` header beats a scoped `proxy`, though both name the same header.
+    func testExplicitProxyHeaderBeatsAScopedProxyOption() async throws {
+        let service = NetworkService(baseURL: baseURL)
+        for spelling in ["atproto-proxy", "Atproto-Proxy"] {
+            XRPCStubURLProtocol.install(status: 200, body: "{}")
+            _ = try await NetworkService.withCallOptions(XRPCCallOptions(proxy: "did:web:scoped.example.com#svc")) {
+                try await service.xrpcQuery(
+                    "com.example.widget.getThing",
+                    options: XRPCCallOptions(headers: [spelling: "did:web:explicit.example.com#svc"])
+                )
+            }
+            let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+            XCTAssertEqual(request.value(forHTTPHeaderField: "atproto-proxy"), "did:web:explicit.example.com#svc", spelling)
+        }
+    }
+
+    func testExplicitLabelersHeaderBeatsScopedLabelersOption() async throws {
+        let service = NetworkService(baseURL: baseURL)
+        XRPCStubURLProtocol.install(status: 200, body: "{}")
+        _ = try await NetworkService.withCallOptions(
+            XRPCCallOptions(acceptLabelers: [XRPCLabeler(did: "did:plc:scoped")])
+        ) {
+            try await service.xrpcQuery(
+                "com.example.widget.getThing",
+                options: XRPCCallOptions(headers: ["Atproto-Accept-Labelers": "did:plc:explicit"])
+            )
+        }
+        let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "atproto-accept-labelers"), "did:plc:explicit")
+    }
+
+    /// The reverse still holds: an explicit typed option beats a scoped header.
+    func testExplicitProxyOptionBeatsAScopedProxyHeader() async throws {
+        let service = NetworkService(baseURL: baseURL)
+        XRPCStubURLProtocol.install(status: 200, body: "{}")
+        _ = try await NetworkService.withCallOptions(XRPCCallOptions(headers: ["atproto-proxy": "did:web:scoped.example.com#svc"])) {
+            try await service.xrpcQuery(
+                "com.example.widget.getThing",
+                options: XRPCCallOptions(proxy: "did:web:explicit.example.com#svc")
+            )
+        }
+        let request = try XCTUnwrap(XRPCStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.value(forHTTPHeaderField: "atproto-proxy"), "did:web:explicit.example.com#svc")
+    }
+
     func testExplicitOptionHeadersReplaceScopedOnesWhateverTheirCase() async throws {
         let service = NetworkService(baseURL: baseURL)
         XRPCStubURLProtocol.install(status: 200, body: "{}")

@@ -207,6 +207,9 @@ public struct XRPCResponse: Sendable, Equatable {
 public extension NetworkService {
     /// Runs `operation` with `options` applied to every XRPC request it sends through a
     /// `NetworkService`: generated calls, untyped calls and raw `performRequest` calls alike.
+    /// Generated subscriptions take them too: `service` is the host the WebSocket connects
+    /// to, `proxy` routes the subscription through the PDS, and headers and labelers are
+    /// sent on the upgrade request.
     ///
     /// The options apply to this task and its child tasks until `operation` returns.
     static func withCallOptions<T: Sendable>(
@@ -313,6 +316,15 @@ public extension NetworkService {
         var effective = Self.scopedCallOptions ?? XRPCCallOptions()
         for name in options.headers.keys.sorted() {
             effective.headers.setHTTPHeader(name, options.headers[name])
+        }
+        // The explicit options win over the scope as a whole. A header the explicit options
+        // set by hand (atproto-proxy, atproto-accept-labelers) displaces the scope's typed
+        // option for the same header, which would otherwise be written over it.
+        if options.proxy == nil, options.headers.hasHTTPHeader("atproto-proxy") {
+            effective.proxy = nil
+        }
+        if options.acceptLabelers == nil, options.headers.hasHTTPHeader("atproto-accept-labelers") {
+            effective.acceptLabelers = nil
         }
         effective.proxy = options.proxy ?? effective.proxy
         effective.acceptLabelers = options.acceptLabelers ?? effective.acceptLabelers

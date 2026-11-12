@@ -2560,32 +2560,53 @@ public actor NetworkService: NetworkServiceProtocol {
         endpoint: String,
         parameters: (any Parametrizable)?
     ) async throws -> AsyncThrowingStream<Message, Error> {
+        // Options from an enclosing `withCallOptions` scope apply here as they do to HTTP
+        // calls: `service` picks the host, `proxy` (or a caller's own atproto-proxy header)
+        // routes through the PDS, and headers and labelers go on the upgrade request.
+        let scoped = Self.scopedCallOptions
+        let scopedProxy = scoped?.proxy ?? scoped?.headers.first {
+            $0.key.caseInsensitiveCompare("atproto-proxy") == .orderedSame
+        }?.value
+
         // Build WebSocket URL
         var urlComponents = URLComponents()
         urlComponents.scheme = "wss"
 
-        // Resolve service DID with strongest signal first (full endpoint),
-        // then fall back to the three-part namespace (e.g., blue.catbird.mls)
-        let fullEndpoint = endpoint
-        let threePartNamespace = endpoint.split(separator: ".").prefix(3).joined(separator: ".")
-
-        var resolvedDID = await getServiceDID(for: fullEndpoint)
-        if resolvedDID == nil {
-            resolvedDID = await getServiceDID(for: String(threePartNamespace))
-        }
-
-        if let did = resolvedDID, let serviceHost = extractHostFromDID(did) {
-            // Prefer connecting directly to the service host for WS
-            urlComponents.host = serviceHost
-        } else {
-            // Fallback to the PDS host (baseURL)
+        var resolvedDID: String?
+        if let service = scoped?.service {
+            urlComponents.scheme = service.scheme?.lowercased() == "http" ? "ws" : "wss"
+            urlComponents.host = service.host
+            urlComponents.port = service.port
+            resolvedDID = scopedProxy
+        } else if let scopedProxy {
+            // An explicit proxy is a request for the PDS to forward the subscription.
             urlComponents.host = baseURL.host
+            resolvedDID = scopedProxy
+        } else {
+            // Resolve service DID with strongest signal first (full endpoint),
+            // then fall back to the three-part namespace (e.g., blue.catbird.mls)
+            let fullEndpoint = endpoint
+            let threePartNamespace = endpoint.split(separator: ".").prefix(3).joined(separator: ".")
+
+            resolvedDID = await getServiceDID(for: fullEndpoint)
+            if resolvedDID == nil {
+                resolvedDID = await getServiceDID(for: String(threePartNamespace))
+            }
+
+            if let did = resolvedDID, let serviceHost = extractHostFromDID(did) {
+                // Prefer connecting directly to the service host for WS
+                urlComponents.host = serviceHost
+            } else {
+                // Fallback to the PDS host (baseURL)
+                urlComponents.host = baseURL.host
+            }
         }
 
-        urlComponents.path = "/xrpc/\(endpoint)"
+        let servicePath = scoped?.service.map { $0.path.hasSuffix("/") ? String($0.path.dropLast()) : $0.path } ?? ""
+        urlComponents.path = "\(servicePath)/xrpc/\(endpoint)"
 
         // Add query parameters if provided
-        if let params = parameters {
+        if let params = parameters, !params.asQueryItems().isEmpty {
             urlComponents.queryItems = params.asQueryItems()
             let escapedQuery = Self.xrpcQueryEscapingPlus(urlComponents.percentEncodedQuery)
             urlComponents.percentEncodedQuery = escapedQuery
@@ -2619,6 +2640,13 @@ public actor NetworkService: NetworkServiceProtocol {
         if resolvedURL.host == baseURL.host, let did = resolvedDID {
             request.setValue(did, forHTTPHeaderField: "atproto-proxy")
             LogManager.logDebug("Network Service - Setting atproto-proxy header: \(did) for endpoint: \(resolvedURL.path)")
+        }
+        // This upgrade request is the scoped call itself, wherever it was routed.
+        // setValue replaces an earlier header whatever its case.
+        if let scoped {
+            for (name, value) in scoped.requestHeaders(over: nil) ?? [:] {
+                request.setValue(value, forHTTPHeaderField: name)
+            }
         }
         var authCtx: AuthContext? = nil
         defer {
