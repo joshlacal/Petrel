@@ -6,6 +6,7 @@
 
     /// Explicit, process-local qualification transport. No environment or manifest is
     /// consumed automatically, and this entire facility is absent from release builds.
+    // @unchecked Sendable: DEBUG only. `tunnels` is confined to `queue`, the ready state to `readyLock`, the statics to `installationLock`.
     public final class DebugFixtureTransport: @unchecked Sendable {
         public enum Failure: Error { case invalidConfiguration, alreadyInstalled, unavailable, rejected, connection }
         public struct Account: Sendable {
@@ -199,6 +200,7 @@
         }
     }
 
+    // @unchecked Sendable: DEBUG only; holds one immutable reference to a Sendable transport.
     private final class FixtureSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, @unchecked Sendable {
         let transport: DebugFixtureTransport
         init(transport: DebugFixtureTransport) {
@@ -247,6 +249,7 @@
     }
 
     /// Serial-queue confined encrypted TCP relay. It neither terminates TLS nor reads application bodies.
+    // @unchecked Sendable: DEBUG only; every var is touched only on `queue` (NWConnection handlers run there).
     final class FixtureTunnel: @unchecked Sendable {
         let connection: NWConnection
         let ports: [String: UInt16]

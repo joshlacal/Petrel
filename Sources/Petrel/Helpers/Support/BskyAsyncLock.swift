@@ -44,6 +44,7 @@ actor BskyAsyncLock {
 /// so the lock that serializes preference writes cannot live in the agent
 /// itself. Keying it on the network service gives every agent of one client the
 /// same lock.
+// @unchecked Sendable: `entries` is read and written only under `guardLock`.
 final class BskyAsyncLockRegistry: @unchecked Sendable {
     static let shared = BskyAsyncLockRegistry()
 

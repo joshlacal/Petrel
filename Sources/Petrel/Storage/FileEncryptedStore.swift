@@ -72,6 +72,7 @@
             }
         }
 
+        // @unchecked Sendable: immutable closures over stateless POSIX calls (tests inject stateless fakes).
         struct Operations: @unchecked Sendable {
             let rename: (String, String) -> Int32
             let unlink: (String) -> Int32

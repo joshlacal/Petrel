@@ -16,6 +16,7 @@ import Foundation
     import FoundationNetworking
 #endif
 
+// @unchecked Sendable: stored properties are immutable; per-task state lives in the lock-guarded `TaskContextManager`. NSObject subclasses cannot be checked Sendable.
 package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, URLSessionTaskDelegate, URLSessionDataDelegate, @unchecked Sendable {
     #if DEBUG && canImport(Network) && canImport(Security)
     let fixtureTransport = DebugFixtureTransport.current
@@ -67,6 +68,7 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             }
         #endif
     }
+    // @unchecked Sendable: all mutable state is read and written only under `lock`.
     package final class TaskContextManager: @unchecked Sendable {
         private let lock = NSLock()
         private var taskContexts = [Int: TaskContext]()
