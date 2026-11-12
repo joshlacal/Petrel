@@ -207,9 +207,9 @@ Generated types are a view of wire data, and writing a value back reproduces it:
   JSON and DAG-CBOR, so a record keeps its CID through a round trip.
 - An open union keeps a variant it does not know as `.unexpected`; a closed
   union rejects it.
-- `cid-link` fields are ``ATProtoLink`` (`{"$link": …}`, CBOR tag 42). Strings of
+- `cid-link` fields are `ATProtoLink` (`{"$link": …}`, CBOR tag 42). Strings of
   format `cid` are ``CIDString``: the text exactly as written, valid for any
-  well-formed CID, with `.cid` giving the parsed ``CID`` when it is one atproto
+  well-formed CID, with `.cid` giving the parsed `CID` when it is one atproto
   blesses for links.
 - A property that is optional and nullable is `ATProtoNullable<T>?`, so
   absent, `null` and a value stay distinct.

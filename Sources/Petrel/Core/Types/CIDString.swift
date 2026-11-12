@@ -7,7 +7,7 @@ import Foundation
 /// string exactly as it appeared on the wire, checked against the `cid` syntax
 /// (``CIDSyntax``), so decoding and re-encoding never changes it.
 ///
-/// It is deliberately not a ``CID``. The syntax admits any multibase and any CID version or
+/// It is deliberately not a `CID`. The syntax admits any multibase and any CID version or
 /// hash, while `CID` parses only the forms atproto blesses for links (CIDv1, base32,
 /// `dag-cbor` or `raw`, SHA-256). A record that mentions some other well-formed CID is still
 /// valid data and must decode. Use ``cid`` when the parsed identifier is needed:
@@ -19,7 +19,7 @@ import Foundation
 /// ```
 ///
 /// A `cid-link` field is a different thing: a link in the data model (`{"$link": …}` in
-/// JSON, tag 42 in DAG-CBOR), typed ``ATProtoLink``.
+/// JSON, tag 42 in DAG-CBOR), typed `ATProtoLink`.
 public struct CIDString: ATProtocolValue, CustomStringConvertible, QueryParameterConvertible {
     /// The CID text, exactly as written.
     public let string: String
