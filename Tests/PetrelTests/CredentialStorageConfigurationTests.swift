@@ -218,6 +218,114 @@
             #expect(try await storage(at: directory).getSession(for: did)?.accessToken == "protected")
         }
 
+        // MARK: - Key-check marker (D15)
+
+        private func isKeyMismatch(_ error: any Error, at directory: URL) -> Bool {
+            error as? EncryptedFileCredentialStorageError
+                == .keyMismatch(directory: directory.standardizedFileURL.path)
+        }
+
+        @Test("The first configuration binds an empty directory to its key")
+        func emptyDirectoryIsBoundToTheFirstKey() throws {
+            let directory = directory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            _ = try CredentialStorageConfiguration.encryptedFiles(directory: directory, masterKey: key)
+
+            // Nothing was stored yet, but a second key is refused at once instead of at the
+            // next start, after it has written credentials the first key cannot read.
+            do {
+                _ = try CredentialStorageConfiguration.encryptedFiles(
+                    directory: directory,
+                    masterKey: Data(repeating: 0x31, count: 32)
+                )
+                Issue.record("a second key for the same directory must be refused")
+            } catch {
+                #expect(isKeyMismatch(error, at: directory), "got \(error)")
+            }
+            _ = try CredentialStorageConfiguration.encryptedFiles(directory: directory, masterKey: key)
+        }
+
+        @Test("The key-check file is owner-only and not a credential")
+        func keyCheckFileIsPrivateAndIgnoredByCredentialScans() async throws {
+            let directory = directory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            let writer = try storage(at: directory)
+            let marker = directory.appendingPathComponent(".petrel-key-check")
+            let attributes = try FileManager.default.attributesOfItem(atPath: marker.path)
+            #expect((attributes[.posixPermissions] as? NSNumber)?.intValue == 0o600)
+            try await writer.saveSession(session("kept"), for: did)
+            try await writer.deleteSession(for: did)
+            #expect(FileManager.default.fileExists(atPath: marker.path))
+            _ = try storage(at: directory)
+        }
+
+        @Test("A wrong key for existing credentials is reported as a key mismatch")
+        func wrongKeyForExistingCredentialsIsTyped() async throws {
+            let directory = directory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            try await storage(at: directory).saveSession(session("protected"), for: did)
+            // Remove the marker: a directory written before markers existed.
+            try FileManager.default.removeItem(at: directory.appendingPathComponent(".petrel-key-check"))
+            do {
+                _ = try storage(at: directory, key: Data(repeating: 0x31, count: 32))
+                Issue.record("a wrong key must be refused")
+            } catch {
+                #expect(isKeyMismatch(error, at: directory), "got \(error)")
+            }
+            // The right key still opens it and writes the marker it was missing.
+            #expect(try await storage(at: directory).getSession(for: did)?.accessToken == "protected")
+            #expect(FileManager.default.fileExists(atPath: directory.appendingPathComponent(".petrel-key-check").path))
+        }
+
+        @Test("A tampered key-check file fails closed")
+        func tamperedKeyCheckFailsClosed() throws {
+            let directory = directory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            _ = try CredentialStorageConfiguration.encryptedFiles(directory: directory, masterKey: key)
+            let marker = directory.appendingPathComponent(".petrel-key-check")
+            var bytes = try Data(contentsOf: marker)
+            bytes[bytes.count - 1] ^= 0x01
+            try bytes.write(to: marker)
+            do {
+                _ = try CredentialStorageConfiguration.encryptedFiles(directory: directory, masterKey: key)
+                Issue.record("a damaged key-check file must be refused")
+            } catch {
+                #expect(isKeyMismatch(error, at: directory), "got \(error)")
+            }
+        }
+
+        @Test("Concurrent first use with different keys: exactly one key wins")
+        func concurrentFirstUseBindsOneKey() async throws {
+            let directory = directory()
+            defer { try? FileManager.default.removeItem(at: directory) }
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true, attributes: [.posixPermissions: 0o700])
+            let keys = (0 ..< 16).map { Data(repeating: UInt8(0x40 + $0 % 2), count: 32) }
+
+            let outcomes = await withTaskGroup(of: (Data, Bool).self) { group in
+                for candidate in keys {
+                    group.addTask {
+                        do {
+                            _ = try CredentialStorageConfiguration.encryptedFiles(directory: directory, masterKey: candidate)
+                            return (candidate, true)
+                        } catch {
+                            return (candidate, false)
+                        }
+                    }
+                }
+                var results: [(Data, Bool)] = []
+                for await result in group {
+                    results.append(result)
+                }
+                return results
+            }
+
+            let winners = Set(outcomes.filter(\.1).map(\.0))
+            #expect(winners.count == 1, "every successful configuration must share one key")
+            let losers = outcomes.filter { !$0.1 }.map(\.0)
+            #expect(!losers.isEmpty)
+            #expect(losers.allSatisfy { !winners.contains($0) })
+        }
+
         @Test("Default configuration retains the platform backend and original mutation hub")
         func platformDefaultRemainsUnchanged() throws {
             let original = KeychainStorage(namespace: "petrel-default-no-io")

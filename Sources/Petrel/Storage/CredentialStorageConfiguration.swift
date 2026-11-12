@@ -11,8 +11,15 @@ public struct CredentialStorageConfiguration: Sendable {
 
     /// Uses the existing encrypted-file format in an explicitly selected directory.
     /// Supply the durable AES key used for this directory, or set PETREL_MASTER_KEY
-    /// to its Base64 representation. Existing credential files must decrypt before
-    /// configuration succeeds. No key is generated, persisted, or logged.
+    /// to its Base64 representation. No key is generated, persisted, or logged.
+    ///
+    /// A directory is bound to one key. The first configuration writes a small encrypted
+    /// key-check file (`.petrel-key-check`); every later configuration, including one in
+    /// another process, must decrypt it, and existing credential files must decrypt too.
+    /// Otherwise this throws ``EncryptedFileCredentialStorageError/keyMismatch(directory:)``
+    /// before anything is written, so a second key can never overwrite credentials the
+    /// first one stored.
+    ///
     /// The directory and files must be owned by the current user; storage enforces
     /// owner-only permissions. Temporary paths and symlinks are rejected.
     /// Access groups are an Apple Keychain feature and are unavailable with files.
@@ -26,9 +33,26 @@ public struct CredentialStorageConfiguration: Sendable {
                 masterKey: masterKey.map { SymmetricKey(data: $0) }
             )
             try backend.validateExistingCredentials()
+            try backend.establishKeyCheck()
             return Self(backend: backend, identifier: directory.standardizedFileURL.path)
         }
     #endif
+}
+
+/// Why an encrypted-file credential directory was refused.
+public enum EncryptedFileCredentialStorageError: Error, Sendable, Equatable, LocalizedError {
+    /// The directory's key-check file or one of its credentials does not decrypt with the
+    /// key supplied: the directory belongs to another key (or the file was damaged).
+    /// Nothing was read or written. The associated value is the standardized directory path.
+    case keyMismatch(directory: String)
+
+    /// A description that names the directory but never the key.
+    public var errorDescription: String? {
+        switch self {
+        case let .keyMismatch(directory):
+            "The encrypted credential directory \(directory) belongs to a different key."
+        }
+    }
 }
 
 /// Keeps the legacy platform route intact while explicit backends bypass its

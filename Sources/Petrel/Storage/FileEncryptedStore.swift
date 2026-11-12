@@ -274,7 +274,77 @@
                       (fileStat.st_mode & 0o077) == 0
                 else { throw FileEncryptedStoreError.insecurePermissions }
                 let combined = try Data(contentsOf: file)
-                _ = try masterKey.open(AES.GCM.SealedBox(combined: combined))
+                do {
+                    _ = try masterKey.open(AES.GCM.SealedBox(combined: combined))
+                } catch {
+                    throw EncryptedFileCredentialStorageError.keyMismatch(directory: storageDirectory.standardizedFileURL.path)
+                }
+            }
+        }
+
+        /// Name of the file that binds a directory to one key. It starts with a dot, so the
+        /// credential scans (`validateExistingCredentials`, `deleteAll`) never treat it as a
+        /// credential.
+        static let keyCheckFilename = ".petrel-key-check"
+        private static let keyCheckPlaintext = Data("petrel.encrypted-files.key-check.v1".utf8)
+
+        /// Binds the directory to this store's key, or confirms it is already bound to it.
+        ///
+        /// An empty directory has no credential to test a key against, so without this two
+        /// clients given different keys could both start, and the second would only fail at
+        /// its next start, after writing credentials the first cannot read. The first store
+        /// to configure the directory writes an encrypted constant here; the file is created
+        /// atomically with `link(2)`, so of two concurrent first uses exactly one key wins and
+        /// the other sees the winner's file and fails.
+        ///
+        /// - Throws: `EncryptedFileCredentialStorageError.keyMismatch` when the file exists and
+        ///   does not decrypt to the constant with this key; `FileEncryptedStoreError` when it
+        ///   is not an owner-only regular file or cannot be written.
+        func establishKeyCheck() throws {
+            let marker = storageDirectory.appendingPathComponent(Self.keyCheckFilename)
+            var markerStat = stat()
+            if lstat(marker.path, &markerStat) == 0 {
+                try verifyKeyCheck(at: marker)
+                return
+            }
+
+            guard let combined = try masterKey.seal(Self.keyCheckPlaintext).combined else {
+                throw FileEncryptedStoreError.encryptionFailed
+            }
+            let tempURL = storageDirectory.appendingPathComponent(".tmp.\(UUID().uuidString)")
+            try combined.write(to: tempURL, options: .atomic)
+            defer { _ = operations.unlink(tempURL.path) }
+            guard chmod(tempURL.path, 0o600) == 0 else {
+                throw FileEncryptedStoreError.insecurePermissions
+            }
+            if link(tempURL.path, marker.path) == 0 {
+                return
+            }
+            guard errno == EEXIST else {
+                throw FileEncryptedStoreError.encryptionFailed
+            }
+            // Another store created it first: it must hold the same key.
+            try verifyKeyCheck(at: marker)
+        }
+
+        private func verifyKeyCheck(at marker: URL) throws {
+            var markerStat = stat()
+            guard lstat(marker.path, &markerStat) == 0,
+                  (markerStat.st_mode & S_IFMT) == S_IFREG,
+                  markerStat.st_uid == getuid(),
+                  (markerStat.st_mode & 0o077) == 0
+            else {
+                throw FileEncryptedStoreError.insecurePermissions
+            }
+            let combined = try Data(contentsOf: marker)
+            let plaintext: Data
+            do {
+                plaintext = try masterKey.open(AES.GCM.SealedBox(combined: combined))
+            } catch {
+                throw EncryptedFileCredentialStorageError.keyMismatch(directory: storageDirectory.standardizedFileURL.path)
+            }
+            guard plaintext == Self.keyCheckPlaintext else {
+                throw EncryptedFileCredentialStorageError.keyMismatch(directory: storageDirectory.standardizedFileURL.path)
             }
         }
 
