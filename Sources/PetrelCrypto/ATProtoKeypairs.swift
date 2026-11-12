@@ -3,12 +3,18 @@ import Foundation
 
 /// An in-memory NIST P-256 (`ES256`) signing key.
 ///
+/// The private scalar is held in ordinary memory (`Data`), which is not
+/// zeroed when the value is released; use a hardware-backed signer such as
+/// `SecureEnclaveP256Signer` where that matters.
+///
 /// ```swift
 /// let keypair = P256Keypair.generate()
 /// let signature = try keypair.sign(Data("hello".utf8))   // 64 bytes, low-S
 /// keypair.publicKey.isValidSignature(signature, for: Data("hello".utf8))
 /// ```
-public struct P256Keypair: ATProtoExportableKeypair, CustomStringConvertible, CustomDebugStringConvertible {
+public struct P256Keypair: ATProtoExportableKeypair, CustomStringConvertible, CustomDebugStringConvertible,
+    CustomReflectable
+{
     /// The public half of the key.
     public let publicKey: ATProtoPublicKey
     private let rawRepresentation: Data
@@ -76,17 +82,26 @@ public struct P256Keypair: ATProtoExportableKeypair, CustomStringConvertible, Cu
     public var description: String { "P256Keypair(\(publicKey.didKey))" }
     /// Same as ``description``.
     public var debugDescription: String { description }
+    /// Only the public key: `dump` and `Mirror` never reach the private scalar.
+    public var customMirror: Mirror {
+        Mirror(self, children: ["publicKey": publicKey.didKey], displayStyle: .struct)
+    }
 }
 
 /// An in-memory secp256k1 (`ES256K`) signing key — the curve the reference
 /// implementation uses by default for new keys.
+///
+/// The private scalar is held in ordinary memory (`Data`), which is not
+/// zeroed when the value is released.
 ///
 /// ```swift
 /// let keypair = K256Keypair.generate()
 /// let signature = try keypair.sign(Data("hello".utf8))   // 64 bytes, low-S
 /// keypair.publicKey.isValidSignature(signature, for: Data("hello".utf8))
 /// ```
-public struct K256Keypair: ATProtoExportableKeypair, CustomStringConvertible, CustomDebugStringConvertible {
+public struct K256Keypair: ATProtoExportableKeypair, CustomStringConvertible, CustomDebugStringConvertible,
+    CustomReflectable
+{
     /// The public half of the key.
     public let publicKey: ATProtoPublicKey
     private let rawRepresentation: Data
@@ -143,6 +158,10 @@ public struct K256Keypair: ATProtoExportableKeypair, CustomStringConvertible, Cu
     public var description: String { "K256Keypair(\(publicKey.didKey))" }
     /// Same as ``description``.
     public var debugDescription: String { description }
+    /// Only the public key: `dump` and `Mirror` never reach the private scalar.
+    public var customMirror: Mirror {
+        Mirror(self, children: ["publicKey": publicKey.didKey], displayStyle: .struct)
+    }
 }
 
 /// Private-key string encodings shared by both curves.
