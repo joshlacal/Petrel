@@ -13,6 +13,9 @@ public enum RepositoryLimitKind: Sendable, Equatable {
     /// ``PublicRepositoryLimits/maximumCARBytes``, counted on the
     /// repository's streamable export.
     case carBytes
+    /// ``PublicRepositoryLimits/maximumRecordBlockBytes``, applied to every
+    /// block a commit writes: records, MST nodes and the commit itself.
+    case blockBytes
 }
 
 /// The exact size of a repository as the read paths measure it: what

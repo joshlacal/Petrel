@@ -25,17 +25,18 @@ struct RepositoryCommitLimitTests {
     }
 
     private func options(
-        records: Int = 1_000, mstNodes: Int = 1_000, carBlocks: Int = 1_000
+        records: Int = 1_000, mstNodes: Int = 1_000, carBlocks: Int = 1_000,
+        blockBytes: Int = 1_000_000, policy: RepositoryReadPolicy = .dataModel
     ) throws -> RepositoryOptions {
         RepositoryOptions(limits: try PublicRepositoryLimits(
-            maximumRecordBlockBytes: 1_000_000,
+            maximumRecordBlockBytes: blockBytes,
             maximumCARBytes: PublicRepositoryLimits.requiredStreamingCARBytes,
             maximumCARBlocks: carBlocks,
             maximumMSTNodes: mstNodes,
             maximumMSTEntriesPerNode: 64,
             maximumCBORNestingDepth: 64,
             maximumRepositoryRecords: records
-        ))
+        ), policy: policy)
     }
 
     /// Everything a successful commit must leave readable under `options`.
@@ -140,6 +141,80 @@ struct RepositoryCommitLimitTests {
         }
         #expect(refused > 0, "the history should reach the node limit")
         #expect(refused < 120, "and still make progress")
+    }
+}
+
+extension RepositoryCommitLimitTests {
+    @Test("Codex repro: depth-zero keys under maximumRecordBlockBytes 256 refuse the oversized MST node unsigned")
+    func mstBlockSizeLimit() async throws {
+        let signer = K256Keypair.generate()
+        let options = try options(blockBytes: 256)
+        let store = InMemoryRepositoryBlockStore()
+        var repository = try await Repository.create(did: did, signer: signer, store: store, options: options)
+        var refusedKey: String?
+        for key in ["0", "1", "2", "4", "5", "6", "7", "8"] {
+            let storedBefore = try await store.storedCIDs().count
+            let counting = CountingSigner(signer)
+            do {
+                repository = try await repository.commit([try create(key)], signer: counting).repository
+            } catch RepositoryError.limitExceeded(.blockBytes, limit: 256) {
+                #expect(counting.signatures == 0)
+                #expect(try await store.storedCIDs().count == storedBefore)
+                refusedKey = key
+                break
+            }
+            // Every accepted commit stays exportable and provable.
+            try await expectReadable(repository, signer: signer)
+            let proof = try await repository.recordProof(collection: posts, recordKey: key)
+            _ = try await proof.car()
+        }
+        #expect(refusedKey != nil, "one node holding all eight keys exceeds 256 bytes")
+        try await expectReadable(repository, signer: signer)
+    }
+
+    @Test("create refuses a first commit its own limits could not export")
+    func createChecksLimits() async throws {
+        let signer = K256Keypair.generate()
+        // The signed commit block alone is larger than 64 bytes.
+        let store = InMemoryRepositoryBlockStore()
+        await #expect(throws: RepositoryError.limitExceeded(.blockBytes, limit: 64)) {
+            try await Repository.create(
+                did: self.did, signer: signer, store: store, options: try self.options(blockBytes: 64)
+            )
+        }
+        #expect(try await store.storedCIDs().isEmpty)
+        // An export of an empty repository is two blocks: commit and root.
+        await #expect(throws: RepositoryError.limitExceeded(.carBlocks, limit: 1)) {
+            try await Repository.create(
+                did: self.did, signer: signer, options: try self.options(mstNodes: 1, carBlocks: 1)
+            )
+        }
+        let minimal = try await Repository.create(
+            did: did, signer: signer, options: try options(mstNodes: 1, carBlocks: 2)
+        )
+        try await expectReadable(minimal, signer: signer)
+    }
+
+    @Test("a record the repository's own read policy refuses is not committed")
+    func recordReadPolicy() async throws {
+        let signer = K256Keypair.generate()
+        let repository = try await Repository.create(did: did, signer: signer, options: options(policy: .strict))
+        // The strict policy caps containers at 65,536 elements; the writer
+        // has no such cap, and 70,000 zeros fit the block budget.
+        let wide: PublicRecord = [
+            "$type": .string(posts),
+            "values": .array(Array(repeating: .integer(0), count: 70_000)),
+        ]
+        let path = try path("wide")
+        let counting = CountingSigner(signer)
+        await #expect(throws: RepositoryError.invalidRecord(path: path.mstKey)) {
+            try await repository.commit([.create(path: path, record: wide)], signer: counting)
+        }
+        #expect(counting.signatures == 0)
+        // The same record is fine under the data-model policy.
+        let tolerant = try await Repository.create(did: did, signer: signer, options: options())
+        let written = try await tolerant.commit([.create(path: path, record: wide)], signer: signer).repository
+        try await expectReadable(written, signer: signer)
     }
 }
 

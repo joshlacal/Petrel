@@ -86,8 +86,12 @@ tolerant ``RepositoryReadPolicy/dataModel`` policy to
 The same limits bound writes. ``Repository/commit(_:signer:revision:expectedCommitCID:)``
 measures the tree it is about to sign and throws
 ``RepositoryError/limitExceeded(_:limit:)`` instead of signing a commit whose
-repository would have more records or MST nodes than allowed, or whose export
-would break the CAR block or byte budget.
+repository would have more records or MST nodes than allowed, would hold a
+block larger than ``PublicRepositoryLimits/maximumRecordBlockBytes``, or whose
+export would break the CAR block or byte budget. A record the read policy
+would refuse is rejected the same way, with
+``RepositoryError/invalidRecord(path:)``. Whatever a write accepts, the same
+options read back.
 
 ## Verify a record proof
 

@@ -107,9 +107,9 @@ public enum RepositoryError: Error, Sendable, Equatable {
     /// A DID document does not carry a usable `#atproto` signing key.
     case signingKeyNotFound
     /// A commit would leave a repository that its own options refuse to
-    /// verify, export or reopen: more records or MST nodes than allowed, or
-    /// an export over the CAR block or byte budget. Nothing was signed or
-    /// written.
+    /// verify, export or reopen: more records or MST nodes than allowed, a
+    /// block over the block size limit, or an export over the CAR block or
+    /// byte budget. Nothing was signed or written.
     case limitExceeded(RepositoryLimitKind, limit: Int)
 }
 
@@ -446,6 +446,9 @@ public struct Repository: Sendable {
     ///   - store: Where to put the blocks.
     ///   - revision: The first revision. The current time by default.
     ///   - options: Limits and read policy.
+    /// - Throws: ``RepositoryError``;
+    ///   ``RepositoryError/limitExceeded(_:limit:)`` before signing when
+    ///   `options` could not export even the empty repository.
     public static func create(
         did: String,
         signer: any ATProtoSigner,
@@ -455,11 +458,28 @@ public struct Repository: Sendable {
     ) async throws -> Repository {
         let emptyTree = PublicRepositoryGenesisCodec.canonicalEmptyMST
         let dataCID = CID.fromDAGCBOR(emptyTree)
+        let footprint = RepositoryFootprint.empty(rootCID: dataCID, rootByteCount: emptyTree.count)
+        let firstRevision = try (revision ?? PublicRepositoryTID.next(after: nil)).value
         let prepared: PreparedPublicRepositorySignedCommit
         do {
+            // The same limits a later commit is held to, checked before the
+            // signer runs and before anything is stored.
+            let commitByteCount = try PublicRepositoryCommitCodec.preflightSignedCommitByteCount(
+                did: did,
+                revision: firstRevision,
+                dataCID: dataCID,
+                currentRevision: nil,
+                signingAlgorithm: ATProtoRepositoryCommitSigner(signer).signingAlgorithm
+            )
+            let maximum = options.limits.maximumRecordBlockBytes
+            guard commitByteCount <= maximum, emptyTree.count <= maximum else {
+                throw RepositoryError.limitExceeded(.blockBytes, limit: maximum)
+            }
+            // Any CID of a repository block has the commit CID's length.
+            try footprint.check(options.limits, commitCID: dataCID, commitByteCount: commitByteCount)
             prepared = try await PublicRepositoryCommitCodec.prepare(
                 did: did,
-                revision: try (revision ?? PublicRepositoryTID.next(after: nil)).value,
+                revision: firstRevision,
                 dataCID: dataCID,
                 signer: signer
             )
@@ -487,7 +507,7 @@ public struct Repository: Sendable {
             statistics: RepositoryStatistics(
                 recordCount: 0, mstNodeCount: 1, rootLayer: 0, unverifiableRecordCount: 0
             ),
-            footprint: .empty(rootCID: dataCID, rootByteCount: emptyTree.count)
+            footprint: footprint
         )
     }
 
@@ -566,6 +586,44 @@ public struct Repository: Sendable {
             framedBlockBytes: framedBytes
         )
         return (statistics, footprint)
+    }
+
+    /// Refuses a mutation that would write a block this repository's own
+    /// read paths reject.
+    ///
+    /// Every block a commit writes is a record, a new MST node or the commit.
+    /// Each must fit ``PublicRepositoryLimits/maximumRecordBlockBytes``,
+    /// which every CAR this repository exports or proves enforces, and each
+    /// record must pass the same validation ``verify()`` applies under
+    /// ``RepositoryOptions/policy``. Blocks the tree keeps were checked when
+    /// they were written or read. The commit's diff needs no separate
+    /// check: its blocks are a subset of the repository's export, which
+    /// ``RepositoryFootprint/check(_:commitCID:commitByteCount:)`` bounds.
+    private func checkWrittenBlocks(of mutation: UnsignedPublicRepositoryMutation) throws {
+        let limits = options.limits
+        let maximum = limits.maximumRecordBlockBytes
+        guard mutation.commitByteCount <= maximum,
+              mutation.newNodes.orderedBlocks.allSatisfy({ $0.bytes.count <= maximum }) else {
+            throw RepositoryError.limitExceeded(.blockBytes, limit: maximum)
+        }
+        var recordBytes: [CID: Data] = [:]
+        for block in mutation.recordBlocks { recordBytes[block.cid] = block.bytes }
+        for change in mutation.recordResults {
+            guard let cid = change.recordCID else { continue }
+            guard let bytes = recordBytes[cid] else {
+                throw RepositoryError.missingRecordBlock(path: change.path.mstKey)
+            }
+            guard bytes.count <= maximum else {
+                throw RepositoryError.limitExceeded(.blockBytes, limit: maximum)
+            }
+            do {
+                try RepositoryMSTValidation.validateRecordBlock(
+                    bytes, for: change.path, limits: limits, policy: options.policy
+                )
+            } catch {
+                throw RepositoryError.invalidRecord(path: change.path.mstKey)
+            }
+        }
     }
 
     /// The footprint after `mutation`, from the footprint before it.
@@ -837,8 +895,10 @@ public struct Repository: Sendable {
     ///     this commit (compare-and-swap).
     /// - Throws: ``RepositoryError``;
     ///   ``RepositoryError/limitExceeded(_:limit:)`` before signing when the
-    ///   resulting repository would break a whole-repository limit in
-    ///   ``RepositoryOptions/limits``. The check costs time proportional to
+    ///   resulting repository would break a limit in
+    ///   ``RepositoryOptions/limits``, and
+    ///   ``RepositoryError/invalidRecord(path:)`` when a written record would
+    ///   fail validation under ``RepositoryOptions/policy``. The check costs time proportional to
     ///   the nodes the commit replaces, except on a repository opened without
     ///   walking its tree, where the first commit walks it once.
     public func commit(
@@ -894,6 +954,7 @@ public struct Repository: Sendable {
                 signingGeneration: 1,
                 mstOptions: options.policy.mstOptions
             ) { unsigned in
+                try self.checkWrittenBlocks(of: unsigned)
                 nextFootprint = try await self.footprint(after: unsigned, from: base)
                 try nextFootprint.check(
                     options.limits, commitCID: commit.cid, commitByteCount: unsigned.commitByteCount
