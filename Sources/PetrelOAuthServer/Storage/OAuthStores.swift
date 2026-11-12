@@ -45,7 +45,23 @@ public protocol OAuthAuthorizationRequestStore: Sendable {
 /// Authorization codes and sessions (token families).
 public protocol OAuthSessionStore: Sendable {
     /// Atomically stores a code and its not-yet-active session.
-    func storeAuthorizationCode(_ code: OAuthAuthorizationCode, session: OAuthSession, now: Date) async throws
+    ///
+    /// `authenticatedAt` is when the browser proved it holds the account
+    /// (the sign-in that authorized this approval, or the remembered sign-in
+    /// it selected). The store refuses the code when
+    /// ``revokeSessions(subject:now:)`` ran for `code.subject` at or after
+    /// that instant, so a browser that authenticated before a revoke-all
+    /// cannot finish an approval after it.
+    ///
+    /// - Throws: ``OAuthStoreError/revoked`` when the authentication predates
+    ///   the account's latest revoke-all; ``OAuthStoreError/duplicate`` when
+    ///   the code or session already exists.
+    func storeAuthorizationCode(
+        _ code: OAuthAuthorizationCode,
+        session: OAuthSession,
+        authenticatedAt: Date,
+        now: Date
+    ) async throws
 
     /// Atomically redeems a code and activates its session with `tokens`.
     ///
@@ -103,7 +119,10 @@ public protocol OAuthSessionStore: Sendable {
     /// whose authorization code has been issued but not yet redeemed (so that
     /// code can no longer be exchanged), and forgets the account on every
     /// device that remembered it, so no browser can select it again without
-    /// signing in. Idempotent.
+    /// signing in. It also records `now` as the account's revocation
+    /// instant, so ``storeAuthorizationCode(_:session:authenticatedAt:now:)``
+    /// refuses approvals from browsers that authenticated before it.
+    /// Idempotent.
     func revokeSessions(subject: String, now: Date) async throws
 
     /// The account's active sessions, for a "connected apps" page. A session

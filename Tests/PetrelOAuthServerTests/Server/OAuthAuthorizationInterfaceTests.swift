@@ -417,4 +417,42 @@ struct OAuthAuthorizationInterfaceTests {
         let selected = await browser.submit(Path.selectAccount, [("account", TestAccounts.alice.did)])
         #expect(selected.status == 400)
     }
+
+    @Test("revoke-all kills an authorization the browser authenticated before it, at consent", arguments: ["sign-in", "account selection"])
+    func revokeAllKillsInFlightConsent(path: String) async throws {
+        let harness = try TestServer()
+        let browser = TestBrowser(harness)
+        if path == "account selection" {
+            // Remembered on this browser by an earlier sign-in.
+            let earlier = try TestClient(harness)
+            _ = try await browser.approve(
+                requestURI: earlier.pushRequest(), clientID: earlier.clientID,
+                account: TestAccounts.alice, password: "alice-password"
+            )
+            harness.clock.advance(60)
+        }
+        let client = try TestClient(harness)
+        await browser.open(requestURI: try await client.pushRequest(), clientID: client.clientID)
+        let consentPage: OAuthHTTPResponse
+        if path == "account selection" {
+            consentPage = await browser.submit(Path.selectAccount, [("account", TestAccounts.alice.did)])
+        } else {
+            consentPage = await browser.submit(
+                Path.signIn, [("identifier", TestAccounts.alice.handle ?? TestAccounts.alice.did), ("password", "alice-password")]
+            )
+        }
+        #expect(consentPage.text.contains("name=\"decision\""))
+
+        // The password changes while the consent page is open.
+        harness.clock.advance(5)
+        try await harness.server.revokeAllSessions(subject: TestAccounts.alice.did)
+        harness.clock.advance(5)
+
+        let response = await browser.submit(Path.consent, [("decision", "approve")])
+        #expect(TestBrowser.redirectParameters(response)["code"] == nil, "\(response.status)")
+
+        // Signing in again afterwards works.
+        let fresh = try TestClient(harness)
+        _ = try await fresh.signIn()
+    }
 }

@@ -18,6 +18,8 @@ public actor InMemoryOAuthStore: OAuthAuthorizationRequestStore, OAuthSessionSto
     private var replay: [OAuthReplayNamespace: [Data: Date]] = [:]
     private var clientMetadata: [String: OAuthCachedClientMetadata] = [:]
     private var devices: [Data: [OAuthDeviceAccount]] = [:]
+    /// The latest revoke-all instant per account.
+    private var accountsRevokedAt: [String: Date] = [:]
     private var lexicons: [String: OAuthCachedLexicon] = [:]
     private let replayCapacity: Int
 
@@ -56,7 +58,15 @@ public actor InMemoryOAuthStore: OAuthAuthorizationRequestStore, OAuthSessionSto
 
     // MARK: Codes and sessions
 
-    public func storeAuthorizationCode(_ code: OAuthAuthorizationCode, session: OAuthSession, now _: Date) throws {
+    public func storeAuthorizationCode(
+        _ code: OAuthAuthorizationCode,
+        session: OAuthSession,
+        authenticatedAt: Date,
+        now _: Date
+    ) throws {
+        if let revokedAt = accountsRevokedAt[code.subject], authenticatedAt <= revokedAt {
+            throw OAuthStoreError.revoked
+        }
         guard codes[code.codeDigest] == nil, sessions[session.sessionID] == nil,
               code.sessionID == session.sessionID
         else {
@@ -143,6 +153,7 @@ public actor InMemoryOAuthStore: OAuthAuthorizationRequestStore, OAuthSessionSto
     }
 
     public func revokeSessions(subject: String, now: Date) {
+        accountsRevokedAt[subject] = max(accountsRevokedAt[subject] ?? now, now)
         for session in sessions.values where session.subject == subject {
             revoke(session.sessionID, now: now)
         }

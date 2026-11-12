@@ -11,6 +11,10 @@ public struct OAuthBrowserFlow: Sendable, Equatable, Codable {
     public let csrfToken: String
     /// The authenticated account, once sign-in or account selection succeeded.
     public var subject: String?
+    /// When the browser proved it holds ``subject``: the sign-in time, or the
+    /// remembered sign-in time of a selected account. An approval is refused
+    /// when the account was revoked at or after this instant.
+    public var authenticatedAt: Date?
     /// A second-factor challenge in progress.
     public var pendingSecondFactor: OAuthSecondFactorChallenge?
     /// When the flow was started.
@@ -52,6 +56,7 @@ public struct OAuthBrowserFlowService: Sendable {
             requestURI: requestURI,
             csrfToken: random.opaqueValue(),
             subject: nil,
+            authenticatedAt: nil,
             pendingSecondFactor: nil,
             issuedAt: now,
             expiresAt: now.addingTimeInterval(min(max(lifetime, 1), Self.maximumLifetime))

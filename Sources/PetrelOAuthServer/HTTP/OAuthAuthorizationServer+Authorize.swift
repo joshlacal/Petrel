@@ -151,11 +151,12 @@ extension OAuthAuthorizationServer {
         guard let chosen = active.fields["account"], !chosen.isEmpty else {
             return signInPage(active, request, error: nil, status: 200)
         }
-        let offered = await deviceAccounts(deviceID: active.deviceID, restrictedBy: active.request.loginHint, now: now)
-        guard let account = offered.first(where: { $0.did == chosen }) else {
+        let offered = await rememberedAccounts(deviceID: active.deviceID, restrictedBy: active.request.loginHint, now: now)
+        guard let (account, authenticatedAt) = offered.first(where: { $0.account.did == chosen }) else {
             return signInPage(active, request, error: "Sign in to continue.", status: 400)
         }
         active.flow.subject = account.did
+        active.flow.authenticatedAt = authenticatedAt
         active.flow.pendingSecondFactor = nil
         return await consentPage(active, account: account, request)
     }
@@ -167,7 +168,7 @@ extension OAuthAuthorizationServer {
         case let .success(value): active = value
         case let .failure(response): return response
         }
-        guard let subject = active.flow.subject else {
+        guard let subject = active.flow.subject, let authenticatedAt = active.flow.authenticatedAt else {
             return signInPage(active, request, error: "Sign in to continue.", status: 400)
         }
         guard let decision = active.fields["decision"], decision == "approve" || decision == "deny" else {
@@ -237,8 +238,13 @@ extension OAuthAuthorizationServer {
                     createdAt: now,
                     expiresAt: sessionLifetime.map { now.addingTimeInterval($0) }
                 ),
+                authenticatedAt: authenticatedAt,
                 now: now
             )
+        } catch OAuthStoreError.revoked {
+            // Every session of the account was revoked after this browser
+            // authenticated: the approval it carries is no longer the user's.
+            return redirect(pushed, [("error", "access_denied"), ("error_description", "the sign-in was revoked")])
         } catch {
             return redirect(pushed, [("error", "server_error")])
         }
@@ -309,6 +315,7 @@ extension OAuthAuthorizationServer {
             return signInPage(active, request, error: "That handle and password were not accepted.", status: 401)
         case let .secondFactorRequired(challenge):
             active.flow.subject = nil
+            active.flow.authenticatedAt = nil
             active.flow.pendingSecondFactor = challenge
             return secondFactorPage(active, challenge, request, error: nil, status: 200)
         case let .authenticated(account):
@@ -323,6 +330,7 @@ extension OAuthAuthorizationServer {
                 )
             }
             active.flow.subject = account.did
+            active.flow.authenticatedAt = now
             active.flow.pendingSecondFactor = nil
             var response: OAuthHTTPResponse
             if configuration.deviceSessionLifetime > 0 {
@@ -383,6 +391,7 @@ extension OAuthAuthorizationServer {
     ) -> OAuthHTTPResponse {
         var flow = active.flow
         flow.subject = nil
+        flow.authenticatedAt = nil
         flow.pendingSecondFactor = nil
         return html(status, .signIn(.init(
             client: presentation(active.client),
@@ -417,6 +426,16 @@ extension OAuthAuthorizationServer {
     /// The accounts signed in on this browser that still exist, narrowed to
     /// the hinted account when the client's `login_hint` names a local one.
     private func deviceAccounts(deviceID: String?, restrictedBy hint: String?, now: Date) async -> [OAuthAccount] {
+        await rememberedAccounts(deviceID: deviceID, restrictedBy: hint, now: now).map(\.account)
+    }
+
+    /// ``deviceAccounts(deviceID:restrictedBy:now:)`` with the time each
+    /// account last signed in on this browser.
+    private func rememberedAccounts(
+        deviceID: String?,
+        restrictedBy hint: String?,
+        now: Date
+    ) async -> [(account: OAuthAccount, authenticatedAt: Date)] {
         guard let deviceID, deviceID.utf8.count == 43, configuration.deviceSessionLifetime > 0,
               let remembered = try? await store.deviceAccounts(
                   deviceDigest: digest.digest(deviceID, purpose: .device),
@@ -426,10 +445,12 @@ extension OAuthAuthorizationServer {
         else { return [] }
         var hinted: String?
         if let hint { hinted = try? await accounts.resolveLoginHint(hint) }
-        var result: [OAuthAccount] = []
+        var result: [(account: OAuthAccount, authenticatedAt: Date)] = []
         for entry in remembered {
             if let hinted, entry.subject != hinted { continue }
-            if let account = try? await accounts.account(did: entry.subject) { result.append(account) }
+            if let account = try? await accounts.account(did: entry.subject) {
+                result.append((account, entry.authenticatedAt))
+            }
         }
         return result
     }

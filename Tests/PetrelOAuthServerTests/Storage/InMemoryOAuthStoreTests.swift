@@ -13,7 +13,12 @@ struct InMemoryOAuthStoreTests {
 
     private func digest(_ text: String) -> Data { Data(text.utf8) }
 
-    private func seedSession(_ store: any OAuthServerStore, code: String = "code", expiresAt: Date? = nil) async throws -> UUID {
+    private func seedSession(
+        _ store: any OAuthServerStore,
+        code: String = "code",
+        expiresAt: Date? = nil,
+        authenticatedAt: Date? = nil
+    ) async throws -> UUID {
         let id = UUID()
         try await store.storeAuthorizationCode(
             OAuthAuthorizationCode(
@@ -21,6 +26,7 @@ struct InMemoryOAuthStoreTests {
                 codeChallenge: "challenge", expiresAt: now.addingTimeInterval(60)
             ),
             session: OAuthSession(sessionID: id, subject: "did:plc:a", binding: binding, createdAt: now, expiresAt: expiresAt),
+            authenticatedAt: authenticatedAt ?? now,
             now: now
         )
         return id
@@ -50,6 +56,25 @@ struct InMemoryOAuthStoreTests {
         #expect(try await store.pushedAuthorizationRequest(requestDigest: digest("r1"), now: now.addingTimeInterval(301)) == nil)
         await #expect(throws: OAuthStoreError.notFound) {
             _ = try await store.consumePushedAuthorizationRequest(requestDigest: digest("r1"), now: now.addingTimeInterval(301))
+        }
+    }
+
+    @Test("revoke-all refuses codes from authentications at or before it, and accepts later ones")
+    func revocationInstant() async throws {
+        let store: any OAuthServerStore = InMemoryOAuthStore()
+        _ = try await seedSession(store, code: "before", authenticatedAt: now.addingTimeInterval(-10))
+        try await store.revokeSessions(subject: "did:plc:a", now: now)
+        await #expect(throws: OAuthStoreError.revoked) {
+            _ = try await seedSession(store, code: "stale", authenticatedAt: now.addingTimeInterval(-5))
+        }
+        await #expect(throws: OAuthStoreError.revoked) {
+            _ = try await seedSession(store, code: "same-instant", authenticatedAt: now)
+        }
+        _ = try await seedSession(store, code: "after", authenticatedAt: now.addingTimeInterval(1))
+        // An earlier revoke-all replayed late never moves the instant back.
+        try await store.revokeSessions(subject: "did:plc:a", now: now.addingTimeInterval(-60))
+        await #expect(throws: OAuthStoreError.revoked) {
+            _ = try await seedSession(store, code: "still-stale", authenticatedAt: now.addingTimeInterval(-5))
         }
     }
 
