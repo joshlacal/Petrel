@@ -6,9 +6,11 @@ import PetrelFirehose
 enum JetstreamWireFrame {
   case message(JetstreamEvent)
   case error(name: String, message: String?)
-  /// A structurally valid frame we don't understand (unknown payload `$type`);
-  /// skipped for forward compatibility with additive lexicon changes.
-  case skipped
+  /// A structurally valid frame we don't understand (unknown payload `$type` or legacy
+  /// `kind`); skipped for forward compatibility with additive lexicon changes.
+  case skipped(type: String?, seq: Int64?)
+  /// A known message type whose body is missing required fields or has invalid ones.
+  case undecodable(type: String?, seq: Int64?, reason: String)
 }
 
 enum JetstreamWireError: Error, Sendable, Equatable {
@@ -46,7 +48,7 @@ enum JetstreamWire {
       return .error(name: name, message: root["message"] as? String)
     default:
       // Unknown envelope $type: additive framing change; skip.
-      return .skipped
+      return .skipped(type: root["$type"] as? String, seq: nil)
     }
   }
 
@@ -68,17 +70,21 @@ enum JetstreamWire {
       throw JetstreamWireError.malformedFrame("invalid JSON: \(error)")
     }
 
-    guard let did = root["did"] as? String,
-          let timeUS = (root["time_us"] as? NSNumber)?.int64Value,
-          let kind = root["kind"] as? String
-    else { return .skipped }
+    let kind = root["kind"] as? String
+    let timeUS = (root["time_us"] as? NSNumber)?.int64Value
+    guard let did = root["did"] as? String, let timeUS, let kind else {
+      return .undecodable(type: kind, seq: timeUS, reason: "event without did, time_us or kind")
+    }
 
     switch kind {
     case "commit":
-      guard let commit = root["commit"] as? [String: Any],
-            let event = decodeCommitBody(commit, seq: timeUS, did: did, timeUS: timeUS)
-      else { return .skipped }
-      return .message(.commit(event))
+      guard let commit = root["commit"] as? [String: Any] else {
+        return .undecodable(type: kind, seq: timeUS, reason: "commit event without a commit object")
+      }
+      switch decodeCommitBody(commit, seq: timeUS, did: did, timeUS: timeUS) {
+      case let .success(event): return .message(.commit(event))
+      case let .failure(failure): return .undecodable(type: kind, seq: timeUS, reason: failure.reason)
+      }
     case "identity":
       return .message(.identity(JetstreamIdentityEvent(
         seq: timeUS, did: did, timeUS: timeUS,
@@ -91,68 +97,81 @@ enum JetstreamWire {
       )))
     default:
       // Unknown kind: additive change; skip.
-      return .skipped
+      return .skipped(type: kind, seq: timeUS)
     }
   }
 
   private static func decodePayload(_ payload: [String: Any]) -> JetstreamWireFrame {
-    guard let type = payload["$type"] as? String, type.hasPrefix(payloadTypePrefix) else {
-      return .skipped
+    let rawSeq = (payload["seq"] as? NSNumber)?.int64Value
+    guard let type = payload["$type"] as? String else {
+      return .undecodable(type: nil, seq: rawSeq, reason: "payload without $type")
     }
-    switch type.dropFirst(payloadTypePrefix.count) {
+    guard type.hasPrefix(payloadTypePrefix) else {
+      return .skipped(type: type, seq: rawSeq)
+    }
+    let name = String(type.dropFirst(payloadTypePrefix.count))
+    func undecodable(_ reason: String) -> JetstreamWireFrame {
+      .undecodable(type: name, seq: rawSeq, reason: reason)
+    }
+    let envelopeFailure = "payload without a valid seq, did or time"
+    switch name {
     case "commit":
-      guard let event = decodeCommit(payload) else { return .skipped }
-      return .message(.commit(event))
+      guard let (seq, did, timeUS) = envelope(payload) else { return undecodable(envelopeFailure) }
+      switch decodeCommitBody(payload, seq: seq, did: did, timeUS: timeUS) {
+      case let .success(event): return .message(.commit(event))
+      case let .failure(failure): return undecodable(failure.reason)
+      }
     case "identity":
-      guard let (seq, did, timeUS) = envelope(payload) else { return .skipped }
+      guard let (seq, did, timeUS) = envelope(payload) else { return undecodable(envelopeFailure) }
       return .message(.identity(JetstreamIdentityEvent(
         seq: seq, did: did, timeUS: timeUS,
         identity: decodeDetail(ComAtprotoSyncSubscribeRepos.Identity.self, payload["identity"])
       )))
     case "account":
-      guard let (seq, did, timeUS) = envelope(payload) else { return .skipped }
+      guard let (seq, did, timeUS) = envelope(payload) else { return undecodable(envelopeFailure) }
       return .message(.account(JetstreamAccountEvent(
         seq: seq, did: did, timeUS: timeUS,
         account: decodeDetail(ComAtprotoSyncSubscribeRepos.Account.self, payload["account"])
       )))
     case "sync":
-      guard let (seq, did, timeUS) = envelope(payload) else { return .skipped }
+      guard let (seq, did, timeUS) = envelope(payload) else { return undecodable(envelopeFailure) }
       return .message(.sync(JetstreamSyncEvent(
         seq: seq, did: did, timeUS: timeUS,
         sync: decodeDetail(ComAtprotoSyncSubscribeRepos.Sync.self, payload["sync"])
       )))
     case "info":
-      guard let name = payload["name"] as? String else { return .skipped }
-      return .message(.info(JetstreamInfoEvent(name: name, message: payload["message"] as? String)))
+      guard let infoName = payload["name"] as? String else { return undecodable("info without name") }
+      return .message(.info(JetstreamInfoEvent(name: infoName, message: payload["message"] as? String)))
     default:
-      return .skipped
+      return .skipped(type: name, seq: rawSeq)
     }
   }
 
-  private static func decodeCommit(_ payload: [String: Any]) -> JetstreamCommitEvent? {
-    guard let (seq, did, timeUS) = envelope(payload) else { return nil }
-    return decodeCommitBody(payload, seq: seq, did: did, timeUS: timeUS)
+  struct CommitBodyFailure: Error {
+    let reason: String
   }
 
   private static func decodeCommitBody(
     _ payload: [String: Any], seq: Int64, did: String, timeUS: Int64
-  ) -> JetstreamCommitEvent? {
-    guard let rev = payload["rev"] as? String,
-          let operationRaw = payload["operation"] as? String,
-          let operation = RelayRepoAction(rawValue: operationRaw),
-          let collection = payload["collection"] as? String,
-          let rkey = payload["rkey"] as? String
-    else { return nil }
+  ) -> Result<JetstreamCommitEvent, CommitBodyFailure> {
+    guard let rev = payload["rev"] as? String else { return .failure(.init(reason: "commit without rev")) }
+    guard let operationRaw = payload["operation"] as? String,
+          let operation = RelayRepoAction(rawValue: operationRaw)
+    else { return .failure(.init(reason: "commit without a valid operation")) }
+    guard let collection = payload["collection"] as? String else {
+      return .failure(.init(reason: "commit without collection"))
+    }
+    guard let rkey = payload["rkey"] as? String else { return .failure(.init(reason: "commit without rkey")) }
 
     var recordJSON: Data?
     if let record = payload["record"], JSONSerialization.isValidJSONObject(record) {
       recordJSON = try? JSONSerialization.data(withJSONObject: record)
     }
-    return JetstreamCommitEvent(
+    return .success(JetstreamCommitEvent(
       seq: seq, did: did, timeUS: timeUS, rev: rev, operation: operation,
       collection: collection, rkey: rkey, cid: payload["cid"] as? String,
       recordJSON: recordJSON
-    )
+    ))
   }
 
   private static func envelope(_ payload: [String: Any]) -> (seq: Int64, did: String, timeUS: Int64)? {

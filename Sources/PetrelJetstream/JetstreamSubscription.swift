@@ -12,6 +12,48 @@ public enum JetstreamSubscriptionEvent: Sendable {
   /// `EventStreamError`, unless the error is `ConsumerTooSlow` and
   /// ``JetstreamSubscriptionConfiguration/reconnectsOnConsumerTooSlow`` is set.
   case streamError(name: String, message: String?)
+  /// The server sent a frame the stream could not use: not JSON, not decompressible, an
+  /// unknown message type, a known type whose body does not decode, or a sequence number
+  /// already delivered on this connection. The stream continues; when the frame carried a
+  /// usable position, the cursor moves past it.
+  case ignoredFrame(JetstreamIgnoredFrame)
+}
+
+/// A Jetstream frame that the subscription skipped, and why.
+public struct JetstreamIgnoredFrame: Sendable, Equatable {
+  /// Why a frame was skipped.
+  public enum Reason: Sendable, Equatable {
+    /// The frame is not a JSON object, or its envelope is incomplete. The associated value
+    /// describes the failure.
+    case malformedFrame(String)
+    /// The frame is compressed and could not be decompressed. The associated value describes
+    /// the failure.
+    case undecompressable(String)
+    /// The message type is not one this version of Petrel knows. Jetstream adds types without
+    /// notice, so this is expected over time.
+    case unknownType
+    /// The message type is known but its body is missing required fields or has invalid ones.
+    /// The associated value names what was wrong.
+    case undecodablePayload(String)
+    /// The server sent a sequence number at or below one already delivered on this
+    /// connection. The associated value is that sequence number.
+    case duplicateSequence(Int64)
+  }
+
+  /// The message type: the part after `#` of the v2 payload `$type`, or the legacy `kind`.
+  /// `nil` when the frame did not get far enough to name one.
+  public let type: String?
+  /// The frame's position (v2 `seq`, legacy `time_us`), when it carried a valid one.
+  public let sequence: Int64?
+  /// Why the frame was skipped.
+  public let reason: Reason
+
+  /// Creates a description of a skipped frame.
+  public init(type: String?, sequence: Int64?, reason: Reason) {
+    self.type = type
+    self.sequence = sequence
+    self.reason = reason
+  }
 }
 
 /// Errors thrown by a Jetstream subscription when a connection is rejected.
@@ -23,6 +65,19 @@ public enum JetstreamSubscriptionError: Error, Sendable, Equatable {
   /// ``JetstreamSubscription/updateOptions(_:)`` was called on a subscription that does not
   /// use the legacy `/subscribe` API, the only one with `options_update`.
   case optionsUpdateUnsupported
+  /// ``JetstreamSubscriptionConfiguration/cursorStorage`` failed. A failed load ends the
+  /// stream before connecting, rather than silently starting at the live tip; a failed save
+  /// ends it, rather than silently losing the position. The message describes the
+  /// underlying error.
+  case cursorStorageFailure(operation: CursorStorageOperation, message: String)
+
+  /// The cursor-storage call that failed.
+  public enum CursorStorageOperation: Sendable, Equatable {
+    /// `FirehoseCursorStorage.loadCursor()`.
+    case load
+    /// `FirehoseCursorStorage.saveCursor(_:)`.
+    case save
+  }
 }
 
 /// The two Jetstream WebSocket dialects.
@@ -306,6 +361,9 @@ actor JetstreamSubscriptionRunner {
   /// resume timestamp is a duplicate only when it was already seen.
   private var legacyEventsAtLastSeq: Set<String> = []
   private var hasProcessedEvents = false
+  /// v2: the cursor of the current connection when it resumed from an already delivered
+  /// sequence number, whose inclusive replay is expected once and dropped without a report.
+  private var replayCursor: Int64?
   private var hasRetriedUnknownDictionary = false
   private var initialCursor: Int64?
   private var loadedInitialCursor = false
@@ -352,8 +410,15 @@ actor JetstreamSubscriptionRunner {
     await closeSession()
   }
 
-  private func saveCursor(_ seq: Int64) async {
-    try? await configuration.cursorStorage?.saveCursor(seq)
+  /// Persists `seq`. A failure ends the stream: continuing would silently lose the position.
+  private func saveCursor(_ seq: Int64) async throws {
+    guard let storage = configuration.cursorStorage else { return }
+    do {
+      try await storage.saveCursor(seq)
+    } catch {
+      await finish()
+      throw JetstreamSubscriptionError.cursorStorageFailure(operation: .save, message: String(describing: error))
+    }
   }
 
   /// The pull-based stream over this runner. The stream owns a handle whose release, when the
@@ -374,14 +439,14 @@ actor JetstreamSubscriptionRunner {
     // The consumer coming back for more means the previous element was processed.
     if let seq = unsavedCursor {
       unsavedCursor = nil
-      await saveCursor(seq)
+      try await saveCursor(seq)
     }
 
     while true {
       while !pending.isEmpty {
         let entry = pending.removeFirst()
         guard let event = entry.event else {
-          if let seq = entry.seq { await saveCursor(seq) }
+          if let seq = entry.seq { try await saveCursor(seq) }
           continue
         }
         unsavedCursor = entry.seq
@@ -416,7 +481,17 @@ actor JetstreamSubscriptionRunner {
       loadedInitialCursor = true
       initialCursor = configuration.cursor
       if initialCursor == nil, let storage = configuration.cursorStorage {
-        initialCursor = try? await storage.loadCursor()
+        do {
+          initialCursor = try await storage.loadCursor()
+        } catch {
+          // Starting at the live tip instead would silently skip everything since the
+          // stored position.
+          terminalError = JetstreamSubscriptionError.cursorStorageFailure(
+            operation: .load,
+            message: String(describing: error)
+          )
+          return
+        }
       }
       // A v2 cursor is a sequence number and the server replays from it inclusively, so
       // anything below it is a duplicate. A unix-microsecond cursor on the v2 API is not
@@ -459,11 +534,12 @@ actor JetstreamSubscriptionRunner {
       } else if let decoder = dictionaryDecoder {
         frameData = try decoder.decompress(rawData)
       } else {
-        frameData = (try? JetstreamZstd.decompress(rawData)) ?? rawData
+        frameData = try JetstreamZstd.decompress(rawData)
       }
     } catch {
-      await closeSession()
-      scheduleRetry()
+      // Reconnecting would resume at the same cursor and receive the same frame again, so
+      // report it and keep reading.
+      reportIgnored(type: nil, sequence: nil, reason: .undecompressable(String(describing: error)))
       return
     }
 
@@ -472,12 +548,21 @@ actor JetstreamSubscriptionRunner {
       wireFrame = try apiVersion == .v1
         ? JetstreamWire.decodeLegacyFrame(frameData)
         : JetstreamWire.decodeFrame(frameData)
+    } catch let JetstreamWireError.malformedFrame(detail) {
+      reportIgnored(type: nil, sequence: nil, reason: .malformedFrame(detail))
+      return
     } catch {
+      reportIgnored(type: nil, sequence: nil, reason: .malformedFrame(String(describing: error)))
       return
     }
 
     switch wireFrame {
-    case .skipped:
+    case let .skipped(type, seq):
+      reportIgnored(type: type, sequence: seq, reason: .unknownType)
+      return
+
+    case let .undecodable(type, seq, detail):
+      reportIgnored(type: type, sequence: seq, reason: .undecodablePayload(detail))
       return
 
     case let .error(name, message):
@@ -496,7 +581,17 @@ actor JetstreamSubscriptionRunner {
         switch apiVersion {
         case .v2:
           // Sequence numbers are unique: anything at or below the last one was already seen.
-          if let last = lastSeq, seq <= last { return }
+          if let last = lastSeq, seq <= last {
+            // The server replays from the cursor inclusively, so the first frame after a
+            // reconnect repeats the last delivered one. Anything else is reported.
+            if seq == replayCursor {
+              replayCursor = nil
+            } else {
+              reportIgnored(type: Self.typeName(event), sequence: seq, reason: .duplicateSequence(seq))
+            }
+            return
+          }
+          replayCursor = nil
         case .v1:
           let key = Self.legacyEventKey(event)
           if let last = lastSeq {
@@ -519,6 +614,33 @@ actor JetstreamSubscriptionRunner {
       } else if event.seq != nil {
         pending.append((nil, event.seq))
       }
+    }
+  }
+
+  /// Queues an ``JetstreamSubscriptionEvent/ignoredFrame(_:)``. On the v2 API a frame with a
+  /// new sequence number also moves the cursor past it, so a reconnect does not fetch it again.
+  /// Legacy `time_us` positions are not unique, so there the cursor only follows decoded events.
+  private func reportIgnored(type: String?, sequence: Int64?, reason: JetstreamIgnoredFrame.Reason) {
+    var cursor: Int64?
+    if apiVersion == .v2, let sequence, sequence < Self.timestampCursorFloor,
+       lastSeq.map({ sequence > $0 }) ?? true
+    {
+      lastSeq = sequence
+      hasProcessedEvents = true
+      replayCursor = nil
+      cursor = sequence
+    }
+    pending.append((.ignoredFrame(JetstreamIgnoredFrame(type: type, sequence: sequence, reason: reason)), cursor))
+  }
+
+  /// The message type name used in ``JetstreamIgnoredFrame/type``.
+  static func typeName(_ event: JetstreamEvent) -> String {
+    switch event {
+    case .commit: return "commit"
+    case .identity: return "identity"
+    case .account: return "account"
+    case .sync: return "sync"
+    case .info: return "info"
     }
   }
 
@@ -546,8 +668,10 @@ actor JetstreamSubscriptionRunner {
     let connectCursor: Int64?
     if hasProcessedEvents, let lastSeq {
       connectCursor = lastSeq
+      replayCursor = lastSeq
     } else {
       connectCursor = initialCursor
+      replayCursor = nil
     }
 
     let options = await liveOptions.snapshot

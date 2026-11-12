@@ -63,6 +63,7 @@ struct JetstreamStreamSemanticsTests {
         switch event {
         case let .event(event): received.append("event \(event.seq ?? -1)")
         case let .streamError(name, _): received.append("error \(name)")
+        case .ignoredFrame: received.append("ignored")
         }
       }
     }

@@ -275,6 +275,9 @@ private actor JetstreamClientRunner {
       case .streamError:
         // The subscription ends by throwing the matching EventStreamError right after.
         break
+      case .ignoredFrame:
+        // Batches carry events only; consume JetstreamSubscription directly to see skipped frames.
+        break
       }
     }
     await continuation.finish()
@@ -324,6 +327,8 @@ private actor JetstreamClientRunner {
             await continuation.yield(JetstreamBatch(events: [jetstreamEvent], lastCursor: lastCursor))
           }
         case .streamError:
+          break
+        case .ignoredFrame:
           break
         }
       }
