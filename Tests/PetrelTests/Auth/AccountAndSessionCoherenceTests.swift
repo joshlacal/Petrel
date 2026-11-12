@@ -264,9 +264,13 @@ struct AccountAndSessionCoherenceTests {
             let namespace = "test.coherence.nonces"
             let storage = KeychainStorage(namespace: namespace)
 
+            // Count retrievals of this test's own key only. The storage override is
+            // process-global, so a test running alongside that reads its own nonces
+            // reaches this backend too; a prefix match would count its reads.
+            let nonceKey = "dpopNonces.\(testDID)"
             let retrievalCounter = Mutex<Int>(0)
             backend.setOperationObserver { op, key in
-                if op == .retrieve && key.hasPrefix("dpopNonces") {
+                if op == .retrieve && key == nonceKey {
                     retrievalCounter.withLock { $0 += 1 }
                 }
             }
@@ -284,10 +288,15 @@ struct AccountAndSessionCoherenceTests {
             // 3. Save nonces (invalidates negative cache and populates positive cache)
             try await storage.saveDPoPNonces(["auth.example.com": "nonce-123"], for: testDID)
 
-            // 4. Read nonces (positive cache hit, 0 backend retrievals)
+            // 4. Read nonces: the save dropped the negative entry, so the stored value
+            //    is returned, never a cached "absent". Whether it comes from the
+            //    positive cache or the backend is not asserted: that cache is a
+            //    process-wide NSCache that may evict at any time (count limit,
+            //    memory pressure, other tests' entries), and a backend read is
+            //    then the correct behaviour.
             let nonces3 = try await storage.getDPoPNonces(for: testDID)
             #expect(nonces3?["auth.example.com"] == "nonce-123")
-            #expect(retrievalCounter.withLock { $0 } == 1, "Read of stored nonce must hit positive cache with 0 backend queries")
+            #expect(retrievalCounter.withLock { $0 } <= 2, "Read of stored nonce must not query the backend more than once")
         }
     }
 

@@ -26,10 +26,25 @@ actor OAuthCore {
     let networkService: NetworkService
     let oauthConfig: OAuthConfig
     let didResolver: DIDResolving
+    /// How this client authenticates to the authorization server (public,
+    /// in-process `private_key_jwt`, or a Client Assertion Backend).
+    let clientAuthenticator: any OAuthClientAuthenticating
+
+    // MARK: - Authorization Flow State
+
+    /// Flow starts in progress, keyed by target and scope, so concurrent identical
+    /// requests share one pushed authorization request.
+    var oauthStartTasks: [String: Task<(url: URL, state: String), Error>] = [:]
+    /// State tokens of flows that have been started and not yet completed or cancelled.
+    var inFlightOAuthStateTokens: Set<String> = []
+    /// Bumped by every cancellation so a start that was mid-flight notices it.
+    var cancellationGeneration: UInt64 = 0
+    /// State tokens that were cancelled or denied and must never complete.
+    var deniedStateTokens: Set<String> = []
+    weak var progressDelegate: AuthProgressDelegate?
 
     // MARK: - Shared State
 
-    var refreshCoordinators: [String: TokenRefreshCoordinator] = [:]
     let refreshCircuitBreaker = RefreshCircuitBreaker()
     var noncesByThumbprint: [String: [String: String]] = [:]
     var usedRefreshTokens: Set<String> = []
@@ -110,13 +125,15 @@ actor OAuthCore {
         accountManager: AccountManaging,
         networkService: NetworkService,
         oauthConfig: OAuthConfig,
-        didResolver: DIDResolving
+        didResolver: DIDResolving,
+        clientAuthenticator: (any OAuthClientAuthenticating)? = nil
     ) {
         self.storage = storage
         self.accountManager = accountManager
         self.networkService = networkService
         self.oauthConfig = oauthConfig
         self.didResolver = didResolver
+        self.clientAuthenticator = clientAuthenticator ?? PublicClientAuthenticator(clientId: oauthConfig.clientId)
 
         // Register synchronously on init so no storage mutation event can be missed
         self.dpopKeyObserverToken = KeychainStorage.dpopKeyMutationHub.addObserver { [weak self] did in
@@ -356,7 +373,8 @@ actor OAuthCore {
         accessToken: String? = nil,
         did: String? = nil,
         ephemeralKeyRawRepresentation: Data? = nil,
-        nonce: String? = nil
+        nonce: String? = nil,
+        usesStoredNonce: Bool = true
     ) async throws -> String {
         let (proof, _) = try await createDPoPProofWithMaterial(
             for: method,
@@ -365,7 +383,8 @@ actor OAuthCore {
             accessToken: accessToken,
             did: did,
             ephemeralKeyRawRepresentation: ephemeralKeyRawRepresentation,
-            nonce: nonce
+            nonce: nonce,
+            usesStoredNonce: usesStoredNonce
         )
         return proof
     }
@@ -377,7 +396,8 @@ actor OAuthCore {
         accessToken: String? = nil,
         did: String? = nil,
         ephemeralKeyRawRepresentation: Data? = nil,
-        nonce: String? = nil
+        nonce: String? = nil,
+        usesStoredNonce: Bool = true
     ) async throws -> (proof: String, thumbprint: String) {
         var targetDID: String? = did
         if targetDID == nil {
@@ -412,6 +432,10 @@ actor OAuthCore {
         let finalNonce: String?
         if let explicitNonce = nonce {
             finalNonce = explicitNonce
+        } else if !usesStoredNonce {
+            // The recipient is not the server the stored nonces came from (e.g. a
+            // client assertion backend): a nonce is only ever sent back to its issuer.
+            finalNonce = nil
         } else if did == nil && ephemeralKeyRawRepresentation != nil,
                   let urlObject = URL(string: url),
                   let domain = urlObject.host?.lowercased()
@@ -693,71 +717,270 @@ actor OAuthCore {
         }
     }
 
-    // MARK: - Metadata Fetching
+    // MARK: - Server Metadata
 
-    func resolveAuthServer(for pdsURL: URL) async throws -> URL {
+    /// Resolves the authorization server for a PDS that came from an account's
+    /// DID document: fetches and validates the PDS's protected-resource metadata,
+    /// then the metadata of the single authorization server it names.
+    ///
+    /// Nothing is assumed on failure. A PDS whose metadata cannot be fetched or
+    /// does not satisfy the atproto OAuth profile cannot be signed in to.
+    func resolveAuthorizationServer(forPDS pdsURL: URL) async throws -> AuthorizationServerMetadata {
+        guard let origin = OAuthOrigin.canonical(of: pdsURL) else {
+            throw OAuthMetadataError.invalidOrigin(pdsURL.absoluteString)
+        }
+        return try await resolveAuthorizationServer(forResourceOrigin: origin)
+    }
+
+    /// Resolves the authorization server for a host the user named (server-first
+    /// login). The host is tried as a PDS first; if it does not serve valid
+    /// protected-resource metadata it is tried as an authorization server (an
+    /// entryway) directly.
+    ///
+    /// Either way the returned metadata's `issuer` equals the origin it was
+    /// fetched from, and the caller must still bind the eventual `sub` to that
+    /// issuer through the account's own DID document.
+    func resolveAuthorizationServer(forServer serverURL: URL) async throws -> AuthorizationServerMetadata {
+        guard let origin = OAuthOrigin.canonical(of: serverURL) else {
+            throw OAuthMetadataError.invalidOrigin(serverURL.absoluteString)
+        }
         do {
-            let metadata = try await fetchProtectedResourceMetadata(pdsURL: pdsURL)
-            if let server = metadata.authorizationServers.first { return server }
-        } catch {}
-        return pdsURL
-    }
-
-    func fetchProtectedResourceMetadata(pdsURL: URL) async throws -> ProtectedResourceMetadata {
-        let endpoint = "\(pdsURL.absoluteString)/.well-known/oauth-protected-resource"
-        guard let endpointURL = URL(string: endpoint) else {
-            throw AuthError.invalidOAuthConfiguration
-        }
-        let request = URLRequest(url: endpointURL)
-
-        let maxRetries = 3
-        var lastError: Error?
-        for attempt in 1 ... maxRetries {
+            return try await resolveAuthorizationServer(forResourceOrigin: origin)
+        } catch let resourceError as OAuthMetadataError {
             do {
-                let (data, _) = try await networkService.request(request)
-                return try decoder.decode(ProtectedResourceMetadata.self, from: data)
-            } catch {
-                lastError = error
-                if attempt < maxRetries {
-                    let delay = pow(2.0, Double(attempt - 1)) * 0.1
-                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                return try await fetchAuthorizationServerMetadata(issuer: origin)
+            } catch let issuerError as OAuthMetadataError {
+                // A host with no protected-resource document at all was only ever
+                // a candidate authorization server, so that failure is the useful one.
+                if case .unexpectedStatus(.protectedResource, 404) = resourceError {
+                    throw issuerError
                 }
+                throw resourceError
             }
         }
-        throw lastError ?? AuthError.networkError(NetworkError.requestFailed)
     }
 
-    func fetchAuthorizationServerMetadata(authServerURL: URL) async throws -> AuthorizationServerMetadata {
-        let endpoint = "\(authServerURL.absoluteString)/.well-known/oauth-authorization-server"
-        guard let endpointURL = URL(string: endpoint) else {
-            throw AuthError.invalidOAuthConfiguration
+    private func resolveAuthorizationServer(forResourceOrigin origin: String) async throws -> AuthorizationServerMetadata {
+        let resource = try await fetchProtectedResourceMetadata(origin: origin)
+        let issuer = try resource.validate(forResourceAt: origin)
+        let metadata = try await fetchAuthorizationServerMetadata(issuer: issuer)
+        // RFC 9728 §4: an authorization server that lists its resources must list this one.
+        if let protected = metadata.protectedResources, !protected.contains(origin) {
+            throw OAuthMetadataError.resourceNotProtected(resource: origin, issuer: issuer)
         }
-        let request = URLRequest(url: endpointURL)
+        return metadata
+    }
 
-        let maxRetries = 3
-        var lastError: Error?
-        for attempt in 1 ... maxRetries {
+    /// Fetches a PDS's protected-resource metadata. The document is returned
+    /// undecided: call `validate(forResourceAt:)` before trusting it.
+    func fetchProtectedResourceMetadata(origin: String) async throws -> ProtectedResourceMetadata {
+        try await fetchMetadataDocument(ProtectedResourceMetadata.self, document: .protectedResource, origin: origin)
+    }
+
+    /// Fetches and validates an authorization server's metadata. `issuer` must be
+    /// a canonical origin; the returned document's `issuer` is guaranteed equal to it.
+    func fetchAuthorizationServerMetadata(issuer: String) async throws -> AuthorizationServerMetadata {
+        try OAuthOrigin.requireCanonical(issuer)
+        let metadata = try await fetchMetadataDocument(
+            AuthorizationServerMetadata.self, document: .authorizationServer, origin: issuer
+        )
+        try metadata.validate(fetchedFrom: issuer, clientAuthentication: clientAuthenticator.method)
+        return metadata
+    }
+
+    /// Fetches one well-known metadata document: HTTP 200 only (redirects are
+    /// never followed), `application/json` only.
+    private func fetchMetadataDocument<Body: Decodable>(
+        _: Body.Type,
+        document: OAuthMetadataError.Document,
+        origin: String
+    ) async throws -> Body {
+        guard let url = URL(string: "\(origin)/.well-known/\(document.rawValue)") else {
+            throw OAuthMetadataError.invalidOrigin(origin)
+        }
+        var request = URLRequest(url: url)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 30.0
+
+        let (data, response) = try await sendWithTransportRetry(request)
+        guard response.statusCode == 200 else {
+            throw OAuthMetadataError.unexpectedStatus(document: document, status: response.statusCode)
+        }
+        let contentType = response.value(forHTTPHeaderField: "Content-Type")
+        guard Self.isJSONContentType(contentType) else {
+            throw OAuthMetadataError.unexpectedContentType(document: document, contentType: contentType)
+        }
+        do {
+            return try decoder.decode(Body.self, from: data)
+        } catch {
+            throw OAuthMetadataError.malformedDocument(document: document)
+        }
+    }
+
+    static func isJSONContentType(_ contentType: String?) -> Bool {
+        guard let mediaType = contentType?.split(separator: ";").first else { return false }
+        return mediaType.trimmingCharacters(in: .whitespaces).lowercased() == "application/json"
+    }
+
+    /// Sends an idempotent request, retrying transport failures (not HTTP
+    /// statuses, and not policy refusals) up to three times.
+    private func sendWithTransportRetry(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        let maxAttempts = 3
+        var attempt = 1
+        while true {
             do {
-                let (data, _) = try await networkService.request(request)
-                return try decoder.decode(AuthorizationServerMetadata.self, from: data)
-            } catch {
-                lastError = error
-                if attempt < maxRetries {
+                return try await sendToAuthorizationServer(request)
+            } catch let error as NetworkError {
+                if case .requestFailed = error, attempt < maxAttempts {
                     let delay = pow(2.0, Double(attempt - 1)) * 0.1
-                    try? await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    try await Task.sleep(nanoseconds: UInt64(delay * 1_000_000_000))
+                    attempt += 1
+                    continue
                 }
+                throw AuthError.networkError(error)
             }
         }
-        throw lastError ?? AuthError.networkError(NetworkError.requestFailed)
+    }
+
+    /// The one place OAuth protocol requests leave the process. Transport
+    /// failures surface as `NetworkError`; cancellation is passed through.
+    private func sendToAuthorizationServer(_ request: URLRequest) async throws -> (Data, HTTPURLResponse) {
+        do {
+            return try await networkService.executeAuthProtocolRequest(request)
+        } catch let error as NetworkError {
+            throw error
+        } catch is CancellationError {
+            throw CancellationError()
+        } catch {
+            LogManager.logError(
+                "OAuth request to \(request.url.map { LogManager.sanitizeURLForLogging($0) } ?? "unknown") failed: \(error)",
+                category: .authentication
+            )
+            throw NetworkError.requestFailed
+        }
+    }
+
+    // MARK: - Authorization Server Requests
+
+    /// Sends a DPoP-signed form POST to an authorization-server endpoint and
+    /// handles the server's nonce protocol (RFC 9449 §8).
+    ///
+    /// - A `DPoP-Nonce` on any response is recorded for the signing key.
+    /// - A `use_dpop_nonce` challenge is answered exactly once, with a new proof
+    ///   carrying the server's nonce and freshly produced client-authentication
+    ///   parameters (a client assertion's `jti` is single-use).
+    ///
+    /// Used for every request to the authorization server — pushed authorization
+    /// request, code exchange, refresh and revocation — so the nonce handling is
+    /// the same on all of them.
+    ///
+    /// - Parameters:
+    ///   - endpoint: The endpoint URL, taken from validated server metadata.
+    ///   - issuer: The validated issuer, used as the client assertion audience.
+    ///   - proofType: The DPoP proof type.
+    ///   - key: The DPoP key that signs the request.
+    ///   - initialNonce: A nonce to use on the first attempt instead of the stored one.
+    ///   - timeout: Per-attempt request timeout.
+    ///   - parameters: The request's own form parameters (client authentication is added here).
+    /// - Returns: The body and response of the final attempt, whatever its status.
+    func sendAuthorizationServerRequest(
+        endpoint: String,
+        issuer: String,
+        proofType: DPoPProofType,
+        key: DPoPKeySource,
+        initialNonce: String? = nil,
+        timeout: TimeInterval = 30.0,
+        parameters: [String: String]
+    ) async throws -> (Data, HTTPURLResponse) {
+        guard OAuthOrigin.isEndpointURL(endpoint), let endpointURL = URL(string: endpoint) else {
+            throw OAuthMetadataError.invalidEndpoint(field: "endpoint", value: endpoint)
+        }
+
+        var nonce = initialNonce
+        var attempt = 0
+        while true {
+            var form = parameters
+            let clientAuthentication = try await clientAuthenticator.parameters(forIssuer: issuer, key: key, core: self)
+            form.merge(clientAuthentication) { _, authentication in authentication }
+
+            var request = URLRequest(url: endpointURL)
+            request.httpMethod = "POST"
+            request.timeoutInterval = timeout
+            request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
+            request.setValue("application/json", forHTTPHeaderField: "Accept")
+            request.httpBody = encodeFormData(form)
+
+            let proof: String
+            switch key {
+            case let .flow(rawRepresentation):
+                proof = try await createDPoPProof(
+                    for: "POST", url: endpoint, type: proofType,
+                    ephemeralKeyRawRepresentation: rawRepresentation, nonce: nonce
+                )
+            case let .account(did):
+                proof = try await createDPoPProof(
+                    for: "POST", url: endpoint, type: proofType, did: did, nonce: nonce
+                )
+            }
+            request.setValue(proof, forHTTPHeaderField: "DPoP")
+
+            let (data, response) = try await sendToAuthorizationServer(request)
+
+            let serverNonce = response.value(forHTTPHeaderField: "DPoP-Nonce")
+            if let serverNonce {
+                await recordNonce(serverNonce, endpoint: endpoint, key: key)
+            }
+
+            if attempt == 0, let serverNonce, Self.isUseDPoPNonceChallenge(data: data, response: response) {
+                LogManager.logInfo(
+                    "Authorization server \(endpointURL.host ?? "unknown") issued a DPoP nonce challenge; retrying once",
+                    category: .authentication
+                )
+                nonce = serverNonce
+                attempt += 1
+                continue
+            }
+            return (data, response)
+        }
+    }
+
+    /// Whether `response` is an RFC 9449 `use_dpop_nonce` challenge: signalled in
+    /// the JSON error body by authorization servers (§8) and in
+    /// `WWW-Authenticate` by resource servers (§9).
+    static func isUseDPoPNonceChallenge(data: Data, response: HTTPURLResponse) -> Bool {
+        guard response.statusCode == 400 || response.statusCode == 401 else { return false }
+        if let body = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data),
+           body.error == "use_dpop_nonce"
+        {
+            return true
+        }
+        if let challenge = response.value(forHTTPHeaderField: "WWW-Authenticate"),
+           challenge.lowercased().contains("error=\"use_dpop_nonce\"")
+        {
+            return true
+        }
+        return false
+    }
+
+    /// Files a server-issued nonce under the key that signed the request: the
+    /// flow's ephemeral key before an account exists, the account's stores after.
+    private func recordNonce(_ nonce: String, endpoint: String, key: DPoPKeySource) async {
+        switch key {
+        case let .flow(rawRepresentation):
+            recordOAuthFlowNonce(nonce, for: endpoint, ephemeralKeyRawRepresentation: rawRepresentation)
+        case let .account(did):
+            guard let domain = URL(string: endpoint)?.host?.lowercased() else { return }
+            await updateDPoPNonceInternal(domain: domain, nonce: nonce, for: did)
+        }
     }
 
     /// Builds the form parameters for a pushed authorization request.
-    /// `additionalParameters` (e.g. a confidential client's `client_assertion`)
-    /// override base entries on key collision.
+    /// `additionalParameters` override base entries on key collision.
     func buildPARParameters(
         codeChallenge: String,
         identifier: String?,
         state: String,
+        scope: String? = nil,
         additionalParameters: [String: String]? = nil
     ) -> [String: String] {
         var parameters: [String: String] = [
@@ -767,7 +990,7 @@ actor OAuthCore {
             "code_challenge_method": "S256",
             "code_challenge": codeChallenge,
             "state": state,
-            "scope": oauthConfig.scope,
+            "scope": scope ?? oauthConfig.scope,
         ]
 
         if let identifier {
@@ -781,123 +1004,51 @@ actor OAuthCore {
         return parameters
     }
 
+    /// Sends the pushed authorization request that starts a flow (RFC 9126).
+    /// - Returns: The `request_uri` for the authorization redirect and the DPoP
+    ///   nonce the server issued with it.
     func pushAuthorizationRequest(
+        metadata: AuthorizationServerMetadata,
         codeChallenge: String,
         identifier: String?,
-        endpoint: String,
-        authServerURL: URL,
         state: String,
-        ephemeralKeyRawRepresentation: Data?,
-        additionalParameters: [String: String]? = nil
-    ) async throws -> (requestURI: String, parNonce: String?) {
-        let parameters = buildPARParameters(
-            codeChallenge: codeChallenge,
-            identifier: identifier,
-            state: state,
-            additionalParameters: additionalParameters
+        scope: String,
+        flowKey: Data
+    ) async throws -> (requestURI: String, parNonce: String) {
+        let (data, response) = try await sendAuthorizationServerRequest(
+            endpoint: metadata.pushedAuthorizationRequestEndpoint,
+            issuer: metadata.issuer,
+            proofType: .authorization,
+            key: .flow(flowKey),
+            parameters: buildPARParameters(
+                codeChallenge: codeChallenge, identifier: identifier, state: state, scope: scope
+            )
         )
 
-        let body = encodeFormData(parameters)
-
-        guard let endpointURL = URL(string: endpoint) else {
-            throw AuthError.invalidOAuthConfiguration
+        guard (200 ... 299).contains(response.statusCode) else {
+            throw parseOAuthError(from: data, statusCode: response.statusCode)
         }
-        var request = URLRequest(url: endpointURL)
-        request.httpMethod = "POST"
-        request.httpBody = body
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-
-        // DPoP Proof Generation
-        let proofKeyRawRepresentation: Data
-        let dpopProof: String
-
-        if let providedKeyData = ephemeralKeyRawRepresentation {
-            proofKeyRawRepresentation = providedKeyData
-            dpopProof = try await createDPoPProof(
-                for: "POST",
-                url: endpoint,
-                type: .authorization,
-                ephemeralKeyRawRepresentation: providedKeyData
-            )
-        } else {
-            let tempKey = P256.Signing.PrivateKey()
-            proofKeyRawRepresentation = tempKey.rawRepresentation
-            dpopProof = try await createDPoPProof(
-                for: "POST",
-                url: endpoint,
-                type: .authorization,
-                ephemeralKeyRawRepresentation: proofKeyRawRepresentation
-            )
+        guard let parResponse = try? decoder.decode(PARResponse.self, from: data) else {
+            throw AuthError.invalidResponse
         }
-        request.setValue(dpopProof, forHTTPHeaderField: "DPoP")
-
-        let (data, response) = try await networkService.request(request)
-
-        guard let httpResponse = response as? HTTPURLResponse else { throw AuthError.invalidResponse }
-        if (200 ... 299).contains(httpResponse.statusCode) {
-            guard let parResponse = try? decoder.decode(PARResponse.self, from: data) else {
-                throw AuthError.invalidResponse
-            }
-            let requestURI = parResponse.requestURI
-            let parNonce = extractNonceFromHeaders(httpResponse.allHeaderFields)
-            if let parNonce {
-                recordOAuthFlowNonce(
-                    parNonce, for: endpoint, ephemeralKeyRawRepresentation: proofKeyRawRepresentation
-                )
-            }
-            return (requestURI, parNonce)
-        } else if httpResponse.statusCode == 400 {
-            let dpopNonceHeader = extractNonceFromHeaders(httpResponse.allHeaderFields)
-            var isNonceError = false
-            if let errorResponse = try? decoder.decode(OAuthErrorResponse.self, from: data),
-               errorResponse.error == "use_dpop_nonce"
-            {
-                isNonceError = true
-            }
-
-            if isNonceError, let receivedNonce = dpopNonceHeader {
-                // Retry with nonce
-                recordOAuthFlowNonce(
-                    receivedNonce, for: endpoint, ephemeralKeyRawRepresentation: proofKeyRawRepresentation
-                )
-                var retryRequest = request
-                let retryProof = try await createDPoPProof(
-                    for: "POST",
-                    url: endpoint,
-                    type: .authorization,
-                    ephemeralKeyRawRepresentation: proofKeyRawRepresentation,
-                    nonce: receivedNonce
-                )
-                retryRequest.setValue(retryProof, forHTTPHeaderField: "DPoP")
-
-                let (retryData, retryResponse) = try await networkService.request(retryRequest)
-                guard let retryHttpResponse = retryResponse as? HTTPURLResponse else {
-                    throw AuthError.invalidResponse
-                }
-
-                if (200 ... 299).contains(retryHttpResponse.statusCode) {
-                    guard let parResponse = try? decoder.decode(PARResponse.self, from: retryData) else {
-                        throw AuthError.invalidResponse
-                    }
-                    let parNonce = extractNonceFromHeaders(retryHttpResponse.allHeaderFields)
-                    if let parNonce {
-                        recordOAuthFlowNonce(
-                            parNonce, for: endpoint, ephemeralKeyRawRepresentation: proofKeyRawRepresentation
-                        )
-                    }
-                    return (parResponse.requestURI, parNonce)
-                } else {
-                    throw parseOAuthError(from: retryData, statusCode: retryHttpResponse.statusCode)
-                }
-            } else {
-                throw parseOAuthError(from: data, statusCode: httpResponse.statusCode)
-            }
-        } else {
-            throw parseOAuthError(from: data, statusCode: httpResponse.statusCode)
-        }
+        let nonce = try Self.requireNonce(in: response, endpoint: "pushed authorization request")
+        return (parResponse.requestURI, nonce)
     }
 
-    private func parseOAuthError(from data: Data, statusCode: Int) -> AuthError {
+    /// The atproto OAuth profile makes server nonces mandatory: a response to a
+    /// DPoP request that carries no `DPoP-Nonce` header must be rejected.
+    static func requireNonce(in response: HTTPURLResponse, endpoint: String) throws -> String {
+        guard let nonce = response.value(forHTTPHeaderField: "DPoP-Nonce"), !nonce.isEmpty else {
+            LogManager.logError(
+                "The \(endpoint) response carried no DPoP-Nonce header; the atproto OAuth profile requires one",
+                category: .authentication
+            )
+            throw AuthError.invalidResponse
+        }
+        return nonce
+    }
+
+    func parseOAuthError(from data: Data, statusCode: Int) -> AuthError {
         if let errorResponse = try? JSONDecoder().decode(OAuthErrorResponse.self, from: data) {
             let desc = errorResponse.errorDescription ?? ""
             let isNativeNone = (errorResponse.error == "invalid_client_metadata" || errorResponse.error == "invalid_client")
@@ -914,19 +1065,120 @@ actor OAuthCore {
         return .authorizationFailed
     }
 
-    func revokeToken(refreshToken: String, endpoint: String, did: String) async {
-        guard let url = URL(string: endpoint) else { return }
-        var request = URLRequest(url: url)
-        request.httpMethod = "POST"
-        request.setValue("application/x-www-form-urlencoded", forHTTPHeaderField: "Content-Type")
-        let params = ["token": refreshToken, "client_id": oauthConfig.clientId]
-        request.httpBody = encodeFormData(params)
+    /// Exchanges an authorization code for tokens (RFC 6749 §4.1.3 with PKCE and DPoP).
+    func exchangeAuthorizationCode(
+        _ code: String,
+        codeVerifier: String,
+        redirectURI: String,
+        metadata: AuthorizationServerMetadata,
+        flowKey: Data,
+        initialNonce: String?
+    ) async throws -> TokenResponse {
+        let (data, response) = try await sendAuthorizationServerRequest(
+            endpoint: metadata.tokenEndpoint,
+            issuer: metadata.issuer,
+            proofType: .tokenRequest,
+            key: .flow(flowKey),
+            initialNonce: initialNonce,
+            parameters: [
+                "grant_type": "authorization_code",
+                "code": code,
+                "redirect_uri": redirectURI,
+                "code_verifier": codeVerifier,
+            ]
+        )
 
-        if let proof = try? await createDPoPProof(for: "POST", url: endpoint, type: .tokenRequest, did: did) {
-            request.setValue(proof, forHTTPHeaderField: "DPoP")
+        guard (200 ..< 300).contains(response.statusCode) else {
+            if let errorResponse = try? decoder.decode(OAuthErrorResponse.self, from: data) {
+                if errorResponse.error == "invalid_grant" {
+                    throw AuthError.invalidCredentials
+                }
+                throw AuthError.serverError(
+                    response.statusCode, "\(errorResponse.error): \(errorResponse.errorDescription ?? "")"
+                )
+            }
+            throw AuthError.tokenRefreshFailed
         }
 
-        _ = try? await networkService.request(request)
+        do {
+            _ = try Self.requireNonce(in: response, endpoint: "token")
+            return try JSONCoders.decode(TokenResponse.self, from: data)
+        } catch {
+            LogManager.logError("Token response failed validation: \(error)", category: .authentication)
+            // The server considers the session issued. Revoke whatever token can
+            // still be read from the response rather than abandoning it.
+            if let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+               let token = (object["refresh_token"] as? String) ?? (object["access_token"] as? String)
+            {
+                await revokeToken(token, metadata: metadata, key: .flow(flowKey))
+            }
+            throw AuthError.invalidResponse
+        }
+    }
+
+    /// Sends a refresh-token grant for `did`'s session.
+    /// - Returns: The raw response; the caller verifies and persists it.
+    func requestTokenRefresh(
+        did: String,
+        refreshToken: String,
+        metadata: AuthorizationServerMetadata
+    ) async throws -> (Data, HTTPURLResponse) {
+        try await sendAuthorizationServerRequest(
+            endpoint: metadata.tokenEndpoint,
+            issuer: metadata.issuer,
+            proofType: .tokenRefresh,
+            key: .account(did),
+            parameters: [
+                "grant_type": "refresh_token",
+                "refresh_token": refreshToken,
+            ]
+        )
+    }
+
+    /// Revokes `token` at the authorization server (RFC 7009).
+    ///
+    /// The request is authenticated like every other authorization-server
+    /// request: DPoP proof, nonce retry, and the client's authentication
+    /// parameters, so a confidential client's revocation carries its assertion.
+    ///
+    /// - Returns: `true` when the server confirmed the revocation with HTTP 200.
+    ///   `false` when the server has no revocation endpoint, refused, or could
+    ///   not be reached — the token may then still be valid server-side.
+    @discardableResult
+    func revokeToken(_ token: String, metadata: AuthorizationServerMetadata, key: DPoPKeySource) async -> Bool {
+        guard let endpoint = metadata.revocationEndpoint else {
+            LogManager.logInfo(
+                "Authorization server \(metadata.issuer) has no revocation endpoint; token not revoked",
+                category: .authentication
+            )
+            return false
+        }
+        do {
+            let (_, response) = try await sendAuthorizationServerRequest(
+                endpoint: endpoint,
+                issuer: metadata.issuer,
+                proofType: .tokenRequest,
+                key: key,
+                // Logout and account removal wait on this; an unreachable
+                // server must not hold them up for long.
+                timeout: 10.0,
+                parameters: ["token": token]
+            )
+            guard response.statusCode == 200 else {
+                LogManager.logError(
+                    "Token revocation at \(metadata.issuer) was refused with HTTP \(response.statusCode); the token may remain valid",
+                    category: .authentication
+                )
+                return false
+            }
+            return true
+        } catch {
+            LogManager.logError(
+                "Token revocation at \(metadata.issuer) failed (\(error)); the token may remain valid",
+                category: .authentication
+            )
+            return false
+        }
     }
 
     // MARK: - AuthenticationProvider Methods
@@ -1001,59 +1253,94 @@ actor OAuthCore {
         try await refreshTokenIfNeeded(forceRefresh: false)
     }
 
+    /// Refreshes the current account's tokens when they are due (or when forced).
+    ///
+    /// This is the refresh lock the profile calls for: refresh tokens are
+    /// single-use, so at most one refresh per account is in flight and every
+    /// concurrent caller awaits that one instead of presenting the same token again.
     func refreshTokenIfNeeded(forceRefresh: Bool) async throws -> TokenRefreshResult {
-        guard let account = await accountManager.getCurrentAccount(),
-              let session = await currentSession(for: account.did)
-        else {
-            throw AuthError.noActiveAccount
-        }
-
-        let did = account.did
-
-        if let task = activeRefreshTasks[did] { return try await task.value }
-
-        guard let refreshToken = session.refreshToken else { throw AuthError.tokenRefreshFailed }
-        if usedRefreshTokens.contains(refreshToken) { throw AuthError.tokenRefreshFailed }
-
-        // Circuit breaker check
-        guard await refreshCircuitBreaker.canAttemptRefresh(for: did) else { throw AuthError.tokenRefreshFailed }
-
-        // Check expiry
-        if !forceRefresh && !session.isExpiringSoon { return .stillValid }
-
-        guard let performRefresh = performActualRefresh else {
-            throw AuthError.tokenRefreshFailed
-        }
-
-        // Guard against concurrent reuse while the request is in flight. The token is
-        // only treated as permanently consumed when the server definitively used it
-        // (success, or invalid_grant); a transient failure (timeout, offline, 5xx)
-        // must NOT burn it, or every later refresh fails until app restart.
-        if usedRefreshTokens.count > Self.usedRefreshTokenCap {
-            usedRefreshTokens.removeAll()
-        }
-        usedRefreshTokens.insert(refreshToken)
-
-        let task = Task<TokenRefreshResult, Error> {
-            try await performRefresh(account, session)
-        }
-        activeRefreshTasks[did] = task
-        defer { activeRefreshTasks.removeValue(forKey: did) }
-
-        do {
-            return try await task.value
-        } catch {
-            if !Self.isDefinitiveRefreshRejection(error) {
-                usedRefreshTokens.remove(refreshToken)
+        while true {
+            guard let account = await accountManager.getCurrentAccount(),
+                  let session = await currentSession(for: account.did)
+            else {
+                throw AuthError.noActiveAccount
             }
-            throw error
+
+            let did = account.did
+
+            if let task = activeRefreshTasks[did] { return try await task.value }
+
+            guard let refreshToken = session.refreshToken else {
+                // A session granted without a refresh token (the client did not
+                // declare the refresh_token grant) is good for as long as its
+                // access token is: there is nothing to refresh it with, so it
+                // must not be refused while the token still works.
+                if !forceRefresh, !session.isExpired { return .stillValid }
+                LogManager.logInfo(
+                    "Session for DID \(LogManager.logDID(did)) has no refresh token and its access token can no longer be used; the user must sign in again",
+                    category: .authentication
+                )
+                throw AuthError.tokenRefreshFailed
+            }
+            if usedRefreshTokens.contains(refreshToken) {
+                // Either the server definitively rejected this token, or a refresh
+                // that finished while this call was reading the session has already
+                // rotated it. Only the first is a failure.
+                if let latest = await currentSession(for: did)?.refreshToken, latest != refreshToken {
+                    continue
+                }
+                throw AuthError.tokenRefreshFailed
+            }
+
+            // Circuit breaker check
+            guard await refreshCircuitBreaker.canAttemptRefresh(for: did) else { throw AuthError.tokenRefreshFailed }
+
+            // Another caller may have started a refresh during the suspensions above.
+            if let task = activeRefreshTasks[did] { return try await task.value }
+            if usedRefreshTokens.contains(refreshToken) { continue }
+
+            // Check expiry
+            if !forceRefresh && !session.isExpiringSoon { return .stillValid }
+
+            // Tests may substitute the wire exchange; production always runs the real one.
+            let performRefresh: @Sendable (Account, Session) async throws -> TokenRefreshResult =
+                performActualRefresh ?? { [weak self] account, session in
+                    guard let self else { throw AuthError.tokenRefreshFailed }
+                    return try await self.performRefresh(for: account, session: session)
+                }
+
+            // Guard against concurrent reuse while the request is in flight. The token is
+            // only treated as permanently consumed when the server definitively used it
+            // (success, or invalid_grant); a transient failure (timeout, offline, 5xx)
+            // must NOT burn it, or every later refresh fails until app restart.
+            if usedRefreshTokens.count > Self.usedRefreshTokenCap {
+                usedRefreshTokens.removeAll()
+            }
+            usedRefreshTokens.insert(refreshToken)
+
+            let task = Task<TokenRefreshResult, Error> {
+                try await performRefresh(account, session)
+            }
+            activeRefreshTasks[did] = task
+            defer { activeRefreshTasks.removeValue(forKey: did) }
+
+            do {
+                return try await task.value
+            } catch {
+                if !Self.isDefinitiveRefreshRejection(error) {
+                    usedRefreshTokens.remove(refreshToken)
+                }
+                throw error
+            }
         }
     }
 
     /// True when the auth server definitively consumed or revoked the refresh token
     /// (it must never be retried); false for transient failures that are safe to retry.
     static func isDefinitiveRefreshRejection(_ error: Error) -> Bool {
-        (error as? AuthError) == .invalidCredentials
+        // `.invalidResponse` is thrown only after a 2xx refresh response failed
+        // verification: the server has rotated the token, so the old one is spent.
+        (error as? AuthError) == .invalidCredentials || (error as? AuthError) == .invalidResponse
     }
 
     /// Returns the freshest known session for `did`: an unpersisted in-memory session
@@ -1153,9 +1440,9 @@ private struct DPoPPayload: Encodable {
     let nonce: String?
 }
 
-private struct PARResponse: Decodable {
+struct PARResponse: Decodable {
     let requestURI: String
-    let expiresIn: Int
+    let expiresIn: Int?
 
     enum CodingKeys: String, CodingKey {
         case requestURI = "request_uri"

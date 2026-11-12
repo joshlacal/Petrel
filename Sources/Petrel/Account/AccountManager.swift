@@ -47,6 +47,34 @@ protocol AccountManaging: Actor {
     ///   - bskyAppViewDID: The new AppView DID
     ///   - bskyChatDID: The new Chat DID
     func updateServiceDIDs(bskyAppViewDID: String, bskyChatDID: String) async throws
+
+    /// Installs the handler run at the start of `removeAccount(did:)`, while the
+    /// account's session is still stored. The authentication layer uses it to
+    /// revoke the session at the authorization server before the tokens are deleted.
+    nonisolated func setAccountRemovalHandler(_ handler: (@Sendable (String) async -> Void)?)
+}
+
+extension AccountManaging {
+    nonisolated func setAccountRemovalHandler(_: (@Sendable (String) async -> Void)?) {}
+}
+
+/// Lock-protected slot for the account-removal handler, so it can be installed
+/// synchronously from the authentication layer's initializer.
+final class AccountRemovalHandlerBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var handler: (@Sendable (String) async -> Void)?
+
+    func set(_ newHandler: (@Sendable (String) async -> Void)?) {
+        lock.lock()
+        defer { lock.unlock() }
+        handler = newHandler
+    }
+
+    func get() -> (@Sendable (String) async -> Void)? {
+        lock.lock()
+        defer { lock.unlock() }
+        return handler
+    }
 }
 
 /// Actor responsible for managing user accounts.
@@ -63,6 +91,12 @@ actor AccountManager: AccountManaging {
     /// Defaults to true to preserve existing behavior. Can be toggled by higher-level services
     /// (e.g., AuthenticationService) to prevent unexpected account switching after logout.
     var autoSwitchOnRemoval: Bool = true
+
+    private nonisolated let removalHandler = AccountRemovalHandlerBox()
+
+    nonisolated func setAccountRemovalHandler(_ handler: (@Sendable (String) async -> Void)?) {
+        removalHandler.set(handler)
+    }
 
     /// Initializes a new AccountManager with the specified storage.
     /// - Parameter storage: The KeychainStorage instance to use for account data.
@@ -307,6 +341,9 @@ actor AccountManager: AccountManaging {
     /// - Parameter did: The DID of the account to remove.
     func removeAccount(did: String) async throws {
         LogManager.logInfo("AccountManager - Removing account with DID: \(did)")
+        // Revoke the session server-side while its tokens and DPoP key still exist;
+        // deleting them first would leave the refresh token valid with no way to revoke it.
+        await removalHandler.get()?(did)
         accountsCache.removeValue(forKey: did)
         do {
             try await storage.deleteAccount(for: did)

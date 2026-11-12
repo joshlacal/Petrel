@@ -115,6 +115,7 @@ let package = Package(
             dependencies: [
                 "PetrelCore",
                 "PetrelCrypto",
+                "PetrelOAuthScopes",
                 "SwiftCBOR",
                 .product(name: "AsyncDNSResolver", package: "swift-async-dns-resolver"),
                 .product(name: "Crypto", package: "swift-crypto"),

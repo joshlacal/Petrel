@@ -1040,7 +1040,10 @@ public actor NetworkService: NetworkServiceProtocol {
     nonisolated func extractContentLabelers(from response: HTTPURLResponse) async -> [(
         did: String, redact: Bool
     )] {
-        guard let contentLabelers = response.allHeaderFields["atproto-content-labelers"] as? String
+        // Header names are case-insensitive; `allHeaderFields` is keyed as the
+        // transport delivered them (lower case over HTTP/2, canonicalised by
+        // Darwin, as received on Linux), so look the name up without regard to case.
+        guard let contentLabelers = response.value(forHTTPHeaderField: "atproto-content-labelers")
         else {
             return []
         }
@@ -1599,8 +1602,9 @@ public actor NetworkService: NetworkServiceProtocol {
                         LogManager.logInfo("Network Service - 401 error is 'use_dpop_nonce'.")
                     } else {
                         // Also check WWW-Authenticate header (though Bluesky uses response body)
-                        let responseHeaders = httpResponse.allHeaderFields as? [String: String] ?? [:]
-                        if let wwwAuth = responseHeaders["WWW-Authenticate"],
+                        // RFC 9449 §9 signals this through the header; header names
+                        // are case-insensitive, so no literal-key dictionary lookup.
+                        if let wwwAuth = httpResponse.value(forHTTPHeaderField: "WWW-Authenticate"),
                            wwwAuth.lowercased().contains("error=\"use_dpop_nonce\"")
                         {
                             isNonceError = true
@@ -1618,8 +1622,8 @@ public actor NetworkService: NetworkServiceProtocol {
                     if isNonceError {
                         LogManager.logInfo("METRIC dpop_nonce_retry_total origin=protected_resource jkt=\(authCtx?.jkt ?? "unknown")")
                         // If it's a nonce error, make sure nonce is stored properly before retrying
-                        let responseHeaders = httpResponse.allHeaderFields as? [String: String] ?? [:]
-                        if let nonce = responseHeaders["DPoP-Nonce"] {
+                        if let nonce = httpResponse.value(forHTTPHeaderField: "DPoP-Nonce") {
+                            let responseHeaders = ["DPoP-Nonce": nonce]
                             // Explicitly store the nonce again, to be double-sure
                             LogManager.logSensitiveValue(
                                 nonce,
@@ -1665,6 +1669,11 @@ public actor NetworkService: NetworkServiceProtocol {
                                 "Network Service - Successfully handled non-nonce 401 via authProvider."
                             )
                             return (retryData, retryResponse) // Return the result of the successful handling
+                        } catch let statusError as AccountStatusError {
+                            // The server refused because of the account's hosting
+                            // status, not its credentials: report that, and leave
+                            // the session alone for the app to act on.
+                            throw statusError
                         } catch {
                             LogManager.logError(
                                 "Network Service - authProvider failed to handle non-nonce 401: \(error). Giving up."
@@ -1969,8 +1978,34 @@ public actor NetworkService: NetworkServiceProtocol {
         )
     }
 
-    func executeUnauthenticatedRequest(
+    /// The authentication provider installed on this service, for the
+    /// hand-written authentication API layered over `ATProtoClient`.
+    var authenticationProvider: AuthenticationProvider? {
+        authProvider
+    }
+
+    /// Sends an authentication-protocol request (OAuth server metadata, pushed
+    /// authorization request, token, revocation; app-password session refresh
+    /// and deletion) exactly as the authentication layer built it.
+    ///
+    /// Unlike `request(_:)`, nothing is inferred from the URL: the caller's own
+    /// `DPoP` proof and `Authorization` header are kept and the active account's
+    /// credentials are never substituted for them, no response nonce is filed
+    /// under the active account, and redirects are never followed, so a proof,
+    /// authorization code or refresh token cannot be forwarded to another origin.
+    func executeAuthProtocolRequest(
         _ request: URLRequest
+    ) async throws -> (Data, HTTPURLResponse) {
+        let (data, response) = try await executeUnauthenticatedRequest(request, keepingCallerCredentials: true)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw NetworkError.requestFailed
+        }
+        return (data, httpResponse)
+    }
+
+    func executeUnauthenticatedRequest(
+        _ request: URLRequest,
+        keepingCallerCredentials: Bool = false
     ) async throws -> (Data, URLResponse) {
         guard let url = request.url else {
             throw NetworkError.invalidURL
@@ -1981,6 +2016,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         var sanitizedRequest = request
         for header in ["Authorization", "DPoP", "Cookie", "Proxy-Authorization", "atproto-proxy"] {
+            if keepingCallerCredentials, header == "DPoP" || header == "Authorization" { continue }
             sanitizedRequest.setValue(nil, forHTTPHeaderField: header)
         }
         if let userAgent = userAgent {
@@ -2800,6 +2836,10 @@ public actor NetworkService: NetworkServiceProtocol {
             return (request, nil)
         } catch is CancellationError {
             throw CancellationError()
+        } catch let statusError as AccountStatusError {
+            // A refresh refused because the account is taken down, suspended or
+            // deactivated: the caller needs that status, not a generic failure.
+            throw statusError
         } catch {
             LogManager.logError("Failed to prepare authenticated request for \(LogManager.sanitizeURLForLogging(url)): \(error)")
             if let authErr = error as? AuthError {
