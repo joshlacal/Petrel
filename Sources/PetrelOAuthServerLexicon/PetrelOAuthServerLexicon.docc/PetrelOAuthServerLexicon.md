@@ -47,7 +47,7 @@ func makeServer(
 }
 ```
 
-`pinnedTransport` is a transport that pins each connection to the addresses the fetcher approved, such as `PinnedNIOOAuthRemoteTransport` from the `PetrelOAuthServerHummingbird` product (package trait `OAuthServerHummingbird`). `AuthenticatedOAuthLexiconResolver(fetcher:)` throws ``OAuthLexiconResolverConfigurationError`` when the fetcher's policy admits responses larger than 256 KiB.
+`pinnedTransport` is a transport that pins each connection to the addresses the fetcher approved, such as `PinnedNIOOAuthRemoteTransport` from the `PetrelOAuthServerNIO` product (package trait `OAuthServerNIO`; `PetrelOAuthServerHummingbird` re-exports it). `AuthenticatedOAuthLexiconResolver(fetcher:)` throws ``OAuthLexiconResolverConfigurationError`` when the fetcher's policy admits responses larger than 256 KiB.
 
 `CachingOAuthLexiconResolver` adds the permission specification's cache lifetimes. The resolver also caches each authority's DID document for five minutes, but never a proof: every resolution checks the proof again under the key the document currently names.
 
