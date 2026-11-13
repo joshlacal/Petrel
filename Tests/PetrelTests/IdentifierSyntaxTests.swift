@@ -651,6 +651,35 @@ struct SpaceURISyntaxTests {
         }
     }
 
+    /// Identifiers re-audit r-1. The Spaces reference (`@atproto/syntax`
+    /// `parseAtUriString`) accepts space URIs wherever a Lexicon says `at-uri`, and the
+    /// Spaces endpoints return them in `at-uri` fields, so decoding keeps doing so; the
+    /// specification grammar stays one explicit check away.
+    @Test("a format: at-uri field decodes a space URI, and .restricted still tells it apart")
+    func atURIFieldsAcceptSpaceURIs() throws {
+        let cid = "bafyreidfayvfuwqa7qlnopdjiqrxzs6blmoeu4rujcjtnci5beludirz2a"
+        let created = try JSONDecoder().decode(
+            ComAtprotoSpaceCreateRecord.Output.self,
+            from: Data(#"{"uri":"\#(Self.record)","cid":"\#(cid)"}"#.utf8)
+        )
+        #expect(created.uri.isSpace)
+        #expect(created.uri.uriString() == Self.record)
+        #expect(!ATProtocolURI.isValidATURI(created.uri.uriString(), grammar: .restricted))
+
+        let strongRef = try JSONDecoder().decode(
+            ComAtprotoRepoStrongRef.self,
+            from: Data(#"{"uri":"\#(Self.space)","cid":"\#(cid)"}"#.utf8)
+        )
+        #expect(strongRef.uri.isSpace)
+
+        let publicRef = try JSONDecoder().decode(
+            ComAtprotoRepoStrongRef.self,
+            from: Data(#"{"uri":"at://did:plc:asdf123/com.example.foo/abc123","cid":"\#(cid)"}"#.utf8)
+        )
+        #expect(!publicRef.uri.isSpace)
+        #expect(ATProtocolURI.isValidATURI(publicRef.uri.uriString(), grammar: .restricted))
+    }
+
     @Test("anything other than the two exact shapes is rejected", arguments: [
         // Marker alone, or missing parts.
         "at://did:plc:x/space",
