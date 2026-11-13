@@ -40,7 +40,11 @@ for owned_path in \
   Sources/PetrelLoad/Owned.swift \
   Tests/PetrelTests/Owned.swift \
   Tests/PetrelLoadTests/Owned.swift \
-  Tests/ReleaseScripts/Owned.swift; do
+  Tests/ReleaseScripts/Owned.swift \
+  Server/Package.swift \
+  Server/Sources/petrel-oauth-server-example/Owned.swift \
+  Server/Tests/PetrelOAuthServerHummingbirdTests/Owned.swift \
+  "$ROOT/Server/Sources/PetrelCABServerCore/Owned.swift"; do
   # The inner shell expands its positional parameter, not this test process.
   # shellcheck disable=SC2016
   expect_status 1 "$GATE" owned-warning -- /bin/bash -c \
@@ -61,6 +65,12 @@ expect_status 1 "$GATE" pathless-package-warning -- /bin/bash -c \
 expect_status 0 "$GATE" dependency-warning -- /bin/bash -c \
   'printf "%s:3:4: warning: dependency warning\n" "$1"' _ \
   "$ROOT/.build/checkouts/Dependency/Sources/Petrel/Dependency.swift"
+
+# The Server package's own dependency checkouts are not owned either.
+# shellcheck disable=SC2016
+expect_status 0 "$GATE" server-dependency-warning -- /bin/bash -c \
+  'printf "%s:3:4: warning: dependency warning\n" "$1"' _ \
+  "$ROOT/Server/.build/checkouts/hummingbird/Sources/Hummingbird/Dependency.swift"
 
 expect_status 0 "$GATE" source-chatter -- /bin/bash -c \
   'printf "Compiling Sources/Petrel/Owned.swift with warning: text\n"'

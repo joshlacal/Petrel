@@ -180,6 +180,7 @@ expected_action_pins = {
   "gradle/actions/setup-gradle" => "748248ddd2a24f49513d8f472f81c3a07d4d50e1", # v4.4.4
   "peter-evans/create-pull-request" => "22a9089034f40e5a961c8808d113e2c98fb63676", # v7.0.11
   "anthropics/claude-code-action" => "1298632ce7736903d02a1435002705aa2a594a6c", # v1.0.175
+  "actions/upload-artifact" => "ea165f8d65b6e75b540449e92b4886f43607fa02", # v4.6.2
 }
 loaded_workflows = {}
 workflow_paths = Dir.glob([

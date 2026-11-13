@@ -17,6 +17,12 @@ struct ExampleServerEndToEndTests {
   static let clientID = "http://localhost?redirect_uri=http%3A%2F%2F127.0.0.1%2Fcallback&scope=atproto%20transition%3Ageneric"
   static let redirectURI = "http://127.0.0.1:53124/callback"
 
+  /// The server's clock and the client's proof timestamps for one test. It
+  /// stands still: a stalled CI runner freezes the test process while the wall
+  /// clock runs, and a real clock would then expire the 60 second
+  /// authorization code (or a proof's window) in a test not about lifetimes.
+  let clock = StillClock()
+
   struct Metadata: Decodable {
     let issuer: String
     let pushed_authorization_request_endpoint: String
@@ -66,10 +72,12 @@ struct ExampleServerEndToEndTests {
   final class Client: @unchecked Sendable {
     let http: any TestClientProtocol
     let key: OAuthSigningKey
+    let clock: any OAuthClock
     var nonce: String?
 
-    init(_ http: any TestClientProtocol) throws {
+    init(_ http: any TestClientProtocol, clock: any OAuthClock) throws {
       self.http = http
+      self.clock = clock
       key = try OAuthSigningKey.generate()
     }
 
@@ -77,7 +85,7 @@ struct ExampleServerEndToEndTests {
       try OAuthCompactJWT.sign(
         ProofClaims(
           jti: UUID().uuidString, htm: method, htu: url,
-          iat: Int64(Date().timeIntervalSince1970), nonce: nonce,
+          iat: Int64(clock.now().timeIntervalSince1970), nonce: nonce,
           ath: accessToken.map { OAuthPKCE.s256Challenge(for: $0) }
         ),
         with: key, type: "dpop+jwt", embedsPublicKey: true
@@ -172,7 +180,7 @@ struct ExampleServerEndToEndTests {
     #expect(metadata.dpop_signing_alg_values_supported.contains("ES256"))
 
     // 2. Pushed authorization request.
-    let client = try Client(http)
+    let client = try Client(http, clock: clock)
     let verifier = (UUID().uuidString + UUID().uuidString).replacingOccurrences(of: "-", with: "")
     let state = UUID().uuidString
     let par = try await client.post(metadata.pushed_authorization_request_endpoint, [
@@ -290,7 +298,7 @@ struct ExampleServerEndToEndTests {
 
   @Test("the whole flow through the Hummingbird router")
   func routerFlow() async throws {
-    let example = try ExampleServer(origin: #require(URL(string: Self.origin)))
+    let example = try ExampleServer(origin: #require(URL(string: Self.origin)), clock: clock)
     let app = Application(router: example.router())
     try await app.test(.router) { http in
       try await runFlow(http)
@@ -299,7 +307,7 @@ struct ExampleServerEndToEndTests {
 
   @Test("the whole flow over a real loopback TCP connection")
   func liveFlow() async throws {
-    let example = try ExampleServer(origin: #require(URL(string: Self.origin)))
+    let example = try ExampleServer(origin: #require(URL(string: Self.origin)), clock: clock)
     let app = Application(router: example.router(), configuration: .init(address: .hostname("127.0.0.1", port: 0)))
     try await app.test(.live) { http in
       try await runFlow(http)
@@ -339,11 +347,12 @@ struct ExampleServerEndToEndTests {
     defer { Task { try? await host.close() } }
     let example = try ExampleServer(
       origin: #require(URL(string: Self.origin)),
+      clock: clock,
       clientFetcher: TLSFixtures.fetcher(reaching: host.port)
     )
     let app = Application(router: example.router())
     try await app.test(.router) { http in
-      let client = try Client(http)
+      let client = try Client(http, clock: clock)
       let verifier = (UUID().uuidString + UUID().uuidString).replacingOccurrences(of: "-", with: "")
       let par = try await client.post(Self.origin + "/oauth/par", [
         ("client_id", clientID),
@@ -428,7 +437,7 @@ struct ExampleServerEndToEndTests {
 
   @Test("a body over the adapter's limit is refused before it reaches the server")
   func oversizedBody() async throws {
-    let example = try ExampleServer(origin: #require(URL(string: Self.origin)))
+    let example = try ExampleServer(origin: #require(URL(string: Self.origin)), clock: clock)
     let app = Application(router: example.router())
     try await app.test(.router) { http in
       let response = try await http.execute(
@@ -439,4 +448,11 @@ struct ExampleServerEndToEndTests {
       #expect(response.status == .contentTooLarge)
     }
   }
+}
+
+/// A clock that reads the same instant every time.
+struct StillClock: OAuthClock {
+  let instant = Date()
+
+  func now() -> Date { instant }
 }

@@ -144,7 +144,48 @@ public struct OAuthRemoteFetchPolicy: Sendable, Equatable {
         requiresConnectedPeerProof: Bool = OAuthRemoteFetchPolicy.defaultRequiresConnectedPeerProof,
         allowsUnpinnedTransport: Bool = false
     ) throws {
-        guard (1024 ... 1_048_576).contains(maximumBodyBytes), timeout > 0, timeout <= 30, timeout.isFinite else {
+        try self.init(
+            allowLoopbackDevelopment: allowLoopbackDevelopment,
+            networkAllowlist: networkAllowlist,
+            maximumBodyBytes: maximumBodyBytes,
+            timeout: timeout,
+            requiresConnectedPeerProof: requiresConnectedPeerProof,
+            allowsUnpinnedTransport: allowsUnpinnedTransport,
+            timeoutCeiling: 30
+        )
+    }
+
+    #if DEBUG
+        /// The default policy with a timeout above the 30 second ceiling. Only
+        /// for tests whose exchanges are answered in-process: a stalled CI
+        /// runner can freeze the test process for minutes, and a timeout that
+        /// fires during the freeze fails a test that is not about timeouts.
+        static func stubbed(
+            networkAllowlist: OAuthRemoteNetworkAllowlist = .init(),
+            timeout: TimeInterval
+        ) throws -> Self {
+            try .init(
+                allowLoopbackDevelopment: false,
+                networkAllowlist: networkAllowlist,
+                maximumBodyBytes: 256 * 1024,
+                timeout: timeout,
+                requiresConnectedPeerProof: defaultRequiresConnectedPeerProof,
+                allowsUnpinnedTransport: false,
+                timeoutCeiling: timeout
+            )
+        }
+    #endif
+
+    private init(
+        allowLoopbackDevelopment: Bool,
+        networkAllowlist: OAuthRemoteNetworkAllowlist,
+        maximumBodyBytes: Int,
+        timeout: TimeInterval,
+        requiresConnectedPeerProof: Bool,
+        allowsUnpinnedTransport: Bool,
+        timeoutCeiling: TimeInterval
+    ) throws {
+        guard (1024 ... 1_048_576).contains(maximumBodyBytes), timeout > 0, timeout <= timeoutCeiling, timeout.isFinite else {
             throw OAuthServerError.malformed("OAuth remote fetch policy bounds are invalid")
         }
         self.allowLoopbackDevelopment = allowLoopbackDevelopment

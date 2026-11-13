@@ -5,18 +5,18 @@
     import NIOCore
     import PetrelOAuthServer
 
-    /// Mounts a framework-agnostic ``OAuthAuthorizationServer`` on a Hummingbird
+    /// Mounts a framework-agnostic `OAuthAuthorizationServer` on a Hummingbird
     /// router, and adapts Hummingbird requests for the resource-server verifier.
     public enum OAuthServerHummingbird {
         /// Registers every endpoint of `server` on `router`.
         ///
         /// Each route collects the request body under `maximumBodyBytes`, converts
-        /// the request to an ``OAuthHTTPRequest``, calls
-        /// ``OAuthAuthorizationServer/handle(_:)`` and converts the result back.
+        /// the request to an `OAuthHTTPRequest`, calls
+        /// `OAuthAuthorizationServer.handle(_:)` and converts the result back.
         /// The adapter adds no behaviour of its own.
         ///
         /// The client's address reaches the server as
-        /// ``OAuthHTTPRequest/remoteAddress`` and from there the account
+        /// `OAuthHTTPRequest.remoteAddress` and from there the account
         /// authenticator, which needs it to limit sign-in attempts. It is read from
         /// the connection when `Context` conforms to `RemoteAddressRequestContext`
         /// (``OAuthServerRequestContext`` does; Hummingbird's `BasicRequestContext`

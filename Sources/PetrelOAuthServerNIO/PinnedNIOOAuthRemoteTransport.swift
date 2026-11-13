@@ -1,4 +1,4 @@
-#if OAuthServerHummingbird
+#if OAuthServerNIO
     import Foundation
     import NIOCore
     import NIOHTTP1
@@ -6,7 +6,7 @@
     import NIOSSL
     import PetrelOAuthServer
 
-    /// An ``OAuthRemoteTransport`` that connects only to an address the fetcher
+    /// An `OAuthRemoteTransport` that connects only to an address the fetcher
     /// approved, built on SwiftNIO. Use it for client metadata and JWKS fetches.
     ///
     /// `URLSession` resolves the host name again when it connects, so a host whose
@@ -16,7 +16,7 @@
     /// then verifies TLS for the URL's host name (SNI and certificate name check)
     /// exactly as a name-based connection would. Redirects are never followed, the
     /// body is bounded while it arrives, and the address connected to is reported
-    /// as ``OAuthRemoteHTTPResponse/connectedPeerAddress``.
+    /// as `OAuthRemoteHTTPResponse.connectedPeerAddress`.
     ///
     /// Works the same on Apple platforms and Linux.
     public struct PinnedNIOOAuthRemoteTransport: OAuthRemoteTransport {
