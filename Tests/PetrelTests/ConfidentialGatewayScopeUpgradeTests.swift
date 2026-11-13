@@ -354,6 +354,56 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
         }
     }
 
+    // MARK: - 0. Mode switching
+
+    /// Gateway mode routes every request to the gateway the client was created with, so a
+    /// switch may change callbacks but never the gateway itself.
+    func testSwitchingToADifferentGatewayIsRefused() async throws {
+        try await withInMemoryBackend { _ in
+            let namespace = "test.gateway.switch.other.\(UUID().uuidString)"
+            let (client, _) = try await self.makeClient(namespace: namespace)
+
+            let other = try GatewayConfiguration(
+                gatewayURL: URL(string: "https://other-gateway.example.test")!,
+                callbackURL: GatewayConfiguration.legacyCallbackURL,
+                permissionCallbackURL: GatewayConfiguration.legacyPermissionCallbackURL
+            )
+            do {
+                try await client.switchAuthMode(.gateway(other))
+                XCTFail("switching to another gateway must be refused")
+            } catch {
+                XCTAssertEqual(error as? AuthError, .invalidOAuthConfiguration)
+            }
+
+            let sameGatewayNewCallbacks = try GatewayConfiguration(
+                gatewayURL: self.gatewayURL,
+                callbackURL: URL(string: "https://app.example.com/cb")!,
+                permissionCallbackURL: URL(string: "https://app.example.com/pcb")!
+            )
+            try await client.switchAuthMode(.gateway(sameGatewayNewCallbacks))
+        }
+    }
+
+    func testSwitchingIntoGatewayModeFromAnotherModeIsRefused() async throws {
+        try await withInMemoryBackend { _ in
+            let client = try await ATProtoClient(
+                oauthConfig: OAuthConfig(
+                    clientId: "https://client.example/client-metadata.json",
+                    redirectUri: "https://client.example/oauth/callback",
+                    scope: "atproto"
+                ),
+                namespace: "test.gateway.switch.into.\(UUID().uuidString)",
+                authMode: .publicOAuth
+            )
+            do {
+                try await client.switchAuthMode(.gateway(.legacyEquivalent(gatewayURL: self.gatewayURL)))
+                XCTFail("switching into gateway mode must be refused")
+            } catch {
+                XCTAssertEqual(error as? AuthError, .invalidOAuthConfiguration)
+            }
+        }
+    }
+
     // MARK: - 1. Start Scope Upgrade Tests
 
     func testStartUpgradeSendsCorrectWireRequestAndValidatesParameters() async throws {

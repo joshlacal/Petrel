@@ -600,7 +600,13 @@ public actor ATProtoClient {
     }
 
     /// Switches the authentication mode at runtime.
+    ///
+    /// A gateway client sends every request to the gateway it was created with, so switching to
+    /// ``AuthMode/gateway(_:)`` is allowed only on a client created in gateway mode and only for a
+    /// configuration with the same `gatewayURL` (its callbacks may differ). Create a new client to
+    /// use a different gateway.
     /// - Parameter mode: The new authentication mode to use.
+    /// - Throws: `AuthError.invalidOAuthConfiguration` when the switch would change the gateway.
     public func switchAuthMode(_ mode: AuthMode) async throws {
         guard let authManager else {
             throw APIError.unauthenticatedClient("Cannot switch auth mode on an unauthenticated client")
@@ -614,6 +620,9 @@ public actor ATProtoClient {
         case .publicOAuth:
             managerMode = .publicOAuth
         case let .gateway(configuration):
+            guard case let .gateway(current) = authMode, current.gatewayURL == configuration.gatewayURL else {
+                throw AuthError.invalidOAuthConfiguration
+            }
             managerMode = .gateway(configuration)
         case let .cab(backendURL):
             managerMode = .cab(backendURL: backendURL)
