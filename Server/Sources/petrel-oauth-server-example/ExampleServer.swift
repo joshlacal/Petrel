@@ -2,6 +2,7 @@ import Foundation
 import Hummingbird
 import PetrelOAuthServer
 import PetrelOAuthServerHummingbird
+import PetrelOAuthServerLexicon
 
 /// A complete, runnable AT Protocol OAuth authorization server with a stub
 /// resource server, for development and interoperability testing.
@@ -44,15 +45,20 @@ public struct ExampleServer: Sendable {
     for index in secret.indices {
       secret[index] = UInt8.random(in: .min ... .max)
     }
+    // One pinned fetcher for every outbound request: client metadata, JWKS,
+    // and the DID documents and repository proofs behind `include:` scopes.
+    let fetcher = try OAuthRemoteDocumentFetcher(
+      policy: OAuthRemoteFetchPolicy(),
+      transport: PinnedNIOOAuthRemoteTransport()
+    )
     let resolver: any OAuthClientResolving = try clients.isEmpty
-      ? OAuthClientMetadataLoader(
-        fetcher: OAuthRemoteDocumentFetcher(
-          policy: OAuthRemoteFetchPolicy(),
-          transport: PinnedNIOOAuthRemoteTransport()
-        ),
-        cache: store
-      )
+      ? OAuthClientMetadataLoader(fetcher: fetcher, cache: store)
       : StaticOAuthClientResolver(clients)
+    let lexicons = try CachingOAuthLexiconResolver(
+      upstream: AuthenticatedOAuthLexiconResolver(fetcher: fetcher, clock: clock),
+      cache: store,
+      clock: clock
+    )
     server = try OAuthAuthorizationServer(
       configuration: OAuthAuthorizationServerConfiguration(
         issuer: origin,
@@ -62,6 +68,7 @@ public struct ExampleServer: Sendable {
       store: store,
       accounts: accounts,
       clients: resolver,
+      lexiconResolver: lexicons,
       interface: OAuthDefaultInterface(serviceName: "Petrel example server"),
       clock: clock
     )

@@ -69,6 +69,7 @@ let package = Package(
       dependencies: [
         "PetrelOAuthServerHummingbird",
         .product(name: "PetrelOAuthServer", package: "Petrel"),
+        .product(name: "PetrelOAuthServerLexicon", package: "Petrel"),
         .product(name: "ArgumentParser", package: "swift-argument-parser"),
         .product(name: "Hummingbird", package: "hummingbird"),
       ],

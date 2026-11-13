@@ -4,8 +4,10 @@ import Foundation
 // its result types, and the budget that bounds the resolutions of one request.
 //
 // The protocol is declared here so that the authorization server core can call
-// it. A concrete resolver — DNS `_lexicon` TXT record, DID document,
-// `com.atproto.sync.getRecord`, repository proof — is supplied by the host.
+// it. The network resolver — DNS `_lexicon` TXT record, DID document,
+// `com.atproto.sync.getRecord`, repository proof — is
+// `AuthenticatedOAuthLexiconResolver` in the `PetrelOAuthServerLexicon`
+// product, which keeps PetrelRepo and the identity layer out of this target.
 //
 // Reference implementation: `packages/lex/lex-resolver/src/lex-resolver.ts`.
 
