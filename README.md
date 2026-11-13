@@ -307,6 +307,7 @@ maps each specification requirement to code and tests.
   [PetrelOAuthServer](Sources/PetrelOAuthServer/PetrelOAuthServer.docc/PetrelOAuthServer.md),
   [PetrelOAuthServerLexicon](Sources/PetrelOAuthServerLexicon/PetrelOAuthServerLexicon.docc/PetrelOAuthServerLexicon.md),
   [PetrelOzone](Sources/PetrelOzone/PetrelOzone.docc/PetrelOzone.md).
+- [docs/Spaces.md](docs/Spaces.md): Petrel's support for the AT Protocol Spaces alpha (permissioned data).
 - [CHANGELOG.md](CHANGELOG.md): changes, including source-breaking ones, per release.
 - [SECURITY.md](SECURITY.md): how to report a vulnerability.
 - [LINUX_SUPPORT.md](LINUX_SUPPORT.md): what differs on Linux.
