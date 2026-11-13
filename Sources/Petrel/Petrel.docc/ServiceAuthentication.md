@@ -102,22 +102,28 @@ used as the verifier's key source directly:
 ```swift
 import Petrel
 
-func verifyFeedSkeletonCaller(authorizationHeader: String?) async throws -> String {
+/// Create one per service and keep it for the life of the process: the key
+/// cache and the replay store only protect requests that share them.
+struct FeedSkeletonAuthenticator {
     let verifier = ServiceAuthVerifier(
         audience: .service(did: "did:web:feed.example.com", id: "bsky_fg", acceptBareDID: true),
-        keyResolver: CachingServiceAuthKeyResolver(upstream: IdentityResolver())
+        keyResolver: CachingServiceAuthKeyResolver(upstream: IdentityResolver()),
+        replayStore: InMemoryServiceAuthReplayStore()
     )
-    let caller = try await verifier.verify(
-        authorizationHeader: authorizationHeader,
-        method: .exactly("app.bsky.feed.getFeedSkeleton")
-    )
-    return caller.issuer
+
+    func callerDID(authorizationHeader: String?) async throws -> String {
+        let caller = try await verifier.verify(
+            authorizationHeader: authorizationHeader,
+            method: .exactly("app.bsky.feed.getFeedSkeleton")
+        )
+        return caller.issuer
+    }
 }
 ```
 
 `CachingServiceAuthKeyResolver` limits how often a failed signature can make
 the resolver fetch a DID document again; anyone can send a token with a bad
-signature.
+signature. The replay store refuses a token whose `jti` it has already seen.
 
 To read keys from a document source of your own — a PLC mirror, a database —
 use ``DIDDocumentServiceAuthKeyResolver`` and give it any way of fetching a

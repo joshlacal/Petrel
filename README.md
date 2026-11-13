@@ -171,18 +171,19 @@ claims the handle.
 
 <!-- compile-example: readme-service-auth -->
 ```swift
+import Petrel
 import PetrelCrypto
 
-func authenticate(
-    authorizationHeader: String?,
-    keyResolver: any ServiceAuthKeyResolver
-) async throws -> String {
-    let verifier = ServiceAuthVerifier(
-        audience: .service(did: "did:web:feed.example.com", id: "bsky_fg"),
-        keyResolver: keyResolver,
-        replayStore: InMemoryServiceAuthReplayStore()
-    )
-    let caller = try await verifier.verify(
+/// Create once at startup and share across requests, so the key cache and
+/// the replay store see every request.
+let serviceAuth = ServiceAuthVerifier(
+    audience: .service(did: "did:web:feed.example.com", id: "bsky_fg"),
+    keyResolver: CachingServiceAuthKeyResolver(upstream: IdentityResolver()),
+    replayStore: InMemoryServiceAuthReplayStore()
+)
+
+func authenticate(authorizationHeader: String?) async throws -> String {
+    let caller = try await serviceAuth.verify(
         authorizationHeader: authorizationHeader,
         method: .exactly("app.bsky.feed.getFeedSkeleton")
     )

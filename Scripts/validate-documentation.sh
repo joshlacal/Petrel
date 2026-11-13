@@ -125,9 +125,14 @@ typecheck_documentation_examples() {
     # BoringSSL, zstd, ...). Each generated module map is passed explicitly, and each
     # checkout's public include and module-map directories are searchable.
     local cc_args=() module_map include_dir
+    # Swift 6.1 also writes Objective-C interop module maps for Swift targets
+    # (`<Target>-Swift.h`), including host-tool copies under `*-tool.build`;
+    # loading those defines the same module twice, so only C module maps are
+    # passed.
     while IFS= read -r module_map; do
+        /usr/bin/grep -q -- '-Swift\.h"' "$module_map" && continue
         cc_args+=(-Xcc "-fmodule-map-file=$module_map")
-    done < <(find "$example_bin_path" -maxdepth 2 -path '*.build/module.modulemap' | LC_ALL=C sort)
+    done < <(find "$example_bin_path" -maxdepth 2 -path '*.build/module.modulemap' -not -path '*-tool.build/*' | LC_ALL=C sort)
     while IFS= read -r include_dir; do
         cc_args+=(-Xcc -I -Xcc "$include_dir")
     done < <(
