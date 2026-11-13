@@ -1089,22 +1089,30 @@ struct ServiceAuthSupportTests {
         #expect(try await resolver.signingKey(for: did, forceRefresh: false) == oldKey)
         #expect(await upstream.lookups.map(\.forceRefresh) == [false])
 
-        // A forced refresh right after a fetch is answered from cache: a burst
-        // of forged tokens cannot turn into a burst of DID resolutions.
-        #expect(try await resolver.signingKey(for: did, forceRefresh: true) == oldKey)
-        #expect(await upstream.lookups.count == 1)
+        // The un-forced answer may be upstream's stale copy from before a key
+        // rotation, so the first forced refresh goes upstream even right away:
+        // an honest issuer that just rotated is not refused.
+        #expect(try await resolver.signingKey(for: did, forceRefresh: true) == newKey)
+        #expect(await upstream.lookups.map(\.forceRefresh) == [false, true])
+
+        // A forced refresh right after a refreshed fetch is answered from
+        // cache: a burst of forged tokens cannot turn into a burst of DID
+        // resolutions.
+        #expect(try await resolver.signingKey(for: did, forceRefresh: true) == newKey)
+        #expect(try await resolver.signingKey(for: did, forceRefresh: true) == newKey)
+        #expect(await upstream.lookups.count == 2)
 
         // Once the interval has passed, a forced refresh reaches upstream.
         clock.advance(31)
         #expect(try await resolver.signingKey(for: did, forceRefresh: true) == newKey)
-        #expect(await upstream.lookups.map(\.forceRefresh) == [false, true])
+        #expect(await upstream.lookups.map(\.forceRefresh) == [false, true, true])
         #expect(try await resolver.signingKey(for: did, forceRefresh: false) == newKey)
-        #expect(await upstream.lookups.count == 2)
+        #expect(await upstream.lookups.count == 3)
 
         // After the time to live, the entry is refetched.
         clock.advance(601)
         #expect(try await resolver.signingKey(for: did, forceRefresh: false) == newKey)
-        #expect(await upstream.lookups.count == 3)
+        #expect(await upstream.lookups.count == 4)
 
         // Wrapped around a rotating upstream, the verifier still follows the rotation.
         await resolver.removeAll()
@@ -1115,6 +1123,8 @@ struct ServiceAuthSupportTests {
     /// overlap with an in-flight fetch.
     actor GatedKeyResolver: ServiceAuthKeyResolver {
         private(set) var calls = 0
+        /// The `forceRefresh` argument of every call, in order.
+        private(set) var refreshFlags: [Bool] = []
         private var waiters: [CheckedContinuation<Void, Never>] = []
         private var isOpen = false
         private let key: ATProtoPublicKey
@@ -1131,6 +1141,7 @@ struct ServiceAuthSupportTests {
 
         func signingKey(for did: String, keyID: String, forceRefresh: Bool) async throws -> ATProtoPublicKey {
             calls += 1
+            refreshFlags.append(forceRefresh)
             if !isOpen {
                 await withCheckedContinuation { waiters.append($0) }
             }
@@ -1186,6 +1197,78 @@ struct ServiceAuthSupportTests {
         #expect(results.count == 20)
         #expect(try results.allSatisfy { try $0.get() == key })
         #expect(await upstream.calls == 1)
+    }
+
+    @Test("A forced refresh does not settle for an in-flight ordinary fetch")
+    func forcedRefreshDoesNotJoinOrdinaryFetch() async throws {
+        let key = K256Keypair.generate().publicKey
+        let upstream = GatedKeyResolver(key: key)
+        let resolver = CachingServiceAuthKeyResolver(upstream: upstream, minimumRefreshInterval: 30)
+
+        let ordinary = Task { try await resolver.signingKey(for: ServiceAuthFixture.issuer, forceRefresh: false) }
+        while await upstream.calls == 0 { await Task.yield() }
+        let forced = Task { try await resolver.signingKey(for: ServiceAuthFixture.issuer, forceRefresh: true) }
+        while await upstream.calls < 2 { await Task.yield() }
+        // Another forced caller joins the refresh rather than starting a third fetch.
+        let forcedAgain = Task { try await resolver.signingKey(for: ServiceAuthFixture.issuer, forceRefresh: true) }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        await upstream.release()
+
+        #expect(try await ordinary.value == key)
+        #expect(try await forced.value == key)
+        #expect(try await forcedAgain.value == key)
+        #expect(await upstream.refreshFlags == [false, true])
+    }
+
+    /// Ordinary lookups block until released and return the old key; forced
+    /// refreshes return the rotated key at once.
+    actor RotatingGatedResolver: ServiceAuthKeyResolver {
+        let oldKey: ATProtoPublicKey
+        let newKey: ATProtoPublicKey
+        private(set) var ordinaryCalls = 0
+        private var waiters: [CheckedContinuation<Void, Never>] = []
+
+        init(oldKey: ATProtoPublicKey, newKey: ATProtoPublicKey) {
+            self.oldKey = oldKey
+            self.newKey = newKey
+        }
+
+        func signingKey(for did: String, forceRefresh: Bool) async throws -> ATProtoPublicKey {
+            try await signingKey(for: did, keyID: "#atproto", forceRefresh: forceRefresh)
+        }
+
+        func signingKey(for did: String, keyID: String, forceRefresh: Bool) async throws -> ATProtoPublicKey {
+            if forceRefresh { return newKey }
+            ordinaryCalls += 1
+            await withCheckedContinuation { waiters.append($0) }
+            return oldKey
+        }
+
+        func releaseOrdinary() {
+            for waiter in waiters { waiter.resume() }
+            waiters.removeAll()
+        }
+    }
+
+    @Test("Every caller sharing a slow ordinary fetch gets the key a faster forced refresh learned")
+    func sharedOrdinaryFetchSeesNewerRefresh() async throws {
+        let oldKey = K256Keypair.generate().publicKey
+        let newKey = K256Keypair.generate().publicKey
+        let upstream = RotatingGatedResolver(oldKey: oldKey, newKey: newKey)
+        let resolver = CachingServiceAuthKeyResolver(upstream: upstream, minimumRefreshInterval: 30)
+        let did = ServiceAuthFixture.issuer
+
+        let owner = Task { try await resolver.signingKey(for: did, forceRefresh: false) }
+        while await upstream.ordinaryCalls == 0 { await Task.yield() }
+        let joiner = Task { try await resolver.signingKey(for: did, forceRefresh: false) }
+        try? await Task.sleep(nanoseconds: 50_000_000)
+        #expect(try await resolver.signingKey(for: did, forceRefresh: true) == newKey)
+        await upstream.releaseOrdinary()
+
+        #expect(try await owner.value == newKey)
+        #expect(try await joiner.value == newKey)
+        #expect(await upstream.ordinaryCalls == 1)
+        #expect(try await resolver.signingKey(for: did, forceRefresh: false) == newKey)
     }
 
     @Test("Callers sharing a failed fetch all see the error, and the next lookup retries")

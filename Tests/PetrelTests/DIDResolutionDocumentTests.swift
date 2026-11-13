@@ -235,6 +235,42 @@ struct DIDResolutionDocumentTests {
         #expect(try document.atprotoSigningDIDKey() == "did:key:zQ3shXjHeiBuRCKmM36cuYnm7YEMzhGnCmCyW92sRJ9pribSF")
     }
 
+    @Test("An unreadable first #atproto_pds entry still wins first-match: no later entry is used")
+    func unreadableFirstServiceStillWins() throws {
+        let document = try decode("""
+        {
+          "id": "\(did)",
+          "service": [
+            {"id": "#other", "type": "LinkedDomains", "serviceEndpoint": {"origins": ["https://x.example.com"]}},
+            {"id": "#atproto_pds", "type": "AtprotoPersonalDataServer", "serviceEndpoint": {"uri": "https://first.example.com"}},
+            {"id": "\(did)#atproto_pds", "type": "AtprotoPersonalDataServer", "serviceEndpoint": "https://later.example.com"},
+            {"id": "#atproto_labeler", "type": "AtprotoLabeler", "serviceEndpoint": "https://labeler.example.com"}
+          ]
+        }
+        """)
+        // The entry is still not readable as a `Service`.
+        #expect(document.service.map(\.serviceEndpoint) == ["https://later.example.com", "https://labeler.example.com"])
+        #expect(document.service(.pds) == nil)
+        #expect(document.pdsEndpoint == nil)
+        #expect(throws: IdentityError.invalidServiceEndpoint(did: did, id: "#atproto_pds")) {
+            try document.serviceEndpoint(.pds)
+        }
+        // Entries of other ids are unaffected by the unreadable ones before them.
+        #expect(document.labelerEndpoint?.absoluteString == "https://labeler.example.com")
+
+        // An unreadable entry of another type does not hide a typed match.
+        let mistyped = try decode("""
+        {
+          "id": "\(did)",
+          "service": [
+            {"id": "#atproto_pds", "serviceEndpoint": {"uri": "https://first.example.com"}},
+            {"id": "#atproto_pds", "type": "AtprotoPersonalDataServer", "serviceEndpoint": "https://pds.example.com"}
+          ]
+        }
+        """)
+        #expect(mistyped.pdsEndpoint?.absoluteString == "https://pds.example.com")
+    }
+
     @Test("Decoding keeps a mixed @context array's strings and accepts a document with only an id")
     func minimalAndMixedContext() throws {
         let mixed = try decode(#"{"@context":["https://www.w3.org/ns/did/v1",{"@base":"x"}],"id":"\#(did)"}"#)

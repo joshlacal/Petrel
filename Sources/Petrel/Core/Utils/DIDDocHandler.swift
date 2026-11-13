@@ -13,8 +13,10 @@ import Foundation
 /// no use for, so one unusual entry does not make an otherwise usable document unreadable:
 ///
 /// - `@context` may be a single string or an array; non-string members are skipped.
-/// - a `service` entry whose `serviceEndpoint` is a map or a set, rather than a URI string, is
-///   left out of ``service``. AT Protocol defines only URI endpoints.
+/// - a `service` entry whose `serviceEndpoint` is a map or a set, rather than a URI string, or
+///   that has no `type`, is left out of ``service``. AT Protocol defines only URI endpoints. Its
+///   position still counts for the first-match rule: when it is the first entry for an id,
+///   ``serviceEndpoint(_:)`` throws rather than using a later entry.
 /// - a `verificationMethod` entry without `id`, `type` or `controller` is left out of
 ///   ``verificationMethod``. An entry that has those but no `publicKeyMultibase` (for example
 ///   one that uses `publicKeyJwk`) is kept with an empty ``VerificationMethod/publicKeyMultibase``
@@ -34,6 +36,17 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
     public let verificationMethod: [VerificationMethod]
     /// The services with a string `serviceEndpoint`.
     public let service: [Service]
+    /// Service entries with an `id` that could not be read as a ``Service``, with their
+    /// position among all entries that have an `id`. Empty for a document built in code.
+    let unreadableServices: [UnreadableService]
+
+    /// A `service` entry that has an `id` but no string `serviceEndpoint` or no `type`.
+    struct UnreadableService: Sendable, Hashable {
+        /// Index among the document's service entries that have an `id`.
+        let position: Int
+        let id: String
+        let type: String?
+    }
 
     public init(
         context: [String] = [],
@@ -47,6 +60,7 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
         self.alsoKnownAs = alsoKnownAs
         self.verificationMethod = verificationMethod
         self.service = service
+        self.unreadableServices = []
     }
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -60,7 +74,42 @@ public struct DIDDocument: ATProtocolCodable, ATProtocolValue {
         self.verificationMethod = Self.decodeTolerantly(
             VerificationMethod.self, from: container, forKey: .verificationMethod
         )
-        self.service = Self.decodeTolerantly(Service.self, from: container, forKey: .service)
+        let slots = Self.decodeTolerantly(ServiceSlot.self, from: container, forKey: .service)
+        var readable: [Service] = []
+        var unreadable: [UnreadableService] = []
+        for (position, slot) in slots.enumerated() {
+            switch slot {
+            case let .readable(service):
+                readable.append(service)
+            case let .unreadable(id, type):
+                unreadable.append(UnreadableService(position: position, id: id, type: type))
+            }
+        }
+        self.service = readable
+        self.unreadableServices = unreadable
+    }
+
+    /// One `service` entry: a readable ``Service``, or just the `id` (and `type`) of one that
+    /// is not. Entries without a string `id` fail to decode and are dropped.
+    private enum ServiceSlot: Decodable {
+        case readable(Service)
+        case unreadable(id: String, type: String?)
+
+        private enum Keys: String, CodingKey {
+            case id, type
+        }
+
+        init(from decoder: Decoder) throws {
+            if let service = try? Service(from: decoder) {
+                self = .readable(service)
+                return
+            }
+            let container = try decoder.container(keyedBy: Keys.self)
+            self = try .unreadable(
+                id: container.decode(String.self, forKey: .id),
+                type: try? container.decode(String.self, forKey: .type)
+            )
+        }
     }
 
     /// One array element that decodes to `nil` instead of failing the whole array.

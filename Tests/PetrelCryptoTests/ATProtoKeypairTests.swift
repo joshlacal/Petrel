@@ -220,6 +220,39 @@ struct ATProtoKeypairTests {
         }
     }
 
+    @Test("Strict JWT verification refuses high-S with the same error on both curves", arguments: ATProtoKeyCurve.allCases)
+    func strictHighSErrorIsUniform(_ curve: ATProtoKeyCurve) async throws {
+        let keypair: any ATProtoExportableKeypair = ATProtoCrypto.generateKeypair(curve: curve)
+        let signature = try await keypair.sign(Self.message)
+        let highS = try highSTwin(of: signature, curve: curve)
+        let key = try ATProtoJWTVerificationKey(keypair.publicKey)
+
+        #expect(try key.verify(signature: signature, signingInput: Self.message, algorithm: keypair.jwtAlgorithm))
+        #expect(throws: PetrelCryptoError.unauthorized("JWT signature is not a canonical low-S compact signature")) {
+            try key.verify(signature: highS, signingInput: Self.message, algorithm: keypair.jwtAlgorithm)
+        }
+        // The lax JWT policy still accepts it, as RFC 7518 requires.
+        #expect(try key.verify(signature: highS, signingInput: Self.message, algorithm: keypair.jwtAlgorithm, options: .jwt))
+    }
+
+    @Test("Reflection (dump, Mirror) never reaches the private scalar")
+    func reflectionDoesNotLeak() throws {
+        let keypairs: [Any] = [P256Keypair.generate(), K256Keypair.generate()]
+        for keypair in keypairs {
+            var dumped = ""
+            dump(keypair, to: &dumped)
+            #expect(!dumped.contains("rawRepresentation"), "\(dumped)")
+            #expect(dumped.contains("did:key:z"), "\(dumped)")
+            // `dump` prints every byte of a `Data` child on its own line.
+            let byteLines = dumped.split(separator: "\n").filter { $0.contains("- ") && UInt8($0.split(separator: " ").last ?? "") != nil }
+            #expect(byteLines.count < 32, "\(dumped)")
+
+            let mirror = Mirror(reflecting: keypair)
+            #expect(!mirror.children.contains { $0.value is Data })
+            #expect(!mirror.children.contains { $0.label == "rawRepresentation" })
+        }
+    }
+
     // MARK: - verifySignature(didKey:data:signature:)
 
     @Test("verifySignature throws for an unusable key and returns false for a bad signature")

@@ -98,9 +98,11 @@ public struct PLCClientConfiguration: Sendable, Equatable {
     ///   - maximumExportBytes: Bound for one export page. A page holds up to
     ///     1,000 operations of up to 7,500 DAG-CBOR bytes each.
     ///   - operationLimits: Write rules applied before submitting.
-    ///     ``PLCOperationLimits/specification`` by default; choose
-    ///     ``PLCOperationLimits/referenceDirectory`` to refuse locally what
-    ///     the reference server would refuse.
+    ///     ``PLCOperationLimits/referenceDirectory`` by default, so an
+    ///     operation `plc.directory` would refuse (over 4,000 bytes, more than
+    ///     10 aliases or services) is refused locally instead of being sent;
+    ///     choose ``PLCOperationLimits/specification`` for a directory that
+    ///     accepts everything the specification allows.
     ///   - allowsNonDefaultPort: Permits an HTTPS origin on a port other
     ///     than 443, for a mirror that listens elsewhere.
     public static func production(
@@ -110,7 +112,7 @@ public struct PLCClientConfiguration: Sendable, Equatable {
         maximumAuditBytes: Int = 4 * 1_024 * 1_024,
         maximumSubmitResponseBytes: Int = 64 * 1_024,
         maximumExportBytes: Int = 16 * 1_024 * 1_024,
-        operationLimits: PLCOperationLimits = .specification,
+        operationLimits: PLCOperationLimits = .referenceDirectory,
         allowsNonDefaultPort: Bool = false
     ) throws -> Self {
         try .init(

@@ -66,7 +66,8 @@ public enum ATProtoJWTVerificationKey: @unchecked Sendable, Equatable {
 
     /// Verifies one compact signature with the algorithm bound to this
     /// pinned public-key representation. Strict: a high-S or non-compact
-    /// signature is an error. Use ``verify(signature:signingInput:algorithm:options:)``
+    /// signature throws ``PetrelCryptoError/unauthorized(_:)``, with the same
+    /// message on both curves. Use ``verify(signature:signingInput:algorithm:options:)``
     /// with ``ATProtoSignatureVerificationOptions/jwt`` for JWTs.
     public func verify(
         signature: Data,
@@ -137,12 +138,16 @@ public enum ATProtoJWTVerificationKey: @unchecked Sendable, Equatable {
             guard algorithm == "ES256" else {
                 throw PetrelCryptoError.unauthorized("JWT algorithm does not match verification key")
             }
-            let canonical = try P256WireSignature.decodeCanonical(signature)
+            guard let canonical = try? P256WireSignature.decodeCanonical(signature) else {
+                throw Self.nonCanonicalSignature
+            }
             return publicKey.isValidSignature(canonical, for: signingInput)
         case let .secp256k1PublicKey(encoded):
-            guard algorithm == "ES256K",
-                  Self.isCanonicalSecp256k1Signature(signature) else {
+            guard algorithm == "ES256K" else {
                 throw PetrelCryptoError.unauthorized("JWT algorithm or signature is invalid")
+            }
+            guard Self.isCanonicalSecp256k1Signature(signature) else {
+                throw Self.nonCanonicalSignature
             }
             guard let compressed = try? K256Backend.compressedPublicKey(fromSEC1: encoded) else {
                 throw PetrelCryptoError.unauthorized("secp256k1 public key is invalid")
@@ -154,6 +159,12 @@ public enum ATProtoJWTVerificationKey: @unchecked Sendable, Equatable {
             )
         }
     }
+
+    /// What strict verification throws, on either curve, for a signature that is not 64 bytes
+    /// with `0 < r < n` and low `s`.
+    static let nonCanonicalSignature = PetrelCryptoError.unauthorized(
+        "JWT signature is not a canonical low-S compact signature"
+    )
 
     public static func validatesSecp256k1PublicKey(_ encoded: Data) -> Bool {
         (try? K256Backend.compressedPublicKey(fromSEC1: encoded)) != nil
