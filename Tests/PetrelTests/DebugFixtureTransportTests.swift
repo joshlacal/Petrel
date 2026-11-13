@@ -1,6 +1,6 @@
 #if DEBUG && canImport(Network) && canImport(Security)
     import Foundation
-    @testable import Petrel
+    @_spi(Fixtures) @testable import Petrel
     import Testing
 
     struct DebugFixtureTransportTests {
@@ -27,8 +27,53 @@
             ]
         }
 
-        private func decode(_ object: [String: Any]) throws -> DebugFixtureTransport {
-            try DebugFixtureTransport(manifest: JSONSerialization.data(withJSONObject: object), certificateDER: certificate)
+        /// The host policy equal to the values Petrel hard-coded before fixture hosts became
+        /// caller-supplied, so every existing manifest test runs unchanged under it.
+        private static let legacyEquivalentPolicy = try! DebugFixtureTransport.HostPolicy(
+            fixtureDomain: "request-fixture.catbird.blue",
+            additionalHosts: ["chat.catbird.blue", "public.api.bsky.app"]
+        )
+
+        private func decode(
+            _ object: [String: Any],
+            policy: DebugFixtureTransport.HostPolicy = Self.legacyEquivalentPolicy
+        ) throws -> DebugFixtureTransport {
+            try DebugFixtureTransport(
+                manifest: JSONSerialization.data(withJSONObject: object), certificateDER: certificate, hostPolicy: policy
+            )
+        }
+
+        @Test func hostPolicyIsCallerSupplied() throws {
+            let policy = try DebugFixtureTransport.HostPolicy(
+                fixtureDomain: "request-fixture.example.com", additionalHosts: ["chat.example.com"]
+            )
+            let text = try String(decoding: JSONSerialization.data(withJSONObject: manifest()), as: UTF8.self)
+                .replacingOccurrences(of: "catbird.blue", with: "example.com")
+            var neutral = try #require(JSONSerialization.jsonObject(with: Data(text.utf8)) as? [String: Any])
+            var hosts = try #require(neutral["hosts"] as? [String: String])
+            hosts["public.api.bsky.app"] = nil
+            neutral["hosts"] = hosts
+            let transport = try decode(neutral, policy: policy)
+            #expect(try transport.permits(#require(URL(string: "https://chat.example.com/x"))))
+            #expect(try !transport.permits(#require(URL(string: "https://public.api.bsky.app/x"))))
+            // The same manifest is not acceptable under a policy that does not name its hosts.
+            #expect(throws: (any Error).self) { try decode(neutral) }
+            // A manifest naming a host the policy does not list is rejected.
+            hosts["public.api.bsky.app"] = "127.0.0.1:34567"
+            neutral["hosts"] = hosts
+            #expect(throws: (any Error).self) { try decode(neutral, policy: policy) }
+        }
+
+        @Test func hostPolicyRejectsMalformedNames() {
+            for domain in ["", ".example.com", "Example.com", "example..com", "-x.example.com", "example.com."] {
+                #expect(throws: (any Error).self) { try DebugFixtureTransport.HostPolicy(fixtureDomain: domain, additionalHosts: []) }
+            }
+            #expect(throws: (any Error).self) {
+                try DebugFixtureTransport.HostPolicy(fixtureDomain: "fx.example.com", additionalHosts: ["CHAT.example.com"])
+            }
+            #expect(throws: (any Error).self) {
+                try DebugFixtureTransport.HostPolicy(fixtureDomain: "fx.example.com", additionalHosts: ["a.fx.example.com"])
+            }
         }
 
         @Test func exactManifestAndURLScope() throws {
@@ -58,10 +103,10 @@
             let original = try JSONSerialization.data(withJSONObject: manifest(), options: [.sortedKeys])
             let text = String(decoding: original, as: UTF8.self)
             let duplicate = "{\"fixtureOnly\":true," + text.dropFirst()
-            #expect(throws: (any Error).self) { try DebugFixtureTransport(manifest: Data(duplicate.utf8), certificateDER: certificate) }
+            #expect(throws: (any Error).self) { try DebugFixtureTransport(manifest: Data(duplicate.utf8), certificateDER: certificate, hostPolicy: Self.legacyEquivalentPolicy) }
             let nested = text.replacingOccurrences(of: "\"label\":\"alice\"", with: "\"label\":\"alice\",\"label\":\"alice\"")
             #expect(nested != text)
-            #expect(throws: (any Error).self) { try DebugFixtureTransport(manifest: Data(nested.utf8), certificateDER: certificate) }
+            #expect(throws: (any Error).self) { try DebugFixtureTransport(manifest: Data(nested.utf8), certificateDER: certificate, hostPolicy: Self.legacyEquivalentPolicy) }
         }
 
         @Test func canonicalConnectOnly() throws {

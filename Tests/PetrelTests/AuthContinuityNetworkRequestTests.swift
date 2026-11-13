@@ -103,7 +103,7 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
         let prepareGate = AsyncGate(initiallyOpen: false)
         let fixture = await makeFixture(prepareGate: prepareGate)
         let replacement = ExactAuthProvider(
-            snapshot: AuthContinuitySnapshot(did: "did:plc:replacement", mode: .gateway, generation: 1),
+            snapshot: AuthContinuitySnapshot(did: "did:plc:replacement", mode: .testGateway, generation: 1),
             token: "replacement-token",
             addAuthorization: true,
             preparedHeaders: [:],
@@ -639,7 +639,7 @@ final class AuthContinuityNetworkRequestTests: XCTestCase {
     ) async -> Fixture {
         let url = URL(string: "https://\(host)")!
         let provider = ExactAuthProvider(
-            snapshot: AuthContinuitySnapshot(did: "did:plc:exact", mode: .gateway, generation: 7),
+            snapshot: AuthContinuitySnapshot(did: "did:plc:exact", mode: .testGateway, generation: 7),
             token: "old-token",
             addAuthorization: addAuthorization,
             preparedHeaders: preparedHeaders,

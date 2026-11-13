@@ -50,11 +50,12 @@ public protocol AuthStrategy: AuthenticationProvider, Sendable {
     /// Attempts to recover from catastrophic auth failures.
     func attemptRecoveryFromServerFailures(for did: String?) async throws
 
-    /// Starts a progressive gateway scope upgrade flow.
+    /// Starts a progressive gateway scope upgrade flow. A `nil` callback URL means the
+    /// configured permission callback.
     func startGatewayScopeUpgrade(
         requesting: Set<String>,
         for expectedDID: String,
-        callbackURL: URL
+        callbackURL: URL?
     ) async throws -> URL
 
     /// Completes a progressive gateway scope upgrade flow.
@@ -81,7 +82,7 @@ extension AuthStrategy {
     public func startGatewayScopeUpgrade(
         requesting: Set<String>,
         for expectedDID: String,
-        callbackURL: URL
+        callbackURL: URL?
     ) async throws -> URL {
         throw AuthError.invalidOAuthConfiguration
     }

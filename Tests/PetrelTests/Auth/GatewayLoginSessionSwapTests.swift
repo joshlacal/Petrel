@@ -129,7 +129,8 @@ struct GatewayLoginSessionSwapTests {
     private func makeStrategy(
         storage: KeychainStorage,
         accountManager: AccountManaging,
-        session: URLSession? = nil
+        session: URLSession? = nil,
+        configuration: GatewayConfiguration? = nil
     ) -> ConfidentialGatewayStrategy {
         let sessionToUse: URLSession
         if let session {
@@ -140,11 +141,59 @@ struct GatewayLoginSessionSwapTests {
             sessionToUse = URLSession(configuration: config)
         }
         return ConfidentialGatewayStrategy(
-            gatewayURL: gatewayURL,
+            configuration: configuration ?? .legacyEquivalent(gatewayURL: gatewayURL),
             storage: storage,
             accountManager: accountManager,
             urlSession: sessionToUse
         )
+    }
+
+    @Test("A caller-supplied configuration drives redirect_to, callback matching and the exchange Origin")
+    func configuredCallbacksDriveTheLoginFlow() async throws {
+        let backend = InMemorySecureStorage()
+        let handler: @Sendable (URLRequest) -> (HTTPURLResponse, Data) = { req in
+            let url = req.url!
+            if url.path.hasSuffix("/auth/exchange") {
+                guard req.value(forHTTPHeaderField: "Origin") == "https://app.example.com:8443" else {
+                    return (makeHTTPResponse(url: url, statusCode: 403), Data("{}".utf8))
+                }
+                let json = "{\"session_id\":\"\(sampleSessionID)\"}"
+                return (makeHTTPResponse(url: url, statusCode: 200), Data(json.utf8))
+            } else if url.path.hasSuffix("/auth/session") {
+                let json = "{\"did\":\"\(aliceDID)\",\"handle\":\"alice.test\",\"active\":true,\"granted_scopes\":[\"atproto\"]}"
+                return (makeHTTPResponse(url: url, statusCode: 200), Data(json.utf8))
+            }
+            return (makeHTTPResponse(url: url, statusCode: 404), Data("{}".utf8))
+        }
+        let configured = try GatewayConfiguration(
+            gatewayURL: gatewayURL,
+            callbackURL: URL(string: "https://app.example.com:8443/auth/done")!,
+            permissionCallbackURL: URL(string: "https://app.example.com:8443/auth/permission")!
+        )
+
+        try await withGatewayLoginTransport(backend, handler: handler) {
+            let storage = KeychainStorage(namespace: "test.gateway.configured_callbacks")
+            let accountManager = await AccountManager(storage: storage)
+            let strategy = makeStrategy(storage: storage, accountManager: accountManager, configuration: configured)
+
+            let (loginURL, _) = try await strategy.startOAuthFlowWithState(identifier: "alice.test")
+            let components = URLComponents(url: loginURL, resolvingAgainstBaseURL: false)!
+            let redirect = components.queryItems?.first { $0.name == "redirect_to" }?.value
+            #expect(redirect == "https://app.example.com:8443/auth/done")
+
+            // The former built-in callback is no longer special.
+            await #expect(throws: (any Error).self) {
+                _ = try await strategy.handleOAuthCallback(url: URL(string: "\(callbackBase)?code=\(validCode)")!)
+            }
+
+            let (_, _) = try await strategy.startOAuthFlowWithState(identifier: "alice.test")
+            let result = try await strategy.handleOAuthCallback(
+                url: URL(string: "https://APP.example.com:8443/auth/done?code=\(validCode)")!
+            )
+            #expect(result.did == aliceDID)
+            let exchange = GatewayLoginTestURLProtocol.recordedRequests().last { $0.url?.path.hasSuffix("/auth/exchange") == true }
+            #expect(exchange?.value(forHTTPHeaderField: "Origin") == "https://app.example.com:8443")
+        }
     }
 
     @Test("Step 1 & 2: Legacy fragment session_id is strictly rejected")

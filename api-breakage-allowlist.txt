@@ -699,3 +699,5 @@ API breakage: accessor ComAtprotoSyncListBlobs.Output.cids.Get() has return type
 API breakage: constructor ComAtprotoSyncListBlobs.Output.init(cursor:cids:) has parameter 1 type change from [Petrel.CID] to [Petrel.CIDString]
 API breakage: var ComAtprotoSyncListRepos.Repo.head has declared type change from Petrel.CID to Petrel.CIDString
 API breakage: accessor ComAtprotoSyncListRepos.Repo.head.Get() has return type change from Petrel.CID to Petrel.CIDString
+API breakage: enumelement AuthMode.gateway has declared type change from (Petrel.AuthMode.Type) -> Petrel.AuthMode to (Petrel.AuthMode.Type) -> (Petrel.GatewayConfiguration) -> Petrel.AuthMode
+API breakage: constructor ATProtoClient.init(baseURL:oauthConfig:namespace:authMode:gatewayURL:userAgent:didResolver:bskyAppViewDID:bskyChatDID:accessGroup:) has been removed

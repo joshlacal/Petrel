@@ -22,21 +22,18 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         case legacy
         /// Public OAuth for mobile/native apps (PAR + PKCE + DPoP).
         case publicOAuth
-        /// Confidential gateway authentication via Nest.
-        case gateway
+        /// Confidential gateway authentication through the app's own gateway.
+        case gateway(GatewayConfiguration)
         /// Client Assertion Backend — DPoP-bound client assertions for confidential browser-based apps.
         case cab(backendURL: URL)
     }
 
     /// Error types specific to AuthManager.
     enum ManagerError: Error, LocalizedError {
-        case gatewayURLRequired
         case strategyCreationFailed
 
         var errorDescription: String? {
             switch self {
-            case .gatewayURLRequired:
-                return "Gateway mode requires a gatewayBaseURL"
             case .strategyCreationFailed:
                 return "Failed to create authentication strategy"
             }
@@ -51,7 +48,6 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     private let networkService: NetworkService
     private let oauthConfig: OAuthConfig
     private let didResolver: DIDResolving
-    private let gatewayBaseURL: URL?
     private var authContinuity: AuthContinuityState
     private var authContinuityObserver: (@Sendable () async -> Void)?
     private var pendingAuthContinuityMutations = 0
@@ -70,23 +66,20 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     ///   - networkService: Network service for API calls.
     ///   - oauthConfig: OAuth configuration for public OAuth flow.
     ///   - didResolver: Resolver for DID and handle lookups.
-    ///   - gatewayBaseURL: Base URL for gateway mode (required if mode is .gateway).
-    /// - Throws: `ManagerError.gatewayURLRequired` if gateway mode is requested without a URL.
+    /// - Throws: An error if the strategy for `mode` cannot be created.
     init(
         mode: Mode,
         storage: KeychainStorage,
         accountManager: AccountManaging,
         networkService: NetworkService,
         oauthConfig: OAuthConfig,
-        didResolver: DIDResolving,
-        gatewayBaseURL: URL? = nil
+        didResolver: DIDResolving
     ) throws {
         self.storage = storage
         self.accountManager = accountManager
         self.networkService = networkService
         self.oauthConfig = oauthConfig
         self.didResolver = didResolver
-        self.gatewayBaseURL = gatewayBaseURL
         currentMode = mode
         authContinuity = AuthContinuityState(mode: mode.authMode)
 
@@ -96,8 +89,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             accountManager: accountManager,
             networkService: networkService,
             oauthConfig: oauthConfig,
-            didResolver: didResolver,
-            gatewayBaseURL: gatewayBaseURL
+            didResolver: didResolver
         )
 
         // Removing an account must end its session at the authorization server,
@@ -111,7 +103,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
 
     /// Switches to a different authentication mode.
     /// - Parameter mode: The new authentication mode.
-    /// - Throws: `ManagerError.gatewayURLRequired` if gateway mode is requested without a URL.
+    /// - Throws: An error if the strategy for `mode` cannot be created.
     func switchMode(_ mode: Mode) async throws {
         guard mode != currentMode else { return }
 
@@ -129,8 +121,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             accountManager: accountManager,
             networkService: networkService,
             oauthConfig: oauthConfig,
-            didResolver: didResolver,
-            gatewayBaseURL: gatewayBaseURL
+            didResolver: didResolver
         )
 
         // No suspension is permitted between publishing the continuity mode and
@@ -149,8 +140,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         accountManager: AccountManaging,
         networkService: NetworkService,
         oauthConfig: OAuthConfig,
-        didResolver: DIDResolving,
-        gatewayBaseURL: URL?
+        didResolver: DIDResolving
     ) throws -> AuthStrategy {
         switch mode {
         case .legacy:
@@ -170,12 +160,9 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
                 didResolver: didResolver
             )
 
-        case .gateway:
-            guard let gatewayURL = gatewayBaseURL else {
-                throw ManagerError.gatewayURLRequired
-            }
+        case let .gateway(configuration):
             return ConfidentialGatewayStrategy(
-                gatewayURL: gatewayURL,
+                configuration: configuration,
                 storage: storage,
                 accountManager: accountManager
             )
@@ -318,7 +305,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     }
 
     func handleOAuthCallback(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
-        let tracksGatewayContinuity = currentMode == .gateway
+        let tracksGatewayContinuity = currentMode.isGateway
         if tracksGatewayContinuity {
             // The callback may install or replace an opaque gateway session.
             // Invalidate before the strategy performs its first await.
@@ -334,7 +321,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
 
     #if DEBUG && canImport(Network) && canImport(Security)
     func adoptFixtureGatewaySession(_ session: String) async throws -> (did: String, handle: String?, pdsURL: URL) {
-        guard currentMode == .gateway, let gateway = activeStrategy as? ConfidentialGatewayStrategy else {
+        guard currentMode.isGateway, let gateway = activeStrategy as? ConfidentialGatewayStrategy else {
             throw AuthError.invalidOAuthConfiguration
         }
         await beginAuthContinuityMutation()
@@ -386,7 +373,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     func startGatewayScopeUpgrade(
         requesting: Set<String>,
         for expectedDID: String,
-        callbackURL: URL = ConfidentialGatewayStrategy.permissionCallbackURL
+        callbackURL: URL? = nil
     ) async throws -> URL {
         try await activeStrategy.startGatewayScopeUpgrade(
             requesting: requesting,
@@ -460,7 +447,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
     }
 
     func isCurrentGatewaySessionFailure(_ context: GatewaySessionFailureContext) async -> Bool {
-        guard currentMode == .gateway else { return false }
+        guard currentMode.isGateway else { return false }
         return await storage.isCurrentGatewaySessionFailure(context)
     }
 
@@ -468,7 +455,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
         _ context: GatewaySessionFailureContext,
         perform: @MainActor @Sendable () -> Void
     ) async -> Bool {
-        guard currentMode == .gateway else { return false }
+        guard currentMode.isGateway else { return false }
         return await storage.withCurrentGatewaySessionFailure(context, perform: perform)
     }
 
@@ -536,7 +523,7 @@ actor AuthManager: AuthStrategy, AuthContinuityProviding {
             let mode = authContinuity.mode
             let exhausted = authContinuity.isExhausted
 
-            guard mode == .gateway, !exhausted else {
+            guard mode.isGateway, !exhausted else {
                 return .stable(authContinuity.snapshot)
             }
 
@@ -605,10 +592,18 @@ private extension AuthManager.Mode {
             .legacy
         case .publicOAuth:
             .publicOAuth
-        case .gateway:
-            .gateway
+        case let .gateway(configuration):
+            .gateway(configuration)
         case let .cab(backendURL):
             .cab(backendURL: backendURL)
         }
+    }
+}
+
+extension AuthManager.Mode {
+    /// Whether this is gateway mode, whatever its configuration.
+    var isGateway: Bool {
+        if case .gateway = self { return true }
+        return false
     }
 }

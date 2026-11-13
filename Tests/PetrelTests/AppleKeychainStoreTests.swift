@@ -3,7 +3,7 @@
 import Foundation
 import Security
 import Testing
-@testable import Petrel
+@_spi(Fixtures) @testable import Petrel
 
 @Suite("Apple Keychain Store", .serialized)
 struct AppleKeychainStoreTests {

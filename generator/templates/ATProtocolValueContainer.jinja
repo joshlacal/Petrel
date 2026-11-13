@@ -65,7 +65,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
 
     private static let decoderFactory = TypeDecoderFactory()
 
-    /// Registers a decoder for a lexicon type id (e.g. "blue.catbird.mlsChat.defs#convoView").
+    /// Registers a decoder for a lexicon type id (e.g. "com.example.chat.defs#convoView").
     /// Overlay packages call this once at startup for each of their generated types so
     /// values embedded in core responses decode as .knownType instead of .unknownType.
     public static func registerDecoder(forType type: String, _ decoderFunction: @escaping DecoderFunction) {

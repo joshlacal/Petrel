@@ -2,7 +2,7 @@
 //  KeychainSecItem.swift
 //  Petrel
 //
-//  The keychain item functions every Catbird keychain access goes through.
+//  The keychain item functions every Petrel keychain access goes through.
 //
 
 #if os(iOS) || os(macOS) || os(tvOS)
@@ -16,8 +16,9 @@
     /// Drop-in replacements for `SecItemAdd`/`SecItemCopyMatching`/`SecItemUpdate`/`SecItemDelete`.
     ///
     /// Release builds and every non-fixture launch call Security directly. A DEBUG macOS launch
-    /// with a runtime-fixture config keeps its items in that fixture's profile instead
-    /// (`FixtureLaunch.keychain`), so it never reads or writes the user's login keychain.
+    /// whose app explicitly activated a fixture keychain (`FixtureLaunch.activateKeychain`)
+    /// keeps its items in that fixture's profile instead, so it never reads or writes the
+    /// user's login keychain.
     public enum KeychainSecItem {
         public static func add(_ query: CFDictionary, _ result: UnsafeMutablePointer<CFTypeRef?>?) -> OSStatus {
             #if DEBUG && os(macOS)

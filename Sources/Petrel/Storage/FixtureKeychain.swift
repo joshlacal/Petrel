@@ -2,7 +2,8 @@
 //  FixtureKeychain.swift
 //  Petrel
 //
-//  DEBUG runtime-fixture launch configuration; on macOS, the fixture launch's keychain file.
+//  DEBUG runtime-fixture support: private-file reading and, on macOS, an explicitly
+//  activated fixture keychain file.
 //
 
 #if DEBUG && canImport(Darwin)
@@ -12,44 +13,21 @@
     import Security
     import Synchronization
 
-    /// The runtime-fixture launch configuration of this process, if any.
+    /// Runtime-fixture support for an app's own end-to-end test launches (DEBUG builds only).
     ///
-    /// A fixture launch names a private JSON config (environment or argument) whose `profile` is a
-    /// directory owned by that run. On macOS the run's keychain items live in
-    /// `fixture-keychain.json` there (mode 0600), never in the user's login keychain: separate
-    /// runs cannot see each other's accounts, sessions or keys, and no login-keychain ACL prompt
-    /// can block startup.
-    public enum FixtureLaunch {
+    /// Petrel reads no environment variables or launch arguments. An app that wants a fixture
+    /// launch finds its private JSON config itself and calls
+    /// ``activateKeychain(configPath:)`` before creating any client. The config's `profile` is a
+    /// directory owned by that run; on macOS the run's keychain items then live in
+    /// `fixture-keychain.json` there (mode 0600), never in the user's login keychain, so separate
+    /// runs cannot see each other's accounts, sessions or keys. Published only as the `Fixtures`
+    /// SPI (`@_spi(Fixtures) import Petrel`).
+    @_spi(Fixtures) public enum FixtureLaunch {
         public enum FileError: Error, Equatable {
             case unreadable(String)
             case tooLarge(String)
             case insecurePermissions(String)
             case invalidConfiguration(String)
-        }
-
-        /// Resolves the fixture config path from the environment, then the launch arguments
-        /// (`--catbird-runtime-fixture-config <path>`, `--catbird-runtime-fixture-config=<path>`,
-        /// `-CatbirdRuntimeFixtureConfig <path>`).
-        public static func resolveConfigPath(
-            arguments: [String] = ProcessInfo.processInfo.arguments,
-            environment: [String: String] = ProcessInfo.processInfo.environment
-        ) -> String? {
-            if let env = environment["CATBIRD_RUNTIME_FIXTURE_CONFIG"], !env.isEmpty {
-                return env
-            }
-            if let env = environment["CATMOS_RUNTIME_FIXTURE_CONFIG"], !env.isEmpty {
-                return env
-            }
-            for (index, arg) in arguments.enumerated() {
-                if arg == "--catbird-runtime-fixture-config" || arg == "-CatbirdRuntimeFixtureConfig" {
-                    if index + 1 < arguments.count {
-                        return arguments[index + 1]
-                    }
-                } else if arg.hasPrefix("--catbird-runtime-fixture-config=") {
-                    return String(arg.dropFirst("--catbird-runtime-fixture-config=".count))
-                }
-            }
-            return nil
         }
 
         /// Reads a small owner-only regular file (no symlinks, no group/other permission bits).
@@ -99,12 +77,34 @@
     extension FixtureLaunch {
         public static let keychainFileName = "fixture-keychain.json"
 
-        /// The keychain of this process: `nil` unless it was launched with a fixture config.
-        public static var keychain: FixtureKeychain? {
-            testKeychain.withLock { $0 } ?? launchKeychain
+        /// Why ``activateKeychain(configPath:)`` refused.
+        public enum ActivationError: Error, Equatable {
+            /// A fixture keychain is already active for this process.
+            case alreadyActive
         }
 
-        private static let launchKeychain: FixtureKeychain? = resolveConfigPath().map(FixtureKeychain.init(configPath:))
+        /// The fixture keychain of this process: `nil` unless the app activated one.
+        public static var keychain: FixtureKeychain? {
+            testKeychain.withLock { $0 } ?? activeKeychain.withLock { $0 }
+        }
+
+        /// Keeps every keychain item this process stores in the fixture profile named by the
+        /// private config at `configPath`, instead of the login keychain. Call once, before
+        /// creating any client; an unusable config makes every keychain operation fail with
+        /// `errSecNotAvailable` rather than fall back to the login keychain.
+        /// - Returns: The activated keychain.
+        /// - Throws: ``ActivationError/alreadyActive`` on a second call.
+        @discardableResult
+        public static func activateKeychain(configPath: String) throws -> FixtureKeychain {
+            try activeKeychain.withLock { active in
+                guard active == nil else { throw ActivationError.alreadyActive }
+                let keychain = FixtureKeychain(configPath: configPath)
+                active = keychain
+                return keychain
+            }
+        }
+
+        private static let activeKeychain = Mutex<FixtureKeychain?>(nil)
         private static let testKeychain = Mutex<FixtureKeychain?>(nil)
 
         /// Tests only: stand in for a fixture launch (nil restores this process's own launch).
@@ -115,12 +115,12 @@
 
     /// Keychain items of one fixture launch, kept in `<profile>/fixture-keychain.json` (0600).
     ///
-    /// Interprets the generic-password and key queries Catbird issues: items are matched by class,
+    /// Interprets the generic-password and key queries Petrel and its host app issue: items are matched by class,
     /// service, account and application tag; every other attribute (access group, accessibility,
     /// synchronizability, data-protection keychain) has no meaning here and is ignored. A config
     /// that cannot be used makes every operation fail with `errSecNotAvailable`; it never falls
     /// back to the login keychain.
-    public final class FixtureKeychain: Sendable {
+    @_spi(Fixtures) public final class FixtureKeychain: Sendable {
         struct Item: Codable, Equatable {
             enum Kind: String, Codable { case genericPassword, key }
             var kind: Kind

@@ -34,8 +34,7 @@ final class AuthContinuityTests: XCTestCase {
                 scope: "atproto"
             ),
             namespace: namespace,
-            authMode: .gateway,
-            gatewayURL: gatewayURL
+            authMode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL))
         )
         return (client, storage)
     }
@@ -61,12 +60,12 @@ final class AuthContinuityTests: XCTestCase {
 
         let initial = await client.authContinuitySnapshot()
         XCTAssertNil(initial.did)
-        XCTAssertEqual(initial.mode, .gateway)
+        XCTAssertTrue(initial.mode.isGateway)
 
         try await install(session: "gateway-session-one", storage: storage, client: client)
         let installed = await client.authContinuitySnapshot()
         XCTAssertEqual(installed.did, did)
-        XCTAssertEqual(installed.mode, .gateway)
+        XCTAssertTrue(installed.mode.isGateway)
         XCTAssertGreaterThan(installed.generation, initial.generation)
 
         try await storage.saveGatewaySession("gateway-session-two", for: did)
@@ -141,7 +140,7 @@ final class AuthContinuityTests: XCTestCase {
         XCTAssertEqual(final.did, did)
         XCTAssertGreaterThan(final.generation, initial.generation)
         XCTAssertTrue(observed.allSatisfy { $0.generation >= initial.generation })
-        XCTAssertTrue(observed.allSatisfy { $0.mode == .gateway })
+        XCTAssertTrue(observed.allSatisfy { $0.mode.isGateway })
     }
 
     func testRefreshStyleReplacementInvalidates() async throws {
@@ -234,7 +233,7 @@ final class AuthContinuityTests: XCTestCase {
         try await storage.saveGatewaySession("gateway-session", for: did)
         try await storage.saveCurrentDID(did)
         let manager = try AuthManager(
-            mode: .gateway,
+            mode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL)),
             storage: storage,
             accountManager: accountManager,
             networkService: NetworkService(baseURL: gatewayURL),
@@ -243,8 +242,7 @@ final class AuthContinuityTests: XCTestCase {
                 redirectUri: "blue.catbird:/oauth/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver(),
-            gatewayBaseURL: gatewayURL
+            didResolver: MockDIDResolver()
         )
         let requestURL = gatewayURL.appendingPathComponent("xrpc/example")
         var request = URLRequest(url: requestURL)
@@ -287,7 +285,7 @@ final class AuthContinuityTests: XCTestCase {
         try await storage.saveGatewaySession("gateway-session", for: did)
         try await storage.saveCurrentDID(did)
         let manager = try AuthManager(
-            mode: .gateway,
+            mode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL)),
             storage: storage,
             accountManager: accountManager,
             networkService: NetworkService(baseURL: gatewayURL),
@@ -296,8 +294,7 @@ final class AuthContinuityTests: XCTestCase {
                 redirectUri: "blue.catbird:/oauth/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver(),
-            gatewayBaseURL: gatewayURL
+            didResolver: MockDIDResolver()
         )
         let requestURL = gatewayURL.appendingPathComponent("xrpc/blue.catbird.chat.getOwnDevices")
         var request = URLRequest(url: requestURL)
@@ -348,7 +345,7 @@ final class AuthContinuityTests: XCTestCase {
         let network = NetworkService(baseURL: gatewayURL)
         let account = Account(did: did, handle: "continuity.example", pdsURL: gatewayURL)
         let manager = try AuthManager(
-            mode: .gateway,
+            mode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL)),
             storage: storage,
             accountManager: MockAccountManager(account: account),
             networkService: network,
@@ -357,8 +354,7 @@ final class AuthContinuityTests: XCTestCase {
                 redirectUri: "blue.catbird:/oauth/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver(),
-            gatewayBaseURL: gatewayURL
+            didResolver: MockDIDResolver()
         )
         await network.setAuthenticationProvider(manager)
         let expectedValue = await network.authContinuitySnapshot()
@@ -402,7 +398,7 @@ final class AuthContinuityTests: XCTestCase {
         let network = NetworkService(baseURL: gatewayURL)
         let account = Account(did: did, handle: "continuity.example", pdsURL: gatewayURL)
         let manager = try AuthManager(
-            mode: .gateway,
+            mode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL)),
             storage: storage,
             accountManager: MockAccountManager(account: account),
             networkService: network,
@@ -411,8 +407,7 @@ final class AuthContinuityTests: XCTestCase {
                 redirectUri: "blue.catbird:/oauth/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver(),
-            gatewayBaseURL: gatewayURL
+            didResolver: MockDIDResolver()
         )
         let gate = SnapshotInterleavingGate()
         let provider = HeldPreSignalContinuityProvider(provider: manager, gate: gate)
@@ -459,7 +454,7 @@ final class AuthContinuityTests: XCTestCase {
         let network = NetworkService(baseURL: gatewayURL)
         let account = Account(did: did, handle: "continuity.example", pdsURL: gatewayURL)
         let manager = try AuthManager(
-            mode: .gateway,
+            mode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL)),
             storage: storage,
             accountManager: MockAccountManager(account: account),
             networkService: network,
@@ -468,8 +463,7 @@ final class AuthContinuityTests: XCTestCase {
                 redirectUri: "blue.catbird:/oauth/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver(),
-            gatewayBaseURL: gatewayURL
+            didResolver: MockDIDResolver()
         )
         await network.setAuthenticationProvider(manager)
         _ = await network.authContinuitySnapshot()
@@ -510,7 +504,7 @@ final class AuthContinuityTests: XCTestCase {
 
         let network = NetworkService(baseURL: gatewayURL)
         let manager = try AuthManager(
-            mode: .gateway,
+            mode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL)),
             storage: storage,
             accountManager: MockAccountManager(account: account),
             networkService: network,
@@ -519,8 +513,7 @@ final class AuthContinuityTests: XCTestCase {
                 redirectUri: "blue.catbird:/oauth/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver(),
-            gatewayBaseURL: gatewayURL
+            didResolver: MockDIDResolver()
         )
         await network.setAuthenticationProvider(manager)
         let beforeValue = await network.authContinuitySnapshot()
@@ -558,7 +551,7 @@ final class AuthContinuityTests: XCTestCase {
         let managerStorage = KeychainStorage(namespace: namespace)
         let network = NetworkService(baseURL: gatewayURL)
         let manager = try AuthManager(
-            mode: .gateway,
+            mode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL)),
             storage: managerStorage,
             accountManager: MockAccountManager(account: account),
             networkService: network,
@@ -567,8 +560,7 @@ final class AuthContinuityTests: XCTestCase {
                 redirectUri: "blue.catbird:/oauth/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver(),
-            gatewayBaseURL: gatewayURL
+            didResolver: MockDIDResolver()
         )
         await network.setAuthenticationProvider(manager)
 
@@ -609,7 +601,7 @@ final class AuthContinuityTests: XCTestCase {
         let managerStorage = KeychainStorage(namespace: namespace)
         let network = NetworkService(baseURL: gatewayURL)
         let manager = try AuthManager(
-            mode: .gateway,
+            mode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL)),
             storage: managerStorage,
             accountManager: MockAccountManager(account: account),
             networkService: network,
@@ -618,8 +610,7 @@ final class AuthContinuityTests: XCTestCase {
                 redirectUri: "blue.catbird:/oauth/callback",
                 scope: "atproto"
             ),
-            didResolver: MockDIDResolver(),
-            gatewayBaseURL: gatewayURL
+            didResolver: MockDIDResolver()
         )
         let gate = SnapshotInterleavingGate()
         let provider = HeldPreSignalContinuityProvider(provider: manager, gate: gate)
@@ -658,7 +649,7 @@ final class AuthContinuityTests: XCTestCase {
 
     func testPendingSentinelCannotBecomeStableLeaseAtRevisionExhaustion() async throws {
         let network = NetworkService(baseURL: gatewayURL)
-        let stable = AuthContinuitySnapshot(did: nil, mode: .gateway, generation: 7)
+        let stable = AuthContinuitySnapshot(did: nil, mode: .testGateway, generation: 7)
         let provider = ControllablePendingContinuityProvider(stableSnapshot: stable)
         await network.setAuthenticationProvider(provider)
         _ = await network.authContinuitySnapshot()
@@ -669,7 +660,7 @@ final class AuthContinuityTests: XCTestCase {
         let pending = try XCTUnwrap(pendingValue)
         XCTAssertEqual(pending.generation, UInt64.max)
         XCTAssertNil(pending.did)
-        XCTAssertEqual(pending.mode, .gateway)
+        XCTAssertTrue(pending.mode.isGateway)
 
         // Complete to the exact same public DID/mode tuple. Only reserving .max
         // and marking the public clock exhausted can keep this from matching.
@@ -692,7 +683,7 @@ final class AuthContinuityTests: XCTestCase {
 
     func testGenerationExhaustionFailsClosed() {
         var state = AuthContinuityState(
-            mode: .gateway,
+            mode: .testGateway,
             generation: .max,
             observedGatewayIdentity: .init(did: did, session: "secret")
         )
@@ -702,17 +693,17 @@ final class AuthContinuityTests: XCTestCase {
         state.invalidate()
         let second = state.snapshot
 
-        XCTAssertEqual(first, AuthContinuitySnapshot(did: nil, mode: .gateway, generation: .max))
+        XCTAssertEqual(first, AuthContinuitySnapshot(did: nil, mode: .testGateway, generation: .max))
         XCTAssertEqual(second, first)
         XCTAssertTrue(state.isExhausted)
     }
 
     func testNetworkSnapshotRetriesWhenReplacementCompletesDuringProviderAwait() async {
         let gate = SnapshotInterleavingGate()
-        let old = AuthContinuitySnapshot(did: did, mode: .gateway, generation: 7)
+        let old = AuthContinuitySnapshot(did: did, mode: .testGateway, generation: 7)
         let new = AuthContinuitySnapshot(
             did: "did:plc:authcontinuity-replacement",
-            mode: .gateway,
+            mode: .testGateway,
             generation: 8
         )
         let provider = InterleavingContinuityProvider(snapshot: old, gate: gate)
@@ -744,10 +735,10 @@ final class AuthContinuityTests: XCTestCase {
 
     func testNetworkSnapshotRetriesWhenProviderChangesDuringObserverInstall() async {
         let gate = SnapshotInterleavingGate()
-        let old = AuthContinuitySnapshot(did: did, mode: .gateway, generation: 7)
+        let old = AuthContinuitySnapshot(did: did, mode: .testGateway, generation: 7)
         let new = AuthContinuitySnapshot(
             did: "did:plc:authcontinuity-replacement",
-            mode: .gateway,
+            mode: .testGateway,
             generation: 8
         )
         let oldProvider = InstallInterleavingContinuityProvider(snapshot: old, installGate: gate)
@@ -779,16 +770,16 @@ final class AuthContinuityTests: XCTestCase {
 
     func testExactTransactionRejectsMutationAfterProviderSnapshot() async {
         let gate = SnapshotInterleavingGate()
-        let old = AuthContinuitySnapshot(did: did, mode: .gateway, generation: 7)
+        let old = AuthContinuitySnapshot(did: did, mode: .testGateway, generation: 7)
         let new = AuthContinuitySnapshot(
             did: "did:plc:authcontinuity-mutated",
-            mode: .gateway,
+            mode: .testGateway,
             generation: 8
         )
         let provider = InterleavingContinuityProvider(snapshot: old, gate: gate)
         let network = NetworkService(baseURL: gatewayURL)
         await network.setAuthenticationProvider(provider)
-        let expected = AuthContinuitySnapshot(did: did, mode: .gateway, generation: 1)
+        let expected = AuthContinuitySnapshot(did: did, mode: .testGateway, generation: 1)
         let callbackRan = LockedContinuityFlag()
 
         let transaction = Task {
@@ -813,7 +804,7 @@ final class AuthContinuityTests: XCTestCase {
     }
 
     func testExactTransactionBlocksMutationUntilSynchronousCallbackReturns() async throws {
-        let snapshot = AuthContinuitySnapshot(did: did, mode: .gateway, generation: 7)
+        let snapshot = AuthContinuitySnapshot(did: did, mode: .testGateway, generation: 7)
         let provider = InstallInterleavingContinuityProvider(snapshot: snapshot)
         let network = NetworkService(baseURL: gatewayURL)
         await network.setAuthenticationProvider(provider)
@@ -861,7 +852,7 @@ final class AuthContinuityTests: XCTestCase {
     }
 
     func testSettingSameProviderDoesNotReinstallContinuityObserver() async {
-        let snapshot = AuthContinuitySnapshot(did: did, mode: .gateway, generation: 7)
+        let snapshot = AuthContinuitySnapshot(did: did, mode: .testGateway, generation: 7)
         let provider = InstallInterleavingContinuityProvider(snapshot: snapshot)
         let network = NetworkService(baseURL: gatewayURL)
 
@@ -876,7 +867,7 @@ final class AuthContinuityTests: XCTestCase {
     }
 
     func testProviderReplacementAdvancesPublicGenerationWhenSnapshotsMatch() async throws {
-        let providerSnapshot = AuthContinuitySnapshot(did: did, mode: .gateway, generation: 7)
+        let providerSnapshot = AuthContinuitySnapshot(did: did, mode: .testGateway, generation: 7)
         let firstProvider = InstallInterleavingContinuityProvider(snapshot: providerSnapshot)
         let secondProvider = InstallInterleavingContinuityProvider(snapshot: providerSnapshot)
         let network = NetworkService(baseURL: gatewayURL)

@@ -287,13 +287,13 @@ struct ATProtoClientSimpleTests {
     let none: AuthMode = .none
     let legacy: AuthMode = .legacy
     let publicOAuth: AuthMode = .publicOAuth
-    let gateway: AuthMode = .gateway
+    let gateway: AuthMode = .gateway(.legacyEquivalent(gatewayURL: URL(string: "https://gateway.example.test")!))
     let cab: AuthMode = .cab(backendURL: URL(string: "https://example.com")!)
 
     #expect(none == .none)
     #expect(legacy == .publicOAuth || legacy == .legacy) // just verify it compiles
     #expect(publicOAuth == .publicOAuth)
-    #expect(gateway == .gateway)
+    #expect(gateway.isGateway)
     #expect(cab != .none)
   }
 }

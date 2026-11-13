@@ -182,7 +182,7 @@ private final class ThrowingStorageBackend: SecureStorage, @unchecked Sendable {
 
 final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
     private static let gatewayURL = URL(string: "https://gateway.catbird.test")!
-    private static let validCallbackBase = ConfidentialGatewayStrategy.permissionCallbackURL
+    private static let validCallbackBase = GatewayConfiguration.legacyPermissionCallbackURL
     private static let aliceDID = "did:plc:alice123456789012345678"
     private static let bobDID = "did:plc:bob9876543210987654321"
 
@@ -219,8 +219,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                 scope: "atproto transition:generic"
             ),
             namespace: namespace,
-            authMode: .gateway,
-            gatewayURL: gatewayURL
+            authMode: .gateway(.legacyEquivalent(gatewayURL: gatewayURL))
         )
 
         let account = Account(
@@ -1034,8 +1033,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     scope: "atproto transition:generic"
                 ),
                 namespace: namespace,
-                authMode: .gateway,
-                gatewayURL: self.gatewayURL
+                authMode: .gateway(.legacyEquivalent(gatewayURL: self.gatewayURL))
             )
 
             let account = Account(
@@ -1091,8 +1089,7 @@ final class ConfidentialGatewayScopeUpgradeTests: XCTestCase {
                     scope: "atproto transition:generic"
                 ),
                 namespace: namespace,
-                authMode: .gateway,
-                gatewayURL: self.gatewayURL
+                authMode: .gateway(.legacyEquivalent(gatewayURL: self.gatewayURL))
             )
 
             // Recovery runs automatically on client startup via refreshTokenIfNeeded, or can be explicitly driven

@@ -11,7 +11,7 @@ import Foundation
 #endif
 import Logging
 
-private let logger = Logger(label: "blue.catbird.Petrel.ConfidentialGatewayStrategy")
+private let logger = Logger(label: "Petrel.ConfidentialGatewayStrategy")
 
 /// Session information returned by the gateway's /auth/session endpoint.
 public struct GatewaySessionInfo: Codable, Sendable {
@@ -189,7 +189,7 @@ private struct PendingGatewayUpgradeState: Codable, Sendable {
     var isPreCandidateExpired: Bool {
         guard !hasCandidate else { return false }
         guard let createdAt else { return false }
-        // Matches Nest UPGRADE_FLOW_TTL_SECONDS (600s / 10 minutes)
+        // Matches the gateway protocol upgrade-flow TTL (600s / 10 minutes)
         return Date().timeIntervalSince(createdAt) > 600
     }
 }
@@ -296,14 +296,12 @@ private func effectivePort(for url: URL) -> Int? {
     }
 }
 
-/// Authentication strategy that delegates auth to a confidential gateway (Nest).
+/// Authentication strategy that delegates auth to the app's own confidential gateway.
 /// The gateway handles ATProto OAuth (PAR, PKCE, DPoP) and token management.
 /// The client only stores a gateway session UUID and attaches it as a Bearer token.
+/// Every URL it trusts (gateway, sign-in and permission callbacks) comes from its
+/// `GatewayConfiguration`; there are no built-in hosts.
 actor ConfidentialGatewayStrategy: AuthStrategy {
-    public static let defaultCallbackURL = URL(string: "https://catbird.blue/oauth/callback")!
-    public static let callbackOrigin = "https://catbird.blue"
-    public static let permissionCallbackURL = URL(string: "https://catbird.blue/oauth/permission-callback")!
-    public static let permissionCallbackOrigin = "https://catbird.blue"
     enum GatewayError: Error, LocalizedError {
         case missingSession
         case invalidCallbackURL
@@ -489,7 +487,8 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
 
     let coordinator = SerialOperationCoordinator()
 
-    private let gatewayURL: URL
+    private let configuration: GatewayConfiguration
+    private nonisolated var gatewayURL: URL { configuration.gatewayURL }
     private let storage: KeychainStorage
     private let accountManager: AccountManaging
     private let urlSession: URLSession
@@ -522,12 +521,12 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     private static let sessionKey = "gatewaySession"
 
     init(
-        gatewayURL: URL,
+        configuration: GatewayConfiguration,
         storage: KeychainStorage,
         accountManager: AccountManaging,
         urlSession: URLSession? = nil
     ) {
-        self.gatewayURL = gatewayURL
+        self.configuration = configuration
         self.storage = storage
         self.accountManager = accountManager
         if let urlSession {
@@ -651,7 +650,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         let pending = PendingGatewayLoginState(
             browserNonce: browserNonce,
             stateToken: stateToken,
-            redirectURI: Self.defaultCallbackURL.absoluteString,
+            redirectURI: configuration.callbackURL.absoluteString,
             expectedDID: expectedDID,
             createdAt: Date()
         )
@@ -682,7 +681,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         components.path = "/auth/login"
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "browser_nonce", value: browserNonce),
-            URLQueryItem(name: "redirect_to", value: Self.defaultCallbackURL.absoluteString)
+            URLQueryItem(name: "redirect_to", value: configuration.callbackURL.absoluteString)
         ]
         if let identifier {
             queryItems.append(URLQueryItem(name: "identifier", value: identifier))
@@ -726,7 +725,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         let pending = PendingGatewayLoginState(
             browserNonce: browserNonce,
             stateToken: stateToken,
-            redirectURI: Self.defaultCallbackURL.absoluteString,
+            redirectURI: configuration.callbackURL.absoluteString,
             expectedDID: nil,
             createdAt: Date()
         )
@@ -757,7 +756,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         components.path = "/auth/login"
         var queryItems: [URLQueryItem] = [
             URLQueryItem(name: "browser_nonce", value: browserNonce),
-            URLQueryItem(name: "redirect_to", value: Self.defaultCallbackURL.absoluteString)
+            URLQueryItem(name: "redirect_to", value: configuration.callbackURL.absoluteString)
         ]
         if let pdsURL {
             queryItems.append(URLQueryItem(name: "pds", value: pdsURL.absoluteString))
@@ -778,19 +777,6 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         let session_id: String
     }
 
-    private static func isExactCallbackBase(_ url: URL) -> Bool {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return false
-        }
-        guard components.scheme?.lowercased() == "https" else { return false }
-        guard components.host?.lowercased() == "catbird.blue" else { return false }
-        guard components.path == "/oauth/callback" else { return false }
-        guard components.user == nil && components.password == nil else { return false }
-        if let port = components.port, port != 443 { return false }
-        guard components.fragment == nil else { return false }
-        return true
-    }
-
     func handleOAuthCallback(url: URL) async throws -> (did: String, handle: String?, pdsURL: URL) {
         try await coordinator.run { [self] in
             try await self.handleOAuthCallbackLocked(url: url)
@@ -800,7 +786,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     #if DEBUG && canImport(Network) && canImport(Security)
     /// DEBUG qualification only: adopts an opaque session issued by the local client runtime
     /// gateway, which has no OAuth login. Refused unless a `DebugFixtureTransport` is installed
-    /// and this strategy targets exactly that fixture's origin, so it can never touch Nest.
+    /// and this strategy targets exactly that fixture's origin, so it can never touch a production gateway.
     func adoptFixtureGatewaySession(_ sessionId: String) async throws -> (did: String, handle: String?, pdsURL: URL) {
         try await coordinator.run { [self] in
             guard let fixture = DebugFixtureTransport.current, fixture.origin == gatewayURL,
@@ -825,7 +811,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw GatewayError.invalidCallbackURL
         }
 
-        guard Self.isExactCallbackBase(url) else {
+        guard configuration.isSignInCallback(url) else {
             throw GatewayError.invalidCallbackURL
         }
 
@@ -901,7 +887,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         // Exchange code with browser nonce
         var exchangeReq = URLRequest(url: gatewayURL.appendingPathComponent("auth/exchange"))
         exchangeReq.httpMethod = "POST"
-        exchangeReq.setValue("https://catbird.blue", forHTTPHeaderField: "Origin")
+        exchangeReq.setValue(configuration.callbackOrigin, forHTTPHeaderField: "Origin")
         exchangeReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
         exchangeReq.setValue("application/json", forHTTPHeaderField: "Accept")
 
@@ -1210,9 +1196,10 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
     func startGatewayScopeUpgrade(
         requesting: Set<String>,
         for expectedDID: String,
-        callbackURL: URL = ConfidentialGatewayStrategy.permissionCallbackURL
+        callbackURL: URL? = nil
     ) async throws -> URL {
-        try await coordinator.run { [self] in
+        let callbackURL = callbackURL ?? configuration.permissionCallbackURL
+        return try await coordinator.run { [self] in
             try await self.startGatewayScopeUpgradeLocked(
                 requesting: requesting,
                 for: expectedDID,
@@ -1257,7 +1244,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
             throw AuthError.invalidCredentials
         }
         // Validate exact callback URL
-        guard Self.isExactPermissionCallbackBase(callbackURL),
+        guard configuration.isPermissionCallback(callbackURL),
               URLComponents(url: callbackURL, resolvingAgainstBaseURL: false)?.query == nil
         else {
             throw AuthError.invalidCallbackURL
@@ -1531,7 +1518,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         guard pendingState.expectedDID == expectedDID else {
             throw AuthError.invalidCredentials
         }
-        guard Self.isExactPermissionCallbackBase(pendingState.callbackURL) else {
+        guard configuration.isPermissionCallback(pendingState.callbackURL) else {
             throw AuthError.invalidCallbackURL
         }
 
@@ -1562,7 +1549,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         // Validate callback base URL
-        guard Self.isExactPermissionCallbackBase(callbackURL) else {
+        guard configuration.isPermissionCallback(callbackURL) else {
             throw AuthError.invalidCallbackURL
         }
 
@@ -1588,7 +1575,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         let codeItems = queryItems.filter { $0.name == "code" }
-        // /auth/upgrade/exchange retries require Nest to return a short-lived,
+        // /auth/upgrade/exchange retries require the gateway to return a short-lived,
         // idempotent receipt keyed by old bearer + code + nonce. This is a deployment
         // prerequisite; there is no client-side fallback.
         guard codeItems.count == 1,
@@ -1608,7 +1595,7 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         exchangeReq.setValue("Bearer \(pendingState.oldSession)", forHTTPHeaderField: "Authorization")
         exchangeReq.setValue("application/json", forHTTPHeaderField: "Content-Type")
         exchangeReq.setValue("application/json", forHTTPHeaderField: "Accept")
-        exchangeReq.setValue(Self.permissionCallbackOrigin, forHTTPHeaderField: "Origin")
+        exchangeReq.setValue(configuration.permissionCallbackOrigin, forHTTPHeaderField: "Origin")
 
         let exchangeBody = UpgradeExchangeRequest(code: code, browser_nonce: pendingState.browserNonce)
         exchangeReq.httpBody = try JSONCoders.encode(exchangeBody)
@@ -1735,19 +1722,6 @@ actor ConfidentialGatewayStrategy: AuthStrategy {
         }
 
         return scopeSet
-    }
-
-    private static func isExactPermissionCallbackBase(_ url: URL) -> Bool {
-        guard let components = URLComponents(url: url, resolvingAgainstBaseURL: false) else {
-            return false
-        }
-        guard components.scheme?.lowercased() == "https" else { return false }
-        guard components.host?.lowercased() == "catbird.blue" else { return false }
-        guard components.path == "/oauth/permission-callback" else { return false }
-        guard components.user == nil && components.password == nil else { return false }
-        if let port = components.port, port != 443 { return false }
-        guard components.fragment == nil else { return false }
-        return true
     }
 
     // MARK: - AuthenticationProvider
