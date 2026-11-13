@@ -193,6 +193,7 @@ expected_workflow_inventory = [
   "generator.yml",
   "kotlin.yml",
   "lint.yml",
+  "live-network.yml",
   "release.yml",
   "swift.yml",
   "sync-lexicons.yml",
@@ -240,7 +241,7 @@ workflow_paths.each do |path|
 end
 
 read_only_permissions = {"contents" => "read"}
-["docc.yml", "generator.yml", "kotlin.yml", "lint.yml", "release.yml", "swift.yml"].each do |label|
+["docc.yml", "generator.yml", "kotlin.yml", "lint.yml", "live-network.yml", "release.yml", "swift.yml"].each do |label|
   fail!("#{label} must use read-only default permissions") unless
     loaded_workflows.fetch(label)["permissions"] == read_only_permissions
 end
