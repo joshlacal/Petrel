@@ -47,7 +47,7 @@ echo "✓ Tests completed"
 echo ""
 
 echo "Step 4: Checking for JAR output..."
-JAR_PATH="build/libs/petrel-kotlin-0.1.0.jar"
+JAR_PATH="build/libs/petrel-kotlin-2.0.0.jar"
 if [ -f "$JAR_PATH" ]; then
     echo "✓ JAR found at: $JAR_PATH"
     ls -lh "$JAR_PATH"

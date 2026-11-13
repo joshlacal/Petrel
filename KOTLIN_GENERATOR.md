@@ -2,7 +2,7 @@
 
 The Petrel generator includes a Kotlin code generation backend that emits strongly typed Kotlin models, sealed interfaces, and client endpoints from AT Protocol Lexicon definitions.
 
-The `0.2.0` package release is scoped to the Swift Package Manager product. Kotlin generator output is repository-internal tooling, not a shipped product of this Swift package. Kotlin artifact publication and Kotlin/Swift feature parity are outside the `0.2.0` SPM release gate.
+The `2.0.0` package release is scoped to the Swift Package Manager product. Kotlin generator output is repository-internal tooling, not a shipped product of this Swift package. Kotlin artifact publication and Kotlin/Swift feature parity are outside the `2.0.0` SPM release gate.
 
 ## Generator architecture
 

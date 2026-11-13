@@ -4,7 +4,7 @@ Petrel is a Swift 6 SDK for the AT Protocol (Authenticated Transfer Protocol). T
 
 ## Prerequisites
 
-- **Swift**: Swift 6.0 toolchain or later (macOS 15+, iOS 18+, or Linux).
+- **Swift**: Swift 6.1 toolchain or later (macOS 15+, iOS 18+, or Linux). Linux CI uses Swift 6.1.2 on Ubuntu 22.04; on Linux also install `libsecret-1-dev libglib2.0-dev pkg-config` (see [LINUX_SUPPORT.md](LINUX_SUPPORT.md)).
 - **Python**: Python 3 with `jinja2` and `aiofiles`, for the code generator.
 - **SwiftFormat**: pinned to **0.61.1**. CI runs
   `nicklockwood/SwiftFormat@0.61.1` (see `.github/workflows/lint.yml` and
@@ -154,11 +154,11 @@ General Swift guidelines:
 - Write Swift 6 compliant code with complete concurrency safety.
 - Model types using `Sendable`, actors, and immutable value semantics where appropriate.
 - Use explicit types for domain primitives: `ATIdentifier`, `DID`, `Handle`, `CID`, `URI`, `ATProtocolURI`, `ATProtocolDate`, and `NSID`.
-- Handle errors with typed errors or thrown `KeychainError` / `NetworkError` instances rather than generic error wrappers.
+- Throw typed errors (for example `NetworkError`, `IdentityError`) rather than generic error wrappers, and never rewrite invalid input into a placeholder value.
 
 ## Writing tests
 
-Test files reside in `Tests/PetrelTests/`. Petrel supports both Swift Testing (`import Testing`) and XCTest (`import XCTest`).
+Each product has its own test target, `Tests/<Product>Tests/` (for example `Tests/PetrelTests/`, `Tests/PetrelCryptoTests/`). Official atproto interop vectors are vendored under `Tests/<Target>/Vectors/` and loaded with `Bundle.module`; tests iterate every valid and invalid file rather than copying values by hand. Petrel supports both Swift Testing (`import Testing`) and XCTest (`import XCTest`).
 
 When writing tests:
 

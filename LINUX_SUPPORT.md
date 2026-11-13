@@ -1,26 +1,23 @@
 # Linux support
 
-Petrel provides native Linux support for Swift applications, with automatic runtime selection between desktop keyring integration and encrypted file storage.
-
-## Storage backends
-
-`KeychainManager` coordinates secure credential and DPoP key storage on Linux through two backends:
-
-1. **`LibSecretStore` (desktop Linux)**: Integrates with Secret Service daemons (GNOME Keyring, KDE Wallet) through `CLibSecretShim` wrapping `libsecret`. Active when a desktop keyring service is available.
-2. **`FileEncryptedStore` (headless Linux / servers)**: Encrypts secrets using AES-256-GCM. Active when no Secret Service daemon is available (in containers, CI environments, and headless servers).
-
-The backend is selected automatically at runtime by `KeychainManager.createLinuxStorage()`. If neither backend can be initialized, operations throw `KeychainError.storageUnavailable`.
+Every library product in the root package builds and is tested on Linux. CI runs the full
+test suite, a debug build and a release build on Ubuntu 22.04 (`swift:6.1.2-jammy`, Swift 6.1.2)
+with strict concurrency, and fails on any compiler warning in Petrel-owned code
+(`.github/workflows/swift.yml`, `Scripts/verify-owned-warnings.sh`). Swift 6.1 is the minimum
+toolchain (`swift-tools-version: 6.1`).
 
 ## System prerequisites
 
-To build Petrel with `libsecret` support on Linux, install the required development packages for your distribution:
+The `Petrel` product links `libsecret` on Linux (through the `CLibSecret` and `CLibSecretShim`
+targets) so it can use a desktop keyring when one is running. Install the development packages
+before building:
 
-**Debian / Ubuntu:**
+**Debian / Ubuntu** (what CI installs):
 ```bash
 sudo apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config
 ```
 
-**Fedora / RHEL / CentOS:**
+**Fedora / RHEL:**
 ```bash
 sudo dnf install -y libsecret-devel glib2-devel pkg-config
 ```
@@ -30,232 +27,125 @@ sudo dnf install -y libsecret-devel glib2-devel pkg-config
 sudo pacman -S --noconfirm libsecret glib2 pkgconf
 ```
 
-**Alpine Linux:**
-```bash
-apk add libsecret-dev glib-dev pkgconf
+At run time only the shared libraries are needed (`libsecret-1-0` and `libglib2.0-0` on
+Debian/Ubuntu).
+
+## What differs from Apple platforms
+
+| Area | Linux behaviour |
+|---|---|
+| Networking | `URLSession` comes from `FoundationNetworking` (libcurl). Petrel imports it wherever it uses `URLSession`; your code must do the same (`#if canImport(FoundationNetworking)`). |
+| SSRF and DNS rebinding | Before every request Petrel resolves the host and refuses private, loopback, link-local and reserved addresses, on Linux as on Apple platforms. On Apple platforms it then checks the address the connection actually used (server-trust and task metrics). swift-corelibs-foundation offers neither hook (checked on Swift 6.1.2: task metrics are never delivered), and libcurl resolves the host again when it connects, so on Linux a hostile DNS server that answers differently the second time can still steer a request to a private address. Where that matters (a server fetching URLs that users supply), run Petrel behind an egress proxy or firewall that blocks private ranges. |
+| Credential storage | No Keychain. See [Credential storage](#credential-storage). |
+| Keychain access groups | Apple-only. Passing an `accessGroup` has no effect on Linux backends. |
+| Secure Enclave signing | `SecureEnclaveP256Signer` (PetrelCrypto) exists only on iOS, macOS and visionOS. Software P-256 and K-256 keys work everywhere. |
+| Image metadata stripping | `ImageMetadataStripper` rewrites JPEG, PNG, WebP and GIF losslessly in pure Swift on every platform, so uploads keep stripping metadata by default on Linux. Other image types (HEIC, HEIF, AVIF, TIFF, …) need ImageIO and are refused on Linux with `ImageMetadataStrippingError.unsupportedImageFormat`; nothing is uploaded unstripped. Pass `stripMetadata: false` to send bytes untouched. |
+| Event-stream WebSockets | All WebSocket connections use `URLSessionWebSocketTask`, which on Linux works only if the system libcurl was built with WebSocket support. The libcurl 7.81 in Ubuntu 22.04, and so in the `swift:6.1.2-jammy` image CI uses, is not: connections fail at once. `PetrelFirehose` and `PetrelJetstream` report this as `FirehoseSubscriptionError.webSocketTransportUnavailable` and let you replace the transport: conform a WebSocket client of your choice (for example one built on swift-nio) to `FirehoseWebSocketSessionFactory` / `FirehoseWebSocketSession` and pass it as `sessionFactory` in the subscription or `JetstreamClient` configuration. Petrel does not ship such a transport. The generated subscription methods on `ATProtoClient` (`client.com.atproto.sync.subscribeRepos()`, `subscribeLabels()`) have no replaceable transport, so on such systems use `PetrelFirehose` instead. Frame decoding, commit verification and everything else in both products work unchanged on Linux. |
+| OAuth sign-in | There is no system web-authentication sheet. Open the URL returned by `startOAuthFlow` yourself and pass the redirect back with `handleOAuthCallback(url:)` (for example from a loopback HTTP listener). |
+| OAuth server metadata fetches | `PetrelOAuthServer` refuses to fetch client metadata over a transport that does not pin the approved IP addresses. The pinning NIO transport lives in the nested `Server/` package (`PetrelOAuthServerHummingbird`), which builds on Linux. |
+
+## Credential storage
+
+Authenticated clients store sessions and DPoP keys through a `SecureStorage` backend chosen per
+client by `CredentialStorageConfiguration`.
+
+### Platform default (`.platformDefault`)
+
+On Linux the platform default picks a backend once per process:
+
+1. **Secret Service via libsecret** (GNOME Keyring, KDE Wallet) when a Secret Service daemon
+   answers.
+2. **Encrypted files** otherwise (containers, CI, headless servers): AES-256-GCM, one file per
+   secret, configured by environment variables:
+   - `PETREL_MASTER_KEY` (required): Base64 of a 32-byte key. If it is missing, storage fails
+     closed with `missingMasterKey`; Petrel never generates, persists or logs a key.
+   - `PETREL_SECRETS_DIR` (optional): the directory for the files. Defaults to
+     `$HOME/.petrel-secrets`.
+
+If neither backend can be initialised, every storage operation throws a storage-unavailable
+error that names the underlying cause; the process is never terminated.
+
+### Explicit encrypted files (`.encryptedFiles(directory:masterKey:)`)
+
+To choose the directory and key in code, and to give two clients separate stores in one process,
+pass an explicit configuration:
+
+```swift
+import Foundation
+import Petrel
+
+let directory = URL(fileURLWithPath: "/var/lib/example-app/credentials", isDirectory: true)
+let masterKey: Data = try loadKeyFromYourSecretManager()  // 32 bytes
+
+let client = try await ATProtoClient(
+    oauthConfig: OAuthConfig(
+        clientId: "https://example.com/oauth/client-metadata.json",
+        redirectUri: "https://example.com/oauth/callback",
+        scope: "atproto transition:generic"
+    ),
+    namespace: "com.example.app",
+    credentialStorage: .encryptedFiles(directory: directory, masterKey: masterKey)
+)
 ```
 
-## Configuring encrypted file storage
+Omit `masterKey` to read it from `PETREL_MASTER_KEY`. Existing files in the directory must
+decrypt with the key before the configuration is accepted.
 
-When running in headless environments where `LibSecretStore` is unavailable, `FileEncryptedStore` manages encrypted credential files on disk.
+### File-store rules (both routes)
 
-### Environment variables
+- The path must be absolute. Temporary directories (`/tmp`, `/private/tmp`, `/var/tmp`) and
+  symbolic links are rejected (`insecureDirectoryPath`).
+- The directory must be owned by the running user and is kept at mode `0700`; files are written
+  atomically with mode `0600` (`insecurePermissions` otherwise).
+- Generate a key with `openssl rand -base64 32` and keep it in your secret manager, not next to the
+  files.
 
-- **`PETREL_MASTER_KEY`**: A base64-encoded 32-byte (256-bit) symmetric encryption key used for AES-GCM operations.
-  - Mandatory when running without `LibSecretStore`. Construction fails closed with `missingMasterKey` if unset; ephemeral keys are never generated and key material is never logged.
-  - Generate a secure key:
-    ```bash
-    export PETREL_MASTER_KEY=$(openssl rand -base64 32)
-    ```
-- **`PETREL_SECRETS_DIR`**: Path to the directory where encrypted secret files are stored.
-  - If unset, Petrel defaults to `$HOME/.petrel-secrets`. `$HOME` must be set; temporary directory paths (`/tmp`, `/private/tmp`, `/var/tmp`) are unconditionally rejected.
-  - The directory must be owner-only (`0700`) and owned by the running `uid`. Stored secret files are written atomically with owner-only `0600` permissions.
+## Deployment examples
 
-### Deployment configurations
-
-#### Systemd service
+### systemd
 
 ```ini
-[Unit]
-Description=Petrel AT Protocol Application
-After=network.target
-
 [Service]
-Type=simple
-User=petrel
-Group=petrel
-WorkingDirectory=/opt/petrel-app
-ExecStart=/opt/petrel-app/bin/App
-Restart=always
-
-Environment="PETREL_MASTER_KEY=YOUR_BASE64_ENCODED_32_BYTE_KEY"
-Environment="PETREL_SECRETS_DIR=/var/lib/petrel-app/secrets"
-
-[Install]
-WantedBy=multi-user.target
+User=example-app
+ExecStart=/opt/example-app/bin/App
+Environment="PETREL_SECRETS_DIR=/var/lib/example-app/secrets"
+# Load PETREL_MASTER_KEY from a credential or environment file readable only by the service.
+EnvironmentFile=/etc/example-app/petrel.env
 ```
 
-#### Docker container
+### Docker
+
+Build and run on the same distribution so the Swift runtime libraries match:
 
 ```dockerfile
-FROM swift:6.0 as builder
+FROM swift:6.1.2-jammy AS builder
+RUN apt-get update && apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config
 WORKDIR /build
 COPY . .
 RUN swift build -c release
 
-FROM ubuntu:24.04
-RUN apt-get update && apt-get install -y \
-    libsecret-1-0 \
-    libglib2.0-0 \
-    ca-certificates \
+FROM swift:6.1.2-jammy-slim
+RUN apt-get update && apt-get install -y libsecret-1-0 libglib2.0-0 ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-
-WORKDIR /app
 COPY --from=builder /build/.build/release/App /app/App
-
-# Inject PETREL_MASTER_KEY at container run time
-ENV PETREL_SECRETS_DIR="/data/secrets"
+ENV PETREL_SECRETS_DIR=/data/secrets
 VOLUME ["/data/secrets"]
-
+# Inject PETREL_MASTER_KEY at run time from your orchestrator's secret store.
 ENTRYPOINT ["/app/App"]
-```
-
-#### Kubernetes deployment and secret
-
-```yaml
-apiVersion: v1
-kind: Secret
-metadata:
-  name: petrel-secrets
-type: Opaque
-stringData:
-  master-key: "YOUR_BASE64_ENCODED_32_BYTE_KEY"
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: petrel-app
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: petrel-app
-  template:
-    metadata:
-      labels:
-        app: petrel-app
-    spec:
-      containers:
-      - name: app
-        image: registry.example.com/petrel-app:latest
-        env:
-        - name: PETREL_MASTER_KEY
-          valueFrom:
-            secretKeyRef:
-              name: petrel-secrets
-              key: master-key
-        - name: PETREL_SECRETS_DIR
-          value: "/var/lib/petrel/secrets"
-        volumeMounts:
-        - name: secret-storage
-          mountPath: "/var/lib/petrel/secrets"
-      volumes:
-      - name: secret-storage
-        persistentVolumeClaim:
-          claimName: petrel-secrets-pvc
-```
-
-## Using KeychainManager on Linux
-
-`KeychainManager` provides identical method signatures across all supported platforms.
-
-### Storing and retrieving generic data
-
-```swift
-import Foundation
-import Petrel
-
-let namespace = "com.example.app"
-let key = "access-token"
-let tokenData = Data("sample-token".utf8)
-
-// Store
-try KeychainManager.store(
-    key: key,
-    value: tokenData,
-    namespace: namespace
-)
-
-// Retrieve
-let retrievedData = try KeychainManager.retrieve(
-    key: key,
-    namespace: namespace
-)
-
-// Delete
-try KeychainManager.delete(
-    key: key,
-    namespace: namespace
-)
-```
-
-### Storing and retrieving DPoP keys
-
-```swift
-import CryptoKit
-import Petrel
-
-let dpopKey = P256.Signing.PrivateKey()
-let keyTag = "com.example.app.dpop"
-
-// Store DPoP private key
-try KeychainManager.storeDPoPKey(
-    dpopKey,
-    keyTag: keyTag
-)
-
-// Retrieve DPoP private key
-let retrievedKey = try KeychainManager.retrieveDPoPKey(
-    keyTag: keyTag
-)
-
-// Delete DPoP key
-try KeychainManager.deleteDPoPKey(
-    keyTag: keyTag
-)
-```
-
-### Asynchronous API variants
-
-For actor contexts or non-blocking execution, `KeychainManager` provides async methods:
-
-```swift
-// Async store and retrieve
-try await KeychainManager.storeAsync(
-    key: "session",
-    value: sessionData,
-    namespace: "com.example.app"
-)
-
-let sessionData = try await KeychainManager.retrieveAsync(
-    key: "session",
-    namespace: "com.example.app"
-)
-
-try await KeychainManager.deleteAsync(
-    key: "session",
-    namespace: "com.example.app"
-)
-```
-
-## Initializing ATProtoClient on Linux
-
-`ATProtoClient` automatically coordinates with `KeychainManager`:
-
-```swift
-import Foundation
-import Petrel
-
-let oauthConfig = OAuthConfig(
-    clientId: "https://example.com/client-metadata.json",
-    redirectUri: "https://example.com/callback",
-    scope: "atproto transition:generic"
-)
-
-let client = try await ATProtoClient(
-    oauthConfig: oauthConfig,
-    namespace: "com.example.app"
-)
 ```
 
 ## Troubleshooting
 
-### "Missing protected master key for file-encrypted storage" (`missingMasterKey`)
+**`missingMasterKey`**: the encrypted-file backend is in use and no key was supplied. Set
+`PETREL_MASTER_KEY` or pass `masterKey:`.
 
-- **Cause**: The application is running with `FileEncryptedStore` on a headless system and `PETREL_MASTER_KEY` is not set.
-- **Solution**: Generate a 32-byte base64 key (`openssl rand -base64 32`) and export `PETREL_MASTER_KEY` in your environment or service definition.
+**`insecureDirectoryPath` / `insecurePermissions`**: the secrets directory is temporary, a
+symlink, owned by another user, or readable by others. Use a dedicated directory owned by the
+service user.
 
-### Missing Secret Service daemon on desktop
+**Desktop session without a keyring**: start the daemon
+(`eval $(gnome-keyring-daemon --start --components=secrets)`) or let Petrel fall back to encrypted
+files by setting `PETREL_MASTER_KEY`.
 
-- **Cause**: Running in a desktop session where GNOME Keyring or KDE Wallet is stopped.
-- **Solution**: Ensure the daemon is running in your session (e.g. `eval $(gnome-keyring-daemon --start --components=secrets)`), or permit Petrel to fall back to `FileEncryptedStore`.
+**Firehose or Jetstream connections fail immediately on Ubuntu 22.04**: see the WebSocket row in
+the table above.
