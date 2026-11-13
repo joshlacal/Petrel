@@ -518,7 +518,7 @@ def generate_swift_overlay_namespaces(
 
     Nodes that already exist in the core (reference) hierarchy are extended;
     new nodes become nested values declared inside an extension, so e.g.
-    ATProtoClient.Blue.Catbird.MlsChat resolves exactly like a core namespace
+    ATProtoClient.Com.Example.Chat resolves exactly like a core namespace
     and the per-lexicon method extensions attach unchanged.
     """
     sections = []
@@ -772,7 +772,7 @@ def generate_kotlin_overlay_namespaces(emit_hierarchy, reference_hierarchy):
     """Namespace tree for a Kotlin overlay module.
 
     Kotlin cannot add nested classes to another module's type, so new namespace
-    nodes become standalone classes (BlueCatbirdMlsChatNamespace) reached via
+    nodes become standalone classes (ComExampleChatNamespace) reached via
     extension vals on the core client (or on an existing core inner class)."""
     extensions = []
     classes = []

@@ -1206,7 +1206,7 @@ public actor KeychainStorage {
                 do {
                     try await credentialBackend.deleteAsync(
                         key: "gatewaySession",
-                        namespace: "catbird.gateway",
+                        namespace: Self.legacyGlobalGatewaySessionNamespace,
                         accessGroup: accessGroup
                     )
                 } catch {
@@ -1240,13 +1240,19 @@ public actor KeychainStorage {
     }
 
 
+    /// Keychain namespace of the single, pre-multi-account gateway session. Compatibility
+    /// constant: it names items already stored on users' devices, which are read once and
+    /// migrated to per-DID storage, so the value keeps its historical spelling. Nothing new is
+    /// ever written under it.
+    static let legacyGlobalGatewaySessionNamespace = "catbird.gateway"
+
     /// Reads the pre-multi-account gateway session from its global namespace.
     /// - Returns: The raw bytes, or nil only when nothing is stored there.
     private func readGlobalGatewaySession() async throws -> Data? {
         do {
             return try await credentialBackend.retrieveAsync(
                 key: "gatewaySession",
-                namespace: "catbird.gateway",
+                namespace: Self.legacyGlobalGatewaySessionNamespace,
                 accessGroup: accessGroup
             )
         } catch {

@@ -579,7 +579,7 @@ class KotlinCodeGenerator(BaseCodeGenerator):
 
         Core: nested inner classes on the client (ATProtoClient.Chat.Bsky.Convo).
         Overlay: standalone namespace classes generated alongside this package
-        (BlueCatbirdMlsChatNamespace), since Kotlin cannot add nested classes
+        (ComExampleChatNamespace), since Kotlin cannot add nested classes
         to another module's type.
         """
         if self.overlay:

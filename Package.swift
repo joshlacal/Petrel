@@ -70,10 +70,6 @@ let package = Package(
             name: "PetrelLexicon",
             targets: ["PetrelLexicon"]
         ),
-        .executable(
-            name: "PetrelLoad",
-            targets: ["PetrelLoad"]
-        ),
         // `swift package petrel-lexgen`: generate Swift types from your own lexicons.
         .plugin(
             name: "PetrelLexgen",
@@ -97,7 +93,7 @@ let package = Package(
             .upToNextMinor(from: "0.8.1")
         ),
         // 3.15.1 is the lowest release tested and the version a sibling consumer
-        // (Swan) pins exactly. 5.x declares swift-tools-version 6.2, so the
+        // pins exactly. 5.x declares swift-tools-version 6.2, so the
         // committed pin is 4.5.2, the newest release the 6.1 floor resolves.
         .package(url: "https://github.com/apple/swift-crypto.git", "3.15.1" ..< "6.0.0"),
         .package(url: "https://github.com/apple/swift-log.git", .upToNextMajor(from: "1.15.1")),

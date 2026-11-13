@@ -1,3 +1,4 @@
+import Crypto
 import Foundation
 import XCTest
 import Petrel
@@ -80,6 +81,34 @@ final class ReferenceRepositorySurfaceTests: XCTestCase {
         let committed = await committer.states
         XCTAssertEqual(committed.count, 1)
         XCTAssertEqual(committed[0].rootCID, root)
+    }
+
+    /// The digest's domain-separation prefix is a compatibility constant: stored digests depend
+    /// on its exact bytes, so renaming it in code must never change the value.
+    func testImportRequestDigestDomainIsStable() throws {
+        XCTAssertEqual(PublicRepositoryReferenceImportVerifier.requestDigestDomain, "swan.repo.import.v1")
+        let bytes = Data([0xa0])
+        let root = CID.fromDAGCBOR(bytes)
+        let envelope = try PublicRepositoryImportEnvelope.make(
+            did: "did:plc:aaaaaaaaaaaaaaaaaaaaaaaa", rootCID: root,
+            blocks: [.init(cid: root, bytes: bytes)], signature: Data([1]), requestID: "import-1"
+        )
+        var expected = Data("swan.repo.import.v1\0".utf8)
+        func append(_ data: Data) {
+            var count = UInt64(data.count).bigEndian
+            expected.append(Data(bytes: &count, count: 8))
+            expected.append(data)
+        }
+        append(Data("did:plc:aaaaaaaaaaaaaaaaaaaaaaaa".utf8))
+        append(Data(root.bytes))
+        append(Data([1]))
+        append(Data([0]))
+        append(Data(root.bytes))
+        append(bytes)
+        XCTAssertEqual(
+            PublicRepositoryReferenceImportVerifier.canonicalRequestDigest(for: envelope),
+            Data(SHA256.hash(data: expected))
+        )
     }
 
     func testImportSupportsBoundedReferencedBlobPayloadAndIdempotentRetry() async throws {

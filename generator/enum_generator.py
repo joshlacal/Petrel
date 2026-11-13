@@ -79,7 +79,7 @@ class EnumGenerator:
 
         Unlike property-level unions (named {Struct}{Prop}Union), refs resolve
         these as the bare CamelCase def name — locally as `SignedTransition`,
-        cross-lexicon as `BlueCatbirdChatDefs.SignedTransition` — so the enum
+        cross-lexicon as `ComExampleChatDefs.SignedTransition` — so the enum
         must carry exactly that name, nested in the lexicon container.
         """
         unique_union_name = convert_to_camel_case(def_name)

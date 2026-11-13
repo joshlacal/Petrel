@@ -38,7 +38,7 @@ struct Refresh: AsyncParsableCommand {
     }
     let client = try await ATProtoClient(
       oauthConfig: OAuthConfig(clientId: clientId, redirectUri: redirectUri, scope: scope),
-      namespace: "blue.catbird.cabdemo",
+      namespace: "com.example.petrel.cabdemo",
       authMode: .cab(backendURL: backendURL),
       userAgent: "petrel-cab-demo/1.0"
     )
@@ -105,7 +105,7 @@ struct Login: AsyncParsableCommand {
 
     let client = try await ATProtoClient(
       oauthConfig: OAuthConfig(clientId: clientId, redirectUri: redirectUri, scope: scope),
-      namespace: "blue.catbird.cabdemo",
+      namespace: "com.example.petrel.cabdemo",
       authMode: .cab(backendURL: backendURL),
       userAgent: "petrel-cab-demo/1.0"
     )

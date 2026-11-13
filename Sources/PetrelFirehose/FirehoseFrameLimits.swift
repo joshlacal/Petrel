@@ -1,8 +1,8 @@
 import Foundation
 
 /// Hard event invariants for complete firehose frames. These match the AT
-/// Protocol sync subscription limits with Swan's stricter operation semantics
-/// layered on top.
+/// Protocol sync subscription limits with stricter per-operation checks layered
+/// on top.
 public enum FirehoseFrameLimits {
   public static let maximumFrameBytes = 5_000_000
   public static let maximumCommitBlocksBytes = 2_000_000

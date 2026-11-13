@@ -100,8 +100,13 @@ public struct PublicRepositoryReferenceImportVerifier: Sendable {
         self.maximumReferenceBytes = maximumReferenceBytes
     }
 
+    /// Domain-separation prefix of ``canonicalRequestDigest(for:)``. Compatibility constant:
+    /// digests computed by existing importers and stored in their request logs depend on these
+    /// exact bytes, so the value keeps its historical spelling and must never change.
+    static let requestDigestDomain = "swan.repo.import.v1"
+
     public static func canonicalRequestDigest(for envelope: PublicRepositoryImportEnvelope) -> Data {
-        var bytes = Data("swan.repo.import.v1\0".utf8)
+        var bytes = Data((requestDigestDomain + "\0").utf8)
         func append(_ data: Data) { var n = UInt64(data.count).bigEndian; bytes.append(Data(bytes: &n, count: 8)); bytes.append(data) }
         let normalizedDID = (try? DID(didString: envelope.did)).map { String(describing: $0) } ?? envelope.did
         append(Data(normalizedDID.utf8)); append(Data(envelope.rootCID.bytes)); append(envelope.signature)

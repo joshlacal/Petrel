@@ -436,6 +436,7 @@ public final class URLSessionPLCTransport: PLCHTTPTransport, @unchecked Sendable
     }
 }
 
-/// The former name of ``URLSessionPLCTransport``.
+/// The former name of ``URLSessionPLCTransport``. It never used AsyncHTTPClient.
+@available(*, deprecated, renamed: "URLSessionPLCTransport")
 public typealias AsyncHTTPClientPLCTransport = URLSessionPLCTransport
 
