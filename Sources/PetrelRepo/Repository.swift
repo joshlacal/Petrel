@@ -523,30 +523,14 @@ public struct Repository: Sendable {
     ///   - did: The account DID; the document's `id` must equal it.
     /// - Throws: ``RepositoryError/signingKeyNotFound``.
     public static func signingKey(fromDIDDocument json: Data, did: String) throws -> ATProtoPublicKey {
-        guard let document = try? JSONSerialization.jsonObject(with: json) as? [String: Any],
-              document["id"] as? String == did,
-              let methods = document["verificationMethod"] as? [[String: Any]] else {
+        // The identity layer's rule: the first `#atproto` method this DID
+        // controls that decodes to a key.
+        guard let document = try? JSONDecoder().decode(DIDDocument.self, from: json),
+              document.id == did,
+              let key = try? document.atprotoSigningKey().publicKey() else {
             throw RepositoryError.signingKeyNotFound
         }
-        for method in methods {
-            guard let id = method["id"] as? String,
-                  id == "#atproto" || id == "\(did)#atproto",
-                  let type = method["type"] as? String,
-                  let multibase = method["publicKeyMultibase"] as? String else {
-                continue
-            }
-            if let controller = method["controller"] as? String, controller != did {
-                continue
-            }
-            do {
-                return try ATProtoPublicKey(
-                    verificationMethodType: type, publicKeyMultibase: multibase
-                )
-            } catch {
-                throw RepositoryError.signingKeyNotFound
-            }
-        }
-        throw RepositoryError.signingKeyNotFound
+        return key
     }
 
     // MARK: Verifying

@@ -66,7 +66,10 @@ struct ATProtocolValueContainerDecodingTests {
         #expect(try intMaxValue.encodedDAGCBOR() == intMaxCBOR)
 
         for unsignedValue in [UInt64(Int.max) + 1, UInt64.max] {
-            let encoded = try DAGCBOR.encodeValue(unsignedValue)
+            // Written by hand: the encoder refuses values above Int64.max.
+            let encoded = Data([0x1b])
+                + Data((0 ..< 8).reversed().map { UInt8(truncatingIfNeeded: unsignedValue >> ($0 * 8)) })
+            #expect(throws: DAGCBORError.self) { try DAGCBOR.encodeValue(unsignedValue) }
             expectOutOfRangeUnsignedIntegerError {
                 try ATProtocolValueContainer.decodedFromDAGCBOR(encoded)
             }

@@ -145,6 +145,30 @@ struct FirehoseCommitProofVectorTests {
     rootLink.append(rootAfter.bytes)
     let pointsAtRootAfter: Bool = deliveredCommit.range(of: rootLink) != nil
     #expect(pointsAtRootAfter)
+
+    // The delivered event carries everything inversion needs: its operations, mapped by the
+    // relay bridge, undo the tree in its own blocks back to its own prevData. (The fixture
+    // keys are synthetic, so they are parsed with the tree-level key rule, and the commit is
+    // unsigned, so only the MST stage of `verify` applies.)
+    let store = InMemoryRepositoryBlockStore()
+    _ = try await PublicRepositoryCAR.load(from: DataCARByteSource(commit.blocks), into: store)
+    let mstKeys = RepositoryMSTOptions(keySyntax: .mstKey)
+    let repositoryOps = try commit.repositoryOperations(keySyntax: .mstKey)
+    try await RepositoryCommitDiff.verifyInversion(
+      dataCID: rootAfter, operations: repositoryOps,
+      previousDataCID: try #require(commit.prevDataCID), blocks: store, options: mstKeys
+    )
+    // Dropping any one operation breaks it.
+    for index in repositoryOps.indices {
+      var partial = repositoryOps
+      partial.remove(at: index)
+      await #expect(throws: RepositoryCommitDiffError.self) {
+        try await RepositoryCommitDiff.verifyInversion(
+          dataCID: rootAfter, operations: partial,
+          previousDataCID: try #require(commit.prevDataCID), blocks: store, options: mstKeys
+        )
+      }
+    }
   }
 }
 

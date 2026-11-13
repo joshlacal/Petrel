@@ -28,7 +28,8 @@ public extension RelayCommitEvent {
   /// `blocks` is a CAR "slice" holding the commit, the changed MST nodes and the new record
   /// blocks. Each record block is checked against the CID named by its operation before it is
   /// decoded. This does not verify the commit signature or the MST; it only pairs operations
-  /// with their record bytes.
+  /// with their record bytes. Call ``RelayCommitEvent/verify(keyResolver:limits:policy:now:maximumClockSkew:)``
+  /// first to know the records are the account's.
   ///
   /// - Throws: ``RelayVerifierError/invalidRepositoryCAR`` when `blocks` is not a readable CAR
   ///   or a record block does not match its CID, and the DAG-CBOR decoding error when a

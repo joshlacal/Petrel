@@ -1,0 +1,10 @@
+{
+  "name": "petrel-repo-ts-interop",
+  "private": true,
+  "description": "Reference TypeScript packages that verify Petrel-written repositories",
+  "dependencies": {
+    "@atproto/crypto": "0.5.7",
+    "@atproto/lex-data": "0.1.10",
+    "@atproto/repo": "0.11.5"
+  }
+}
