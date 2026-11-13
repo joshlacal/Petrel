@@ -57,6 +57,57 @@
             }
         }
 
+        @Test("Client-wide headers and the User-Agent are sent on the upgrade request")
+        func clientHeadersReachSubscriptions() async throws {
+            let request = try await openedRequest(
+                options: XRPCCallOptions(),
+                configure: {
+                    await $0.setHeader(name: "X-App-Trace", value: "trace-7")
+                    await $0.setUserAgent("ExampleApp/1.0")
+                }
+            )
+            #expect(request.url?.host == "pds.example.com")
+            #expect(request.value(forHTTPHeaderField: "x-app-trace") == "trace-7")
+            #expect(request.value(forHTTPHeaderField: "User-Agent") == "ExampleApp/1.0")
+        }
+
+        @Test("A third-party stream host gets the User-Agent but not client-wide headers")
+        func thirdPartyStreamHostGetsNoClientHeaders() async throws {
+            let request = try await openedRequest(
+                options: XRPCCallOptions(service: Self.labelerURL),
+                configure: {
+                    await $0.setHeader(name: "X-App-Trace", value: "trace-7")
+                    await $0.setUserAgent("ExampleApp/1.0")
+                }
+            )
+            #expect(request.url?.host == "labeler.example.com")
+            #expect(request.value(forHTTPHeaderField: "x-app-trace") == nil)
+            #expect(request.value(forHTTPHeaderField: "User-Agent") == "ExampleApp/1.0")
+        }
+
+        @Test("A third-party stream host keeps a scoped header that repeats a client-wide one")
+        func thirdPartyStreamHostKeepsExplicitScopedHeaders() async throws {
+            let request = try await openedRequest(
+                options: XRPCCallOptions(headers: ["X-Api-Key": "key-1"], service: Self.labelerURL),
+                configure: {
+                    await $0.setHeader(name: "X-API-Key", value: "key-1")
+                    await $0.setHeader(name: "X-App-Trace", value: "trace-7")
+                }
+            )
+            #expect(request.url?.host == "labeler.example.com")
+            #expect(request.value(forHTTPHeaderField: "x-api-key") == "key-1")
+            #expect(request.value(forHTTPHeaderField: "x-app-trace") == nil)
+        }
+
+        @Test("A credential header set client-wide never reaches the upgrade request")
+        func clientCredentialHeadersAreNotCopied() async throws {
+            let request = try await openedRequest(
+                options: XRPCCallOptions(),
+                configure: { await $0.setHeader(name: "Authorization", value: "Bearer stray") }
+            )
+            #expect(request.value(forHTTPHeaderField: "Authorization") == nil)
+        }
+
         @Test("A scoped service is where the socket connects")
         func scopedServiceIsTheHost() async throws {
             let request = try await openedRequest(

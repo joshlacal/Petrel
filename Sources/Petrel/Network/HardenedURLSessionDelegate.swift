@@ -395,7 +395,10 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
     }
 
     // swift-corelibs-foundation does not support server-trust authentication
-    // methods; transport rebinding is still enforced via task metrics on Linux.
+    // methods, and (checked on Swift 6.1.2) never calls `didFinishCollecting`
+    // with task metrics. On Linux the only defence against DNS rebinding is the
+    // pre-flight check in `NetworkService.resolveApprovedAddresses`; libcurl then
+    // resolves the host again. LINUX_SUPPORT.md states this limit.
     #if canImport(Darwin)
     package nonisolated func urlSession(
         _ session: URLSession,
@@ -479,7 +482,8 @@ package final class HardenedURLSessionDelegate: NSObject, URLSessionDelegate, UR
             return
         }
         #endif
-        // Inspect the actual remote address connected to by the transport (DNS rebinding defense)
+        // Inspect the actual remote address connected to by the transport (DNS rebinding
+        // defense). Apple platforms deliver metrics; swift-corelibs-foundation does not.
         let isLocalTarget: Bool = {
             guard let host = task.originalRequest?.url?.host?.lowercased() else { return false }
             return host == "localhost" || host == "127.0.0.1" || host == "::1"

@@ -514,6 +514,8 @@ public actor NetworkService: NetworkServiceProtocol {
     public let limits: NetworkResponseLimits
     private var authProvider: AuthenticationProvider?
     private var headers: [String: String] = [:]
+    /// Header that carries a fresh per-request identifier, or `nil` to send none.
+    private var requestIDHeaderName: String?
     nonisolated package let sessionDelegate: HardenedURLSessionDelegate
     nonisolated package let exactAuthSessionDelegate: HardenedURLSessionDelegate
     nonisolated package let session: URLSession
@@ -1005,6 +1007,17 @@ public actor NetworkService: NetworkServiceProtocol {
         headers.removeAll()
     }
 
+    /// Sends a fresh request identifier (a UUID) in the named header on every request this
+    /// service sends to the client's own origin, so a server or gateway you operate can
+    /// correlate its logs with the client's. Requests to third-party hosts that receive no
+    /// account credentials never carry it.
+    ///
+    /// Petrel sends no request-identifier header unless you set one.
+    /// - Parameter name: The header name, for example `X-Request-Id`; `nil` stops sending it.
+    public func setRequestIDHeader(name: String?) async {
+        requestIDHeaderName = name?.isEmpty == true ? nil : name
+    }
+
     /// Sets the User-Agent header
     /// - Parameter userAgent: The user agent string
     public func setUserAgent(_ userAgent: String) async {
@@ -1395,18 +1408,15 @@ public actor NetworkService: NetworkServiceProtocol {
                 requestToSend.setValue(userAgent, forHTTPHeaderField: "User-Agent")
             }
 
-            // Generate request ID for end-to-end correlation with BFF
+            // Request ID for log correlation; sent only when the app opted in.
             let requestId = UUID().uuidString
             if isAnonymousThirdParty {
                 requestToSend = Self.withAnonymousSessionDefaults(requestToSend)
-            } else {
-                requestToSend.setValue(requestId, forHTTPHeaderField: "X-Catbird-Request-Id")
-                if let ua = userAgent {
-                    requestToSend.setValue(ua, forHTTPHeaderField: "X-Catbird-Client")
-                }
+            } else if let requestIDHeaderName {
+                requestToSend.setValue(requestId, forHTTPHeaderField: requestIDHeaderName)
             }
 
-            // Log structured request shape for BFF debugging
+            // Log structured request shape for debugging
             let requestStartTime = Date()
             if let url = requestToSend.url {
                 let bodySize = requestToSend.httpBody?.count ?? 0
@@ -1557,17 +1567,16 @@ public actor NetworkService: NetworkServiceProtocol {
 
                     // Handle unauthorized (401)
                     guard let authProvider = authProvider, let url = requestToSend.url else {
-                        LogManager.logError(
-                            "Network Service - Received 401 but no auth provider or URL for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
+                        // No session was involved (an unauthenticated client), so there is
+                        // nothing to refresh and no session to log out of. The server's
+                        // error body goes to the caller unchanged.
+                        LogManager.logInfo(
+                            "Network Service - 401 without an auth provider for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL"); not a session failure."
                         )
-                        let autoLogoutDID = authCtx?.did ?? ""
-                        // Broadcast auto-logout event so UI can redirect to reauth
-                        if !gatewayMode {
-                            Task {
-                                await AuthEventBroadcaster.shared.broadcast(.autoLogoutTriggered(did: autoLogoutDID, reason: "401_no_auth_provider_or_url"))
-                            }
+                        if returnsTerminalHTTPErrorResponses {
+                            return (decompressedData, httpResponse)
                         }
-                        throw NetworkError.authenticationRequired // Cannot handle 401 without provider/URL
+                        throw NetworkError.authenticationRequired
                     }
 
                     LogManager.logInfo("Network Service - Received 401 for \(LogManager.sanitizeURLForLogging(url)). Analyzing response.")
@@ -1751,7 +1760,9 @@ public actor NetworkService: NetworkServiceProtocol {
                     )
 
                     // Check if this is an ExpiredToken error that needs refresh
-                    if responseBody.contains("ExpiredToken"), let authProvider = authProvider, !skipTokenRefresh {
+                    if Self.xrpcErrorName(in: decompressedData) == "ExpiredToken",
+                       let authProvider = authProvider, !skipTokenRefresh
+                    {
                         LogManager.logError(
                             "Network Service - 400 ExpiredToken detected, attempting token refresh for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
                         )
@@ -1780,12 +1791,7 @@ public actor NetworkService: NetworkServiceProtocol {
 
                     // Log request headers (redact auth)
                     if let headers = requestToSend.allHTTPHeaderFields {
-                        let redactedHeaders = headers.mapValues { value -> String in
-                            if value.lowercased().contains("bearer") || value.lowercased().contains("dpop") {
-                                return "<REDACTED>"
-                            }
-                            return value
-                        }
+                        let redactedHeaders = Self.redactedHeadersForLogging(headers)
                         LogManager.logError(
                             "Network Service - 400 Request headers: \(redactedHeaders)"
                         )
@@ -1833,10 +1839,15 @@ public actor NetworkService: NetworkServiceProtocol {
                     continue // Go to next iteration of the while loop
 
                 default:
+                    // 1xx, 3xx that were not followed, and codes outside HTTP's range: the
+                    // caller still gets the status and, on the typed path, the body.
                     LogManager.logError(
                         "Network Service - Unexpected status code \(httpResponse.statusCode) for \(requestToSend.url.map { LogManager.sanitizeURLForLogging($0) } ?? "Unknown URL")"
                     )
-                    throw NetworkError.requestFailed
+                    if returnsTerminalHTTPErrorResponses {
+                        return (decompressedData, httpResponse)
+                    }
+                    throw NetworkError.responseError(statusCode: httpResponse.statusCode)
                 }
 
             } catch let error as URLError
@@ -1924,9 +1935,10 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         if let userAgent {
             requestToPrepare.setValue(userAgent, forHTTPHeaderField: "User-Agent")
-            requestToPrepare.setValue(userAgent, forHTTPHeaderField: "X-Catbird-Client")
         }
-        requestToPrepare.setValue(UUID().uuidString, forHTTPHeaderField: "X-Catbird-Request-Id")
+        if let requestIDHeaderName {
+            requestToPrepare.setValue(UUID().uuidString, forHTTPHeaderField: requestIDHeaderName)
+        }
 
         let prepared: URLRequest
         var authCtx: AuthContext? = nil
@@ -2153,6 +2165,27 @@ public actor NetworkService: NetworkServiceProtocol {
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         }
         return request
+    }
+
+    /// The `error` name of an XRPC error envelope (`{"error": "...", "message": "..."}`), or
+    /// `nil` when the body is not one.
+    nonisolated static func xrpcErrorName(in body: Data) -> String? {
+        guard let object = try? JSONSerialization.jsonObject(with: body) as? [String: Any] else {
+            return nil
+        }
+        return object["error"] as? String
+    }
+
+    /// Request headers safe to write to a log: every credential header (by name, whatever its
+    /// value looks like) and any value that looks like a bearer or DPoP token is replaced.
+    nonisolated static func redactedHeadersForLogging(_ headers: [String: String]) -> [String: String] {
+        var redacted: [String: String] = [:]
+        for (name, value) in headers {
+            let lowered = value.lowercased()
+            let isSecret = isCredentialHeader(name) || lowered.contains("bearer") || lowered.contains("dpop")
+            redacted[name] = isSecret ? "<REDACTED>" : value
+        }
+        return redacted
     }
 
     private nonisolated static func isCredentialHeader(_ name: String) -> Bool {
@@ -2680,6 +2713,14 @@ public actor NetworkService: NetworkServiceProtocol {
 
         // Create URLRequest to add auth headers and optional proxy header
         var request = URLRequest(url: resolvedURL)
+        // Client-wide headers apply to the upgrade request as to any other request.
+        // Credential headers come only from the auth strategy.
+        for (name, value) in headers where !Self.isCredentialHeader(name) {
+            request.setValue(value, forHTTPHeaderField: name)
+        }
+        if let userAgent {
+            request.setValue(userAgent, forHTTPHeaderField: "User-Agent")
+        }
 
         // If we are connecting via the PDS host, attach atproto-proxy so the PDS can forward
         if resolvedURL.host == baseURL.host, let did = resolvedDID {
@@ -2688,10 +2729,9 @@ public actor NetworkService: NetworkServiceProtocol {
         }
         // This upgrade request is the scoped call itself, wherever it was routed.
         // setValue replaces an earlier header whatever its case.
-        if let scoped {
-            for (name, value) in scoped.requestHeaders(over: nil) ?? [:] {
-                request.setValue(value, forHTTPHeaderField: name)
-            }
+        let scopedHeaders = scoped?.requestHeaders(over: nil) ?? [:]
+        for (name, value) in scopedHeaders {
+            request.setValue(value, forHTTPHeaderField: name)
         }
         var authCtx: AuthContext? = nil
         defer {
@@ -2701,6 +2741,22 @@ public actor NetworkService: NetworkServiceProtocol {
         let (authedRequest, authedCtx) = try await attachCredentialsIfAuthorized(request, policy: policy)
         request = authedRequest
         authCtx = authedCtx
+        // A third-party stream host that gets no credentials gets no client-wide headers either.
+        // Headers this call asked for explicitly are kept, even when a client-wide header has
+        // the same name and value.
+        let inheritedClientHeaders = headers.filter { name, _ in
+            !scopedHeaders.keys.contains { $0.caseInsensitiveCompare(name) == .orderedSame }
+        }
+        if let anonymous = Self.anonymousThirdPartyRequest(
+            request,
+            additionalHeaders: nil,
+            clientHeaders: inheritedClientHeaders,
+            policy: policy,
+            authContext: authCtx,
+            baseURL: baseURL
+        ) {
+            request = anonymous
+        }
         let webSocketTask: any WebSocketTaskProtocol = {
             #if DEBUG
             if let override = Self.webSocketTaskOverride {
