@@ -319,7 +319,7 @@ public struct AuthenticatedOAuthLexiconResolver: OAuthLexiconResolving {
             verified = try await PublicRepositoryCommitCodec.verify(
                 signedCommitBytes: commitBytes,
                 expectedCommitCID: parsed.rootCID,
-                verifier: OAuthLexiconCommitVerifier(publicKey: key)
+                verifier: ATProtoRepositoryCommitVerifier(publicKey: key)
             )
         } catch {
             try Self.classify(error, as: .commitSignatureInvalid)

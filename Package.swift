@@ -348,8 +348,23 @@ let package = Package(
         ),
         .testTarget(
             name: "PetrelRepoTests",
-            dependencies: ["PetrelRepo"],
+            dependencies: ["PetrelRepo", "PetrelRepoTestSupport"],
             resources: [.copy("Vectors")]
+        ),
+        // Test support only (not a product): builds repository proof CARs, valid and
+        // deliberately broken, for the PetrelRepo and authenticated Lexicon resolver tests.
+        .target(
+            name: "PetrelRepoTestSupport",
+            dependencies: [
+                "Petrel",
+                "PetrelCrypto",
+                "PetrelRepo",
+                .product(name: "Crypto", package: "swift-crypto"),
+            ],
+            path: "Tests/PetrelRepoTestSupport",
+            swiftSettings: [
+                .swiftLanguageMode(.v6),
+            ]
         ),
         // Test support only (not a product): a loopback WebSocket server on a real socket and an
         // independent DAG-CBOR fixture encoder, shared by the two streaming test targets.
@@ -391,6 +406,7 @@ let package = Package(
                 "PetrelOAuthServerLexicon",
                 "PetrelCrypto",
                 "PetrelRepo",
+                "PetrelRepoTestSupport",
                 "Petrel",
                 .product(name: "Crypto", package: "swift-crypto"),
             ]

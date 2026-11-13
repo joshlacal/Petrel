@@ -2,6 +2,7 @@ import Crypto
 import Foundation
 import Petrel
 @testable import PetrelRepo
+import PetrelRepoTestSupport
 import XCTest
 
 final class RepositoryMSTProofTests: XCTestCase {
@@ -287,7 +288,7 @@ final class RepositoryMSTProofTests: XCTestCase {
         let fixture = try await PublicRepositoryProofFixtureBuilder
             .build(.commitSignedWithUnnamedKey)
 
-        XCTAssertNotEqual(fixture.documentPublicKeyX963, fixture.commitPublicKeyX963)
+        XCTAssertNotEqual(fixture.documentPublicKey, fixture.commitPublicKey)
         // A real signature — just not by the key the document names.
         _ = try await PublicRepositoryCommitCodec.verify(
             signedCommitBytes: fixture.commitBytes,

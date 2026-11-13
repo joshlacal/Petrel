@@ -1,12 +1,10 @@
-// Test-support only: builds `com.atproto.sync.getRecord` proof CARs, valid and
-// deliberately broken, for the authenticated Lexicon resolver.
-//
-// Copied from Tests/PetrelRepoTests/PublicRepositoryProofFixtures.swift because
-// SwiftPM test targets cannot import each other. Fold the two into one test
-// support target once the PetrelRepo changes in flight have landed.
+// Test-support only. This target is not a package product: it deliberately
+// constructs artifacts that production code must refuse, and nothing here
+// belongs on a serving path. PetrelRepoTests and PetrelOAuthServerTests share it.
 //
 // CAR framing follows bluesky-social/atproto@3f6c96d5d2d25438bd40fa89d6ecc37865f8e354
-// packages/repo/src/car.ts (MIT OR Apache-2.0).
+// packages/repo/src/car.ts, used under the repository's MIT OR Apache-2.0
+// notice policy recorded in THIRD_PARTY_NOTICES.md.
 
 import Crypto
 import Foundation
@@ -114,13 +112,14 @@ public struct PublicRepositoryProofFixture: Sendable {
     public let pathNodeCIDs: [CID]
     public let decoyPaths: [PublicRepositoryPath]
 
-    /// The key the REQUESTED DID's document names. Build a
-    /// `did:key` from it with `ATProtoPublicKey`.
-    public let documentPublicKeyX963: Data
+    /// The curve both keys are on.
+    public let curve: ATProtoKeyCurve
+    /// The key the REQUESTED DID's document names.
+    public let documentPublicKey: ATProtoPublicKey
     /// The key that actually signed the commit in this CAR.
-    public let commitPublicKeyX963: Data
-    public let documentVerifier: P256PublicRepositoryCommitVerifier
-    public let commitVerifier: P256PublicRepositoryCommitVerifier
+    public let commitPublicKey: ATProtoPublicKey
+    public let documentVerifier: ATProtoRepositoryCommitVerifier
+    public let commitVerifier: ATProtoRepositoryCommitVerifier
 }
 
 public enum PublicRepositoryProofFixtureBuilder {
@@ -137,8 +136,10 @@ public enum PublicRepositoryProofFixtureBuilder {
     ///     is enough to force a multi-node path.
     ///   - record: overrides the default lexicon document. `$type` still comes
     ///     from the variant.
+    ///   - curve: the curve of the document and commit keys.
     public static func build(
         _ variant: PublicRepositoryProofFixtureVariant = .valid,
+        curve: ATProtoKeyCurve = .p256,
         nsid: String = defaultNSID,
         requestedDID: String = defaultRequestedDID,
         substituteDID: String = defaultSubstituteDID,
@@ -179,11 +180,11 @@ public enum PublicRepositoryProofFixtureBuilder {
         )
 
         // --- keys ---------------------------------------------------------
-        let documentPrivateKey = P256.Signing.PrivateKey()
-        let commitPrivateKey: P256.Signing.PrivateKey
+        let documentPrivateKey = ATProtoCrypto.generateKeypair(curve: curve)
+        let commitPrivateKey: any ATProtoExportableKeypair
         switch variant {
         case .crossRepositorySubstitution, .commitSignedWithUnnamedKey:
-            commitPrivateKey = P256.Signing.PrivateKey()
+            commitPrivateKey = ATProtoCrypto.generateKeypair(curve: curve)
         default:
             commitPrivateKey = documentPrivateKey
         }
@@ -256,14 +257,15 @@ public enum PublicRepositoryProofFixtureBuilder {
             did: commitDID,
             revision: revision,
             dataCID: mstRootCID,
-            signer: P256PublicRepositoryCommitSigner(privateKey: commitPrivateKey)
+            signer: ATProtoRepositoryCommitSigner(commitPrivateKey)
         )
         var commitBytes = prepared.signedCommitBytes
         var commitCID = prepared.commitCID
         if case .flippedCommitSignatureByte = variant {
             let tampered = try tamperedCommitBytes(
                 prepared.signedCommitBytes,
-                signature: prepared.signature
+                signature: prepared.signature,
+                curve: curve
             )
             commitBytes = tampered
             commitCID = CID.fromDAGCBOR(tampered)
@@ -294,7 +296,7 @@ public enum PublicRepositoryProofFixtureBuilder {
                 did: commitDID,
                 revision: "3lqxpvknsi2cb",
                 dataCID: mstRootCID,
-                signer: P256PublicRepositoryCommitSigner(privateKey: commitPrivateKey)
+                signer: ATProtoRepositoryCommitSigner(commitPrivateKey)
             )
             roots.append(second.commitCID)
             proof.append(.init(
@@ -333,14 +335,11 @@ public enum PublicRepositoryProofFixtureBuilder {
             fullRepositoryBlocks: try PublicRepositoryBlockMap(blocks: full),
             pathNodeCIDs: pathNodeCIDs,
             decoyPaths: decoyPaths,
-            documentPublicKeyX963: documentPrivateKey.publicKey.x963Representation,
-            commitPublicKeyX963: commitPrivateKey.publicKey.x963Representation,
-            documentVerifier: P256PublicRepositoryCommitVerifier(
-                publicKey: documentPrivateKey.publicKey
-            ),
-            commitVerifier: P256PublicRepositoryCommitVerifier(
-                publicKey: commitPrivateKey.publicKey
-            )
+            curve: curve,
+            documentPublicKey: documentPrivateKey.publicKey,
+            commitPublicKey: commitPrivateKey.publicKey,
+            documentVerifier: ATProtoRepositoryCommitVerifier(publicKey: documentPrivateKey.publicKey),
+            commitVerifier: ATProtoRepositoryCommitVerifier(publicKey: commitPrivateKey.publicKey)
         )
     }
 
@@ -473,14 +472,15 @@ public enum PublicRepositoryProofFixtureBuilder {
     /// check rather than a structural one.
     private static func tamperedCommitBytes(
         _ commitBytes: Data,
-        signature: Data
+        signature: Data,
+        curve: ATProtoKeyCurve
     ) throws -> Data {
         guard let range = commitBytes.range(of: signature) else {
             throw PublicRepositoryProofFixtureError.signatureNotFoundInCommitBytes
         }
         var tampered = signature
         tampered[tampered.startIndex + 31] ^= 0x01
-        guard P256WireSignature.isCanonicalLowS(tampered) else {
+        guard ATProtoSignature.isCanonical(tampered, curve: curve) else {
             throw PublicRepositoryProofFixtureError.signatureTamperingChangedStructure
         }
         var result = commitBytes
