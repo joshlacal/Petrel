@@ -189,6 +189,43 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         self.assertIn('title = "Simple Space"', generated)
         self.assertIn('titleLang = mapOf("es" to "Espacio sencillo", "ja" to "\\u30b7\\u30f3\\u30d7\\u30eb\\u30b9\\u30da\\u30fc\\u30b9")', generated)
 
+    def test_space_descriptor_handles_optional_title_and_empty_localizations(self):
+        title_only = {
+            "lexicon": 1,
+            "id": "com.example.titled.space",
+            "defs": {
+                "main": {
+                    "type": "space",
+                    "key": "any",
+                    "title": "Titled Space",
+                    "collections": [],
+                }
+            },
+        }
+        untitled = {
+            "lexicon": 1,
+            "id": "com.example.untitled.space",
+            "defs": {
+                "main": {
+                    "type": "space",
+                    "key": "any",
+                    "collections": [],
+                }
+            },
+        }
+
+        titled_swift = SwiftCodeGenerator(title_only).convert()
+        self.assertIn('nsid: "com.example.titled.space"', titled_swift)
+        self.assertIn('title: "Titled Space", titleLang: [:]', titled_swift)
+        untitled_swift = SwiftCodeGenerator(untitled).convert()
+        self.assertIn('nsid: "com.example.untitled.space"', untitled_swift)
+        self.assertIn('title: nil, titleLang: [:]', untitled_swift)
+
+        titled_kotlin = KotlinCodeGenerator(title_only).convert()
+        self.assertIn('title = "Titled Space", titleLang = mapOf()', titled_kotlin)
+        untitled_kotlin = KotlinCodeGenerator(untitled).convert()
+        self.assertIn('title = null, titleLang = mapOf()', untitled_kotlin)
+
     def test_server_contracts_are_opt_in_and_typed(self):
         ordinary = SwiftCodeGenerator(QUERY_LEXICON).convert()
         generated = SwiftCodeGenerator(QUERY_LEXICON, emit_server_contracts=True).convert()

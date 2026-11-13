@@ -925,6 +925,7 @@ class SwiftCodeGenerator(BaseCodeGenerator):
             for language, value in sorted(title_lang.items())
             if isinstance(language, str) and isinstance(value, str)
         )
+        title_lang_expression = f'[{title_lang_literal}]' if title_lang_literal else '[:]'
         collections = main_def.get('collections', [])
         collections_literal = ', '.join(json.dumps(value) for value in collections)
         return f'''\n    public struct SpaceDeclarationDescriptor: Sendable, Equatable {{
@@ -937,7 +938,7 @@ class SwiftCodeGenerator(BaseCodeGenerator):
 
     public static let spaceDeclaration = SpaceDeclarationDescriptor(
         nsid: "{self.lexicon_id}", keyType: {json.dumps(key_type)},
-        title: {title}, titleLang: [{title_lang_literal}],
+        title: {title}, titleLang: {title_lang_expression},
         collections: [{collections_literal}]
     )
 '''
