@@ -124,7 +124,7 @@ final class ServiceJWTTests: XCTestCase {
         let spaceToken = try SpaceServiceJWT.create(
             issuer: issuerPLC,
             audience: audience,
-            method: "com.atproto.space.notifyWrite",
+            method: "com.atproto.space.notifyRepoUpdate",
             eventID: "space-jti",
             key: p256Key,
             now: now,
@@ -658,7 +658,7 @@ final class ServiceJWTTests: XCTestCase {
         let tokenP256 = try ServiceJWT.mint(
             issuer: issuerPLC,
             audience: audience,
-            method: "com.atproto.space.notifyWrite",
+            method: "com.atproto.space.notifyRepoUpdate",
             eventID: "req-test-1",
             requestBodyDigest: digest,
             key: p256Key,
@@ -684,7 +684,7 @@ final class ServiceJWTTests: XCTestCase {
             tokenP256,
             publicKey: verifierP256,
             expectedAudience: audience,
-            expectedMethod: "com.atproto.space.notifyWrite",
+            expectedMethod: "com.atproto.space.notifyRepoUpdate",
             expectedRequestBodyDigest: digest,
             now: now
         )
@@ -780,7 +780,7 @@ final class ServiceJWTTests: XCTestCase {
             try ServiceJWT.mint(
                 issuer: issuerPLC,
                 audience: audience,
-                method: "com.atproto.space.notifyWrite",
+                method: "com.atproto.space.notifyRepoUpdate",
                 eventID: "neg-1",
                 requestBodyDigest: "",
                 key: p256Key,
@@ -793,7 +793,7 @@ final class ServiceJWTTests: XCTestCase {
             try ServiceJWT.mint(
                 issuer: issuerPLC,
                 audience: audience,
-                method: "com.atproto.space.notifyWrite",
+                method: "com.atproto.space.notifyRepoUpdate",
                 eventID: "neg-2",
                 requestBodyDigest: "has spaces in digest",
                 key: p256Key,
@@ -807,7 +807,7 @@ final class ServiceJWTTests: XCTestCase {
             try ServiceJWT.mint(
                 issuer: issuerPLC,
                 audience: audience,
-                method: "com.atproto.space.notifyWrite",
+                method: "com.atproto.space.notifyRepoUpdate",
                 eventID: "neg-3",
                 requestBodyDigest: oversized,
                 key: p256Key,
@@ -817,7 +817,7 @@ final class ServiceJWTTests: XCTestCase {
 
         // Hand-crafted token with empty "req" claim rejected by shape validation
         let headerData = try JSONEncoder().encode(["alg": "ES256", "typ": "JWT"])
-        let emptyReqJSON = "{\"iss\":\"\(issuerPLC)\",\"aud\":\"\(audience)\",\"exp\":1700000060,\"lxm\":\"com.atproto.space.notifyWrite\",\"jti\":\"empty-req\",\"req\":\"\"}"
+        let emptyReqJSON = "{\"iss\":\"\(issuerPLC)\",\"aud\":\"\(audience)\",\"exp\":1700000060,\"lxm\":\"com.atproto.space.notifyRepoUpdate\",\"jti\":\"empty-req\",\"req\":\"\"}"
         let emptyReqInput = "\(JWTBase64URL.encode(headerData)).\(JWTBase64URL.encode(Data(emptyReqJSON.utf8)))"
         let emptyReqSig = try P256WireSignature.sign(Data(emptyReqInput.utf8), using: p256Key)
         let emptyReqToken = "\(emptyReqInput).\(JWTBase64URL.encode(emptyReqSig))"

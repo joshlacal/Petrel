@@ -2230,7 +2230,7 @@ public actor NetworkService: NetworkServiceProtocol {
     /// transport checks are unchanged.
     ///
     /// Requests that `SpaceCredentialManager` and `SpaceHostResolver` send on
-    /// their own sessions do not read this scope. The `getSpaceCredential`
+    /// their own sessions do not read this scope. The `authorizeSpaceSync`
     /// exchange passes no per-request limits, so it gets those of the
     /// manager's session: `NetworkResponseLimits.default` (10 MiB) when the
     /// manager created that session itself. The signed request of

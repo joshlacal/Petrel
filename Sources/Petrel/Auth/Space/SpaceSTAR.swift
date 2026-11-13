@@ -11,6 +11,7 @@ public enum SpaceVerificationError: Error, Sendable, Equatable {
     case invalidRecord
     case digestMismatch
     case missingKEMKey
+    case missingSigningKey
 }
 
 /// A complete, verified repository snapshot. No records escape until every frame
@@ -28,20 +29,39 @@ public struct VerifiedSpaceRepository: Sendable {
 }
 
 public enum SpaceSTAR {
+    public static let maximumMetadataBytes = 64 * 1024
+    public static let maximumKeyBytes = 4 * 1024
     public static let maximumRecordBytes = 1_048_576
     public static let defaultMaximumArchiveBytes = 128 * 1_048_576
 
-    /// Verify an October 22 STAR archive. A nil MAC context is only appropriate
-    /// for the repository owner's OAuth response, whose transport authenticates it.
+    /// Verify a repository STAR archive. No records escape until the explicit
+    /// end marker, every frame, and the final set digest have been validated.
     public static func verify(
-        archive: Data, space: SpaceRef, repo: String,
-        sharedSecret: Data? = nil, mac: Data? = nil,
+        archive: Data,
+        space: SpaceRef,
+        repo: String,
         maximumArchiveBytes: Int = defaultMaximumArchiveBytes
+    ) throws -> VerifiedSpaceRepository {
+        try verify(
+            archive: archive,
+            space: space,
+            repo: repo,
+            maximumArchiveBytes: maximumArchiveBytes,
+            authenticate: { _, _ in }
+        )
+    }
+
+    static func verify(
+        archive: Data,
+        space: SpaceRef,
+        repo: String,
+        maximumArchiveBytes: Int,
+        authenticate: (_ revision: String, _ data: Data) throws -> Void
     ) throws -> VerifiedSpaceRepository {
         guard archive.count <= maximumArchiveBytes else { throw SpaceVerificationError.boundsExceeded }
         var cursor = Cursor(bytes: archive)
         guard try cursor.take(4) == Data([0x2A, 0x6C, 1, 0]) else { throw SpaceVerificationError.invalidArchive }
-        let metadata = try cursor.frame(limit: 65536)
+        let metadata = try cursor.frame(limit: maximumMetadataBytes)
         let value = try canonicalObject(metadata)
         guard value["$type"] as? String == "atproto-space-repo",
               Set(value.keys) == ["$type", "ver", "repo", "space", "rev", "data"]
@@ -49,18 +69,18 @@ public enum SpaceSTAR {
             throw SpaceVerificationError.invalidCommit
         }
         let commit = try SpaceResponseVerifier.commitFields(value, space: space, repo: repo)
-        if let sharedSecret, let mac {
-            try SpaceMAC.verify(mac: mac, expected: SpaceMAC.commit(
-                sharedSecret: sharedSecret, space: space.uriString(), repo: repo, rev: commit.rev, data: commit.data
-            ))
-        } else if sharedSecret != nil || mac != nil {
-            throw SpaceVerificationError.malformedHeader
-        }
+        try authenticate(commit.rev, commit.data)
         var records: [VerifiedSpaceRepository.Record] = []
         var previous = Data()
         var hash = SpaceSetHash()
-        while !cursor.isAtEnd {
-            let pathBytes = try cursor.frame(limit: 830)
+        while true {
+            let control = try cursor.take(1)[0]
+            if control == 0 {
+                guard cursor.isAtEnd else { throw SpaceVerificationError.invalidArchive }
+                break
+            }
+            guard control == 1 else { throw SpaceVerificationError.invalidArchive }
+            let pathBytes = try cursor.frame(limit: maximumKeyBytes)
             guard previous.lexicographicallyPrecedes(pathBytes),
                   let path = String(data: pathBytes, encoding: .utf8) else { throw SpaceVerificationError.invalidArchive }
             let components = path.split(separator: "/", omittingEmptySubsequences: false)
@@ -114,9 +134,8 @@ public enum SpaceSTAR {
 
         mutating func frame(limit: Int) throws -> Data {
             var length: UInt64 = 0
-            for index in 0 ..< 10 {
+            for index in 0 ..< 9 {
                 let byte = try take(1)[0]
-                guard index < 9 || byte < 2 else { throw SpaceVerificationError.invalidArchive }
                 length |= UInt64(byte & 127) << (index * 7)
                 if byte & 128 == 0 {
                     guard index == 0 || byte != 0 else { throw SpaceVerificationError.invalidArchive }
@@ -130,6 +149,11 @@ public enum SpaceSTAR {
 }
 
 enum SpaceResponseVerifier {
+    enum VerifiedResponse {
+        case commit(revision: String, data: Data)
+        case record(uri: String, cid: CID)
+    }
+
     static func commitFields(_ value: [String: Any], space: SpaceRef, repo: String) throws -> (rev: String, data: Data) {
         guard let version = value["ver"] as? NSNumber,
               CFGetTypeID(version) != CFBooleanGetTypeID(), version.intValue == 1, version.doubleValue == 1,
@@ -147,31 +171,40 @@ enum SpaceResponseVerifier {
         return (rev, digest)
     }
 
-    static func verifyJSON(_ bytes: Data, method: String, url: URL, space: SpaceRef, repo: String, secret: Data, macHeader: String?) throws {
-        guard let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else { throw SpaceVerificationError.invalidCommit }
+    static func verifyJSON(
+        _ bytes: Data,
+        method: String,
+        url: URL,
+        space: SpaceRef,
+        repo: String
+    ) throws -> VerifiedResponse {
+        guard let value = try JSONSerialization.jsonObject(with: bytes) as? [String: Any] else {
+            throw SpaceVerificationError.invalidCommit
+        }
         if method == "getRecord" {
             let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
             guard let collection = items.first(where: { $0.name == "collection" })?.value,
-                  let rkey = items.first(where: { $0.name == "rkey" })?.value else { throw SpaceVerificationError.invalidRecord }
+                  let rkey = items.first(where: { $0.name == "rkey" })?.value
+            else {
+                throw SpaceVerificationError.invalidRecord
+            }
             let uri = "\(space.uriString())/\(repo)/\(collection)/\(rkey)"
             guard value["uri"] as? String == uri, let cidString = value["cid"] as? String,
                   let cid = try? CID.parse(cidString), let record = value["value"] as? [String: Any]
             else {
                 throw SpaceVerificationError.invalidRecord
             }
-            let mac = try SpaceMACHeader.parse(macHeader, type: "atproto-space-record")
-            try SpaceMAC.verify(mac: mac, expected: SpaceMAC.record(sharedSecret: secret, uri: uri, cid: cid.bytes))
             let encoded = try DAGCBOR.encodeValue(lexiconValue(record))
-            guard encoded.count <= SpaceSTAR.maximumRecordBytes, CID.fromDAGCBOR(encoded) == cid else { throw SpaceVerificationError.invalidRecord }
-            return
+            guard encoded.count <= SpaceSTAR.maximumRecordBytes, CID.fromDAGCBOR(encoded) == cid else {
+                throw SpaceVerificationError.invalidRecord
+            }
+            return .record(uri: uri, cid: cid)
         }
         guard let commit = value["commit"] as? [String: Any] else {
-            if method == "listRepoOps", value["commit"] == nil, macHeader == nil { return }
             throw SpaceVerificationError.invalidCommit
         }
         let fields = try commitFields(commit, space: space, repo: repo)
-        let mac = try SpaceMACHeader.parse(macHeader, type: "atproto-space-repo")
-        try SpaceMAC.verify(mac: mac, expected: SpaceMAC.commit(sharedSecret: secret, space: space.uriString(), repo: repo, rev: fields.rev, data: fields.data))
+        return .commit(revision: fields.rev, data: fields.data)
     }
 
     private static func decodeBytes(_ encoded: String) throws -> Data {
