@@ -22,8 +22,23 @@ public struct OAuthAuthorizationServerConfiguration: Sendable {
     /// The representation of access tokens.
     public var accessTokenFormat: OAuthAccessTokenFormat
 
+    /// Public keys of signing keys that have been replaced but whose tokens
+    /// may still be in use. They are published in the JWKS next to the
+    /// current key, and a verifier built from the server accepts tokens they
+    /// signed. Keep a retired key here for at least one access-token lifetime
+    /// after the switch, then remove it.
+    ///
+    /// Only valid with ``OAuthAccessTokenFormat/signedJWT(_:)``. Every key,
+    /// including the current one, needs a distinct `kid`, so that a token's
+    /// header names exactly one key.
+    public var retiringAccessTokenKeys: [OAuthJSONWebKey] = []
+
     /// Access token lifetime. The profile requires under 30 minutes, and at
     /// most 15 where tokens are not individually revocable.
+    ///
+    /// Signed tokens (``OAuthAccessTokenFormat/signedJWT(_:)``) are capped at
+    /// 15 minutes: a stateless resource server checks only the signature and
+    /// cannot see a revocation.
     public var accessTokenLifetime: TimeInterval
 
     /// How long an unused refresh token of a public client stays valid.
@@ -61,6 +76,13 @@ public struct OAuthAuthorizationServerConfiguration: Sendable {
     /// The largest form body accepted by the PAR, token and revocation
     /// endpoints.
     public var maximumFormBytes: Int
+
+    /// How often the server purges expired state from its store while
+    /// handling requests, in seconds: five minutes by default. `nil` turns
+    /// this off; the host must then call
+    /// ``OAuthAuthorizationServer/purgeExpiredState()`` on a schedule, or the
+    /// store grows without bound.
+    public var expiredStatePurgeInterval: TimeInterval? = 5 * 60
 
     /// Creates a configuration with the profile's recommended lifetimes.
     ///
@@ -124,9 +146,36 @@ public struct OAuthAuthorizationServerConfiguration: Sendable {
               codeLifetime >= 5, codeLifetime <= 5 * 60,
               codeChallengeReuseWindow >= requestLifetime,
               deviceSessionLifetime >= 0,
-              (1024 ... 1_048_576).contains(maximumFormBytes)
+              (1024 ... 1_048_576).contains(maximumFormBytes),
+              expiredStatePurgeInterval.map({ $0 > 0 && $0.isFinite }) ?? true
         else {
             throw OAuthServerError.malformed("OAuth server lifetime configuration is outside the profile's limits")
         }
+        switch accessTokenFormat {
+        case .opaque:
+            guard retiringAccessTokenKeys.isEmpty else {
+                throw OAuthServerError.malformed("retiring access token keys require signed access tokens")
+            }
+        case let .signedJWT(key):
+            // oauth.mdx: at most 15 minutes for tokens that cannot be revoked
+            // individually, which is what a stateless verifier sees.
+            guard accessTokenLifetime <= 15 * 60 else {
+                throw OAuthServerError.malformed("signed access tokens must not live longer than 15 minutes")
+            }
+            if !retiringAccessTokenKeys.isEmpty {
+                let ids = [key.keyID] + retiringAccessTokenKeys.map(\.keyID)
+                let named = ids.compactMap { $0 }
+                guard named.count == ids.count, Set(named).count == named.count else {
+                    throw OAuthServerError.malformed("every access token signing key needs a distinct kid")
+                }
+            }
+        }
+    }
+
+    /// The public keys a verifier accepts for access tokens: the current
+    /// signing key, then the retiring ones. Empty for opaque tokens.
+    var accessTokenVerificationKeys: [OAuthJSONWebKey] {
+        guard case let .signedJWT(key) = accessTokenFormat, let current = try? key.publicJWK else { return [] }
+        return [current] + retiringAccessTokenKeys
     }
 }

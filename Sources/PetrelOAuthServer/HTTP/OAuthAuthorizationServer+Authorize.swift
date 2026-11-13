@@ -1,3 +1,4 @@
+import Crypto
 import Foundation
 import PetrelCrypto
 
@@ -6,7 +7,16 @@ extension OAuthAuthorizationServer {
     // a sibling subdomain cannot set one for this origin (it could set a
     // `__Secure-` cookie with a parent-domain Domain). Only the exact name is
     // read, so a cookie without the prefix is ignored.
-    private var flowCookieName: String { configuration.secureCookies ? "__Host-oauth-flow" : "oauth-flow" }
+    private var flowCookiePrefix: String { configuration.secureCookies ? "__Host-oauth-flow" : "oauth-flow" }
+
+    /// Each authorization in progress has its own flow cookie, named after a
+    /// digest of its CSRF token, so two authorizations in one browser (two
+    /// tabs, two applications) do not overwrite each other. A form post names
+    /// its flow by the CSRF token it carries; the cookie still has to match.
+    private func flowCookieName(csrf: String) -> String {
+        let digest = SHA256.hash(data: Data(csrf.utf8)).prefix(8)
+        return flowCookiePrefix + "-" + digest.map { String(format: "%02x", $0) }.joined()
+    }
     private var deviceCookieName: String { configuration.secureCookies ? "__Host-oauth-device" : "oauth-device" }
 
     /// What a form handler has in hand once the flow cookie, CSRF token and
@@ -181,7 +191,7 @@ extension OAuthAuthorizationServer {
             return errorPage(503, "Try again", "The server cannot answer right now.", request)
         }
         guard let account else {
-            return errorPage(403, "Account unavailable", "This account can no longer be used.", request, clearFlow: true)
+            return errorPage(403, "Account unavailable", "This account can no longer be used.", request, clearFlow: active.flow.csrfToken)
         }
 
         // Consuming the pushed request is the linearization point: one
@@ -195,23 +205,23 @@ extension OAuthAuthorizationServer {
             return errorPage(
                 400, "Request expired",
                 "This authorization request has expired or was already used. Return to the application and try again.",
-                request, clearFlow: true
+                request, clearFlow: active.flow.csrfToken
             )
         } catch {
             return errorPage(503, "Try again", "The server cannot answer right now.", request)
         }
 
         guard decision == "approve" else {
-            return redirect(pushed, [("error", "access_denied"), ("error_description", "the user denied the request")])
+            return redirect(pushed, [("error", "access_denied"), ("error_description", "the user denied the request")], clearing: active.flow.csrfToken)
         }
 
         let granted: Set<String>
         do {
             granted = try await effectiveGrant(for: pushed.binding.requestedScopes, stage: .pushedAuthorizationRequest).scopes
         } catch is OAuthScopeResolutionError {
-            return redirect(pushed, [("error", "invalid_scope"), ("error_description", "a requested permission set could not be resolved")])
+            return redirect(pushed, [("error", "invalid_scope"), ("error_description", "a requested permission set could not be resolved")], clearing: active.flow.csrfToken)
         } catch {
-            return redirect(pushed, [("error", "temporarily_unavailable")])
+            return redirect(pushed, [("error", "temporarily_unavailable")], clearing: active.flow.csrfToken)
         }
 
         let isConfidential = pushed.binding.clientKey != nil
@@ -244,11 +254,11 @@ extension OAuthAuthorizationServer {
         } catch OAuthStoreError.revoked {
             // Every session of the account was revoked after this browser
             // authenticated: the approval it carries is no longer the user's.
-            return redirect(pushed, [("error", "access_denied"), ("error_description", "the sign-in was revoked")])
+            return redirect(pushed, [("error", "access_denied"), ("error_description", "the sign-in was revoked")], clearing: active.flow.csrfToken)
         } catch {
-            return redirect(pushed, [("error", "server_error")])
+            return redirect(pushed, [("error", "server_error")], clearing: active.flow.csrfToken)
         }
-        return redirect(pushed, [("code", code)])
+        return redirect(pushed, [("code", code)], clearing: active.flow.csrfToken)
     }
 
     // MARK: - Flow plumbing
@@ -272,14 +282,15 @@ extension OAuthAuthorizationServer {
         if let origin = request.headers.single("Origin"), origin != issuer {
             return .failure(errorPage(403, "Invalid request", "This form was submitted from another site.", request))
         }
-        guard let sealed = cookie(flowCookieName, in: request),
+        guard let csrf = fields["csrf"],
+              let sealed = cookie(flowCookieName(csrf: csrf), in: request),
               let flow = try? flows.open(sealed, now: now),
-              let csrf = fields["csrf"], ConstantTime.equal(csrf, flow.csrfToken)
+              ConstantTime.equal(csrf, flow.csrfToken)
         else {
             return .failure(errorPage(
                 400, "Session expired",
                 "Your sign-in session expired. Return to the application and try again.",
-                request, clearFlow: true
+                request, clearFlow: fields["csrf"]
             ))
         }
         let pushed: OAuthPushedAuthorizationRequest?
@@ -294,7 +305,7 @@ extension OAuthAuthorizationServer {
             return .failure(errorPage(
                 400, "Request expired",
                 "This authorization request has expired or was already used. Return to the application and try again.",
-                request, clearFlow: true
+                request, clearFlow: flow.csrfToken
             ))
         }
         return .success(ActiveFlow(
@@ -477,7 +488,8 @@ extension OAuthAuthorizationServer {
     /// (RFC 9207), and always `303` so the browser follows it with a GET.
     private func redirect(
         _ pushed: OAuthPushedAuthorizationRequest,
-        _ parameters: [(String, String)]
+        _ parameters: [(String, String)],
+        clearing csrf: String
     ) -> OAuthHTTPResponse {
         let all = parameters + [("state", pushed.state), ("iss", issuer)]
         let query = all.map { "\(OAuthForm.encodeComponent($0.0))=\(OAuthForm.encodeComponent($0.1))" }
@@ -494,7 +506,7 @@ extension OAuthAuthorizationServer {
             ("Cache-Control", "no-store"),
             ("Referrer-Policy", "no-referrer"),
         ])
-        headers.add("Set-Cookie", setCookie(flowCookieName, "", path: "/", maxAge: 0))
+        headers.add("Set-Cookie", setCookie(flowCookieName(csrf: csrf), "", path: "/", maxAge: 0))
         return OAuthHTTPResponse(status: 303, headers: headers)
     }
 
@@ -503,11 +515,11 @@ extension OAuthAuthorizationServer {
         _ title: String,
         _ message: String,
         _ request: OAuthHTTPRequest,
-        clearFlow: Bool = false
+        clearFlow csrf: String? = nil
     ) -> OAuthHTTPResponse {
         var response = html(status, .error(.init(title: title, message: message)), request, flow: nil, redirectURI: nil)
-        if clearFlow {
-            response.headers.add("Set-Cookie", setCookie(flowCookieName, "", path: "/", maxAge: 0))
+        if let csrf {
+            response.headers.add("Set-Cookie", setCookie(flowCookieName(csrf: csrf), "", path: "/", maxAge: 0))
         }
         return response
     }
@@ -539,7 +551,7 @@ extension OAuthAuthorizationServer {
         ])
         if let flow, let sealed = try? flows.seal(flow) {
             headers.add("Set-Cookie", setCookie(
-                flowCookieName, sealed, path: "/",
+                flowCookieName(csrf: flow.csrfToken), sealed, path: "/",
                 maxAge: max(1, Int(flow.expiresAt.timeIntervalSince(clock.now())))
             ))
         }

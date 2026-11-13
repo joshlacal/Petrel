@@ -3,6 +3,7 @@ import Hummingbird
 import HummingbirdTesting
 import NIOCore
 import PetrelOAuthServer
+import PetrelOAuthServerHummingbird
 import Testing
 
 @testable import petrel_oauth_server_example
@@ -303,6 +304,24 @@ struct ExampleServerEndToEndTests {
     try await app.test(.live) { http in
       try await runFlow(http)
     }
+    // The connection's address reached the account authenticator.
+    let address = example.accounts.lastSignInAddress
+    #expect(address == "127.0.0.1" || address == "::1", "\(String(describing: address))")
+  }
+
+  @Test("X-Forwarded-For is honoured only from a trusted proxy, and only its right-most untrusted hop")
+  func forwardedForPolicy() {
+    let proxy = "10.0.0.2"
+    let policy = OAuthClientAddressPolicy.forwardedFor(trustedProxies: [proxy, "10.0.0.3"])
+    let forwarded = OAuthHTTPHeaders([("X-Forwarded-For", "6.6.6.6, 203.0.113.9"), ("X-Forwarded-For", "10.0.0.3")])
+    // Through two trusted proxies: the hop before them.
+    #expect(policy.clientAddress(peer: proxy, headers: forwarded) == "203.0.113.9")
+    // From an untrusted peer the header is ignored.
+    #expect(policy.clientAddress(peer: "198.51.100.7", headers: forwarded) == "198.51.100.7")
+    // A trusted proxy that sent no header is the client.
+    #expect(policy.clientAddress(peer: proxy, headers: OAuthHTTPHeaders()) == proxy)
+    // The default never reads the header.
+    #expect(OAuthClientAddressPolicy.connection.clientAddress(peer: proxy, headers: forwarded) == proxy)
   }
 
   /// Runs `Scripts/ts-client-interop/run.mjs`: the reference TypeScript client

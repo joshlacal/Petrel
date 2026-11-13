@@ -94,6 +94,7 @@ public struct OAuthAuthorizationServer: Sendable {
     let dpopValidator: OAuthDPoPProofValidator
     let assertionValidator: OAuthClientAssertionValidator
     let flows: OAuthBrowserFlowService
+    let purgeSchedule = OAuthPurgeSchedule()
 
     /// Creates a server.
     ///
@@ -160,6 +161,7 @@ public struct OAuthAuthorizationServer: Sendable {
     /// Answers one request. Requests for paths or methods the server does not
     /// serve get `404` or `405`; nothing throws.
     public func handle(_ request: OAuthHTTPRequest) async -> OAuthHTTPResponse {
+        await purgeExpiredStateIfDue()
         let known = Self.routes.filter { $0.path == request.path }
         guard !known.isEmpty else {
             return jsonError(404, "not_found", "no such endpoint", cors: false)
@@ -198,6 +200,30 @@ public struct OAuthAuthorizationServer: Sendable {
         default:
             return jsonError(404, "not_found", "no such endpoint", cors: false)
         }
+    }
+
+    // MARK: - Housekeeping
+
+    /// Removes expired requests, codes, sessions and single-use markers from
+    /// the store.
+    ///
+    /// ``handle(_:)`` calls this itself, at most once per
+    /// ``OAuthAuthorizationServerConfiguration/expiredStatePurgeInterval``, so
+    /// a server that is receiving requests needs nothing more. Call it directly
+    /// from a scheduled job instead when that interval is `nil`, for example
+    /// because purging a large database should not run inside a request.
+    public func purgeExpiredState() async throws {
+        try await store.purgeExpired(now: clock.now())
+    }
+
+    /// Runs ``purgeExpiredState()`` when the interval has passed. A failure
+    /// does not fail the request that happened to trigger it; the next
+    /// interval tries again.
+    private func purgeExpiredStateIfDue() async {
+        guard let interval = configuration.expiredStatePurgeInterval,
+              purgeSchedule.claim(now: clock.now(), interval: interval)
+        else { return }
+        try? await purgeExpiredState()
     }
 
     // MARK: - Session management
@@ -244,11 +270,7 @@ public struct OAuthAuthorizationServer: Sendable {
 
     private func jwksResponse() -> OAuthHTTPResponse {
         struct Document: Encodable { let keys: [OAuthJSONWebKey] }
-        var keys: [OAuthJSONWebKey] = []
-        if case let .signedJWT(key) = configuration.accessTokenFormat, let jwk = try? key.publicJWK {
-            keys = [jwk]
-        }
-        return metadataResponse(Document(keys: keys))
+        return metadataResponse(Document(keys: configuration.accessTokenVerificationKeys))
     }
 
     // MARK: - Shared response helpers
@@ -445,5 +467,23 @@ public struct OAuthAuthorizationServer: Sendable {
         try await OAuthLexiconScopeResolution.expandIncludes(
             requestedScopes, resolver: lexiconResolver, stage: stage
         )
+    }
+}
+
+/// When the server last purged expired state. One request at a time claims a
+/// due purge, so a burst of requests causes one purge, not one each.
+final class OAuthPurgeSchedule: @unchecked Sendable {
+    private let lock = NSLock()
+    private var lastPurge: Date?
+
+    /// True, and records `now`, when no purge has run in the last `interval`.
+    func claim(now: Date, interval: TimeInterval) -> Bool {
+        lock.lock()
+        defer { lock.unlock() }
+        if let lastPurge, now >= lastPurge, now.timeIntervalSince(lastPurge) < interval {
+            return false
+        }
+        lastPurge = now
+        return true
     }
 }

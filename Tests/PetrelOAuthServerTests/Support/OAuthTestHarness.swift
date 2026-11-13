@@ -227,7 +227,8 @@ struct TestServer {
         webClientScopes: Set<String> = ["atproto", "transition:generic", "repo:app.bsky.feed.post?action=create"],
         webClientGrants: Set<String> = ["authorization_code", "refresh_token"],
         trustedClientIDs: Set<String> = [],
-        unknownScopePolicy: OAuthUnknownScopePolicy = .reject
+        unknownScopePolicy: OAuthUnknownScopePolicy = .reject,
+        retiringAccessTokenKeys: [OAuthJSONWebKey] = []
     ) throws {
         store = InMemoryOAuthStore()
         clock = TestClock()
@@ -265,14 +266,16 @@ struct TestServer {
             ),
             keySet: keySet
         ))
+        var configuration = try OAuthAuthorizationServerConfiguration(
+            issuer: #require(URL(string: Self.issuer)),
+            serverSecret: Data(repeating: 7, count: 32),
+            accessTokenFormat: accessTokenFormat,
+            unknownScopePolicy: unknownScopePolicy,
+            trustedClientIDs: trustedClientIDs
+        )
+        configuration.retiringAccessTokenKeys = retiringAccessTokenKeys
         server = try OAuthAuthorizationServer(
-            configuration: OAuthAuthorizationServerConfiguration(
-                issuer: #require(URL(string: Self.issuer)),
-                serverSecret: Data(repeating: 7, count: 32),
-                accessTokenFormat: accessTokenFormat,
-                unknownScopePolicy: unknownScopePolicy,
-                trustedClientIDs: trustedClientIDs
-            ),
+            configuration: configuration,
             store: store,
             accounts: accounts,
             clients: clients,
