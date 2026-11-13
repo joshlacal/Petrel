@@ -1457,6 +1457,7 @@ public actor NetworkService: NetworkServiceProtocol {
                     try await requestDeduplicator.deduplicate(
                         request: request,
                         authIdentity: authIdentity,
+                        ignoringHeaders: requestIDHeaderName.map { [$0] } ?? [],
                         onJoinExisting: releaseLease
                     ) { @Sendable [transportSession, transportDelegate] in
                         return try await Self.executeDataTask(
@@ -2662,7 +2663,7 @@ public actor NetworkService: NetworkServiceProtocol {
             resolvedDID = scopedProxy
         } else {
             // Resolve service DID with strongest signal first (full endpoint),
-            // then fall back to the three-part namespace (e.g., blue.catbird.mls)
+            // then fall back to the three-part namespace (e.g., com.example.chat)
             let fullEndpoint = endpoint
             let threePartNamespace = endpoint.split(separator: ".").prefix(3).joined(separator: ".")
 
@@ -2917,7 +2918,7 @@ public actor NetworkService: NetworkServiceProtocol {
         }
     }
 
-    /// Extract hostname from a DID (e.g., "did:web:mls.catbird.blue#atproto_mls" -> "mls.catbird.blue", or nested path "did:web:evil.example:a:b" -> "evil.example")
+    /// Extract hostname from a DID (e.g., "did:web:chat.example.com#example_chat" -> "chat.example.com", or nested path "did:web:evil.example:a:b" -> "evil.example")
     /// - Parameter did: The DID string
     /// - Returns: The hostname if extractable, nil otherwise
     private func extractHostFromDID(_ did: String) -> String? {
