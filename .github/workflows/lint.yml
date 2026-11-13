@@ -87,3 +87,5 @@ jobs:
             echo "$matches"
             exit 1
           fi
+      - name: Forbid app-specific names in library sources and generator
+        run: Scripts/tests/check-app-specific-names.sh
