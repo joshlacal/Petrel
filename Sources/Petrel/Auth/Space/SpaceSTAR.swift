@@ -42,6 +42,22 @@ public enum SpaceSTAR {
         repo: String,
         maximumArchiveBytes: Int = defaultMaximumArchiveBytes
     ) throws -> VerifiedSpaceRepository {
+        try verify(
+            archive: archive,
+            space: space,
+            repo: repo,
+            maximumArchiveBytes: maximumArchiveBytes,
+            authenticate: { _, _ in }
+        )
+    }
+
+    static func verify(
+        archive: Data,
+        space: SpaceRef,
+        repo: String,
+        maximumArchiveBytes: Int,
+        authenticate: (_ revision: String, _ data: Data) throws -> Void
+    ) throws -> VerifiedSpaceRepository {
         guard archive.count <= maximumArchiveBytes else { throw SpaceVerificationError.boundsExceeded }
         var cursor = Cursor(bytes: archive)
         guard try cursor.take(4) == Data([0x2A, 0x6C, 1, 0]) else { throw SpaceVerificationError.invalidArchive }
@@ -53,6 +69,7 @@ public enum SpaceSTAR {
             throw SpaceVerificationError.invalidCommit
         }
         let commit = try SpaceResponseVerifier.commitFields(value, space: space, repo: repo)
+        try authenticate(commit.rev, commit.data)
         var records: [VerifiedSpaceRepository.Record] = []
         var previous = Data()
         var hash = SpaceSetHash()

@@ -293,6 +293,9 @@ enum SpaceMACHeader {
             var result: Parameters = []
             while current == 59 {
                 index += 1
+                while current == 32 {
+                    index += 1
+                }
                 let name = try key()
                 guard !result.contains(where: { $0.0 == name }) else {
                     throw SpaceVerificationError.malformedHeader
@@ -365,7 +368,10 @@ enum SpaceMACHeader {
                 }
                 index += 1
             }
-            let encoded = String(decoding: bytes[start ..< index], as: UTF8.self)
+            var encoded = String(decoding: bytes[start ..< index], as: UTF8.self)
+            while encoded.count % 4 != 0 {
+                encoded += "="
+            }
             try take(58)
             guard let data = Data(base64Encoded: encoded) else {
                 throw SpaceVerificationError.malformedHeader

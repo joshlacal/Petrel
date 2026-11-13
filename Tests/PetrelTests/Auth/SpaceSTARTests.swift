@@ -54,32 +54,48 @@ struct SpaceSTARTests {
         keyShare: String,
         tag: String? = nil,
         responseKey: String? = nil,
-        duplicateTaggedSignature: Bool = false
+        label: String = "mac",
+        parameters: String? = nil,
+        signedParameters: String? = nil,
+        signedCoveredHeader: String? = nil,
+        duplicateTaggedSignature: Bool = false,
+        omittedHeaders: Set<String> = [],
+        unpaddedSignature: Bool = false
     ) throws -> HTTPURLResponse {
         let tag = tag ?? profile.rawValue
         let responseKey = responseKey ?? keyShare
-        let parameters = "(\"\(profile.rawValue)\";sf);keyid=\"\(responseKey)\";tag=\"\(tag)\""
+        let parameters = parameters ??
+            "(\"\(profile.rawValue)\";sf);keyid=\"\(responseKey)\";tag=\"\(tag)\""
         let base = Data(
-            "\"\(profile.rawValue)\";sf: \(coveredHeader)\n\"@signature-params\": \(parameters)".utf8
+            (
+                "\"\(profile.rawValue)\";sf: \(signedCoveredHeader ?? coveredHeader)\n" +
+                    "\"@signature-params\": \(signedParameters ?? parameters)"
+            ).utf8
         )
-        let authenticationCode = Data(
+        var authenticationCode = Data(
             HMAC<SHA256>.authenticationCode(for: base, using: SymmetricKey(data: secret))
         ).base64EncodedString()
+        if unpaddedSignature {
+            authenticationCode = authenticationCode.replacingOccurrences(of: "=", with: "")
+        }
         let signatureInputs = duplicateTaggedSignature
-            ? "mac=\(parameters), other=\(parameters)"
-            : "mac=\(parameters)"
+            ? "\(label)=\(parameters), other=\(parameters)"
+            : "\(label)=\(parameters)"
         let signatures = duplicateTaggedSignature
-            ? "mac=:\(authenticationCode):, other=:\(authenticationCode):"
-            : "mac=:\(authenticationCode):"
+            ? "\(label)=:\(authenticationCode):, other=:\(authenticationCode):"
+            : "\(label)=:\(authenticationCode):"
+        var headers = [profile.responseHeader: coveredHeader]
+        if !omittedHeaders.contains("Signature-Input") {
+            headers["Signature-Input"] = signatureInputs
+        }
+        if !omittedHeaders.contains("Signature") {
+            headers["Signature"] = signatures
+        }
         return HTTPURLResponse(
             url: URL(string: "https://repo.example")!,
             statusCode: 200,
             httpVersion: nil,
-            headerFields: [
-                profile.responseHeader: coveredHeader,
-                "Signature-Input": signatureInputs,
-                "Signature": signatures,
-            ]
+            headerFields: headers
         )!
     }
 
@@ -185,6 +201,20 @@ struct SpaceSTARTests {
         }
     }
 
+    @Test("Commit authentication runs before record frames are parsed")
+    func authenticatesBeforeRecords() throws {
+        let bytes = try archive(records: [("app.bsky.feed.post/a", Data([0xFF]))]).bytes
+        #expect(throws: SpaceMAC.Failure.mismatch) {
+            try SpaceSTAR.verify(
+                archive: bytes,
+                space: space,
+                repo: repo,
+                maximumArchiveBytes: SpaceSTAR.defaultMaximumArchiveBytes,
+                authenticate: { _, _ in throw SpaceMAC.Failure.mismatch }
+            )
+        }
+    }
+
     @Test("Non-canonical metadata integers are rejected")
     func nonCanonicalMetadata() throws {
         let digest = SpaceSetHash().digest
@@ -271,6 +301,134 @@ struct SpaceSTARTests {
         }
     }
 
+    @Test("MAC structured fields accept canonical equivalents and reject changed coverage")
+    func structuredFieldMAC() throws {
+        let keyShare = "did:key:zDnaExample"
+        let digest = Data(repeating: 1, count: 32)
+        let covered = "ver=1, repo=\"\(repo)\", space=\"\(space.uriString())\", rev=\"\(rev)\", data=:\(digest.base64EncodedString()):"
+        let canonicalParameters = "(\"atproto-space-commit\";sf);keyid=\"\(keyShare)\";tag=\"atproto-space-commit\""
+
+        for (name, response) in try [
+            (
+                "arbitrary label",
+                signedResponse(
+                    profile: .commit,
+                    coveredHeader: covered,
+                    keyShare: keyShare,
+                    label: "other"
+                )
+            ),
+            (
+                "covered dictionary OWS",
+                signedResponse(
+                    profile: .commit,
+                    coveredHeader: covered.replacingOccurrences(of: ", ", with: ",   "),
+                    keyShare: keyShare,
+                    signedCoveredHeader: covered
+                )
+            ),
+            (
+                "parameter SP",
+                signedResponse(
+                    profile: .commit,
+                    coveredHeader: covered,
+                    keyShare: keyShare,
+                    parameters: "(\"atproto-space-commit\"; sf); keyid=\"\(keyShare)\"; tag=\"atproto-space-commit\"",
+                    signedParameters: canonicalParameters
+                )
+            ),
+            (
+                "unpadded covered bytes",
+                signedResponse(
+                    profile: .commit,
+                    coveredHeader: String(covered.dropLast(2)) + ":",
+                    keyShare: keyShare,
+                    signedCoveredHeader: covered
+                )
+            ),
+            (
+                "unpadded signature bytes",
+                signedResponse(
+                    profile: .commit,
+                    coveredHeader: covered,
+                    keyShare: keyShare,
+                    unpaddedSignature: true
+                )
+            ),
+        ] {
+            do {
+                try SpaceMACHeader.verifyCommit(
+                    response: response,
+                    keyShare: keyShare,
+                    sharedSecret: secret,
+                    space: space,
+                    repo: repo,
+                    revision: rev,
+                    data: digest
+                )
+            } catch {
+                Issue.record("\(name): \(error)")
+            }
+        }
+
+        let invalidParameters = [
+            "(\"atproto-space-commit\";sf);keyid=\"\(keyShare)\";tag=\"atproto-space-commit\";alg=\"hmac-sha512\"",
+            "(\"atproto-space-commit\");keyid=\"\(keyShare)\";tag=\"atproto-space-commit\"",
+            "(\"atproto-space-commit\";sf \"extra\");keyid=\"\(keyShare)\";tag=\"atproto-space-commit\"",
+        ]
+        var invalid = try invalidParameters.map {
+            try signedResponse(
+                profile: .commit,
+                coveredHeader: covered,
+                keyShare: keyShare,
+                parameters: $0
+            )
+        }
+        invalid += try [
+            signedResponse(
+                profile: .commit,
+                coveredHeader: covered,
+                keyShare: keyShare,
+                omittedHeaders: ["Signature-Input"]
+            ),
+            signedResponse(
+                profile: .commit,
+                coveredHeader: covered,
+                keyShare: keyShare,
+                omittedHeaders: ["Signature"]
+            ),
+        ]
+        for response in invalid {
+            #expect(throws: SpaceVerificationError.malformedHeader) {
+                try SpaceMACHeader.verifyCommit(
+                    response: response,
+                    keyShare: keyShare,
+                    sharedSecret: secret,
+                    space: space,
+                    repo: repo,
+                    revision: rev,
+                    data: digest
+                )
+            }
+        }
+
+        #expect(throws: SpaceVerificationError.invalidCommit) {
+            try SpaceMACHeader.verifyCommit(
+                response: try signedResponse(
+                    profile: .commit,
+                    coveredHeader: covered,
+                    keyShare: keyShare
+                ),
+                keyShare: keyShare,
+                sharedSecret: secret,
+                space: space,
+                repo: repo,
+                revision: rev,
+                data: Data(repeating: 2, count: 32)
+            )
+        }
+    }
+
     @Test("Record MAC authenticates the covered URI and CID")
     func recordMAC() throws {
         let keyShare = "did:key:zDnaExample"
@@ -323,6 +481,16 @@ struct SpaceSTARTests {
         #expect(throws: (any Error).self) {
             try SpaceResponseVerifier.verifyJSON(
                 body(record, recordURI: uri + "x"), method: "getRecord", url: url, space: space, repo: repo
+            )
+        }
+        let otherCID = try CID.fromDAGCBOR(DAGCBOR.encodeValue(["text": "world"]))
+        #expect(throws: SpaceVerificationError.invalidRecord) {
+            try SpaceResponseVerifier.verifyJSON(
+                body(record, cidString: otherCID.string),
+                method: "getRecord",
+                url: url,
+                space: space,
+                repo: repo
             )
         }
     }

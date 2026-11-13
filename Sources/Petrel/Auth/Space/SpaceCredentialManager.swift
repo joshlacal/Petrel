@@ -546,20 +546,22 @@ public actor SpaceCredentialManager {
         guard generations[space, default: 0] == generation else { throw CancellationError() }
         if (200 ... 299).contains(httpResponse.statusCode), let context {
             if method == "getRepo" {
-                let repository = try SpaceSTAR.verify(
+                _ = try SpaceSTAR.verify(
                     archive: data,
                     space: space,
                     repo: audience,
-                    maximumArchiveBytes: responseLimits?.maximumDecodedBytes ?? SpaceSTAR.defaultMaximumArchiveBytes
-                )
-                try SpaceMACHeader.verifyCommit(
-                    response: httpResponse,
-                    keyShare: context.keyShare,
-                    sharedSecret: context.sharedSecret,
-                    space: space,
-                    repo: audience,
-                    revision: repository.revision,
-                    data: repository.data
+                    maximumArchiveBytes: responseLimits?.maximumDecodedBytes ?? SpaceSTAR.defaultMaximumArchiveBytes,
+                    authenticate: { revision, data in
+                        try SpaceMACHeader.verifyCommit(
+                            response: httpResponse,
+                            keyShare: context.keyShare,
+                            sharedSecret: context.sharedSecret,
+                            space: space,
+                            repo: audience,
+                            revision: revision,
+                            data: data
+                        )
+                    }
                 )
             } else {
                 switch try SpaceResponseVerifier.verifyJSON(
