@@ -5,6 +5,7 @@ import PetrelCrypto
 @testable import PetrelOAuthServer
 @testable import PetrelOAuthServerLexicon
 import PetrelRepo
+import PetrelRepoTestSupport
 import Testing
 
 /// DNS answers by name; a name absent from the table has no TXT records.
@@ -46,12 +47,17 @@ struct LexiconResolverScenario {
         "\(pds)/xrpc/com.atproto.sync.getRecord?did=\(did)&collection=com.atproto.lexicon.schema&rkey=\(nsid)"
     }
 
-    /// - Parameter signedByCommitKey: name the key that signed the commit in
-    ///   the DID document, rather than the requested DID's own key.
-    init(_ variant: PublicRepositoryProofFixtureVariant = .valid, signedByCommitKey: Bool = false) async throws {
-        fixture = try await PublicRepositoryProofFixtureBuilder.build(variant)
-        let x963 = signedByCommitKey ? fixture.commitPublicKeyX963 : fixture.documentPublicKeyX963
-        let key = try ATProtoPublicKey(P256.Signing.PublicKey(x963Representation: x963))
+    /// - Parameters:
+    ///   - signedByCommitKey: name the key that signed the commit in the DID
+    ///     document, rather than the requested DID's own key.
+    ///   - curve: the curve of the repository's signing keys.
+    init(
+        _ variant: PublicRepositoryProofFixtureVariant = .valid,
+        signedByCommitKey: Bool = false,
+        curve: ATProtoKeyCurve = .p256
+    ) async throws {
+        fixture = try await PublicRepositoryProofFixtureBuilder.build(variant, curve: curve)
+        let key = signedByCommitKey ? fixture.commitPublicKey : fixture.documentPublicKey
         authorities = StubLexiconAuthorities(authorities: [
             Self.did: OAuthLexiconAuthority(pdsEndpoint: URL(string: Self.pds)!, signingKey: key),
         ])
@@ -101,9 +107,13 @@ func resolverFailure(_ resolver: AuthenticatedOAuthLexiconResolver, _ nsid: Stri
 
 @Suite("Permission sets: authenticated Lexicon resolution")
 struct AuthenticatedOAuthLexiconResolverTests {
-    @Test("a proved record resolves to its permission set, URI and CID, fetched with sync.getRecord")
-    func resolvesValidProof() async throws {
-        let scenario = try await LexiconResolverScenario()
+    @Test(
+        "a proved record resolves to its permission set, URI and CID, fetched with sync.getRecord",
+        arguments: ATProtoKeyCurve.allCases
+    )
+    func resolvesValidProof(curve: ATProtoKeyCurve) async throws {
+        let scenario = try await LexiconResolverScenario(curve: curve)
+        #expect(scenario.fixture.documentPublicKey.curve == curve)
         let resolution = try await scenario.resolver().resolve(LexiconResolverScenario.nsid)
         guard case let .resolved(.permissionSet(set), sourceURI, cid) = resolution else {
             Issue.record("\(resolution)")
@@ -115,7 +125,7 @@ struct AuthenticatedOAuthLexiconResolverTests {
         #expect(scenario.transport.requests == [LexiconResolverScenario.getRecordURL])
     }
 
-    @Test("every broken proof is refused at the step that catches it", arguments: [
+    @Test("every broken proof is refused at the step that catches it, on either curve", arguments: [
         (PublicRepositoryProofFixtureVariant.twoCARRoots, false, OAuthLexiconResolverFailure.carRootCountInvalid),
         (.crossRepositorySubstitution, false, .commitDIDMismatch),
         // Signature valid under the key named in the document: only the DID
@@ -127,13 +137,13 @@ struct AuthenticatedOAuthLexiconResolverTests {
         (.omittedPathNode, false, .recordNotInProof),
         (.recordTypeMismatch("com.example.foo.item"), false, .recordTypeMismatch),
         (.lexiconIDMismatch("com.example.foo.other"), false, .documentIDMismatch),
-    ])
+    ], ATProtoKeyCurve.allCases)
     func refusesBrokenProofs(
-        variant: PublicRepositoryProofFixtureVariant,
-        signedByCommitKey: Bool,
-        expected: OAuthLexiconResolverFailure
+        vector: (PublicRepositoryProofFixtureVariant, Bool, OAuthLexiconResolverFailure),
+        curve: ATProtoKeyCurve
     ) async throws {
-        let scenario = try await LexiconResolverScenario(variant, signedByCommitKey: signedByCommitKey)
+        let (variant, signedByCommitKey, expected) = vector
+        let scenario = try await LexiconResolverScenario(variant, signedByCommitKey: signedByCommitKey, curve: curve)
         let resolver = try scenario.resolver()
         #expect(await resolverFailure(resolver) == expected)
         #expect(try await resolver.resolve(LexiconResolverScenario.nsid) == .unresolvable)
@@ -197,9 +207,8 @@ struct AuthenticatedOAuthLexiconResolverTests {
             "id": .string(LexiconResolverScenario.nsid),
             "defs": .object(["main": .object(["type": .string("query")])]),
         ]))
-        let key = try ATProtoPublicKey(P256.Signing.PublicKey(x963Representation: fixture.documentPublicKeyX963))
         scenario.authorities.authorities[LexiconResolverScenario.did] = OAuthLexiconAuthority(
-            pdsEndpoint: URL(string: LexiconResolverScenario.pds)!, signingKey: key
+            pdsEndpoint: URL(string: LexiconResolverScenario.pds)!, signingKey: fixture.documentPublicKey
         )
         scenario.transport.serve(LexiconResolverScenario.getRecordURL, .init(body: fixture.carBytes))
         let resolution = try await scenario.resolver().resolve(LexiconResolverScenario.nsid)
@@ -213,8 +222,7 @@ struct AuthenticatedOAuthLexiconResolverTests {
     func identityAuthority() async throws {
         let scenario = try await LexiconResolverScenario()
         let did = LexiconResolverScenario.did
-        func serveDocument(_ x963: Data) throws {
-            let key = try ATProtoPublicKey(P256.Signing.PublicKey(x963Representation: x963))
+        func serveDocument(_ key: ATProtoPublicKey) throws {
             let document: [String: Any] = [
                 "id": did,
                 "verificationMethod": [[
@@ -229,7 +237,7 @@ struct AuthenticatedOAuthLexiconResolverTests {
                 .init(contentType: "application/did+ld+json", body: try JSONSerialization.data(withJSONObject: document))
             )
         }
-        try serveDocument(scenario.fixture.documentPublicKeyX963)
+        try serveDocument(scenario.fixture.documentPublicKey)
         let fetcher = OAuthRemoteDocumentFetcher(
             policy: try OAuthRemoteFetchPolicy(), resolver: StubResolver(), transport: scenario.transport
         )
@@ -248,11 +256,11 @@ struct AuthenticatedOAuthLexiconResolverTests {
         _ = try await resolver.resolve(LexiconResolverScenario.nsid)
         #expect(scenario.transport.requests.filter { $0.hasPrefix("https://plc.directory/") }.count == 1)
 
-        // The authority rotates its signing key. Once the five-minute
-        // authority cache lapses, the new document is fetched, not an
-        // identity-layer copy of the old one.
-        let rotated = try await PublicRepositoryProofFixtureBuilder.build()
-        try serveDocument(rotated.documentPublicKeyX963)
+        // The authority rotates its signing key, to the other curve. Once the
+        // five-minute authority cache lapses, the new document is fetched, not
+        // an identity-layer copy of the old one.
+        let rotated = try await PublicRepositoryProofFixtureBuilder.build(curve: .k256)
+        try serveDocument(rotated.documentPublicKey)
         scenario.transport.serve(LexiconResolverScenario.getRecordURL, .init(contentType: "application/vnd.ipld.car", body: rotated.carBytes))
         clock.advance(OAuthLexiconResolutionBudget.refreshThresholdSeconds + 1)
         let afterRotation = try await resolver.resolve(LexiconResolverScenario.nsid)
@@ -262,25 +270,6 @@ struct AuthenticatedOAuthLexiconResolverTests {
         }
         #expect(cid == rotated.recordCID.string)
         #expect(scenario.transport.requests.filter { $0.hasPrefix("https://plc.directory/") }.count == 2)
-    }
-
-    @Test("secp256k1 commit signatures verify under the document's key, and only that key")
-    func secp256k1Commits() async throws {
-        // PetrelRepo on this base prepares P-256 commits only, so the curve
-        // dispatch is checked on the verifier the proof step hands the codec.
-        let keypair = K256Keypair.generate()
-        let unsigned = Data("unsigned commit bytes".utf8)
-        let signature = try keypair.sign(unsigned)
-        let verifier = OAuthLexiconCommitVerifier(publicKey: keypair.publicKey)
-        #expect(verifier.signingAlgorithm == .secp256k1)
-        try await verifier.verify(signature: signature, unsignedCommitBytes: unsigned, did: LexiconResolverScenario.did)
-        await #expect(throws: PublicRepositoryCommitError.invalidSignature) {
-            try await OAuthLexiconCommitVerifier(publicKey: K256Keypair.generate().publicKey)
-                .verify(signature: signature, unsignedCommitBytes: unsigned, did: LexiconResolverScenario.did)
-        }
-        await #expect(throws: PublicRepositoryCommitError.invalidSignature) {
-            try await verifier.verify(signature: signature, unsignedCommitBytes: Data("other".utf8), did: LexiconResolverScenario.did)
-        }
     }
 
     @Test("include: works end to end with the authenticated resolver: PAR, consent, token, resource")

@@ -126,26 +126,3 @@ public struct OAuthRemoteIdentityHTTPTransport: IdentityHTTPTransport {
         return IdentityHTTPResponse(statusCode: 200, body: body)
     }
 }
-
-// MARK: - Commit verification
-
-/// Verifies a repository commit signature under a key from a DID document, on
-/// either curve. Strict: high-S and non-compact signatures are refused.
-struct OAuthLexiconCommitVerifier: PublicRepositoryCommitVerifier {
-    let publicKey: ATProtoPublicKey
-
-    var signingAlgorithm: PublicRepositorySigningAlgorithm {
-        switch publicKey.curve {
-        case .p256: return .p256
-        case .k256: return .secp256k1
-        }
-    }
-
-    var verificationIdentity: String { publicKey.didKey }
-
-    func verify(signature: Data, unsignedCommitBytes: Data, did _: String) async throws {
-        guard publicKey.isValidSignature(signature, for: unsignedCommitBytes, options: .strict) else {
-            throw PublicRepositoryCommitError.invalidSignature
-        }
-    }
-}
