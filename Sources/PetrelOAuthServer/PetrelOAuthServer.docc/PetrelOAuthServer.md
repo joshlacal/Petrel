@@ -6,15 +6,15 @@ An AT Protocol OAuth 2.0 authorization server, and the resource-server verifier 
 
 `PetrelOAuthServer` is what a PDS or entryway runs to issue tokens: the server side of the [AT Protocol OAuth profile](https://atproto.com/specs/oauth) and the [permission specification](https://atproto.com/specs/permission). It is the counterpart of the OAuth client in the `Petrel` module.
 
-The server is a value with one entry point. ``OAuthAuthorizationServer`` takes an ``OAuthHTTPRequest`` and returns an ``OAuthHTTPResponse``, so it embeds in any web framework; the `Server/` package in the Petrel repository contains a Hummingbird adapter and a runnable example. Everything the server needs from its host is injected:
+The server is a value with one entry point. ``OAuthAuthorizationServer`` takes an ``OAuthHTTPRequest`` and returns an ``OAuthHTTPResponse``, so it embeds in any web framework. A Hummingbird adapter ships as the `PetrelOAuthServerHummingbird` product of this package, built when the package trait `OAuthServerHummingbird` is enabled, and the separate `Server/` package in the Petrel repository contains a runnable example. Everything the server needs from its host is injected:
 
 | Seam | Protocol | Shipped implementation |
 |---|---|---|
 | Accounts and passwords | ``OAuthAccountAuthenticating`` | none (the host's account system) |
 | Persistence | ``OAuthServerStore`` | ``InMemoryOAuthStore`` |
 | Client discovery | ``OAuthClientResolving`` | ``OAuthClientMetadataLoader``, ``StaticOAuthClientResolver`` |
-| Outbound HTTP | ``OAuthRemoteTransport`` | `PinnedNIOOAuthRemoteTransport` (in the `Server` package's `PetrelOAuthServerHummingbird`); ``URLSessionOAuthRemoteTransport`` only with ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport`` |
-| Permission sets | ``OAuthLexiconResolving`` | ``CachingOAuthLexiconResolver``, ``StaticOAuthLexiconResolver`` |
+| Outbound HTTP | ``OAuthRemoteTransport`` | `PinnedNIOOAuthRemoteTransport` (product `PetrelOAuthServerHummingbird`, trait `OAuthServerHummingbird`); ``URLSessionOAuthRemoteTransport`` only with ``OAuthRemoteFetchPolicy/allowsUnpinnedTransport`` |
+| Permission sets | ``OAuthLexiconResolving`` | `AuthenticatedOAuthLexiconResolver` (product `PetrelOAuthServerLexicon`), wrapped in ``CachingOAuthLexiconResolver``; ``StaticOAuthLexiconResolver`` for tests or a vendored table of sets |
 | Authorization Interface | ``OAuthInterfaceRendering`` | ``OAuthDefaultInterface`` |
 | Time and randomness | ``OAuthClock``, ``OAuthRandomSource`` | ``SystemOAuthClock``, ``SystemOAuthRandomSource`` |
 
@@ -26,7 +26,7 @@ What the server implements:
 - DPoP on every request, with rotating server nonces, `jti` replay protection and `ath` at the resource server.
 - The Authorization Interface: sign-in, account selection, an optional second factor, consent with plain-language scope descriptions, and denial.
 - The `authorization_code` and `refresh_token` grants with single-use refresh rotation, session revocation on code or refresh replay, and the profile's lifetimes for public and confidential clients.
-- Token revocation.
+- Token revocation, and session listing and revocation for a "connected applications" page that the host builds.
 - Scopes: `atproto`, the `transition:` scopes, the granular `repo:`, `rpc:`, `blob:`, `account:` and `identity:` permissions, and `include:` permission sets.
 - The scope grammar itself lives in the dependency-free `PetrelOAuthScopes` module, which this module re-exports, so clients and servers share one parser.
 - General-purpose JOSE types for ES256 and ES256K: ``OAuthJSONWebKey``, ``OAuthJSONWebKeySet``, ``OAuthSigningKey`` and ``OAuthCompactJWT``.

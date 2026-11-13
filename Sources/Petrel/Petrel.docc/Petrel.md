@@ -1,27 +1,65 @@
 # ``Petrel``
 
-A Swift 6 SDK for the AT Protocol and Bluesky.
+A Swift 6 SDK for the AT Protocol and Bluesky: typed XRPC calls, OAuth, identity, and Bluesky helpers.
 
 ## Overview
 
-Petrel generates strongly typed, actor-based Swift APIs from the upstream
-`com.atproto.*`, `app.bsky.*`, and `chat.bsky.*` lexicons. Calls are made
-through ``ATProtoClient``, which owns authentication, networking, and account
-state.
+Petrel is a Swift 6 SDK for the AT Protocol and Bluesky. The `Petrel` module gives you
+``ATProtoClient``, which carries a typed method for every query, procedure and
+subscription in the bundled Lexicons (`com.atproto.*`, `app.bsky.*`, `chat.bsky.*`),
+grouped by NSID: `app.bsky.feed.getTimeline` is `client.app.bsky.feed.getTimeline`.
+Authentication (atproto OAuth with PAR, PKCE and DPoP, or app passwords), token refresh,
+service routing and retries apply to every call. Start with <doc:GettingStarted>.
 
-Authentication covers OAuth with PAR, PKCE, and DPoP; a confidential gateway
-mode; a client-assertion backend mode; and a legacy app-password path retained
-for existing integrations. New applications should use OAuth.
+For Bluesky apps, `client.bsky` (``ATProtoClient/bsky``) returns a ``BskyAgent`` with
+higher-level helpers: posting with rich-text facets, images and replies, the social-graph
+verbs, preferences, and moderation decisions. See <doc:BlueskyPosting>,
+<doc:BlueskyModeration> and <doc:BlueskyPreferences>.
+
+To generate the same typed API for your own Lexicons, see <doc:CustomLexicons>.
+
+### Modules
+
+Petrel is split into products so you link only what you use:
+
+| Product | Purpose |
+| :--- | :--- |
+| `Petrel` | Client SDK: ``ATProtoClient``, ``BskyAgent``, ``RichText``, ``Moderation``, ``OAuthConfig``, ``IdentityResolver``, and the generated `com.atproto`, `app.bsky` and `chat.bsky` API |
+| `PetrelCore` | IPLD data model with no networking: `CID`, `DAGCBOR`, `OrderedCBORMap`, `CARReader`, `JSONCoders` |
+| `PetrelCrypto` | P-256 and secp256k1 signing (including Secure Enclave P-256), `did:key` codecs, service-auth JWTs |
+| `PetrelRepo` | Repository engine: commits, CAR files and Merkle Search Trees |
+| `PetrelFirehose` | Event-stream consumers for `com.atproto.sync.subscribeRepos` and other subscriptions |
+| `PetrelJetstream` | Jetstream client (JSON, optional `zstd` compression) |
+| `PetrelPLC` | `did:plc` directory client and audit-log verification |
+| `PetrelPLCPDS` | PLC identity updates coordinated with a PDS |
+| `PetrelOAuthScopes` | The atproto permission-scope grammar (`repo:`, `rpc:`, `blob:`, `account:`, `identity:`, `include:`); re-exported by `Petrel` |
+| `PetrelOAuthServer` | An embeddable atproto OAuth authorization server |
+| `PetrelOAuthServerLexicon` | Lexicon resolution for `include:` permission sets |
+| `PetrelOAuthServerHummingbird` | Hummingbird adapter for `PetrelOAuthServer` (needs the `OAuthServerHummingbird` package trait) |
+| `PetrelLexicon` | Runtime Lexicon schema validation and Lexicon resolution |
+| `PetrelOzone` | Generated `tools.ozone.*` moderation and administration API |
+
+Each module other than `Petrel` has its own documentation. <doc:StreamingAndVerification>
+shows how the streaming and repository modules fit together.
 
 ## Topics
 
-### Getting Started
+### Essentials
 
 - <doc:GettingStarted>
-- <doc:Authentication>
-- <doc:OAuthClient>
+- <doc:ArchitectureAndMentalModel>
+- <doc:RosettaStone>
+- <doc:StreamingAndVerification>
 
-### XRPC and Lexicons
+### Client & Networking
+
+- ``ATProtoClient``
+- ``AuthMode``
+- ``ATProtocolValueContainer``
+- ``ATProtoError``
+- ``NetworkError``
+
+### XRPC & Lexicons
 
 - <doc:XRPCClient>
 - <doc:CustomLexicons>
@@ -31,27 +69,51 @@ for existing integrations. New applications should use OAuth.
 - ``XRPCResponse``
 - ``XRPCResponseMetadata``
 - ``XRPCRateLimit``
+- ``XRPCLabeler``
+- ``XRPCPages``
+- ``XRPCCursorPaginatedParameters``
+- ``XRPCCursorPaginatedOutput``
+- ``EventStreamError``
 - ``ATProtoNullable``
 - ``CIDString``
 - ``LexiconPermissionSet``
 - ``LexiconRecordKeyType``
 
-### Core Components
+### Authentication, OAuth & Scopes
 
-- ``ATProtoClient``
+- <doc:Authentication>
+- <doc:OAuthClient>
+- ``OAuthConfig``
+- ``AuthError``
+- ``AccountStatus``
+- ``AccountStatusError``
+- ``CredentialStorageConfiguration``
 
-The client encapsulates authentication, networking, and account management. You typically do not interact with
-the internal services directly.
-
-### Bluesky
+### Bluesky Agent, Rich Text & Moderation
 
 - <doc:BlueskyPosting>
-- <doc:BlueskyPreferences>
 - <doc:BlueskyModeration>
+- <doc:BlueskyPreferences>
+- ``BskyAgent``
+- ``BskyAgentError``
+- ``RichText``
+- ``RichTextSegment``
+- ``PostEmbed``
+- ``PostImage``
+- ``ImageMetadataStripper``
+- ``Moderation``
+- ``ModerationOptions``
+- ``ModerationDecision``
+- ``BskyPreferences``
 
-### Identifier and Record Utilities
+### Identity, Identifiers & Service Auth
 
+- <doc:Identity>
 - <doc:Identifiers>
+- <doc:ServiceAuthentication>
+- ``IdentityResolver``
+- ``ResolvedIdentity``
+- ``DIDDocument``
 - ``DID``
 - ``Handle``
 - ``ATIdentifier``
@@ -62,5 +124,7 @@ the internal services directly.
 - ``ATProtocolURI``
 - ``ATProtocolDate``
 - ``LanguageTag``
+- ``LanguageCodeContainer``
 - ``URI``
+- ``CIDSyntax``
 - ``ATProtocolError``

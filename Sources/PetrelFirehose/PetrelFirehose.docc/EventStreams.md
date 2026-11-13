@@ -24,35 +24,40 @@ reconnect. The types above are built for long-running consumers.
 
 ## Read the firehose
 
+<!-- compile-example: firehose-read-firehose -->
 ```swift
+import Foundation
 import PetrelFirehose
 
-let subscription = FirehoseSubscription(
-  service: URL(string: "https://bsky.network")!,
-  cursorStorage: InMemoryFirehoseCursorStorage(),   // use your own durable storage
-  autoAcknowledge: true
-)
+func readFirehose() async throws {
+  let subscription = FirehoseSubscription(
+    service: URL(string: "https://bsky.network")!,
+    cursorStorage: InMemoryFirehoseCursorStorage(),   // use your own durable storage
+    autoAcknowledge: true
+  )
 
-for try await element in subscription.events() {
-  switch element {
-  case let .event(.commit(commit)):
-    for operation in try commit.records() {
-      // operation.action, operation.collection, operation.recordKey, operation.record
+  for try await element in subscription.events() {
+    switch element {
+    case let .event(.commit(commit)):
+      for operation in try commit.records() {
+        // operation.action, operation.collection, operation.recordKey, operation.record
+        _ = operation
+      }
+    case let .event(.identity(identity)):
+      // identity.did may have a new handle or DID document: refresh your cache
+      _ = identity
+    case let .event(.account(account)):
+      // account.active / account.status: stop serving content of inactive accounts
+      _ = account
+    case .event(.sync), .event(.info), .event(.error):
+      break
+    case let .sequenceGap(expected, received):
+      // informational; the stream continues
+      _ = (expected, received)
+    case let .ignoredFrame(frame):
+      // unknown message type or a payload that did not match its schema
+      _ = frame
     }
-  case let .event(.identity(identity)):
-    // identity.did may have a new handle or DID document: refresh your cache
-    _ = identity
-  case let .event(.account(account)):
-    // account.active / account.status: stop serving content of inactive accounts
-    _ = account
-  case .event(.sync), .event(.info), .event(.error):
-    break
-  case let .sequenceGap(expected, received):
-    // informational; the stream continues
-    _ = (expected, received)
-  case let .ignoredFrame(frame):
-    // unknown message type or a payload that did not match its schema
-    _ = frame
   }
 }
 ```
@@ -69,17 +74,24 @@ decoded from the commit's `blocks` CAR after checking the block against the oper
 ``EventStreamSubscription`` works for every subscription Lexicon. It decodes into the message
 union the code generator emits for that Lexicon.
 
+<!-- compile-example: firehose-read-labels -->
 ```swift
-let labels = LabelSubscription.labels(
-  service: URL(string: "https://mod.bsky.app")!,
-  cursorStorage: InMemoryFirehoseCursorStorage(initialCursor: 0),   // 0: replay everything
-  autoAcknowledge: true
-)
+import Foundation
+import PetrelFirehose
 
-for try await element in labels.events() {
-  if case let .message(.labels(batch), _) = element {
-    for label in batch.labels {
-      // label.src, label.uri, label.val, label.neg
+func readLabels() async throws {
+  let labels = LabelSubscription.labels(
+    service: URL(string: "https://mod.bsky.app")!,
+    cursorStorage: InMemoryFirehoseCursorStorage(initialCursor: 0),   // 0: replay everything
+    autoAcknowledge: true
+  )
+
+  for try await element in labels.events() {
+    if case let .message(.labels(batch), _) = element {
+      for label in batch.labels {
+        // label.src, label.uri, label.val, label.neg
+        _ = label
+      }
     }
   }
 }
@@ -87,13 +99,20 @@ for try await element in labels.events() {
 
 For another endpoint, name the NSID and the generated `Message` type:
 
+<!-- compile-example: firehose-any-subscription -->
 ```swift
-let stream = EventStreamSubscription<ComAtprotoSyncSubscribeRepos.Message>(
-  nsid: "com.atproto.sync.subscribeRepos",
-  configuration: FirehoseSubscriptionConfiguration(
-    url: URL(string: "wss://bsky.network/xrpc/com.atproto.sync.subscribeRepos")!
+import Foundation
+import Petrel
+import PetrelFirehose
+
+func makeSubscription() -> EventStreamSubscription<ComAtprotoSyncSubscribeRepos.Message> {
+  EventStreamSubscription<ComAtprotoSyncSubscribeRepos.Message>(
+    nsid: "com.atproto.sync.subscribeRepos",
+    configuration: FirehoseSubscriptionConfiguration(
+      url: URL(string: "wss://bsky.network/xrpc/com.atproto.sync.subscribeRepos")!
+    )
   )
-)
+}
 ```
 
 ## Cursors
@@ -141,14 +160,20 @@ finished processing; Petrel sends it as the `cursor` query parameter on every (r
 
 Error frames are typed, so the common ones can be matched directly:
 
+<!-- compile-example: firehose-error-frames -->
 ```swift
-do {
-  for try await _ in subscription.events() {}
-} catch EventStreamError.futureCursor {
-  // The stored cursor is ahead of the server (it may have reset its sequence).
-  // Do not reset the cursor automatically; an operator should decide.
-} catch EventStreamError.consumerTooSlow {
-  // The server dropped this client for falling behind.
+import Petrel
+import PetrelFirehose
+
+func consume(_ subscription: FirehoseSubscription) async throws {
+  do {
+    for try await _ in subscription.events() {}
+  } catch EventStreamError.futureCursor {
+    // The stored cursor is ahead of the server (it may have reset its sequence).
+    // Do not reset the cursor automatically; an operator should decide.
+  } catch EventStreamError.consumerTooSlow {
+    // The server dropped this client for falling behind.
+  }
 }
 ```
 
@@ -184,25 +209,37 @@ limit of the sync specification. A larger message ends the stream with
 Endpoints that require authentication at connect time take extra headers through the
 transport options:
 
+<!-- compile-example: firehose-auth-headers -->
 ```swift
-let factory = URLSessionFirehoseWebSocketFactory(
-  options: FirehoseWebSocketOptions(additionalHeaders: ["Authorization": "Bearer \(token)"])
-)
-let subscription = FirehoseSubscription(url: url, sessionFactory: factory)
+import Foundation
+import PetrelFirehose
+
+func authenticatedSubscription(url: URL, token: String) -> FirehoseSubscription {
+  let factory = URLSessionFirehoseWebSocketFactory(
+    options: FirehoseWebSocketOptions(additionalHeaders: ["Authorization": "Bearer \(token)"])
+  )
+  return FirehoseSubscription(url: url, sessionFactory: factory)
+}
 ```
 
 ## Decode frames without a connection
 
 ``RelayFrameDecoder`` decodes one frame, for example from a capture file.
 
+<!-- compile-example: firehose-decode-frame -->
 ```swift
-switch try RelayFrameDecoder.decodeFrame(frameData) {
-case let .event(event):
-  // RelayEvent
-  _ = event
-case let .ignored(frame):
-  // unknown op or t
-  _ = frame
+import Foundation
+import PetrelFirehose
+
+func decode(frameData: Data) throws {
+  switch try RelayFrameDecoder.decodeFrame(frameData) {
+  case let .event(event):
+    // RelayEvent
+    _ = event
+  case let .ignored(frame):
+    // unknown op or t
+    _ = frame
+  }
 }
 ```
 
@@ -227,7 +264,11 @@ To consume streams on such a system, wrap a WebSocket client of your choice (for
 built on SwiftNIO) in the two protocols. Petrel does not ship one, because that would add a
 networking stack to every consumer of the package.
 
+<!-- compile-example: firehose-custom-transport -->
 ```swift
+import Foundation
+import PetrelFirehose
+
 struct MySession: FirehoseWebSocketSession {
   func receiveMessage() async throws -> Data { /* next binary message */ fatalError() }
   func close() async { /* close the socket */ }
@@ -237,18 +278,49 @@ struct MyFactory: FirehoseWebSocketSessionFactory {
   func makeSession(url: URL) async throws -> any FirehoseWebSocketSession { MySession() }
 }
 
-let subscription = FirehoseSubscription(url: url, sessionFactory: MyFactory())
+func customTransportSubscription(url: URL) -> FirehoseSubscription {
+  FirehoseSubscription(url: url, sessionFactory: MyFactory())
+}
 ```
 
 `receiveMessage()` is called once per element the consumer takes, so a transport that reads
-from the socket on demand keeps the backpressure property.
+from the socket on demand keeps the backpressure property. `sendText(_:)` has a default that
+throws ``FirehoseSubscriptionError/sendingUnsupported``; only Jetstream's legacy
+`options_update` sends messages, so a receive-only transport can leave it out.
 
-## What this module does not do
+## Verifying events
 
-The stream consumers deliver events; they do not authenticate them. Verifying a commit's
-signature against the account's current signing key, and checking `blocks` against `prevData`
-by MST inversion (sync 1.1), are repository-level operations and are not performed on the
-stream. `PetrelRepo` has the CAR, MST and commit primitives.
+The stream consumers deliver events; they do not authenticate them on their own. Verifying a
+commit's signature against the account's current signing key, and checking `blocks` against
+`prevData` by MST inversion (sync 1.1), is a separate step you choose to run on the events you
+trust:
+
+<!-- compile-example: firehose-verify-commit -->
+```swift
+import Petrel
+import PetrelCrypto
+import PetrelFirehose
+
+func verifiedCreates(subscription: FirehoseSubscription) async throws {
+  let keys = CachingServiceAuthKeyResolver(upstream: IdentityResolver())
+  for try await element in subscription.events() {
+    guard case let .event(.commit(commit)) = element else { continue }
+    try await commit.verify(keyResolver: keys)   // throws if the event is not authentic
+    for operation in try commit.records() where operation.action == .create {
+      _ = operation.record
+    }
+  }
+}
+```
+
+``RelayCommitEvent/verify(keyResolver:limits:policy:now:maximumClockSkew:)`` checks that the
+commit in `blocks` is signed by the key the resolver returns for `repo` (retrying once with a
+refreshed key), that its revision is `rev` and not more than five minutes ahead of the clock,
+that the operations invert the new tree to `prevData`, and that every created or updated
+record block matches its CID. After it succeeds, the event's ``RelayCommitEvent/records()``
+are authentic. ``RelaySyncEvent/verify(keyResolver:limits:now:maximumClockSkew:)`` does the
+same for a `#sync` event. Both apply `RepositoryCommitDiff` from `PetrelRepo`; the
+`PetrelRepo` article "Working with Repositories" describes it.
 
 ## Live tests
 

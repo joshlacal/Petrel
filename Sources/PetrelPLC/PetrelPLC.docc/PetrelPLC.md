@@ -44,7 +44,8 @@ signatures (45,414 signatures by K-256 keys and 14,669 by P-256 keys
 across the sample). `Tests/PetrelPLCTests/Vectors/plc-directory/README.md`
 gives the command that repeats it.
 
-The module depends only on `PetrelCore` and `PetrelCrypto`. Changing an
+Within Petrel, the module depends only on `PetrelCore` and `PetrelCrypto`, not
+on the `Petrel` client. Changing an
 identity through the account's PDS, for accounts that hold no rotation key
 of their own, is in the separate `PetrelPLCPDS` product.
 
