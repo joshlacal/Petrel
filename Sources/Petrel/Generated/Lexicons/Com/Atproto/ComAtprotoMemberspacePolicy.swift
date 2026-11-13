@@ -3,19 +3,19 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.memberspace.policy
 
-/// Space policy that governs access via a member list maintained by the space host, managed with putMember and removeMember.
+/// Space policy that grants access based on a member list.
 public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.memberspace.policy"
 
-    /// If true, the authority issues a space credential to anyone, with or without a delegation token. Otherwise, only to members whose entry has read set.
+    /// If true, anyone may read the space. Otherwise, only members with read access.
     public let publicRead: Bool?
-    /// If true, the authority tracks and forwards notifications for any user's writes. Otherwise, only for members whose entry has write set.
+    /// If true, any account's writes are tracked in the writer set, except members without write access. Otherwise, only members with write access.
     public let publicWrite: Bool?
-    /// If set, the authority mints a credential only for these apps, evaluated against the attested client_id. When omitted, any app may read the space and no client attestation is required. Does not apply to writes.
-    public let allowedApps: [String]?
-    /// Publish the policy to readers as a com.atproto.space.policy record in the authority's repo in the space.
+    /// If set, only these apps (by OAuth client ID) may read the space.
+    public let allowedApps: [URI]?
+    /// Publish the policy as a com.atproto.space.policy record in the space.
     public let publishPolicy: Bool?
-    /// Publish the member list to readers as com.atproto.memberspace.member records in the authority's repo in the space.
+    /// Publish the member list as com.atproto.memberspace.member records in the space.
     public let publishMembers: Bool?
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.
@@ -24,7 +24,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
     public init(
         publicRead: Bool? = nil,
         publicWrite: Bool? = nil,
-        allowedApps: [String]? = nil,
+        allowedApps: [URI]? = nil,
         publishPolicy: Bool? = nil,
         publishMembers: Bool? = nil,
         extraFields: [String: ATProtocolValueContainer] = [:]
@@ -42,7 +42,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
         let strict = decoder.isATProtoStrictDecoding
         publicRead = try container.decodeIfPresent(Bool.self, forKey: .publicRead, rejectingNull: strict)
         publicWrite = try container.decodeIfPresent(Bool.self, forKey: .publicWrite, rejectingNull: strict)
-        allowedApps = try container.decodeIfPresent([String].self, forKey: .allowedApps, rejectingNull: strict)
+        allowedApps = try container.decodeIfPresent([URI].self, forKey: .allowedApps, rejectingNull: strict)
         publishPolicy = try container.decodeIfPresent(Bool.self, forKey: .publishPolicy, rejectingNull: strict)
         publishMembers = try container.decodeIfPresent(Bool.self, forKey: .publishMembers, rejectingNull: strict)
         extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)

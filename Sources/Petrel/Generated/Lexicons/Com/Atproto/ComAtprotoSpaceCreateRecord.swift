@@ -3,18 +3,14 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.createRecord
 
-/// Create a single new record in a permissioned space. Requires auth, implemented by PDS.
+/// Create a single new record in a space repo. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceCreateRecord {
     public static let typeIdentifier = "com.atproto.space.createRecord"
 
     public struct Input: ATProtocolCodable {
-        /// Reference to the space.
         public let space: SpaceRef
-        /// The DID of the repo to write to (the authenticated member).
         public let repo: DID
-        /// The NSID of the record collection.
         public let collection: NSID
-        /// The Record Key.
         public let rkey: RecordKey?
         /// Can be set to 'false' to skip Lexicon schema validation of record data, 'true' to require it, or leave unset to validate only for known Lexicons.
         public let validate: Bool?
@@ -115,7 +111,6 @@ public enum ComAtprotoSpaceCreateRecord {
     }
 
     public struct Output: ATProtocolCodable {
-        /// URI of the created record.
         public let uri: ATProtocolURI
         public let cid: CIDString
         public let validationStatus: String?
@@ -176,7 +171,6 @@ public enum ComAtprotoSpaceCreateRecord {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        /// A record already exists at this collection and rkey. Retry with a different rkey, or use putRecord.
         case recordAlreadyExists = "RecordAlreadyExists"
         public var description: String {
             return rawValue
@@ -212,7 +206,7 @@ public enum ComAtprotoSpaceCreateRecord {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - createRecord
 
-    /// Create a single new record in a permissioned space. Requires auth, implemented by PDS.
+    /// Create a single new record in a space repo. Requires auth, implemented by PDS.
     ///
     /// - Parameters:
     ///   - input: The request body

@@ -3,7 +3,7 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.importSpaceMeta
 
-/// Import a space from a space meta archive, as served by exportSpaceMeta, during account migration, replacing whatever this host holds for that space. The space must be anchored on the authenticated account's DID. Must come before importing the account's own repo in the space with importRepo. Notification registrations, credential revocations, and deleted space tombstones are not carried over. Requires OAuth with manage=create and manage=update grants for the space, implemented by PDS.
+/// Import a space's state from an archive produced by exportSpaceMeta, for account migration. Must be called before importing the authority's space repo with importRepo. Requires auth as the space authority, implemented by PDS.
 public enum ComAtprotoSpaceImportSpaceMeta {
     public static let typeIdentifier = "com.atproto.space.importSpaceMeta"
 
@@ -39,9 +39,10 @@ public enum ComAtprotoSpaceImportSpaceMeta {
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        case notSpaceOwner = "NotSpaceOwner"
-        /// The archive's policy, or a value within it, is not one the host implements. A host will not store a policy it cannot enforce.
+        case notAuthorized = "NotAuthorized"
         case unsupportedPolicy = "UnsupportedPolicy"
+        /// The STAR file is malformed or fails verification.
+        case invalidSpaceMeta = "InvalidSpaceMeta"
         public var description: String {
             return rawValue
         }
@@ -61,8 +62,8 @@ public enum ComAtprotoSpaceImportSpaceMeta {
 
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.importSpaceMeta", kind: "procedure",
-        inputEncoding: "application/octet-stream", outputEncoding: nil,
-        declaredErrors: ["NotSpaceOwner", "UnsupportedPolicy"]
+        inputEncoding: "application/vnd.dasl.star", outputEncoding: nil,
+        declaredErrors: ["NotAuthorized", "UnsupportedPolicy", "InvalidSpaceMeta"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -76,7 +77,7 @@ public enum ComAtprotoSpaceImportSpaceMeta {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - importSpaceMeta
 
-    /// Import a space from a space meta archive, as served by exportSpaceMeta, during account migration, replacing whatever this host holds for that space. The space must be anchored on the authenticated account's DID. Must come before importing the account's own repo in the space with importRepo. Notification registrations, credential revocations, and deleted space tombstones are not carried over. Requires OAuth with manage=create and manage=update grants for the space, implemented by PDS.
+    /// Import a space's state from an archive produced by exportSpaceMeta, for account migration. Must be called before importing the authority's space repo with importRepo. Requires auth as the space authority, implemented by PDS.
     ///
     /// - Parameters:
     ///   - data: The request body bytes
@@ -89,7 +90,7 @@ public extension ATProtoClient.Com.Atproto.Space {
         let endpoint = "com.atproto.space.importSpaceMeta"
 
         let headers: [String: String] = [
-            "Content-Type": "application/octet-stream",
+            "Content-Type": "application/vnd.dasl.star",
             "Content-Length": "\(data.count)",
         ]
 

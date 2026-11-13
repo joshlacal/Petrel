@@ -3,16 +3,14 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.memberspace.member
 
-/// An entry in the member list of a space governed by the memberspace policy, published to readers when the policy's publishMembers is set. Keyed by the member's DID. Written by the space authority's PDS to the authority's own repo in the space, and kept in sync with the member list. Only authoritative in the authority's repo.
+/// A published entry in a space's member list, keyed by the member's DID. Only authoritative in the space authority's repo.
 public struct ComAtprotoMemberspaceMember: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.memberspace.member"
 
     /// The record key type this collection declares (`key` in the Lexicon).
     public static let recordKeyType = LexiconRecordKeyType(lexiconValue: "any")
 
-    /// Whether the member may read when the policy's publicRead is not set.
     public let read: Bool
-    /// Whether the member's writes are tracked when the policy's publicWrite is not set.
     public let write: Bool
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.

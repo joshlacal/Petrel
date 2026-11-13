@@ -3,16 +3,15 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.createSpace
 
-/// Create a new space governed by the given policy. The space is anchored on the authenticated user's DID, who becomes the space owner. Requires auth, implemented by PDS.
+/// Create a new space, with the authenticated account as its authority. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceCreateSpace {
     public static let typeIdentifier = "com.atproto.space.createSpace"
 
     public struct Input: ATProtocolCodable {
-        /// The NSID of the space type, describing the modality of the space (e.g. app.bsky.group, app.bsky.personal).
         public let spaceType: NSID
-        /// The space key. Used to differentiate multiple spaces of the same type under the same owner. Same syntax requirements as a record key. If not provided, one will be auto-generated (TID).
+        /// Space key. Generated as a TID if not provided.
         public let skey: RecordKey?
-        /// The policy governing the space, including its configuration.
+        /// PDSes must support all of the listed policies. Other space hosts may support only some of them, and any host may support policies beyond those listed.
         public let policy: InputPolicyUnion
 
         public init(
@@ -73,41 +72,38 @@ public enum ComAtprotoSpaceCreateSpace {
     }
 
     public struct Output: ATProtocolCodable {
-        /// URI of the created space.
-        public let uri: SpaceRef
+        public let space: SpaceRef
 
         public init(
-            uri: SpaceRef
+            space: SpaceRef
         ) {
-            self.uri = uri
+            self.space = space
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            uri = try container.decode(SpaceRef.self, forKey: .uri)
+            space = try container.decode(SpaceRef.self, forKey: .space)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(uri, forKey: .uri)
+            try container.encode(space, forKey: .space)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            let spaceValue = try space.toCBORValue()
+            map = map.adding(key: "space", value: spaceValue)
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
-            case uri
+            case space
         }
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        /// A space with this owner, type, and skey already exists. A space that was previously deleted may be created again.
         case spaceAlreadyExists = "SpaceAlreadyExists"
-        /// The requested policy is not one the host implements.
         case unsupportedPolicy = "UnsupportedPolicy"
         public var description: String {
             return rawValue
@@ -313,7 +309,7 @@ public enum ComAtprotoSpaceCreateSpace {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - createSpace
 
-    /// Create a new space governed by the given policy. The space is anchored on the authenticated user's DID, who becomes the space owner. Requires auth, implemented by PDS.
+    /// Create a new space, with the authenticated account as its authority. Requires auth, implemented by PDS.
     ///
     /// - Parameters:
     ///   - input: The request body

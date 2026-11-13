@@ -3,22 +3,17 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.putRecord
 
-/// Write a record in a permissioned space, creating or updating it as needed. Requires auth, implemented by PDS.
+/// Write a record in a space repo, creating or updating it as needed. Requires auth, implemented by PDS.
 public enum ComAtprotoSpacePutRecord {
     public static let typeIdentifier = "com.atproto.space.putRecord"
 
     public struct Input: ATProtocolCodable {
-        /// Reference to the space.
         public let space: SpaceRef
-        /// The DID of the repo to write to (the authenticated member).
         public let repo: DID
-        /// The NSID of the record collection.
         public let collection: NSID
-        /// The Record Key.
         public let rkey: RecordKey
         /// Can be set to 'false' to skip Lexicon schema validation of record data, 'true' to require it, or leave unset to validate only for known Lexicons.
         public let validate: Bool?
-        /// The record to write.
         public let record: ATProtocolValueContainer
 
         public init(
@@ -100,7 +95,6 @@ public enum ComAtprotoSpacePutRecord {
     }
 
     public struct Output: ATProtocolCodable {
-        /// URI of the written record.
         public let uri: ATProtocolURI
         public let cid: CIDString
         public let validationStatus: String?
@@ -195,7 +189,7 @@ public enum ComAtprotoSpacePutRecord {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - putRecord
 
-    /// Write a record in a permissioned space, creating or updating it as needed. Requires auth, implemented by PDS.
+    /// Write a record in a space repo, creating or updating it as needed. Requires auth, implemented by PDS.
     ///
     /// - Parameters:
     ///   - input: The request body

@@ -3,7 +3,7 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.getLatestCommit
 
-/// Get the current commit for an account's permissioned repo within a space. Served by a repo host. When called with a space credential, the caller must send an Atproto-Space-Want-Mac header, and the commit's MAC is returned in the Atproto-Space-Mac response header. Throws RepoNotFound when the account holds no repo in the space, including the case of a member that has never written to it. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+/// Get the current commit of a space repo. Responses are authenticated with a MAC. Requires auth as the repo's account or with a space credential; implemented by PDS.
 public enum ComAtprotoSpaceGetLatestCommit {
     public static let typeIdentifier = "com.atproto.space.getLatestCommit"
 
@@ -21,7 +21,6 @@ public enum ComAtprotoSpaceGetLatestCommit {
     }
 
     public struct Output: ATProtocolCodable {
-        /// The account's current commit.
         public let commit: ComAtprotoSpaceDefs.Commit
 
         public init(
@@ -53,8 +52,8 @@ public enum ComAtprotoSpaceGetLatestCommit {
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        /// The Atproto-Space-Want-Mac header is missing or malformed, names an unsupported type or version, or carries an invalid key share.
-        case badSpaceMac = "BadSpaceMac"
+        /// The MAC requested in the Accept-Signature header is missing or invalid.
+        case invalidSpaceMac = "InvalidSpaceMac"
         case spaceNotFound = "SpaceNotFound"
         case repoNotFound = "RepoNotFound"
         case repoTakendown = "RepoTakendown"
@@ -80,7 +79,7 @@ public enum ComAtprotoSpaceGetLatestCommit {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.getLatestCommit", kind: "query",
         inputEncoding: nil, outputEncoding: "application/json",
-        declaredErrors: ["BadSpaceMac", "SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated"]
+        declaredErrors: ["InvalidSpaceMac", "SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -94,7 +93,7 @@ public enum ComAtprotoSpaceGetLatestCommit {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - getLatestCommit
 
-    /// Get the current commit for an account's permissioned repo within a space. Served by a repo host. When called with a space credential, the caller must send an Atproto-Space-Want-Mac header, and the commit's MAC is returned in the Atproto-Space-Mac response header. Throws RepoNotFound when the account holds no repo in the space, including the case of a member that has never written to it. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+    /// Get the current commit of a space repo. Responses are authenticated with a MAC. Requires auth as the repo's account or with a space credential; implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     /// - Returns: The HTTP status code (always 2xx) and the decoded response body.

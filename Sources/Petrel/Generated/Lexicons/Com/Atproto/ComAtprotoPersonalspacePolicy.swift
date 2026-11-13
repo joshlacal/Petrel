@@ -3,7 +3,7 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.personalspace.policy
 
-/// Space policy for data that only its owner should see, such as bookmarks, mutes, or drafts. Only the space authority's own account is authorized to read, and the authority tracks no other writers. Has no configuration fields.
+/// Space policy for personal data that only the space authority and authorized apps can read, such as bookmarks or drafts.
 public struct ComAtprotoPersonalspacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.personalspace.policy"
 

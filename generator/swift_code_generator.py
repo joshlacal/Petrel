@@ -916,19 +916,29 @@ class SwiftCodeGenerator(BaseCodeGenerator):
 
     def generate_space_declaration(self, main_def):
         key_type = main_def.get('key', 'tid')
-        name = main_def.get('name', self.lexicon_id)
+        title = json.dumps(main_def['title']) if isinstance(main_def.get('title'), str) else 'nil'
+        title_lang = main_def.get('title:lang', {})
+        if not isinstance(title_lang, dict):
+            title_lang = {}
+        title_lang_literal = ', '.join(
+            f'{json.dumps(language)}: {json.dumps(value)}'
+            for language, value in sorted(title_lang.items())
+            if isinstance(language, str) and isinstance(value, str)
+        )
         collections = main_def.get('collections', [])
         collections_literal = ', '.join(json.dumps(value) for value in collections)
         return f'''\n    public struct SpaceDeclarationDescriptor: Sendable, Equatable {{
         public let nsid: String
         public let keyType: String
-        public let name: String
+        public let title: String?
+        public let titleLang: [String: String]
         public let collections: [String]
     }}
 
     public static let spaceDeclaration = SpaceDeclarationDescriptor(
         nsid: "{self.lexicon_id}", keyType: {json.dumps(key_type)},
-        name: {json.dumps(name)}, collections: [{collections_literal}]
+        title: {title}, titleLang: [{title_lang_literal}],
+        collections: [{collections_literal}]
     )
 '''
 

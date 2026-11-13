@@ -28,7 +28,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
 
         init() {
             var decoders: [String: DecoderFunction] = [:]
-            decoders.reserveCapacity(404)
+            decoders.reserveCapacity(408)
 
             Self.registerChunk0(into: &decoders)
 
@@ -3474,13 +3474,13 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["com.atproto.memberspace.listMembers#member"] = { decoder in
+            decoders["com.atproto.memberspace.defs#member"] = { decoder in
                 do {
-                    let decodedObject = try ComAtprotoMemberspaceListMembers.Member(from: decoder)
+                    let decodedObject = try ComAtprotoMemberspaceDefs.Member(from: decoder)
                     return .knownType(decodedObject)
                 } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoMemberspaceListMembers.Member: \(error)")
-                    return .decodeError("Error decoding ComAtprotoMemberspaceListMembers.Member: \(error)")
+                    LogManager.logDebug("Error decoding ComAtprotoMemberspaceDefs.Member: \(error)")
+                    return .decodeError("Error decoding ComAtprotoMemberspaceDefs.Member: \(error)")
                 }
             }
 
@@ -3756,6 +3756,16 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["com.atproto.space.authorizeSpaceSync#notify"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoSpaceAuthorizeSpaceSync.Notify(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoSpaceAuthorizeSpaceSync.Notify: \(error)")
+                    return .decodeError("Error decoding ComAtprotoSpaceAuthorizeSpaceSync.Notify: \(error)")
+                }
+            }
+
             decoders["com.atproto.space.defs#commit"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoSpaceDefs.Commit(from: decoder)
@@ -3763,6 +3773,26 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 } catch {
                     LogManager.logDebug("Error decoding ComAtprotoSpaceDefs.Commit: \(error)")
                     return .decodeError("Error decoding ComAtprotoSpaceDefs.Commit: \(error)")
+                }
+            }
+
+            decoders["com.atproto.space.defs#repoWrite"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoSpaceDefs.RepoWrite(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoSpaceDefs.RepoWrite: \(error)")
+                    return .decodeError("Error decoding ComAtprotoSpaceDefs.RepoWrite: \(error)")
+                }
+            }
+
+            decoders["com.atproto.space.defs#repoRemoved"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoSpaceDefs.RepoRemoved(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoSpaceDefs.RepoRemoved: \(error)")
+                    return .decodeError("Error decoding ComAtprotoSpaceDefs.RepoRemoved: \(error)")
                 }
             }
 
@@ -3786,16 +3816,6 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
-            decoders["com.atproto.space.listRepos#repo"] = { decoder in
-                do {
-                    let decodedObject = try ComAtprotoSpaceListRepos.Repo(from: decoder)
-                    return .knownType(decodedObject)
-                } catch {
-                    LogManager.logDebug("Error decoding ComAtprotoSpaceListRepos.Repo: \(error)")
-                    return .decodeError("Error decoding ComAtprotoSpaceListRepos.Repo: \(error)")
-                }
-            }
-
             decoders["com.atproto.space.listSpaces#spaceView"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoSpaceListSpaces.SpaceView(from: decoder)
@@ -3806,6 +3826,28 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                 }
             }
 
+            decoders["com.atproto.space.notifySpaceUpdate#spaceDeleted"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoSpaceNotifySpaceUpdate.SpaceDeleted(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoSpaceNotifySpaceUpdate.SpaceDeleted: \(error)")
+                    return .decodeError("Error decoding ComAtprotoSpaceNotifySpaceUpdate.SpaceDeleted: \(error)")
+                }
+            }
+
+            decoders["com.atproto.space.notifySpaceUpdate#registrationExpired"] = { decoder in
+                do {
+                    let decodedObject = try ComAtprotoSpaceNotifySpaceUpdate.RegistrationExpired(from: decoder)
+                    return .knownType(decodedObject)
+                } catch {
+                    LogManager.logDebug("Error decoding ComAtprotoSpaceNotifySpaceUpdate.RegistrationExpired: \(error)")
+                    return .decodeError("Error decoding ComAtprotoSpaceNotifySpaceUpdate.RegistrationExpired: \(error)")
+                }
+            }
+        }
+
+        private static func registerChunk15(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.space.policy"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoSpacePolicy(from: decoder)
@@ -3845,9 +3887,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding ComAtprotoSyncListReposByCollection.Repo: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk15(into decoders: inout [String: DecoderFunction]) {
             decoders["com.atproto.sync.subscribeRepos#commit"] = { decoder in
                 do {
                     let decodedObject = try ComAtprotoSyncSubscribeRepos.Commit(from: decoder)
@@ -4057,7 +4097,9 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding SiteStandardDocument.Contributor: \(error)")
                 }
             }
+        }
 
+        private static func registerChunk16(into decoders: inout [String: DecoderFunction]) {
             decoders["site.standard.document"] = { decoder in
                 do {
                     let decodedObject = try SiteStandardDocument(from: decoder)
@@ -4097,9 +4139,7 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
                     return .decodeError("Error decoding SiteStandardGraphRecommend: \(error)")
                 }
             }
-        }
 
-        private static func registerChunk16(into decoders: inout [String: DecoderFunction]) {
             decoders["site.standard.graph.subscription"] = { decoder in
                 do {
                     let decodedObject = try SiteStandardGraphSubscription(from: decoder)

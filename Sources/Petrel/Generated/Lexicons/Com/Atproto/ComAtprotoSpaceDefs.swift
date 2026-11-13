@@ -6,19 +6,16 @@ import Foundation
 public enum ComAtprotoSpaceDefs {
     public static let typeIdentifier = "com.atproto.space.defs"
 
-    /// A commit over the current state of a permissioned repo. Carries no signature: the repo host authenticates it to a syncer with a MAC in the Atproto-Space-Mac response header.
+    /// Commit to the current state of a space repo. Not signed; authenticated by the repo host with a MAC instead.
     public struct Commit: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.defs#commit"
 
         /// Commit format version, currently 1.
         public let ver: Int
-        /// The author DID of the repo.
         public let repo: DID
-        /// Reference to the space.
         public let space: SpaceRef
-        /// Commit revision (TID).
         public let rev: TID
-        /// sha256 digest of the LtHash state (32 bytes).
+        /// SHA-256 digest of the repo's LtHash state.
         public let data: Bytes
         /// Wire fields this Lexicon revision does not declare. They are kept on decode and
         /// written back on encode, so re-serializing data never drops them.
@@ -116,6 +113,264 @@ public enum ComAtprotoSpaceDefs {
             case space
             case rev
             case data
+        }
+    }
+
+    /// A repo in the space advanced to a new revision.
+    public struct RepoWrite: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.space.defs#repoWrite"
+
+        public let repo: DID
+        public let repoRev: TID
+        public let data: Bytes
+        /// The space revision at which this update was sequenced.
+        public let spaceRev: TID
+        /// The space revision before this update, if any. Set in notifySpaceUpdate, where a gap indicates missed notifications, which can be recovered with listWriters.
+        public let prevSpaceRev: TID?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            repo: DID,
+            repoRev: TID,
+            data: Bytes,
+            spaceRev: TID,
+            prevSpaceRev: TID? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.repo = repo
+            self.repoRev = repoRev
+            self.data = data
+            self.spaceRev = spaceRev
+            self.prevSpaceRev = prevSpaceRev
+            self.extraFields = extraFields
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
+            repo = try container.decode(DID.self, forKey: .repo)
+            repoRev = try container.decode(TID.self, forKey: .repoRev)
+            data = try container.decode(Bytes.self, forKey: .data)
+            spaceRev = try container.decode(TID.self, forKey: .spaceRev)
+            do {
+                prevSpaceRev = try container.decodeIfPresent(TID.self, forKey: .prevSpaceRev, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'prevSpaceRev' — degrading to nil: \(error)")
+                prevSpaceRev = nil
+                malformedFields.insert("prevSpaceRev")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(repo, forKey: .repo)
+            try container.encode(repoRev, forKey: .repoRev)
+            try container.encode(data, forKey: .data)
+            try container.encode(spaceRev, forKey: .spaceRev)
+            try container.encodeIfPresent(prevSpaceRev, forKey: .prevSpaceRev)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(repo)
+            hasher.combine(repoRev)
+            hasher.combine(data)
+            hasher.combine(spaceRev)
+            if let value = prevSpaceRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(extraFields)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if repo != other.repo {
+                return false
+            }
+            if repoRev != other.repoRev {
+                return false
+            }
+            if data != other.data {
+                return false
+            }
+            if spaceRev != other.spaceRev {
+                return false
+            }
+            if prevSpaceRev != other.prevSpaceRev {
+                return false
+            }
+            return extraFields == other.extraFields
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let repoValue = try repo.toCBORValue()
+            map = map.adding(key: "repo", value: repoValue)
+            let repoRevValue = try repoRev.toCBORValue()
+            map = map.adding(key: "repoRev", value: repoRevValue)
+            let dataValue = try data.toCBORValue()
+            map = map.adding(key: "data", value: dataValue)
+            let spaceRevValue = try spaceRev.toCBORValue()
+            map = map.adding(key: "spaceRev", value: spaceRevValue)
+            if let value = prevSpaceRev {
+                let prevSpaceRevValue = try value.toCBORValue()
+                map = map.adding(key: "prevSpaceRev", value: prevSpaceRevValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+        }
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "repo", "repoRev", "data", "spaceRev", "prevSpaceRev"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "repo": return true
+            case "repoRev": return true
+            case "data": return true
+            case "spaceRev": return true
+            case "prevSpaceRev": return prevSpaceRev != nil
+            default: return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case repo
+            case repoRev
+            case data
+            case spaceRev
+            case prevSpaceRev
+        }
+    }
+
+    /// A repo was removed from the writer set.
+    public struct RepoRemoved: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.space.defs#repoRemoved"
+
+        public let repo: DID
+        /// The space revision at which this update was sequenced.
+        public let spaceRev: TID
+        /// The space revision before this update, if any. Set in notifySpaceUpdate, where a gap indicates missed notifications, which can be recovered with listWriters.
+        public let prevSpaceRev: TID?
+        /// Wire fields this Lexicon revision does not declare. They are kept on decode and
+        /// written back on encode, so re-serializing data never drops them.
+        public let extraFields: [String: ATProtocolValueContainer]
+
+        public init(
+            repo: DID,
+            spaceRev: TID,
+            prevSpaceRev: TID? = nil,
+            extraFields: [String: ATProtocolValueContainer] = [:]
+        ) {
+            self.repo = repo
+            self.spaceRev = spaceRev
+            self.prevSpaceRev = prevSpaceRev
+            self.extraFields = extraFields
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
+            repo = try container.decode(DID.self, forKey: .repo)
+            spaceRev = try container.decode(TID.self, forKey: .spaceRev)
+            do {
+                prevSpaceRev = try container.decodeIfPresent(TID.self, forKey: .prevSpaceRev, rejectingNull: strict)
+            } catch {
+                // Invalid data is invalid as a whole (Lexicon specification); strict decoders
+                // fail here. The default keeps reading what the network actually serves and
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                guard !strict else { throw error }
+                LogManager.logWarning("Decoding error for optional property 'prevSpaceRev' — degrading to nil: \(error)")
+                prevSpaceRev = nil
+                malformedFields.insert("prevSpaceRev")
+            }
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(repo, forKey: .repo)
+            try container.encode(spaceRev, forKey: .spaceRev)
+            try container.encodeIfPresent(prevSpaceRev, forKey: .prevSpaceRev)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(repo)
+            hasher.combine(spaceRev)
+            if let value = prevSpaceRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            hasher.combine(extraFields)
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if repo != other.repo {
+                return false
+            }
+            if spaceRev != other.spaceRev {
+                return false
+            }
+            if prevSpaceRev != other.prevSpaceRev {
+                return false
+            }
+            return extraFields == other.extraFields
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            let repoValue = try repo.toCBORValue()
+            map = map.adding(key: "repo", value: repoValue)
+            let spaceRevValue = try spaceRev.toCBORValue()
+            map = map.adding(key: "spaceRev", value: spaceRevValue)
+            if let value = prevSpaceRev {
+                let prevSpaceRevValue = try value.toCBORValue()
+                map = map.adding(key: "prevSpaceRev", value: prevSpaceRevValue)
+            }
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
+        }
+
+        private static let knownFieldKeys: Swift.Set<String> = ["$type", "repo", "spaceRev", "prevSpaceRev"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "repo": return true
+            case "spaceRev": return true
+            case "prevSpaceRev": return prevSpaceRev != nil
+            default: return false
+            }
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case repo
+            case spaceRev
+            case prevSpaceRev
         }
     }
 }

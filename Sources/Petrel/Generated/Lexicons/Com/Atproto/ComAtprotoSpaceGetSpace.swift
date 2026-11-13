@@ -3,7 +3,7 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.getSpace
 
-/// Describe a space, including the policy that governs it. Served by the space host for every space it hosts, regardless of policy. Requires OAuth as the space owner with a covering read_self grant. A policy may optionally be published in the space, as a com.atproto.space.policy record, so that syncers can view it.
+/// Get a space and its policy. Requires auth as the space authority, implemented by PDS.
 public enum ComAtprotoSpaceGetSpace {
     public static let typeIdentifier = "com.atproto.space.getSpace"
 
@@ -18,48 +18,48 @@ public enum ComAtprotoSpaceGetSpace {
     }
 
     public struct Output: ATProtocolCodable {
-        /// URI of the space.
-        public let uri: SpaceRef
-        /// The policy governing the space, including its configuration.
+        public let space: SpaceRef
+        /// PDSes must support all of the listed policies. Other space hosts may support only some of them, and any host may support policies beyond those listed.
         public let policy: OutputPolicyUnion
 
         public init(
-            uri: SpaceRef,
+            space: SpaceRef,
             policy: OutputPolicyUnion
         ) {
-            self.uri = uri
+            self.space = space
             self.policy = policy
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
-            uri = try container.decode(SpaceRef.self, forKey: .uri)
+            space = try container.decode(SpaceRef.self, forKey: .space)
             policy = try container.decode(OutputPolicyUnion.self, forKey: .policy)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(uri, forKey: .uri)
+            try container.encode(space, forKey: .space)
             try container.encode(policy, forKey: .policy)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
-            let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            let spaceValue = try space.toCBORValue()
+            map = map.adding(key: "space", value: spaceValue)
             let policyValue = try policy.toCBORValue()
             map = map.adding(key: "policy", value: policyValue)
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
-            case uri
+            case space
             case policy
         }
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
+        case notAuthorized = "NotAuthorized"
         public var description: String {
             return rawValue
         }
@@ -80,7 +80,7 @@ public enum ComAtprotoSpaceGetSpace {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.getSpace", kind: "query",
         inputEncoding: nil, outputEncoding: "application/json",
-        declaredErrors: ["SpaceNotFound"]
+        declaredErrors: ["SpaceNotFound", "NotAuthorized"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -264,7 +264,7 @@ public enum ComAtprotoSpaceGetSpace {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - getSpace
 
-    /// Describe a space, including the policy that governs it. Served by the space host for every space it hosts, regardless of policy. Requires OAuth as the space owner with a covering read_self grant. A policy may optionally be published in the space, as a com.atproto.space.policy record, so that syncers can view it.
+    /// Get a space and its policy. Requires auth as the space authority, implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     /// - Returns: The HTTP status code (always 2xx) and the decoded response body.

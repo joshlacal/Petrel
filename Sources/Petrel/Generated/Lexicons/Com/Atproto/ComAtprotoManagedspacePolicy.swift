@@ -3,13 +3,13 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.managedspace.policy
 
-/// Space policy that defers each user access decision to an external managing app, which the authority asks via checkUserAccess.
+/// Space policy that delegates access decisions to an external app through checkAccess.
 public struct ComAtprotoManagedspacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.managedspace.policy"
 
-    /// Service identifier of the managing app: a DID with an optional service fragment (e.g. 'did:web:example.com#forum').
+    /// The `did#serviceId` reference of the managing app.
     public let managingApp: String
-    /// Publish the policy to readers as a com.atproto.space.policy record in the authority's repo in the space.
+    /// Publish the policy as a com.atproto.space.policy record in the space.
     public let publishPolicy: Bool?
     /// Wire fields this Lexicon revision does not declare. They are kept on decode and
     /// written back on encode, so re-serializing data never drops them.

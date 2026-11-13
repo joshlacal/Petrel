@@ -3,7 +3,7 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.applyWrites
 
-/// Apply a batch transaction of creates, updates, and deletes in a permissioned space. Requires auth, implemented by PDS.
+/// Apply a batch transaction of creates, updates, and deletes to a space repo. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceApplyWrites {
     public static let typeIdentifier = "com.atproto.space.applyWrites"
 
@@ -538,9 +538,7 @@ public enum ComAtprotoSpaceApplyWrites {
     }
 
     public struct Input: ATProtocolCodable {
-        /// Reference to the space.
         public let space: SpaceRef
-        /// The DID of the repo to write to (the authenticated member).
         public let repo: DID
         /// Can be set to 'false' to skip Lexicon schema validation of record data across all operations, 'true' to require it, or leave unset to validate only for known Lexicons.
         public let validate: Bool?
@@ -655,9 +653,7 @@ public enum ComAtprotoSpaceApplyWrites {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        /// An update or delete targeted a record that does not exist.
         case recordNotFound = "RecordNotFound"
-        /// A create targeted a collection and rkey that already holds a record.
         case recordAlreadyExists = "RecordAlreadyExists"
         public var description: String {
             return rawValue
@@ -1015,7 +1011,7 @@ public enum ComAtprotoSpaceApplyWrites {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - applyWrites
 
-    /// Apply a batch transaction of creates, updates, and deletes in a permissioned space. Requires auth, implemented by PDS.
+    /// Apply a batch transaction of creates, updates, and deletes to a space repo. Requires auth, implemented by PDS.
     ///
     /// - Parameters:
     ///   - input: The request body

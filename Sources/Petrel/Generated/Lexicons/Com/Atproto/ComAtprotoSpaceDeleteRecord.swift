@@ -3,18 +3,14 @@ import Foundation
 
 // lexicon: 1, id: com.atproto.space.deleteRecord
 
-/// Delete a record from a permissioned space, or ensure it doesn't exist. Succeeds whether or not the record was present. Requires auth, implemented by PDS.
+/// Delete a record from a space repo, or ensure it doesn't exist. Requires auth, implemented by PDS.
 public enum ComAtprotoSpaceDeleteRecord {
     public static let typeIdentifier = "com.atproto.space.deleteRecord"
 
     public struct Input: ATProtocolCodable {
-        /// Reference to the space.
         public let space: SpaceRef
-        /// The DID of the repo to delete from (the authenticated member).
         public let repo: DID
-        /// The NSID of the record collection.
         public let collection: NSID
-        /// The Record Key.
         public let rkey: RecordKey
 
         public init(
@@ -120,7 +116,7 @@ public enum ComAtprotoSpaceDeleteRecord {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - deleteRecord
 
-    /// Delete a record from a permissioned space, or ensure it doesn't exist. Succeeds whether or not the record was present. Requires auth, implemented by PDS.
+    /// Delete a record from a space repo, or ensure it doesn't exist. Requires auth, implemented by PDS.
     ///
     /// - Parameters:
     ///   - input: The request body
