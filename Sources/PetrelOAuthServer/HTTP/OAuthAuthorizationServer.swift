@@ -231,7 +231,18 @@ public struct OAuthAuthorizationServer: Sendable {
 
     // MARK: - Session management
 
+    // The server ships no account page and no route for these methods. The
+    // atproto OAuth profile says a server *should* let users see and revoke
+    // their sessions, and that page belongs to the host: it sits behind the
+    // host's own account sign-in, CSRF protection and design, none of which
+    // this library sees. The host calls these methods from that page, always
+    // with the subject of the account signed in to it.
+
     /// The account's active sessions, for a "connected applications" page.
+    ///
+    /// The server serves no such page itself. A host builds it behind its own
+    /// account sign-in and lists what this returns: client, scopes and dates
+    /// for each session.
     public func sessions(subject: String) async throws -> [OAuthSession] {
         try await store.sessions(subject: subject, now: clock.now())
     }
@@ -239,6 +250,10 @@ public struct OAuthAuthorizationServer: Sendable {
     /// Revokes one of the account's sessions. A session that belongs to
     /// another account is left untouched, so a caller cannot revoke by
     /// guessing identifiers.
+    ///
+    /// For the host's "connected applications" page. The host must check that
+    /// the request comes from the account named by `subject`, signed in to the
+    /// host, and must protect the form that calls this against CSRF.
     ///
     /// - Returns: whether a session of this account was revoked.
     @discardableResult
