@@ -1,0 +1,128 @@
+name: OAuth server
+
+# The nested Server package: the Hummingbird adapter for PetrelOAuthServer, the
+# pinned NIO transport, the runnable example authorization server and its HTTP
+# end-to-end tests, and the CAB server. It depends on the root package by path,
+# so it is built against this commit.
+#
+# The TypeScript interop job runs the reference client (@atproto/oauth-client-node)
+# against the example authorization server: PAR, the Authorization Interface,
+# code exchange, a DPoP-protected resource call, refresh and revocation, for a
+# public loopback client and a confidential private_key_jwt client. It installs
+# packages from npm, so it runs nightly and on demand, not on pull requests.
+'on':
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: '17 6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: oauth-server-${{ github.ref }}-${{ github.event_name }}
+  cancel-in-progress: true
+
+jobs:
+  server-macos:
+    name: Server package (macOS)
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    runs-on: macos-26
+    env:
+      DEVELOPER_DIR: /Applications/Xcode_26.6.app/Contents/Developer
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Build and test the Server package
+        shell: bash
+        run: |
+          set -euo pipefail
+          xcrun swift --version
+          xcrun swift build --package-path Server --build-tests
+          xcrun swift test --package-path Server --skip-build
+
+  server-linux:
+    name: Server package (Linux, Swift 6.1.2)
+    if: ${{ github.event_name == 'push' || github.event_name == 'pull_request' }}
+    runs-on: ubuntu-24.04
+    container: swift:6.1.2-jammy@sha256:5910655d205a5a54b0b9efdf72c4066a8de1932513fdc81793e2544b5d5a0709
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install system dependencies
+        # Same retry as the root Linux job: the container resolver is not
+        # always ready when the job starts.
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if apt-get update && apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config; then
+              exit 0
+            fi
+            echo "apt attempt ${attempt} failed; retrying in $((attempt * 15))s"
+            if [ "${attempt}" -eq 2 ]; then
+              printf "nameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+            fi
+            sleep $((attempt * 15))
+          done
+          echo "apt-get could not install system dependencies after 6 attempts" >&2
+          exit 1
+      - name: Build and test the Server package
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(swift --version | head -n 1)" = 'Swift version 6.1.2 (swift-6.1.2-RELEASE)'
+          swift build --package-path Server --build-tests
+          swift test --package-path Server --skip-build
+
+  ts-client-interop:
+    name: TypeScript client against the example server
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-24.04
+    container: swift:6.1.2-jammy@sha256:5910655d205a5a54b0b9efdf72c4066a8de1932513fdc81793e2544b5d5a0709
+    env:
+      NODE_VERSION: v22.23.5
+      NODE_SHA256: cdeb8670a0c81f51b4dc4ac61919f9b1ad917b304bf8221eb939570663d240f8
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
+        with:
+          persist-credentials: false
+      - name: Install system dependencies
+        run: |
+          for attempt in 1 2 3 4 5 6; do
+            if apt-get update && apt-get install -y libsecret-1-dev libglib2.0-dev pkg-config curl xz-utils; then
+              exit 0
+            fi
+            echo "apt attempt ${attempt} failed; retrying in $((attempt * 15))s"
+            if [ "${attempt}" -eq 2 ]; then
+              printf "nameserver 1.1.1.1\nnameserver 8.8.8.8\n" > /etc/resolv.conf
+            fi
+            sleep $((attempt * 15))
+          done
+          echo "apt-get could not install system dependencies after 6 attempts" >&2
+          exit 1
+      - name: Install Node.js (checksum-pinned)
+        # Downloaded directly rather than through a setup action, so the only
+        # third-party code is the pinned tarball itself.
+        shell: bash
+        run: |
+          set -euo pipefail
+          archive="node-${NODE_VERSION}-linux-x64.tar.xz"
+          curl -fsSLo "/tmp/${archive}" "https://nodejs.org/dist/${NODE_VERSION}/${archive}"
+          echo "${NODE_SHA256}  /tmp/${archive}" | sha256sum -c -
+          mkdir -p /opt/node
+          tar -xJf "/tmp/${archive}" -C /opt/node --strip-components=1
+          echo /opt/node/bin >> "$GITHUB_PATH"
+      - name: Install the reference client
+        working-directory: Server/Scripts/ts-client-interop
+        run: npm install --no-audit --no-fund
+      - name: Run the interop test
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "commit under test: ${GITHUB_SHA}"
+          node --version
+          export PETREL_TS_INTEROP_DIR="$GITHUB_WORKSPACE/Server/Scripts/ts-client-interop"
+          swift test --package-path Server --filter typeScriptClientInterop
