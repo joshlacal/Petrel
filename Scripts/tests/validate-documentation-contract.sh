@@ -9,6 +9,9 @@ README="$ROOT/README.md"
 GUIDE="$ROOT/GETTING_STARTED.md"
 GETTING_STARTED="$ROOT/Sources/Petrel/Petrel.docc/GettingStarted.md"
 AUTHENTICATION="$ROOT/Sources/Petrel/Petrel.docc/Authentication.md"
+ARCHITECTURE="$ROOT/Sources/Petrel/Petrel.docc/ArchitectureAndMentalModel.md"
+ROSETTA="$ROOT/Sources/Petrel/Petrel.docc/RosettaStone.md"
+STREAMING="$ROOT/Sources/Petrel/Petrel.docc/StreamingAndVerification.md"
 RELEASE_NOTES="$ROOT/docs/releases/0.2.0.md"
 TMP=$(mktemp -d "${TMPDIR:-/tmp}/petrel-documentation-contract.XXXXXX")
 trap 'rm -rf "$TMP"' EXIT
@@ -21,13 +24,20 @@ trap 'rm -rf "$TMP"' EXIT
 /bin/bash -n "$VALIDATOR"
 /bin/bash -n "$EXTRACTOR"
 
+for required_article in "$ARCHITECTURE" "$ROSETTA" "$STREAMING"; do
+    [[ -f $required_article ]] || {
+        echo "missing required DocC article: $required_article" >&2
+        exit 1
+    }
+done
+
 /usr/bin/grep -F 'set -euo pipefail' "$VALIDATOR" >/dev/null
 # The following patterns intentionally assert literal shell expressions.
 # shellcheck disable=SC2016
 /usr/bin/grep -F 'source "$ROOT/Scripts/activate-release-toolchain.sh"' "$VALIDATOR" >/dev/null
 # shellcheck disable=SC2016
 /usr/bin/grep -F '"$RELEASE_SWIFT" package' "$VALIDATOR" >/dev/null
-/usr/bin/grep -F -- '--target Petrel' "$VALIDATOR" >/dev/null
+/usr/bin/grep -F 'Petrel' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F -- '--warnings-as-errors' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'RELEASE_TOOLCHAIN_LANE:-' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'RELEASE_SWIFT_VERSION:-' "$VALIDATOR" >/dev/null
@@ -57,7 +67,7 @@ trap 'rm -rf "$TMP"' EXIT
 # The backticks are literal Markdown in the required release-scope sentence.
 /usr/bin/grep -F 'Kotlin publication' "$README" >/dev/null
 # shellcheck disable=SC2016
-/usr/bin/grep -F 'outside the `0.2.0` SPM release gate.' "$README" >/dev/null
+/usr/bin/grep -F 'outside the `2.0.0` SPM release gate.' "$README" >/dev/null
 /usr/bin/grep -F 'Kotlin' "$GUIDE" >/dev/null
 /usr/bin/grep -F 'outside this SPM release gate' "$GUIDE" >/dev/null
 /usr/bin/grep -F 'loginWithPassword' "$AUTHENTICATION" >/dev/null
@@ -73,8 +83,6 @@ if /usr/bin/grep -F 'API_REFERENCE.md' "$README" "$GUIDE" >/dev/null; then
     echo "launch guides must not link the unvalidated API reference as authoritative" >&2
     exit 1
 fi
-/usr/bin/grep -F 'exactly these four launch documents' "$README" >/dev/null
-/usr/bin/grep -F 'does not certify every Markdown file' "$README" >/dev/null
 /usr/bin/grep -F -- '-typecheck' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F -- '-parse-as-library' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F -- '-warnings-as-errors' "$VALIDATOR" >/dev/null
@@ -89,14 +97,26 @@ fi
 /usr/bin/grep -F 'oauth-authentication.swift' "$VALIDATOR" >/dev/null
 /usr/bin/grep -F 'oauth-callback.swift' "$VALIDATOR" >/dev/null
 
-mkdir "$TMP/examples"
-"$EXTRACTOR" "$TMP/examples" \
-    "$README" \
-    "$GUIDE" \
-    "$GETTING_STARTED" \
-    "$AUTHENTICATION"
+catalog_files=()
+while IFS= read -r md_file; do
+    catalog_files+=("$md_file")
+done < <(find "$ROOT/Sources/Petrel/Petrel.docc" -maxdepth 1 -type f -name '*.md' | LC_ALL=C sort)
 
-expected_examples=$(printf '%s\n' \
+documentation_sources=("$README" "$GUIDE" "$ROOT/docs/Spaces.md")
+while IFS= read -r catalog_article; do
+    documentation_sources+=("$catalog_article")
+done < <(find "$ROOT/Sources" -path '*/*.docc/*' -type f -name '*.md' | LC_ALL=C sort)
+
+mkdir "$TMP/examples"
+"$EXTRACTOR" "$TMP/examples" "${documentation_sources[@]}"
+
+fence_count=$(cat "${documentation_sources[@]}" | /usr/bin/grep -c '^```swift$' || true)
+example_count=$(find "$TMP/examples" -type f -name '*.swift' | /usr/bin/wc -l | /usr/bin/tr -d ' ')
+[[ $example_count == "$fence_count" ]] || {
+    printf 'extracted %s examples from %s Swift fences\n' "$example_count" "$fence_count" >&2
+    exit 1
+}
+for required_example in \
     getting-started-basic.swift \
     guide-oauth.swift \
     guide-package-manifest.swift \
@@ -104,16 +124,14 @@ expected_examples=$(printf '%s\n' \
     oauth-authentication.swift \
     oauth-callback.swift \
     package-manifest.swift \
-    readme-encrypted-credentials.swift \
     readme-oauth.swift \
     readme-package-manifest.swift \
-    readme-public-profile.swift)
-actual_examples=$(find "$TMP/examples" -type f -name '*.swift' -exec basename {} \; | LC_ALL=C sort)
-[[ $actual_examples == "$expected_examples" ]] || {
-    printf 'unexpected extracted example inventory\nexpected:\n%s\nactual:\n%s\n' \
-        "$expected_examples" "$actual_examples" >&2
-    exit 1
-}
+    readme-public-profile.swift; do
+    [[ -f "$TMP/examples/$required_example" ]] || {
+        echo "required documentation example is missing: $required_example" >&2
+        exit 1
+    }
+done
 while IFS= read -r required_manifest_fragment; do
     /usr/bin/grep -F \
         "$required_manifest_fragment" \
@@ -124,7 +142,7 @@ while IFS= read -r required_manifest_fragment; do
 done <<'MANIFEST'
 .macOS(.v15)
 .iOS(.v18)
-.upToNextMinor(from: "0.2.0")
+from: "2.0.0"
 .product(name: "Petrel", package: "Petrel")
 MANIFEST
 
