@@ -101,6 +101,29 @@ public indirect enum ATProtocolValueContainer: Codable, Hashable {
         for (name, value) in fields { result = result.adding(key: name, value: value) }
         return result
     }
+
+    public static func decodeExtraFields(
+        from decoder: Decoder, knownKeys: Set<String>, keepingMalformed malformed: Set<String>
+    ) throws -> [String: ATProtocolValueContainer] {
+        var fields = try decodeExtraFields(from: decoder, knownKeys: knownKeys)
+        let keyed = try decoder.container(keyedBy: Key.self)
+        for name in malformed {
+            if let raw = try? keyed.decode(ATProtocolValueContainer.self, forKey: Key(name)) { fields[name] = raw }
+        }
+        return fields
+    }
+
+    public static func encodeExtraFields(
+        _ fields: [String: ATProtocolValueContainer], to encoder: Encoder, unlessSet isSet: (String) -> Bool
+    ) throws {
+        try encodeExtraFields(fields.filter { !isSet($0.key) }, to: encoder)
+    }
+
+    public static func addingExtraFields(
+        _ fields: [String: ATProtocolValueContainer], to map: OrderedCBORMap, unlessSet isSet: (String) -> Bool
+    ) throws -> OrderedCBORMap {
+        try addingExtraFields(fields.filter { !isSet($0.key) }, to: map)
+    }
 }
 
 extension CodingUserInfoKey {

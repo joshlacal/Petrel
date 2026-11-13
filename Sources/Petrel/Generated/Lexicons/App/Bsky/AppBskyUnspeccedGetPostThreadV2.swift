@@ -100,10 +100,10 @@ public enum AppBskyUnspeccedGetPostThreadV2 {
 
         public init(
             anchor: ATProtocolURI,
-            above: Bool? = nil,
-            below: Int? = nil,
-            branchingFactor: Int? = nil,
-            sort: String? = nil
+            above: Bool? = true,
+            below: Int? = 6,
+            branchingFactor: Int? = 10,
+            sort: String? = "oldest"
         ) {
             self.anchor = anchor
             self.above = above

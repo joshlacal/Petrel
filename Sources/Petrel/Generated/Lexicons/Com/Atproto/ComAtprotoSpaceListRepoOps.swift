@@ -43,6 +43,7 @@ public enum ComAtprotoSpaceListRepoOps {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             rev = try container.decode(TID.self, forKey: .rev)
             collection = try container.decode(NSID.self, forKey: .collection)
             rkey = try container.decode(RecordKey.self, forKey: .rkey)
@@ -71,12 +72,14 @@ public enum ComAtprotoSpaceListRepoOps {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'value' — degrading to nil: \(error)")
                 value = nil
+                malformedFields.insert("value")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -87,7 +90,7 @@ public enum ComAtprotoSpaceListRepoOps {
             try container.encode(cid, forKey: .cid)
             try container.encode(prev, forKey: .prev)
             try container.encodeIfPresent(value, forKey: .value)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -163,10 +166,24 @@ public enum ComAtprotoSpaceListRepoOps {
                 let valueValue = try value.toCBORValue()
                 map = map.adding(key: "value", value: valueValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "rev", "collection", "rkey", "cid", "prev", "value"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "rev": return true
+            case "collection": return true
+            case "rkey": return true
+            case "cid": return true
+            case "prev": return true
+            case "value": return value != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case rev
@@ -190,9 +207,9 @@ public enum ComAtprotoSpaceListRepoOps {
             space: SpaceRef,
             repo: DID,
             since: TID? = nil,
-            limit: Int? = nil,
+            limit: Int? = 100,
             cursor: String? = nil,
-            excludeValues: Bool? = nil
+            excludeValues: Bool? = false
         ) {
             self.space = space
             self.repo = repo
@@ -361,3 +378,11 @@ public extension ATProtoClient.Com.Atproto.Space {
         }
     }
 }
+
+extension ComAtprotoSpaceListRepoOps.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(space: space, repo: repo, since: since, limit: limit, cursor: cursor, excludeValues: excludeValues)
+    }
+}
+
+extension ComAtprotoSpaceListRepoOps.Output: XRPCCursorPaginatedOutput {}

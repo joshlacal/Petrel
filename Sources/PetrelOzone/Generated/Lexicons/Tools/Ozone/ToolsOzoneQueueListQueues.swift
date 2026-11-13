@@ -21,7 +21,7 @@ public enum ToolsOzoneQueueListQueues {
             subjectType: String? = nil,
             collection: String? = nil,
             reportTypes: [String]? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.enabled = enabled
@@ -132,3 +132,11 @@ public extension ATProtoClient.Tools.Ozone.Queue {
         }
     }
 }
+
+extension ToolsOzoneQueueListQueues.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(enabled: enabled, subjectType: subjectType, collection: collection, reportTypes: reportTypes, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneQueueListQueues.Output: XRPCCursorPaginatedOutput {}

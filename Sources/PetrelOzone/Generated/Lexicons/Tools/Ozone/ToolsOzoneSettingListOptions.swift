@@ -16,9 +16,9 @@ public enum ToolsOzoneSettingListOptions {
         public let keys: [NSID]?
 
         public init(
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
-            scope: String? = nil,
+            scope: String? = "instance",
             prefix: String? = nil,
             keys: [NSID]? = nil
         ) {
@@ -129,3 +129,11 @@ public extension ATProtoClient.Tools.Ozone.Setting {
         }
     }
 }
+
+extension ToolsOzoneSettingListOptions.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(limit: limit, cursor: cursor, scope: scope, prefix: prefix, keys: keys)
+    }
+}
+
+extension ToolsOzoneSettingListOptions.Output: XRPCCursorPaginatedOutput {}

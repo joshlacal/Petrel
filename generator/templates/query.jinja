@@ -27,94 +27,12 @@ extension ATProtoClient.{{ template_namespace_name }} {
         let serviceDID = await networkService.getServiceDID(for: "{{ endpoint | escapeStringLiteral }}")
         let proxyHeaders = serviceDID.map { ["atproto-proxy": $0] }
 
-        return AsyncThrowingStream { continuation in
-            let producerTask = Task {
-                // Create URLSession with infinite timeouts for SSE long-lived connections
-                let configuration = URLSessionConfiguration.default
-                configuration.timeoutIntervalForRequest = .infinity
-                configuration.timeoutIntervalForResource = .infinity
-                configuration.waitsForConnectivity = true
-                let sseSession = URLSession(configuration: configuration)
-                defer {
-                    sseSession.invalidateAndCancel()
-                }
-
-                do {
-                    // Use networkService to prepare authenticated streaming request with OAuth/DPoP
-                    let preparedRequest = try await networkService.prepareStreamingRequest(
-                        urlRequest,
-                        additionalHeaders: proxyHeaders
-                    )
-                    defer {
-                        preparedRequest.releaseAuthenticationLease()
-                    }
-
-                    let (bytes, response) = try await sseSession.bytes(for: preparedRequest.request)
-                    preparedRequest.releaseAuthenticationLease()
-                    guard let httpResponse = response as? HTTPURLResponse else {
-                        continuation.finish(throwing: NetworkError.invalidResponse(description: "Non-HTTP response"))
-                        return
-                    }
-
-                    guard httpResponse.statusCode == 200 else {
-                        continuation.finish(throwing: NetworkError.serverError(code: httpResponse.statusCode, message: "SSE connection failed"))
-                        return
-                    }
-
-                    guard let contentType = httpResponse.value(forHTTPHeaderField: "Content-Type"),
-                          contentType.lowercased().contains("text/event-stream") else {
-                        continuation.finish(throwing: NetworkError.invalidContentType(expected: "text/event-stream", actual: httpResponse.value(forHTTPHeaderField: "Content-Type") ?? "nil"))
-                        return
-                    }
-
-                    // Parse SSE stream
-                    var buffer = ""
-                    let decoder = JSONDecoder()
-
-                    for try await byte in bytes {
-                        let char = Character(UnicodeScalar(byte))
-                        buffer.append(char)
-
-                        // SSE events are delimited by double newline
-                        if buffer.hasSuffix("\n\n") {
-                            // Parse the event
-                            let lines = buffer.split(separator: "\n", omittingEmptySubsequences: false)
-
-                            for line in lines {
-                                let lineStr = String(line)
-
-                                // SSE data lines start with "data: "
-                                if lineStr.hasPrefix("data: ") {
-                                    let jsonString = String(lineStr.dropFirst(6))
-
-                                    if let jsonData = jsonString.data(using: .utf8) {
-                                        do {
-                                            let event = try decoder.decode({{ output_type }}.self, from: jsonData)
-                                            continuation.yield(event)
-                                        } catch {
-                                            LogManager.logError("Failed to decode SSE event for {{ endpoint | escapeStringLiteral }}: \(error)")
-                                            // Continue processing other events
-                                        }
-                                    }
-                                }
-                                // Ignore comment lines (start with ":") and other SSE fields
-                            }
-
-                            buffer = ""
-                        }
-                    }
-
-                    // Stream ended normally
-                    continuation.finish()
-                } catch {
-                    continuation.finish(throwing: error)
-                }
-            }
-
-            continuation.onTermination = { @Sendable _ in
-                producerTask.cancel()
-            }
-        }
+        return try await networkService.serverSentEvents(
+            urlRequest,
+            additionalHeaders: proxyHeaders,
+            endpoint: endpoint,
+            as: {{ output_type }}.self
+        )
     }
 }
 {% else %}
@@ -178,3 +96,7 @@ extension ATProtoClient.{{ template_namespace_name }} {
     }
 }
 {% endif %}
+{% if pagination %}
+
+{{ pagination }}
+{%- endif %}

@@ -1257,3 +1257,11 @@ public extension ATProtoClient.Chat.Bsky.Convo {
         }
     }
 }
+
+extension ChatBskyConvoGetLog.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(cursor: cursor)
+    }
+}
+
+extension ChatBskyConvoGetLog.Output: XRPCCursorPaginatedOutput {}

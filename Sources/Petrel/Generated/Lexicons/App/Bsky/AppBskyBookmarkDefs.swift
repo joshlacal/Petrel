@@ -93,19 +93,22 @@ public enum AppBskyBookmarkDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             subject = try container.decode(ComAtprotoRepoStrongRef.self, forKey: .subject)
             do {
                 createdAt = try container.decodeIfPresent(ATProtocolDate.self, forKey: .createdAt, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
                 createdAt = nil
+                malformedFields.insert("createdAt")
             }
             item = try container.decode(BookmarkViewItemUnion.self, forKey: .item)
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -113,7 +116,7 @@ public enum AppBskyBookmarkDefs {
             try container.encode(subject, forKey: .subject)
             try container.encodeIfPresent(createdAt, forKey: .createdAt)
             try container.encode(item, forKey: .item)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -155,10 +158,21 @@ public enum AppBskyBookmarkDefs {
             }
             let itemValue = try item.toCBORValue()
             map = map.adding(key: "item", value: itemValue)
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "createdAt", "item"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "subject": return true
+            case "createdAt": return createdAt != nil
+            case "item": return true
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case subject

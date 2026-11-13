@@ -120,25 +120,30 @@ public struct AppBskyDraftDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             do {
                 deviceId = try container.decodeIfPresent(String.self, forKey: .deviceId, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'deviceId' — degrading to nil: \(error)")
                 deviceId = nil
+                malformedFields.insert("deviceId")
             }
             do {
                 deviceName = try container.decodeIfPresent(String.self, forKey: .deviceName, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'deviceName' — degrading to nil: \(error)")
                 deviceName = nil
+                malformedFields.insert("deviceName")
             }
             posts = try container.decode([DraftPost].self, forKey: .posts)
             do {
@@ -146,32 +151,38 @@ public struct AppBskyDraftDefs {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'langs' — degrading to nil: \(error)")
                 langs = nil
+                malformedFields.insert("langs")
             }
             do {
                 postgateEmbeddingRules = try container.decodeIfPresent([DraftPostgateEmbeddingRulesUnion].self, forKey: .postgateEmbeddingRules, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'postgateEmbeddingRules' — degrading to nil: \(error)")
                 postgateEmbeddingRules = nil
+                malformedFields.insert("postgateEmbeddingRules")
             }
             do {
                 threadgateAllow = try container.decodeIfPresent([DraftThreadgateAllowUnion].self, forKey: .threadgateAllow, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'threadgateAllow' — degrading to nil: \(error)")
                 threadgateAllow = nil
+                malformedFields.insert("threadgateAllow")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -182,7 +193,7 @@ public struct AppBskyDraftDefs {
             try container.encodeIfPresent(langs, forKey: .langs)
             try container.encodeIfPresent(postgateEmbeddingRules, forKey: .postgateEmbeddingRules)
             try container.encodeIfPresent(threadgateAllow, forKey: .threadgateAllow)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -266,10 +277,24 @@ public struct AppBskyDraftDefs {
                 let threadgateAllowValue = try value.toCBORValue()
                 map = map.adding(key: "threadgateAllow", value: threadgateAllowValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "deviceId", "deviceName", "posts", "langs", "postgateEmbeddingRules", "threadgateAllow"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "deviceId": return deviceId != nil
+            case "deviceName": return deviceName != nil
+            case "posts": return true
+            case "langs": return langs != nil
+            case "postgateEmbeddingRules": return postgateEmbeddingRules != nil
+            case "threadgateAllow": return threadgateAllow != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case deviceId
@@ -321,68 +346,81 @@ public struct AppBskyDraftDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             text = try container.decode(String.self, forKey: .text)
             do {
                 labels = try container.decodeIfPresent(DraftPostLabelsUnion.self, forKey: .labels, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'labels' — degrading to nil: \(error)")
                 labels = nil
+                malformedFields.insert("labels")
             }
             do {
                 embedImages = try container.decodeIfPresent([DraftEmbedImage].self, forKey: .embedImages, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'embedImages' — degrading to nil: \(error)")
                 embedImages = nil
+                malformedFields.insert("embedImages")
             }
             do {
                 embedGallery = try container.decodeIfPresent(DraftEmbedGallery.self, forKey: .embedGallery, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'embedGallery' — degrading to nil: \(error)")
                 embedGallery = nil
+                malformedFields.insert("embedGallery")
             }
             do {
                 embedVideos = try container.decodeIfPresent([DraftEmbedVideo].self, forKey: .embedVideos, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'embedVideos' — degrading to nil: \(error)")
                 embedVideos = nil
+                malformedFields.insert("embedVideos")
             }
             do {
                 embedExternals = try container.decodeIfPresent([DraftEmbedExternal].self, forKey: .embedExternals, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'embedExternals' — degrading to nil: \(error)")
                 embedExternals = nil
+                malformedFields.insert("embedExternals")
             }
             do {
                 embedRecords = try container.decodeIfPresent([DraftEmbedRecord].self, forKey: .embedRecords, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'embedRecords' — degrading to nil: \(error)")
                 embedRecords = nil
+                malformedFields.insert("embedRecords")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -394,7 +432,7 @@ public struct AppBskyDraftDefs {
             try container.encodeIfPresent(embedVideos, forKey: .embedVideos)
             try container.encodeIfPresent(embedExternals, forKey: .embedExternals)
             try container.encodeIfPresent(embedRecords, forKey: .embedRecords)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -490,10 +528,25 @@ public struct AppBskyDraftDefs {
                 let embedRecordsValue = try value.toCBORValue()
                 map = map.adding(key: "embedRecords", value: embedRecordsValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "text", "labels", "embedImages", "embedGallery", "embedVideos", "embedExternals", "embedRecords"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "text": return true
+            case "labels": return labels != nil
+            case "embedImages": return embedImages != nil
+            case "embedGallery": return embedGallery != nil
+            case "embedVideos": return embedVideos != nil
+            case "embedExternals": return embedExternals != nil
+            case "embedRecords": return embedRecords != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case text
@@ -817,25 +870,28 @@ public struct AppBskyDraftDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             localRef = try container.decode(DraftEmbedLocalRef.self, forKey: .localRef)
             do {
                 alt = try container.decodeIfPresent(String.self, forKey: .alt, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'alt' — degrading to nil: \(error)")
                 alt = nil
+                malformedFields.insert("alt")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(localRef, forKey: .localRef)
             try container.encodeIfPresent(alt, forKey: .alt)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -871,10 +927,20 @@ public struct AppBskyDraftDefs {
                 let altValue = try value.toCBORValue()
                 map = map.adding(key: "alt", value: altValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "localRef", "alt"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "localRef": return true
+            case "alt": return alt != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case localRef
@@ -907,28 +973,33 @@ public struct AppBskyDraftDefs {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             localRef = try container.decode(DraftEmbedLocalRef.self, forKey: .localRef)
             do {
                 alt = try container.decodeIfPresent(String.self, forKey: .alt, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'alt' — degrading to nil: \(error)")
                 alt = nil
+                malformedFields.insert("alt")
             }
             do {
                 captions = try container.decodeIfPresent([DraftEmbedCaption].self, forKey: .captions, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'captions' — degrading to nil: \(error)")
                 captions = nil
+                malformedFields.insert("captions")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -936,7 +1007,7 @@ public struct AppBskyDraftDefs {
             try container.encode(localRef, forKey: .localRef)
             try container.encodeIfPresent(alt, forKey: .alt)
             try container.encodeIfPresent(captions, forKey: .captions)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -984,10 +1055,21 @@ public struct AppBskyDraftDefs {
                 let captionsValue = try value.toCBORValue()
                 map = map.adding(key: "captions", value: captionsValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "localRef", "alt", "captions"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "localRef": return true
+            case "alt": return alt != nil
+            case "captions": return captions != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case localRef

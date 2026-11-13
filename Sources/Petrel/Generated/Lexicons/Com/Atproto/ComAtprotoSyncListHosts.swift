@@ -37,38 +37,45 @@ public enum ComAtprotoSyncListHosts {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             hostname = try container.decode(String.self, forKey: .hostname)
             do {
                 seq = try container.decodeIfPresent(Int.self, forKey: .seq, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'seq' — degrading to nil: \(error)")
                 seq = nil
+                malformedFields.insert("seq")
             }
             do {
                 accountCount = try container.decodeIfPresent(Int.self, forKey: .accountCount, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'accountCount' — degrading to nil: \(error)")
                 accountCount = nil
+                malformedFields.insert("accountCount")
             }
             do {
                 status = try container.decodeIfPresent(ComAtprotoSyncDefs.HostStatus.self, forKey: .status, rejectingNull: strict)
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'status' — degrading to nil: \(error)")
                 status = nil
+                malformedFields.insert("status")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -77,7 +84,7 @@ public enum ComAtprotoSyncListHosts {
             try container.encodeIfPresent(seq, forKey: .seq)
             try container.encodeIfPresent(accountCount, forKey: .accountCount)
             try container.encodeIfPresent(status, forKey: .status)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -137,10 +144,22 @@ public enum ComAtprotoSyncListHosts {
                 let statusValue = try value.toCBORValue()
                 map = map.adding(key: "status", value: statusValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "hostname", "seq", "accountCount", "status"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "hostname": return true
+            case "seq": return seq != nil
+            case "accountCount": return accountCount != nil
+            case "status": return status != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case hostname
@@ -155,7 +174,7 @@ public enum ComAtprotoSyncListHosts {
         public let cursor: String?
 
         public init(
-            limit: Int? = nil,
+            limit: Int? = 200,
             cursor: String? = nil
         ) {
             self.limit = limit
@@ -263,3 +282,11 @@ public extension ATProtoClient.Com.Atproto.Sync {
         }
     }
 }
+
+extension ComAtprotoSyncListHosts.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(limit: limit, cursor: cursor)
+    }
+}
+
+extension ComAtprotoSyncListHosts.Output: XRPCCursorPaginatedOutput {}

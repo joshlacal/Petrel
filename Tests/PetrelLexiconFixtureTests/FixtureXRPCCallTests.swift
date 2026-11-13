@@ -42,6 +42,45 @@ final class FixtureXRPCCallTests: XCTestCase {
         return try XCTUnwrap(JSONSerialization.jsonObject(with: body) as? NSDictionary)
     }
 
+    // MARK: - text/event-stream queries (re-audit r-6)
+
+    func testEventStreamQueryDecodesEachEventAndSendsTheParameterDefault() async throws {
+        FixtureStubURLProtocol.install(
+            status: 200,
+            body: "data: {\"seq\":1,\"note\":\"caf\u{E9}\"}\n\n: keep-alive\n\ndata: not json\n\ndata: {\"seq\":2}\n\n",
+            contentType: "text/event-stream"
+        )
+
+        let stream = try await ATProtoClient.Com(networkService: service()).example.widget.watchTicks(input: .init())
+        var ticks: [ComExampleWidgetWatchTicks.Output] = []
+        for try await tick in stream {
+            ticks.append(tick)
+        }
+
+        // The undecodable event is skipped; the others arrive in order.
+        XCTAssertEqual(ticks.map(\.seq), [1, 2])
+        XCTAssertEqual(ticks.first?.note, "caf\u{E9}")
+        let request = try XCTUnwrap(FixtureStubURLProtocol.lastRequest)
+        XCTAssertEqual(request.url?.path, "/xrpc/com.example.widget.watchTicks")
+        XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "text/event-stream")
+        let items = URLComponents(url: try XCTUnwrap(request.url), resolvingAgainstBaseURL: false)?.queryItems ?? []
+        XCTAssertEqual(items.first { $0.name == "since" }?.value, "0")
+    }
+
+    func testEventStreamQueryRejectsAnotherContentType() async throws {
+        FixtureStubURLProtocol.install(status: 200, body: "data: {\"seq\":1}\n\n")
+
+        let stream = try await ATProtoClient.Com(networkService: service()).example.widget.watchTicks(input: .init())
+        do {
+            for try await _ in stream {}
+            XCTFail("a JSON response is not an event stream")
+        } catch let error as NetworkError {
+            guard case .invalidContentType = error else {
+                return XCTFail("expected invalidContentType, got \(error)")
+            }
+        }
+    }
+
     // MARK: - NSIDs of any depth (lex-6)
 
     func testThreeSegmentNSIDIsCallableOnItsAuthorityNamespace() async throws {
@@ -252,6 +291,7 @@ final class FixtureStubURLProtocol: URLProtocol {
     private struct Stub {
         let status: Int
         let body: Data
+        let contentType: String
     }
 
     private static let lock = NSLock()
@@ -267,9 +307,9 @@ final class FixtureStubURLProtocol: URLProtocol {
         lock.withLock { recordedBody }
     }
 
-    static func install(status: Int, body: String) {
+    static func install(status: Int, body: String, contentType: String = "application/json") {
         lock.withLock {
-            stub = Stub(status: status, body: Data(body.utf8))
+            stub = Stub(status: status, body: Data(body.utf8), contentType: contentType)
             recordedRequest = nil
             recordedBody = nil
         }
@@ -304,7 +344,7 @@ final class FixtureStubURLProtocol: URLProtocol {
                   url: url,
                   statusCode: stub.status,
                   httpVersion: "HTTP/1.1",
-                  headerFields: ["Content-Type": "application/json"]
+                  headerFields: ["Content-Type": stub.contentType]
               )
         else {
             client?.urlProtocol(self, didFailWithError: URLError(.resourceUnavailable))

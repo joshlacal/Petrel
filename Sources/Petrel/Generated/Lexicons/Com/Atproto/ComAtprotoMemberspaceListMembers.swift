@@ -97,7 +97,7 @@ public enum ComAtprotoMemberspaceListMembers {
 
         public init(
             space: SpaceRef,
-            limit: Int? = nil,
+            limit: Int? = 100,
             cursor: String? = nil
         ) {
             self.space = space
@@ -239,3 +239,11 @@ public extension ATProtoClient.Com.Atproto.Memberspace {
         }
     }
 }
+
+extension ComAtprotoMemberspaceListMembers.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(space: space, limit: limit, cursor: cursor)
+    }
+}
+
+extension ComAtprotoMemberspaceListMembers.Output: XRPCCursorPaginatedOutput {}

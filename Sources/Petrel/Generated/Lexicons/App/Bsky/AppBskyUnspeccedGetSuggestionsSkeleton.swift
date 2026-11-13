@@ -15,7 +15,7 @@ public enum AppBskyUnspeccedGetSuggestionsSkeleton {
 
         public init(
             viewer: DID? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
             relativeToDid: DID? = nil
         ) {
@@ -185,3 +185,11 @@ public extension ATProtoClient.App.Bsky.Unspecced {
         }
     }
 }
+
+extension AppBskyUnspeccedGetSuggestionsSkeleton.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(viewer: viewer, limit: limit, cursor: cursor, relativeToDid: relativeToDid)
+    }
+}
+
+extension AppBskyUnspeccedGetSuggestionsSkeleton.Output: XRPCCursorPaginatedOutput {}

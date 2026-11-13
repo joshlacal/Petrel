@@ -15,7 +15,7 @@ public enum AppBskyFeedGetListFeed {
 
         public init(
             list: ATProtocolURI,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
             since: String? = nil
         ) {
@@ -156,3 +156,11 @@ public extension ATProtoClient.App.Bsky.Feed {
         }
     }
 }
+
+extension AppBskyFeedGetListFeed.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(list: list, limit: limit, cursor: cursor, since: since)
+    }
+}
+
+extension AppBskyFeedGetListFeed.Output: XRPCCursorPaginatedOutput {}

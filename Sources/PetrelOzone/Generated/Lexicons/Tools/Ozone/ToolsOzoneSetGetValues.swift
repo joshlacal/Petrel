@@ -15,7 +15,7 @@ public enum ToolsOzoneSetGetValues {
 
         public init(
             name: String,
-            limit: Int? = nil,
+            limit: Int? = 100,
             cursor: String? = nil
         ) {
             self.name = name
@@ -143,3 +143,11 @@ public extension ATProtoClient.Tools.Ozone.Set {
         }
     }
 }
+
+extension ToolsOzoneSetGetValues.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(name: name, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneSetGetValues.Output: XRPCCursorPaginatedOutput {}

@@ -11,7 +11,7 @@ public enum ChatBskyConvoGetUnreadCounts {
         public let includeGroupChats: Bool?
 
         public init(
-            includeGroupChats: Bool? = nil
+            includeGroupChats: Bool? = true
         ) {
             self.includeGroupChats = includeGroupChats
         }

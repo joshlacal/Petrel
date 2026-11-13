@@ -12,6 +12,9 @@
     ctx.uses_strict_flag the decoder's strict mode is read (once) into `strict`
     ctx.server_input     reject an explicit null for an optional, non-nullable property
     ctx.extra_fields     keep wire fields the Lexicon does not declare and re-emit them
+    ctx.keeps_malformed  (lenient + extra_fields) a leniently dropped optional value is kept,
+                         raw, in the extra fields and written back while the property is
+                         nil; an extra field never shadows a field the struct writes itself
 
   Property fields come from SwiftCodeGenerator.generate_properties:
     name   wire name            ident  Swift identifier (keyword-escaped)
@@ -144,6 +147,9 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
             {%- if ctx.uses_strict_flag %}
             let strict = decoder.isATProtoStrictDecoding
             {%- endif %}
+            {%- if ctx.keeps_malformed %}
+            var malformedFields: Swift.Set<String> = []
+            {%- endif %}
             {%- elif not ctx.extra_fields %}
             _ = try decoder.container(keyedBy: CodingKeys.self)
             {%- endif %}
@@ -165,17 +171,25 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
+                {%- if ctx.keeps_malformed %}
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
+                {%- else %}
                 // drops only the malformed optional field.
+                {%- endif %}
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property '{{ prop.name | escapeStringLiteral }}' — degrading to nil: \(error)")
                 {{ assign_nil(prop) }}
+                {%- if ctx.keeps_malformed %}
+                malformedFields.insert("{{ prop.name | escapeStringLiteral }}")
+                {%- endif %}
             }
             {%- else %}
             {{ decode_value(prop, ctx) }}
             {%- endif %}
             {%- endfor %}
             {%- if ctx.extra_fields %}
-            self.{{ ctx.extra_name }} = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            self.{{ ctx.extra_name }} = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys{% if ctx.keeps_malformed %}, keepingMalformed: malformedFields{% endif %})
             {%- endif %}
         }
 
@@ -198,7 +212,7 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
             {%- endif %}
             {%- endfor %}
             {%- if ctx.extra_fields %}
-            try ATProtocolValueContainer.encodeExtraFields({{ ctx.extra_name }}, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields({{ ctx.extra_name }}, to: encoder{% if ctx.keeps_malformed %}, unlessSet: hasValue(forField:){% endif %})
             {%- endif %}
         }
         {%- if ctx.value_semantics %}
@@ -267,7 +281,7 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
             {%- endif %}
             {%- endfor %}
             {%- if ctx.extra_fields %}
-            return try ATProtocolValueContainer.addingExtraFields({{ ctx.extra_name }}, to: map)
+            return try ATProtocolValueContainer.addingExtraFields({{ ctx.extra_name }}, to: map{% if ctx.keeps_malformed %}, unlessSet: hasValue(forField:){% endif %})
             {%- else %}
             return map
             {%- endif %}
@@ -279,6 +293,22 @@ if container.contains(.{{ prop.key }}), try !container.decodeNil(forKey: .{{ pro
         {%- if ctx.extra_fields %}
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type"{% for prop in properties %}, "{{ prop.name | escapeStringLiteral }}"{% endfor %}]
+        {%- endif %}
+        {%- if ctx.keeps_malformed %}
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            {%- if ctx.encodes_type %}
+            case "$type": return true
+            {%- endif %}
+            {%- for prop in properties %}
+            case "{{ prop.name | escapeStringLiteral }}": return {% if prop.optional and not prop.required_nullable %}{{ read(prop) }} != nil{% else %}true{% endif %}
+            {%- endfor %}
+            default: return false
+            }
+        }
         {%- endif %}
 
         private enum CodingKeys: {% if properties or ctx.encodes_type %}String, {% endif %}CodingKey {

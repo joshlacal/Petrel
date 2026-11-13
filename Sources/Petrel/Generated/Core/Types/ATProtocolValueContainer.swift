@@ -4305,10 +4305,10 @@ public indirect enum ATProtocolValueContainer: ATProtocolCodable, ATProtocolValu
     ///
     /// Generated types keep fields their Lexicon does not declare in `extraFields`, so
     /// every non-null raw field must reappear in the typed encoding with the same value.
-    /// A raw field that is missing means the typed decode dropped it (an optional field
-    /// that did not match its schema); the Lexicon specification treats such data as
-    /// invalid as a whole, so the value stays raw (`.unknownType`) and nothing is lost
-    /// if it is written back. Tolerated differences: the `$type` discriminator on either
+    /// A raw field that is missing means the typed decode dropped it, so the value stays
+    /// raw (`.unknownType`) and nothing is lost if it is written back. (Generated
+    /// objects and records keep the raw value of an optional field that did not match
+    /// its schema in `extraFields`, so such a field is not missing.) Tolerated differences: the `$type` discriminator on either
     /// side, and `null` versus absent.
     public static func isSpecTolerantMatch(
         typed: ATProtocolValueContainer,

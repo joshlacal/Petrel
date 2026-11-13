@@ -83,7 +83,7 @@ public enum ToolsOzoneTeamListOnlineMembers {
         public let limit: Int?
 
         public init(
-            limit: Int? = nil
+            limit: Int? = 50
         ) {
             self.limit = limit
         }

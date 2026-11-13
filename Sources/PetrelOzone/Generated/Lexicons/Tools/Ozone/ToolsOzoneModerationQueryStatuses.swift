@@ -64,11 +64,11 @@ public enum ToolsOzoneModerationQueryStatuses {
             reviewState: String? = nil,
             ignoreSubjects: [URI]? = nil,
             lastReviewedBy: DID? = nil,
-            sortField: ParametersSortField? = nil,
-            sortDirection: ParametersSortDirection? = nil,
+            sortField: ParametersSortField? = .value_lastReportedAt,
+            sortDirection: ParametersSortDirection? = .value_desc,
             takendown: Bool? = nil,
             appealed: Bool? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             tags: [String]? = nil,
             excludeTags: [String]? = nil,
             cursor: String? = nil,
@@ -244,3 +244,11 @@ public extension ATProtoClient.Tools.Ozone.Moderation {
         }
     }
 }
+
+extension ToolsOzoneModerationQueryStatuses.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(queueCount: queueCount, queueIndex: queueIndex, queueSeed: queueSeed, includeAllUserRecords: includeAllUserRecords, subject: subject, comment: comment, reportedAfter: reportedAfter, reportedBefore: reportedBefore, reviewedAfter: reviewedAfter, hostingDeletedAfter: hostingDeletedAfter, hostingDeletedBefore: hostingDeletedBefore, hostingUpdatedAfter: hostingUpdatedAfter, hostingUpdatedBefore: hostingUpdatedBefore, hostingStatuses: hostingStatuses, reviewedBefore: reviewedBefore, includeMuted: includeMuted, onlyMuted: onlyMuted, reviewState: reviewState, ignoreSubjects: ignoreSubjects, lastReviewedBy: lastReviewedBy, sortField: sortField, sortDirection: sortDirection, takendown: takendown, appealed: appealed, limit: limit, tags: tags, excludeTags: excludeTags, cursor: cursor, collections: collections, subjectType: subjectType, minPriorityScore: minPriorityScore, minStrikeCount: minStrikeCount, ageAssuranceState: ageAssuranceState)
+    }
+}
+
+extension ToolsOzoneModerationQueryStatuses.Output: XRPCCursorPaginatedOutput {}

@@ -16,7 +16,7 @@ public enum AppBskyActorSearchActors {
         public init(
             term: String? = nil,
             q: String? = nil,
-            limit: Int? = nil,
+            limit: Int? = 25,
             cursor: String? = nil
         ) {
             self.term = term
@@ -125,3 +125,11 @@ public extension ATProtoClient.App.Bsky.Actor {
         }
     }
 }
+
+extension AppBskyActorSearchActors.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(term: term, q: q, limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyActorSearchActors.Output: XRPCCursorPaginatedOutput {}

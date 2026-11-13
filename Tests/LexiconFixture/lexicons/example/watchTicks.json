@@ -1,0 +1,34 @@
+{
+  "lexicon": 1,
+  "id": "com.example.widget.watchTicks",
+  "defs": {
+    "main": {
+      "type": "query",
+      "description": "A query answered as a text/event-stream: each event's data is one tick.",
+      "parameters": {
+        "type": "params",
+        "properties": {
+          "since": {
+            "type": "integer",
+            "default": 0
+          }
+        }
+      },
+      "output": {
+        "encoding": "text/event-stream",
+        "schema": {
+          "type": "object",
+          "required": ["seq"],
+          "properties": {
+            "seq": {
+              "type": "integer"
+            },
+            "note": {
+              "type": "string"
+            }
+          }
+        }
+      }
+    }
+  }
+}

@@ -40,6 +40,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             let strict = decoder.isATProtoStrictDecoding
+            var malformedFields: Swift.Set<String> = []
             subject = try container.decode(DID.self, forKey: .subject)
             handle = try container.decode(Handle.self, forKey: .handle)
             displayName = try container.decode(String.self, forKey: .displayName)
@@ -48,12 +49,14 @@ public enum ToolsOzoneVerificationGrantVerifications {
             } catch {
                 // Invalid data is invalid as a whole (Lexicon specification); strict decoders
                 // fail here. The default keeps reading what the network actually serves and
-                // drops only the malformed optional field.
+                // reads only the malformed optional field as nil. Its raw value is kept in
+                // the extra fields, so writing this value back does not lose it.
                 guard !strict else { throw error }
                 LogManager.logWarning("Decoding error for optional property 'createdAt' — degrading to nil: \(error)")
                 createdAt = nil
+                malformedFields.insert("createdAt")
             }
-            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+            extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -62,7 +65,7 @@ public enum ToolsOzoneVerificationGrantVerifications {
             try container.encode(handle, forKey: .handle)
             try container.encode(displayName, forKey: .displayName)
             try container.encodeIfPresent(createdAt, forKey: .createdAt)
-            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+            try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
         }
 
         public func hash(into hasher: inout Hasher) {
@@ -110,10 +113,22 @@ public enum ToolsOzoneVerificationGrantVerifications {
                 let createdAtValue = try value.toCBORValue()
                 map = map.adding(key: "createdAt", value: createdAtValue)
             }
-            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+            return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
         }
 
         private static let knownFieldKeys: Swift.Set<String> = ["$type", "subject", "handle", "displayName", "createdAt"]
+
+        /// Whether this value writes the wire field `name` itself. An extra field of the
+        /// same name (a malformed value kept from decoding) is written only when it is not.
+        private func hasValue(forField name: String) -> Bool {
+            switch name {
+            case "subject": return true
+            case "handle": return true
+            case "displayName": return true
+            case "createdAt": return createdAt != nil
+            default: return false
+            }
+        }
 
         private enum CodingKeys: String, CodingKey {
             case subject

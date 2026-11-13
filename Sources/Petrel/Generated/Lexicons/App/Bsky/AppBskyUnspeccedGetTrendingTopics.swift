@@ -13,7 +13,7 @@ public enum AppBskyUnspeccedGetTrendingTopics {
 
         public init(
             viewer: DID? = nil,
-            limit: Int? = nil
+            limit: Int? = 10
         ) {
             self.viewer = viewer
             self.limit = limit

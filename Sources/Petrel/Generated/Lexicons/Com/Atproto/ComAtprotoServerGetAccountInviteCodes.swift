@@ -12,8 +12,8 @@ public enum ComAtprotoServerGetAccountInviteCodes {
         public let createAvailable: Bool?
 
         public init(
-            includeUsed: Bool? = nil,
-            createAvailable: Bool? = nil
+            includeUsed: Bool? = true,
+            createAvailable: Bool? = true
         ) {
             self.includeUsed = includeUsed
             self.createAvailable = createAvailable

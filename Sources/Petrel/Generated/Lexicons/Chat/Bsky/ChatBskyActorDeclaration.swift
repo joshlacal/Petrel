@@ -30,18 +30,21 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         let strict = decoder.isATProtoStrictDecoding
+        var malformedFields: Swift.Set<String> = []
         allowIncoming = try container.decode(String.self, forKey: .allowIncoming)
         do {
             allowGroupInvites = try container.decodeIfPresent(String.self, forKey: .allowGroupInvites, rejectingNull: strict)
         } catch {
             // Invalid data is invalid as a whole (Lexicon specification); strict decoders
             // fail here. The default keeps reading what the network actually serves and
-            // drops only the malformed optional field.
+            // reads only the malformed optional field as nil. Its raw value is kept in
+            // the extra fields, so writing this value back does not lose it.
             guard !strict else { throw error }
             LogManager.logWarning("Decoding error for optional property 'allowGroupInvites' — degrading to nil: \(error)")
             allowGroupInvites = nil
+            malformedFields.insert("allowGroupInvites")
         }
-        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys)
+        extraFields = try ATProtocolValueContainer.decodeExtraFields(from: decoder, knownKeys: Self.knownFieldKeys, keepingMalformed: malformedFields)
     }
 
     public func encode(to encoder: Encoder) throws {
@@ -49,7 +52,7 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
         try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
         try container.encode(allowIncoming, forKey: .allowIncoming)
         try container.encodeIfPresent(allowGroupInvites, forKey: .allowGroupInvites)
-        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder)
+        try ATProtocolValueContainer.encodeExtraFields(extraFields, to: encoder, unlessSet: hasValue(forField:))
     }
 
     public func hash(into hasher: inout Hasher) {
@@ -86,10 +89,21 @@ public struct ChatBskyActorDeclaration: ATProtocolCodable, ATProtocolValue {
             let allowGroupInvitesValue = try value.toCBORValue()
             map = map.adding(key: "allowGroupInvites", value: allowGroupInvitesValue)
         }
-        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map)
+        return try ATProtocolValueContainer.addingExtraFields(extraFields, to: map, unlessSet: hasValue(forField:))
     }
 
     private static let knownFieldKeys: Swift.Set<String> = ["$type", "allowIncoming", "allowGroupInvites"]
+
+    /// Whether this value writes the wire field `name` itself. An extra field of the
+    /// same name (a malformed value kept from decoding) is written only when it is not.
+    private func hasValue(forField name: String) -> Bool {
+        switch name {
+        case "$type": return true
+        case "allowIncoming": return true
+        case "allowGroupInvites": return allowGroupInvites != nil
+        default: return false
+        }
+    }
 
     private enum CodingKeys: String, CodingKey {
         case typeIdentifier = "$type"

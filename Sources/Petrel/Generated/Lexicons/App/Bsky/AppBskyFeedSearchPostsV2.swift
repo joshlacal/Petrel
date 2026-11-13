@@ -40,7 +40,7 @@ public enum AppBskyFeedSearchPostsV2 {
 
         public init(
             cursor: String? = nil,
-            limit: Int? = nil,
+            limit: Int? = 25,
             query: String? = nil,
             sort: String? = nil,
             authors: [ATIdentifier]? = nil,
@@ -253,3 +253,11 @@ public extension ATProtoClient.App.Bsky.Feed {
         }
     }
 }
+
+extension AppBskyFeedSearchPostsV2.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(cursor: cursor, limit: limit, query: query, sort: sort, authors: authors, mentions: mentions, domains: domains, urls: urls, embeddedAtUris: embeddedAtUris, hashtags: hashtags, excludeAuthors: excludeAuthors, excludeMentions: excludeMentions, excludeDomains: excludeDomains, excludeUrls: excludeUrls, excludeEmbeddedAtUris: excludeEmbeddedAtUris, excludeHashtags: excludeHashtags, since: since, until: until, allTime: allTime, languages: languages, excludeLanguages: excludeLanguages, hasMedia: hasMedia, hasVideo: hasVideo, replyParentUri: replyParentUri, threadRootUri: threadRootUri, excludeReplies: excludeReplies, repliesOnly: repliesOnly, following: following, queryLanguage: queryLanguage)
+    }
+}
+
+extension AppBskyFeedSearchPostsV2.Output: XRPCCursorPaginatedOutput {}

@@ -16,10 +16,10 @@ public enum ToolsOzoneQueueGetAssignments {
         public let cursor: String?
 
         public init(
-            onlyActive: Bool? = nil,
+            onlyActive: Bool? = true,
             queueIds: [Int]? = nil,
             dids: [DID]? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.onlyActive = onlyActive
@@ -129,3 +129,11 @@ public extension ATProtoClient.Tools.Ozone.Queue {
         }
     }
 }
+
+extension ToolsOzoneQueueGetAssignments.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(onlyActive: onlyActive, queueIds: queueIds, dids: dids, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneQueueGetAssignments.Output: XRPCCursorPaginatedOutput {}

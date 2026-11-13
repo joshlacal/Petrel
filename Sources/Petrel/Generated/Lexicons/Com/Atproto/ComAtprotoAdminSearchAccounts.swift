@@ -15,7 +15,7 @@ public enum ComAtprotoAdminSearchAccounts {
         public init(
             email: String? = nil,
             cursor: String? = nil,
-            limit: Int? = nil
+            limit: Int? = 50
         ) {
             self.email = email
             self.cursor = cursor
@@ -122,3 +122,11 @@ public extension ATProtoClient.Com.Atproto.Admin {
         }
     }
 }
+
+extension ComAtprotoAdminSearchAccounts.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(email: email, cursor: cursor, limit: limit)
+    }
+}
+
+extension ComAtprotoAdminSearchAccounts.Output: XRPCCursorPaginatedOutput {}

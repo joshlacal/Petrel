@@ -11,7 +11,7 @@ public enum AppBskyUnspeccedGetOnboardingSuggestedStarterPacks {
         public let limit: Int?
 
         public init(
-            limit: Int? = nil
+            limit: Int? = 10
         ) {
             self.limit = limit
         }

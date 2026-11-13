@@ -14,8 +14,8 @@ public enum AppBskyFeedGetPostThread {
 
         public init(
             uri: ATProtocolURI,
-            depth: Int? = nil,
-            parentHeight: Int? = nil
+            depth: Int? = 6,
+            parentHeight: Int? = 80
         ) {
             self.uri = uri
             self.depth = depth

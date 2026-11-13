@@ -15,7 +15,7 @@ public enum AppBskyUnspeccedGetSuggestedUsersSkeleton {
         public init(
             viewer: DID? = nil,
             category: String? = nil,
-            limit: Int? = nil
+            limit: Int? = 25
         ) {
             self.viewer = viewer
             self.category = category

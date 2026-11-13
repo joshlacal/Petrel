@@ -13,7 +13,7 @@ public enum AppBskyLabelerGetServices {
 
         public init(
             dids: [DID],
-            detailed: Bool? = nil
+            detailed: Bool? = false
         ) {
             self.dids = dids
             self.detailed = detailed

@@ -13,8 +13,8 @@ public enum ComAtprotoAdminGetInviteCodes {
         public let cursor: String?
 
         public init(
-            sort: String? = nil,
-            limit: Int? = nil,
+            sort: String? = "recent",
+            limit: Int? = 100,
             cursor: String? = nil
         ) {
             self.sort = sort
@@ -122,3 +122,11 @@ public extension ATProtoClient.Com.Atproto.Admin {
         }
     }
 }
+
+extension ComAtprotoAdminGetInviteCodes.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(sort: sort, limit: limit, cursor: cursor)
+    }
+}
+
+extension ComAtprotoAdminGetInviteCodes.Output: XRPCCursorPaginatedOutput {}

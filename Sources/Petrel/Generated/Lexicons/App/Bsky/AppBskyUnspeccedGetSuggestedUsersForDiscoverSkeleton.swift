@@ -13,7 +13,7 @@ public enum AppBskyUnspeccedGetSuggestedUsersForDiscoverSkeleton {
 
         public init(
             viewer: DID? = nil,
-            limit: Int? = nil
+            limit: Int? = 25
         ) {
             self.viewer = viewer
             self.limit = limit

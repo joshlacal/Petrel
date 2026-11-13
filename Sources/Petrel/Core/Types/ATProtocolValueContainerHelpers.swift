@@ -915,6 +915,61 @@ public extension ATProtocolValueContainer {
         }
         return result
     }
+
+    // MARK: Malformed optional fields
+
+    /// Reads the undeclared fields, plus the raw value of each declared field in
+    /// `malformed`.
+    ///
+    /// Lenient decoding (the default) reads a malformed optional field as `nil`. A
+    /// generated type keeps that field's raw value next to its undeclared fields, so
+    /// re-encoding the value (writing a record back, computing its CID) does not lose it.
+    /// A raw value that cannot be read even untyped is dropped, as before.
+    ///
+    /// - Parameters:
+    ///   - decoder: The decoder positioned at the object.
+    ///   - knownKeys: The wire names the type decodes itself, plus `$type`.
+    ///   - malformed: Declared wire names whose values failed to decode and were read as `nil`.
+    static func decodeExtraFields(
+        from decoder: Decoder,
+        knownKeys: Set<String>,
+        keepingMalformed malformed: Set<String>
+    ) throws -> [String: ATProtocolValueContainer] {
+        var fields = try decodeExtraFields(from: decoder, knownKeys: knownKeys)
+        guard !malformed.isEmpty else { return fields }
+        let container = try decoder.container(keyedBy: UndeclaredFieldKey.self)
+        for name in malformed {
+            if let raw = try? container.decode(ATProtocolValueContainer.self, forKey: UndeclaredFieldKey(name)) {
+                fields[name] = raw
+            }
+        }
+        return fields
+    }
+
+    /// Writes the extra fields the type does not write itself.
+    ///
+    /// `isSet(name)` says whether the type writes the wire field `name`. An extra field of
+    /// that name (a malformed value kept by
+    /// ``decodeExtraFields(from:knownKeys:keepingMalformed:)``, or one a caller copied
+    /// into `extraFields`) is written only when the type does not, so a value set on the
+    /// property always wins.
+    static func encodeExtraFields(
+        _ fields: [String: ATProtocolValueContainer],
+        to encoder: Encoder,
+        unlessSet isSet: (String) -> Bool
+    ) throws {
+        try encodeExtraFields(fields.filter { !isSet($0.key) }, to: encoder)
+    }
+
+    /// Adds the extra fields the type does not write itself to its DAG-CBOR map. See
+    /// ``encodeExtraFields(_:to:unlessSet:)``.
+    static func addingExtraFields(
+        _ fields: [String: ATProtocolValueContainer],
+        to map: OrderedCBORMap,
+        unlessSet isSet: (String) -> Bool
+    ) throws -> OrderedCBORMap {
+        try addingExtraFields(fields.filter { !isSet($0.key) }, to: map)
+    }
 }
 
 // MARK: - Strict decoding

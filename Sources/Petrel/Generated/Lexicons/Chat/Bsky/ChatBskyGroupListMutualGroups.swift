@@ -14,7 +14,7 @@ public enum ChatBskyGroupListMutualGroups {
 
         public init(
             subject: DID,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.subject = subject
@@ -122,3 +122,11 @@ public extension ATProtoClient.Chat.Bsky.Group {
         }
     }
 }
+
+extension ChatBskyGroupListMutualGroups.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(subject: subject, limit: limit, cursor: cursor)
+    }
+}
+
+extension ChatBskyGroupListMutualGroups.Output: XRPCCursorPaginatedOutput {}

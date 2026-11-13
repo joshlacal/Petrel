@@ -35,11 +35,11 @@ public enum ToolsOzoneReportQueryReports {
             collections: [NSID]? = nil,
             reportedAfter: ATProtocolDate? = nil,
             reportedBefore: ATProtocolDate? = nil,
-            isMuted: Bool? = nil,
+            isMuted: Bool? = false,
             assignedTo: DID? = nil,
-            sortField: ParametersSortField? = nil,
-            sortDirection: ParametersSortDirection? = nil,
-            limit: Int? = nil,
+            sortField: ParametersSortField? = .value_createdAt,
+            sortDirection: ParametersSortDirection? = .value_desc,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.queueId = queueId
@@ -187,3 +187,11 @@ public extension ATProtoClient.Tools.Ozone.Report {
         }
     }
 }
+
+extension ToolsOzoneReportQueryReports.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(queueId: queueId, reportTypes: reportTypes, status: status, subject: subject, did: did, subjectType: subjectType, collections: collections, reportedAfter: reportedAfter, reportedBefore: reportedBefore, isMuted: isMuted, assignedTo: assignedTo, sortField: sortField, sortDirection: sortDirection, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneReportQueryReports.Output: XRPCCursorPaginatedOutput {}

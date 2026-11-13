@@ -20,12 +20,12 @@ public enum ToolsOzoneVerificationListVerifications {
 
         public init(
             cursor: String? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             createdAfter: ATProtocolDate? = nil,
             createdBefore: ATProtocolDate? = nil,
             issuers: [DID]? = nil,
             subjects: [DID]? = nil,
-            sortDirection: ParametersSortDirection? = nil,
+            sortDirection: ParametersSortDirection? = .value_desc,
             isRevoked: Bool? = nil
         ) {
             self.cursor = cursor
@@ -152,3 +152,11 @@ public extension ATProtoClient.Tools.Ozone.Verification {
         }
     }
 }
+
+extension ToolsOzoneVerificationListVerifications.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(cursor: cursor, limit: limit, createdAfter: createdAfter, createdBefore: createdBefore, issuers: issuers, subjects: subjects, sortDirection: sortDirection, isRevoked: isRevoked)
+    }
+}
+
+extension ToolsOzoneVerificationListVerifications.Output: XRPCCursorPaginatedOutput {}

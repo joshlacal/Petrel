@@ -16,7 +16,7 @@ public enum ComAtprotoLabelQueryLabels {
         public init(
             uriPatterns: [String],
             sources: [DID]? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.uriPatterns = uriPatterns
@@ -125,3 +125,11 @@ public extension ATProtoClient.Com.Atproto.Label {
         }
     }
 }
+
+extension ComAtprotoLabelQueryLabels.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(uriPatterns: uriPatterns, sources: sources, limit: limit, cursor: cursor)
+    }
+}
+
+extension ComAtprotoLabelQueryLabels.Output: XRPCCursorPaginatedOutput {}

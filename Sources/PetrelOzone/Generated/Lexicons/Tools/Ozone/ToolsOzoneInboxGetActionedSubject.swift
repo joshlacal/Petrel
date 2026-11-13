@@ -17,7 +17,7 @@ public enum ToolsOzoneInboxGetActionedSubject {
         public init(
             did: DID? = nil,
             subject: URI,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.did = did

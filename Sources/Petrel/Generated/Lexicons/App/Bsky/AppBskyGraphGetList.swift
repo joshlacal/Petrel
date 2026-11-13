@@ -14,7 +14,7 @@ public enum AppBskyGraphGetList {
 
         public init(
             list: ATProtocolURI,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.list = list
@@ -130,3 +130,11 @@ public extension ATProtoClient.App.Bsky.Graph {
         }
     }
 }
+
+extension AppBskyGraphGetList.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(list: list, limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyGraphGetList.Output: XRPCCursorPaginatedOutput {}

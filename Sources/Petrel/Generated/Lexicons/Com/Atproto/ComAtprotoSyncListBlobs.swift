@@ -16,7 +16,7 @@ public enum ComAtprotoSyncListBlobs {
         public init(
             did: DID,
             since: TID? = nil,
-            limit: Int? = nil,
+            limit: Int? = 500,
             cursor: String? = nil
         ) {
             self.did = did
@@ -139,3 +139,11 @@ public extension ATProtoClient.Com.Atproto.Sync {
         }
     }
 }
+
+extension ComAtprotoSyncListBlobs.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(did: did, since: since, limit: limit, cursor: cursor)
+    }
+}
+
+extension ComAtprotoSyncListBlobs.Output: XRPCCursorPaginatedOutput {}

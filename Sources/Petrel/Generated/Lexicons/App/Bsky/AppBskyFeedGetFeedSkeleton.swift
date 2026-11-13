@@ -14,7 +14,7 @@ public enum AppBskyFeedGetFeedSkeleton {
 
         public init(
             feed: ATProtocolURI,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.feed = feed
@@ -153,3 +153,11 @@ public extension ATProtoClient.App.Bsky.Feed {
         }
     }
 }
+
+extension AppBskyFeedGetFeedSkeleton.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(feed: feed, limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyFeedGetFeedSkeleton.Output: XRPCCursorPaginatedOutput {}

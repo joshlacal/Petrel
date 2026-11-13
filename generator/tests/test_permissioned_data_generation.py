@@ -294,9 +294,11 @@ class PermissionedDataGenerationTests(unittest.TestCase):
         # Re-pinned by the sdk-green generator pass (typed XRPC errors on every endpoint,
         # extraFields, shared object template), and again when the output Content-Type
         # check moved to value(forHTTPHeaderField:); that line is the only change.
+        # Re-pinned for re-audit r-5: lenient objects keep a malformed optional value in
+        # extraFields (malformedFields, keepingMalformed:, unlessSet:, hasValue(forField:)).
         self.assertEqual(
             hashlib.sha256(ordinary.encode("utf-8")).hexdigest(),
-            "c2a24a611bb7ea70c2aa305dd5d3ca3d2e61961f6e44e7735bcc99e531b1f3eb",
+            "cb3c2b49653c949785ea72b7f5a2a7b21f30ccf5b7419c23ea369e3abbf5e0c2",
         )
 
     def test_server_contract_flag_false_preserves_direct_input_bytes(self):

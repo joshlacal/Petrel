@@ -14,7 +14,7 @@ public enum AppBskyGraphGetKnownFollowers {
 
         public init(
             actor: ATIdentifier,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.actor = actor
@@ -130,3 +130,11 @@ public extension ATProtoClient.App.Bsky.Graph {
         }
     }
 }
+
+extension AppBskyGraphGetKnownFollowers.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(actor: actor, limit: limit, cursor: cursor)
+    }
+}
+
+extension AppBskyGraphGetKnownFollowers.Output: XRPCCursorPaginatedOutput {}

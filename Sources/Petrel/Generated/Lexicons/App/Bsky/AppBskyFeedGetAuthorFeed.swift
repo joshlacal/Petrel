@@ -16,10 +16,10 @@ public enum AppBskyFeedGetAuthorFeed {
 
         public init(
             actor: ATIdentifier,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil,
-            filter: String? = nil,
-            includePins: Bool? = nil
+            filter: String? = "posts_with_replies",
+            includePins: Bool? = false
         ) {
             self.actor = actor
             self.limit = limit
@@ -140,3 +140,11 @@ public extension ATProtoClient.App.Bsky.Feed {
         }
     }
 }
+
+extension AppBskyFeedGetAuthorFeed.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(actor: actor, limit: limit, cursor: cursor, filter: filter, includePins: includePins)
+    }
+}
+
+extension AppBskyFeedGetAuthorFeed.Output: XRPCCursorPaginatedOutput {}

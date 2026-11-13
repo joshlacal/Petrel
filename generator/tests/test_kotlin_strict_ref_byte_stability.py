@@ -160,22 +160,25 @@ class KotlinStrictRefByteStabilityTests(unittest.TestCase):
                 )
 
     def test_ordinary_swift_shapes_remain_byte_identical_to_pre_strict_ref_output(self):
+        # Re-pinned for re-audit r-5 (all four): lenient objects keep a malformed optional
+        # value in extraFields (malformedFields, keepingMalformed:, unlessSet:,
+        # hasValue(forField:)); no other line changed.
         expected = {
             "blue.catbird.test.ordinaryObject": (
-                "113cde43cb20176b56202d0d3e8a435c226872674fec4d7f4fd90a015fe4b745"
+                "44c43e3dc58b6d5b1980d4f7a1ae09670ddbea922e3a9116b42f0a8cc03a7ef9"
             ),
             # Re-pinned by the sdk-green generator pass: typed XRPC errors on every endpoint,
             # undeclared-field round trip (extraFields) and the shared object template.
             # Re-pinned again when the output Content-Type check moved to
             # value(forHTTPHeaderField:) (case-insensitive); that line is the only change.
             "blue.catbird.test.ordinaryProcedure": (
-                "e12ad62c091e4c2fc77e8c8eded72d9c7552b6b9d42381da619a272734f22068"
+                "3bbeee19de2026f67a82c2f2c3068f0a6951ab8a65d8c6e8b787cef39f004431"
             ),
             "blue.catbird.test.ordinaryRecord": (
-                "15e04b341cd7fd68eee2c980d4df28fa682e58419174faca613cd411755854ff"
+                "538cb0bfa62f7f07c9d7478233ccde6c31c0d12ab4a6dfffe5ee65774f5fc2ee"
             ),
             "blue.catbird.test.ordinarySubscription": (
-                "f5e151d76ad87ac39b402edd0afcf2977a7d60f7d50eabcd338c0b7bc60fac16"
+                "3c73629ea5b22d22e1a405e377e5c57e7341cd085d8bac60806fefe4126493eb"
             ),
         }
         for lexicon in ordinary_lexicons():

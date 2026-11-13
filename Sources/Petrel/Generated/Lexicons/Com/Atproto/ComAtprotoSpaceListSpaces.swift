@@ -76,7 +76,7 @@ public enum ComAtprotoSpaceListSpaces {
         public init(
             spaceType: NSID? = nil,
             did: DID? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.spaceType = spaceType
@@ -206,3 +206,11 @@ public extension ATProtoClient.Com.Atproto.Space {
         }
     }
 }
+
+extension ComAtprotoSpaceListSpaces.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(spaceType: spaceType, did: did, limit: limit, cursor: cursor)
+    }
+}
+
+extension ComAtprotoSpaceListSpaces.Output: XRPCCursorPaginatedOutput {}

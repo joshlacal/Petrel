@@ -23,7 +23,7 @@ public enum ToolsOzoneReportGetHistoricalStats {
             reportTypes: [String]? = nil,
             startDate: ATProtocolDate? = nil,
             endDate: ATProtocolDate? = nil,
-            limit: Int? = nil,
+            limit: Int? = 30,
             cursor: String? = nil
         ) {
             self.queueId = queueId
@@ -135,3 +135,11 @@ public extension ATProtoClient.Tools.Ozone.Report {
         }
     }
 }
+
+extension ToolsOzoneReportGetHistoricalStats.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(queueId: queueId, moderatorDid: moderatorDid, reportTypes: reportTypes, startDate: startDate, endDate: endDate, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneReportGetHistoricalStats.Output: XRPCCursorPaginatedOutput {}

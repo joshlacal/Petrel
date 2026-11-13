@@ -17,7 +17,7 @@ public enum ToolsOzoneModerationSearchRepos {
         public init(
             term: String? = nil,
             q: String? = nil,
-            limit: Int? = nil,
+            limit: Int? = 50,
             cursor: String? = nil
         ) {
             self.term = term
@@ -126,3 +126,11 @@ public extension ATProtoClient.Tools.Ozone.Moderation {
         }
     }
 }
+
+extension ToolsOzoneModerationSearchRepos.Parameters: XRPCCursorPaginatedParameters {
+    public func withCursor(_ cursor: String?) -> Self {
+        Self(term: term, q: q, limit: limit, cursor: cursor)
+    }
+}
+
+extension ToolsOzoneModerationSearchRepos.Output: XRPCCursorPaginatedOutput {}
