@@ -492,6 +492,16 @@ The Spaces lexicons track an unreleased atproto proposal and change between alph
   your own Lexicons. (#52)
 - An inline object whose generated name collides with a named definition gets an `Object` suffix
   instead of failing generation. (#66)
+- `petrel-gen`, a command-line front end to the generator for Lexicon overlay packages driven by
+  a `petrel-manifest.json`, and `PetrelCodegenPlugin`, a SwiftPM command plugin
+  (`swift package plugin petrel-codegen`) that runs an installed `petrel-gen` without network
+  access. [CODEGEN.md](CODEGEN.md) is the guide. (#77)
+- Example packages under `Examples/`: a SwiftUI app that signs in with loopback OAuth, a custom
+  Lexicon overlay with its generated code, and a Jetstream command-line tool. (#77)
+- Documentation: thirteen DocC catalogs (every product except the two trait-gated OAuth server
+  transports), and every Swift code block in the README, GETTING_STARTED.md and the catalogs is
+  typechecked in CI by
+  `Scripts/validate-documentation.sh`. (#77)
 - CI: a scheduled `Live network smoke` workflow runs the firehose, labeler, Jetstream and identity
   live tests (never on pull requests). (#61)
 - CI: `Scripts/tests/check-app-specific-names.sh` fails a pull request that names a specific
