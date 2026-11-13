@@ -1488,14 +1488,14 @@ extension SpaceCredentialManagerTests {
         }
     }
 
-    @Test("Only exact SpaceDeleted is destructive; suspension and upstream errors stay exchange failures")
+    @Test("Only exact SpaceDeleted is destructive; authority repo state failures stay exchange failures")
     func exactErrors() async throws {
         try await withSpaceTestSession {
             let session = makeMockSession()
             defer { session.invalidateAndCancel() }
             let client = try await ATProtoClient(baseURL: #require(URL(string: "https://pds.test")))
             let space = try SpaceRef(uriString: "at://did:plc:auth123/space/com.example.drive/self")
-            let cases: [(Int, String, String)] = [
+            for (status, body, expected) in [
                 (400, #"{"error":"InvalidDelegationToken","message":"expired"}"#, "token"),
                 (400, #"{"error":"Other","message":"Upstream said SpaceDeleted"}"#, "exchange"),
                 (400, "SpaceDeleted", "exchange"),
@@ -1504,9 +1504,8 @@ extension SpaceCredentialManagerTests {
                 (503, #"{"error":"SpaceDeleted"}"#, "exchange"),
                 (400, #"{"error":"RepoTakendown"}"#, "exchange"),
                 (400, #"{"error":"RepoDeactivated"}"#, "exchange"),
-                (400, #"{"error":"UpstreamFailure"}"#, "exchange"),
-            ]
-            for (status, body, expected) in cases {
+                (502, #"{"error":"UpstreamFailure"}"#, "exchange"),
+            ] {
                 SpaceMockURLProtocol.setHandler { request in
                     (HTTPURLResponse(url: request.url!, statusCode: status, httpVersion: nil, headerFields: nil)!, Data(body.utf8))
                 }
