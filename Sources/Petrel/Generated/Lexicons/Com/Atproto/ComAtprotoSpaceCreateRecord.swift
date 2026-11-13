@@ -177,7 +177,6 @@ public enum ComAtprotoSpaceCreateRecord {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        /// A record already exists at this collection and rkey. Retry with a different rkey, or use putRecord.
         case recordAlreadyExists = "RecordAlreadyExists"
         public var description: String {
             return rawValue
@@ -213,7 +212,7 @@ public enum ComAtprotoSpaceCreateRecord {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - createRecord
 
-    // Create a single new record in a permissioned space. Requires auth, implemented by PDS.
+    // Create a single new record in a space repo. Requires auth, implemented by PDS.
     //
     // - Parameter input: The input parameters for the request
 

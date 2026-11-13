@@ -114,19 +114,29 @@ class KotlinCodeGenerator(BaseCodeGenerator):
 
     def generate_space_declaration(self) -> str:
         key_type = self.main_def.get('key', 'tid')
-        name = self.main_def.get('name', self.lexicon_id)
+        title = json.dumps(self.main_def['title']) if isinstance(self.main_def.get('title'), str) else 'null'
+        title_lang = self.main_def.get('title:lang', {})
+        if not isinstance(title_lang, dict):
+            title_lang = {}
+        title_lang_literal = ', '.join(
+            f'{json.dumps(language)} to {json.dumps(value)}'
+            for language, value in sorted(title_lang.items())
+            if isinstance(language, str) and isinstance(value, str)
+        )
         collections = self.main_def.get('collections', [])
         collections_literal = ', '.join(json.dumps(value) for value in collections)
         return f'''data class SpaceDeclarationDescriptor(
     val nsid: String,
     val keyType: String,
-    val name: String,
+    val title: String?,
+    val titleLang: Map<String, String>,
     val collections: List<String>,
 )
 
 val spaceDeclaration = SpaceDeclarationDescriptor(
     nsid = "{self.lexicon_id}", keyType = {json.dumps(key_type)},
-    name = {json.dumps(name)}, collections = listOf({collections_literal}),
+    title = {title}, titleLang = mapOf({title_lang_literal}),
+    collections = listOf({collections_literal}),
 )'''
 
     def generate_properties(

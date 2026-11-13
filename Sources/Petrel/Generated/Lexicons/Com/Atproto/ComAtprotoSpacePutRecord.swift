@@ -196,7 +196,7 @@ public enum ComAtprotoSpacePutRecord {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - putRecord
 
-    // Write a record in a permissioned space, creating or updating it as needed. Requires auth, implemented by PDS.
+    // Write a record in a space repo, creating or updating it as needed. Requires auth, implemented by PDS.
     //
     // - Parameter input: The input parameters for the request
 

@@ -125,4 +125,228 @@ public enum ComAtprotoSpaceDefs {
             case data
         }
     }
+
+    public struct RepoWrite: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.space.defs#repoWrite"
+        public let repo: DID
+        public let repoRev: TID
+        public let data: Bytes
+        public let spaceRev: TID
+        public let prevSpaceRev: TID?
+
+        public init(
+            repo: DID, repoRev: TID, data: Bytes, spaceRev: TID, prevSpaceRev: TID? = nil
+        ) {
+            self.repo = repo
+            self.repoRev = repoRev
+            self.data = data
+            self.spaceRev = spaceRev
+            self.prevSpaceRev = prevSpaceRev
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                repo = try container.decode(DID.self, forKey: .repo)
+            } catch {
+                LogManager.logError("Decoding error for required property 'repo': \(error)")
+                throw error
+            }
+            do {
+                repoRev = try container.decode(TID.self, forKey: .repoRev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'repoRev': \(error)")
+                throw error
+            }
+            do {
+                data = try container.decode(Bytes.self, forKey: .data)
+            } catch {
+                LogManager.logError("Decoding error for required property 'data': \(error)")
+                throw error
+            }
+            do {
+                spaceRev = try container.decode(TID.self, forKey: .spaceRev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'spaceRev': \(error)")
+                throw error
+            }
+            do {
+                prevSpaceRev = try container.decodeIfPresent(TID.self, forKey: .prevSpaceRev)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'prevSpaceRev' — degrading to nil: \(error)")
+                prevSpaceRev = nil
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(repo, forKey: .repo)
+            try container.encode(repoRev, forKey: .repoRev)
+            try container.encode(data, forKey: .data)
+            try container.encode(spaceRev, forKey: .spaceRev)
+            try container.encodeIfPresent(prevSpaceRev, forKey: .prevSpaceRev)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(repo)
+            hasher.combine(repoRev)
+            hasher.combine(data)
+            hasher.combine(spaceRev)
+            if let value = prevSpaceRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if repo != other.repo {
+                return false
+            }
+            if repoRev != other.repoRev {
+                return false
+            }
+            if data != other.data {
+                return false
+            }
+            if spaceRev != other.spaceRev {
+                return false
+            }
+            if prevSpaceRev != other.prevSpaceRev {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let repoValue = try repo.toCBORValue()
+            map = map.adding(key: "repo", value: repoValue)
+            let repoRevValue = try repoRev.toCBORValue()
+            map = map.adding(key: "repoRev", value: repoRevValue)
+            let dataValue = try data.toCBORValue()
+            map = map.adding(key: "data", value: dataValue)
+            let spaceRevValue = try spaceRev.toCBORValue()
+            map = map.adding(key: "spaceRev", value: spaceRevValue)
+            if let value = prevSpaceRev {
+                let prevSpaceRevValue = try value.toCBORValue()
+                map = map.adding(key: "prevSpaceRev", value: prevSpaceRevValue)
+            }
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case repo
+            case repoRev
+            case data
+            case spaceRev
+            case prevSpaceRev
+        }
+    }
+
+    public struct RepoRemoved: ATProtocolCodable, ATProtocolValue {
+        public static let typeIdentifier = "com.atproto.space.defs#repoRemoved"
+        public let repo: DID
+        public let spaceRev: TID
+        public let prevSpaceRev: TID?
+
+        public init(
+            repo: DID, spaceRev: TID, prevSpaceRev: TID? = nil
+        ) {
+            self.repo = repo
+            self.spaceRev = spaceRev
+            self.prevSpaceRev = prevSpaceRev
+        }
+
+        public init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            do {
+                repo = try container.decode(DID.self, forKey: .repo)
+            } catch {
+                LogManager.logError("Decoding error for required property 'repo': \(error)")
+                throw error
+            }
+            do {
+                spaceRev = try container.decode(TID.self, forKey: .spaceRev)
+            } catch {
+                LogManager.logError("Decoding error for required property 'spaceRev': \(error)")
+                throw error
+            }
+            do {
+                prevSpaceRev = try container.decodeIfPresent(TID.self, forKey: .prevSpaceRev)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'prevSpaceRev' — degrading to nil: \(error)")
+                prevSpaceRev = nil
+            }
+        }
+
+        public func encode(to encoder: Encoder) throws {
+            var container = encoder.container(keyedBy: CodingKeys.self)
+            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
+            try container.encode(repo, forKey: .repo)
+            try container.encode(spaceRev, forKey: .spaceRev)
+            try container.encodeIfPresent(prevSpaceRev, forKey: .prevSpaceRev)
+        }
+
+        public func hash(into hasher: inout Hasher) {
+            hasher.combine(repo)
+            hasher.combine(spaceRev)
+            if let value = prevSpaceRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+        }
+
+        public func isEqual(to other: any ATProtocolValue) -> Bool {
+            guard let other = other as? Self else { return false }
+            if repo != other.repo {
+                return false
+            }
+            if spaceRev != other.spaceRev {
+                return false
+            }
+            if prevSpaceRev != other.prevSpaceRev {
+                return false
+            }
+            return true
+        }
+
+        public static func == (lhs: Self, rhs: Self) -> Bool {
+            return lhs.isEqual(to: rhs)
+        }
+
+        public func toCBORValue() throws -> Any {
+            var map = OrderedCBORMap()
+            map = map.adding(key: "$type", value: Self.typeIdentifier)
+            let repoValue = try repo.toCBORValue()
+            map = map.adding(key: "repo", value: repoValue)
+            let spaceRevValue = try spaceRev.toCBORValue()
+            map = map.adding(key: "spaceRev", value: spaceRevValue)
+            if let value = prevSpaceRev {
+                let prevSpaceRevValue = try value.toCBORValue()
+                map = map.adding(key: "prevSpaceRev", value: prevSpaceRevValue)
+            }
+            return map
+        }
+
+        private enum CodingKeys: String, CodingKey {
+            case typeIdentifier = "$type"
+            case repo
+            case spaceRev
+            case prevSpaceRev
+        }
+    }
 }

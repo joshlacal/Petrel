@@ -99,7 +99,7 @@ public enum ComAtprotoSpaceGetBlob {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - getBlob
 
-    /// Get a blob referenced from a record in a permissioned space. Returns the full blob as originally uploaded. Blobs are not uploaded through this namespace: a space record references a blob uploaded via com.atproto.repo.uploadBlob, so a client writing blob-bearing records into a space needs a blob permission alongside its space permission. Use listBlobs to enumerate a repo's blobs in a space. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services).
+    /// Get a blob referenced by a record in a space repo. Returns the full blob as originally uploaded. Requires auth as the repo's account or with a space credential; implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     ///

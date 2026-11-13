@@ -44,8 +44,7 @@ public enum ComAtprotoSpaceUpdateSpace {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        case notSpaceOwner = "NotSpaceOwner"
-        /// The requested policy is not one the host implements.
+        case notAuthorized = "NotAuthorized"
         case unsupportedPolicy = "UnsupportedPolicy"
         public var description: String {
             return rawValue
@@ -67,7 +66,7 @@ public enum ComAtprotoSpaceUpdateSpace {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.updateSpace", kind: "procedure",
         inputEncoding: "application/json", outputEncoding: nil,
-        declaredErrors: ["SpaceNotFound", "NotSpaceOwner", "UnsupportedPolicy"]
+        declaredErrors: ["SpaceNotFound", "NotAuthorized", "UnsupportedPolicy"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -249,7 +248,7 @@ public enum ComAtprotoSpaceUpdateSpace {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - updateSpace
 
-    // Replace the policy of a space wholesale. A policy with a different $type migrates the space, discarding state held by the previous policy (such as a member list). The authenticated user must be the space owner. Requires auth, implemented by PDS.
+    // Replace the policy of a space. Changing to a different policy type discards state held by the previous policy, such as a member list. Requires auth as the space authority, implemented by PDS.
     //
     // - Parameter input: The input parameters for the request
 

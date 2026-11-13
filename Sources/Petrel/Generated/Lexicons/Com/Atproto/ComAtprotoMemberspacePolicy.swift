@@ -7,11 +7,11 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
     public static let typeIdentifier = "com.atproto.memberspace.policy"
     public let publicRead: Bool?
     public let publicWrite: Bool?
-    public let allowedApps: [String]?
+    public let allowedApps: [URI]?
     public let publishPolicy: Bool?
     public let publishMembers: Bool?
 
-    public init(publicRead: Bool? = nil, publicWrite: Bool? = nil, allowedApps: [String]? = nil, publishPolicy: Bool? = nil, publishMembers: Bool? = nil) {
+    public init(publicRead: Bool? = nil, publicWrite: Bool? = nil, allowedApps: [URI]? = nil, publishPolicy: Bool? = nil, publishMembers: Bool? = nil) {
         self.publicRead = publicRead
         self.publicWrite = publicWrite
         self.allowedApps = allowedApps
@@ -23,7 +23,7 @@ public struct ComAtprotoMemberspacePolicy: ATProtocolCodable, ATProtocolValue {
         let container = try decoder.container(keyedBy: CodingKeys.self)
         publicRead = try container.decodeIfPresent(Bool.self, forKey: .publicRead)
         publicWrite = try container.decodeIfPresent(Bool.self, forKey: .publicWrite)
-        allowedApps = try container.decodeIfPresent([String].self, forKey: .allowedApps)
+        allowedApps = try container.decodeIfPresent([URI].self, forKey: .allowedApps)
         publishPolicy = try container.decodeIfPresent(Bool.self, forKey: .publishPolicy)
         publishMembers = try container.decodeIfPresent(Bool.self, forKey: .publishMembers)
     }

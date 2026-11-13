@@ -8,37 +8,94 @@ public enum ComAtprotoSpaceListSpaces {
 
     public struct SpaceView: ATProtocolCodable, ATProtocolValue {
         public static let typeIdentifier = "com.atproto.space.listSpaces#spaceView"
-        public let uri: SpaceRef
+        public let space: SpaceRef
+        public let repoRev: TID?
+        public let data: Bytes?
+        public let spaceRev: TID?
 
         public init(
-            uri: SpaceRef
+            space: SpaceRef, repoRev: TID? = nil, data: Bytes? = nil, spaceRev: TID? = nil
         ) {
-            self.uri = uri
+            self.space = space
+            self.repoRev = repoRev
+            self.data = data
+            self.spaceRev = spaceRev
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
             do {
-                uri = try container.decode(SpaceRef.self, forKey: .uri)
+                space = try container.decode(SpaceRef.self, forKey: .space)
             } catch {
-                LogManager.logError("Decoding error for required property 'uri': \(error)")
+                LogManager.logError("Decoding error for required property 'space': \(error)")
                 throw error
+            }
+            do {
+                repoRev = try container.decodeIfPresent(TID.self, forKey: .repoRev)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'repoRev' — degrading to nil: \(error)")
+                repoRev = nil
+            }
+            do {
+                data = try container.decodeIfPresent(Bytes.self, forKey: .data)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'data' — degrading to nil: \(error)")
+                data = nil
+            }
+            do {
+                spaceRev = try container.decodeIfPresent(TID.self, forKey: .spaceRev)
+            } catch {
+                // Forward compatibility: a malformed or unknown-shaped optional field
+                // must not fail the whole response.
+                LogManager.logWarning("Decoding error for optional property 'spaceRev' — degrading to nil: \(error)")
+                spaceRev = nil
             }
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
             try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            try container.encode(uri, forKey: .uri)
+            try container.encode(space, forKey: .space)
+            try container.encodeIfPresent(repoRev, forKey: .repoRev)
+            try container.encodeIfPresent(data, forKey: .data)
+            try container.encodeIfPresent(spaceRev, forKey: .spaceRev)
         }
 
         public func hash(into hasher: inout Hasher) {
-            hasher.combine(uri)
+            hasher.combine(space)
+            if let value = repoRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = data {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
+            if let value = spaceRev {
+                hasher.combine(value)
+            } else {
+                hasher.combine(nil as Int?)
+            }
         }
 
         public func isEqual(to other: any ATProtocolValue) -> Bool {
             guard let other = other as? Self else { return false }
-            if uri != other.uri {
+            if space != other.space {
+                return false
+            }
+            if repoRev != other.repoRev {
+                return false
+            }
+            if data != other.data {
+                return false
+            }
+            if spaceRev != other.spaceRev {
                 return false
             }
             return true
@@ -51,31 +108,46 @@ public enum ComAtprotoSpaceListSpaces {
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
             map = map.adding(key: "$type", value: Self.typeIdentifier)
-            let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            let spaceValue = try space.toCBORValue()
+            map = map.adding(key: "space", value: spaceValue)
+            if let value = repoRev {
+                let repoRevValue = try value.toCBORValue()
+                map = map.adding(key: "repoRev", value: repoRevValue)
+            }
+            if let value = data {
+                let dataValue = try value.toCBORValue()
+                map = map.adding(key: "data", value: dataValue)
+            }
+            if let value = spaceRev {
+                let spaceRevValue = try value.toCBORValue()
+                map = map.adding(key: "spaceRev", value: spaceRevValue)
+            }
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
             case typeIdentifier = "$type"
-            case uri
+            case space
+            case repoRev
+            case data
+            case spaceRev
         }
     }
 
     public struct Parameters: Parametrizable {
+        public let spaceDid: DID?
         public let spaceType: NSID?
-        public let did: DID?
         public let limit: Int?
         public let cursor: String?
 
         public init(
+            spaceDid: DID? = nil,
             spaceType: NSID? = nil,
-            did: DID? = nil,
             limit: Int? = nil,
             cursor: String? = nil
         ) {
+            self.spaceDid = spaceDid
             self.spaceType = spaceType
-            self.did = did
             self.limit = limit
             self.cursor = cursor
         }
@@ -142,6 +214,17 @@ public enum ComAtprotoSpaceListSpaces {
         }
     }
 
+    public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
+        case invalidCursor = "InvalidCursor"
+        public var description: String {
+            return rawValue
+        }
+
+        public var errorName: String {
+            return rawValue
+        }
+    }
+
     public struct XRPCMethodDescriptor: Sendable, Equatable {
         public let nsid: String
         public let kind: String
@@ -153,7 +236,7 @@ public enum ComAtprotoSpaceListSpaces {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.listSpaces", kind: "query",
         inputEncoding: nil, outputEncoding: "application/json",
-        declaredErrors: []
+        declaredErrors: ["InvalidCursor"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -167,7 +250,7 @@ public enum ComAtprotoSpaceListSpaces {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - listSpaces
 
-    /// List the spaces the authenticated user holds a repo in (i.e. spaces the user has written data to) or is the authority of, optionally filtered by type and/or authority DID. Note this is not 'spaces I'm a member of' — a member's PDS only tracks spaces its user has written to. Requires auth, implemented by PDS.
+    /// List spaces that the authenticated account has written to or is the authority for. Requires auth, implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     ///
@@ -215,6 +298,15 @@ public extension ATProtoClient.Com.Atproto.Space {
                 return (responseCode, nil)
             }
         } else {
+            // Try to parse a declared structured error response
+            if let atprotoError = ATProtoErrorParser.parse(
+                data: responseData,
+                statusCode: responseCode,
+                errorType: ComAtprotoSpaceListSpaces.Error.self
+            ) {
+                throw atprotoError
+            }
+
             if let genericError = ATProtoErrorParser.parseGeneric(data: responseData, statusCode: responseCode) {
                 throw genericError
             }

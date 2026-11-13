@@ -124,7 +124,6 @@ public enum ComAtprotoSpaceListRecords {
         public let collection: NSID?
         public let limit: Int?
         public let cursor: String?
-        public let reverse: Bool?
         public let excludeValues: Bool?
 
         public init(
@@ -133,7 +132,6 @@ public enum ComAtprotoSpaceListRecords {
             collection: NSID? = nil,
             limit: Int? = nil,
             cursor: String? = nil,
-            reverse: Bool? = nil,
             excludeValues: Bool? = nil
         ) {
             self.space = space
@@ -141,7 +139,6 @@ public enum ComAtprotoSpaceListRecords {
             self.collection = collection
             self.limit = limit
             self.cursor = cursor
-            self.reverse = reverse
             self.excludeValues = excludeValues
         }
     }
@@ -213,6 +210,7 @@ public enum ComAtprotoSpaceListRecords {
         case repoTakendown = "RepoTakendown"
         case repoSuspended = "RepoSuspended"
         case repoDeactivated = "RepoDeactivated"
+        case invalidCursor = "InvalidCursor"
         public var description: String {
             return rawValue
         }
@@ -233,7 +231,7 @@ public enum ComAtprotoSpaceListRecords {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.listRecords", kind: "query",
         inputEncoding: nil, outputEncoding: "application/json",
-        declaredErrors: ["SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated"]
+        declaredErrors: ["SpaceNotFound", "RepoNotFound", "RepoTakendown", "RepoSuspended", "RepoDeactivated", "InvalidCursor"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -247,7 +245,7 @@ public enum ComAtprotoSpaceListRecords {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - listRecords
 
-    /// List the records in an account's repo within a permissioned space, optionally filtered by collection. By default each record's value is inlined; set excludeValues for a metadata-only listing (collection, rkey, cid). Used for full-state recovery. Callable with either OAuth (for the authenticated user's own data) or a space credential (for syncing services). Throws RepoNotFound when the account holds no repo in the space; this does not distinguish a member that has never written from a non-member.
+    /// List records in a space repo, optionally filtered by collection. Requires auth as the repo's account or with a space credential; implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     ///

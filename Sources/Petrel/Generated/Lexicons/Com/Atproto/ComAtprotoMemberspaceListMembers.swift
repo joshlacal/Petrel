@@ -5,95 +5,6 @@ import Foundation
 
 public enum ComAtprotoMemberspaceListMembers {
     public static let typeIdentifier = "com.atproto.memberspace.listMembers"
-
-    public struct Member: ATProtocolCodable, ATProtocolValue {
-        public static let typeIdentifier = "com.atproto.memberspace.listMembers#member"
-        public let did: DID
-        public let read: Bool
-        public let write: Bool
-
-        public init(
-            did: DID, read: Bool, write: Bool
-        ) {
-            self.did = did
-            self.read = read
-            self.write = write
-        }
-
-        public init(from decoder: Decoder) throws {
-            let container = try decoder.container(keyedBy: CodingKeys.self)
-            do {
-                did = try container.decode(DID.self, forKey: .did)
-            } catch {
-                LogManager.logError("Decoding error for required property 'did': \(error)")
-                throw error
-            }
-            do {
-                read = try container.decode(Bool.self, forKey: .read)
-            } catch {
-                LogManager.logError("Decoding error for required property 'read': \(error)")
-                throw error
-            }
-            do {
-                write = try container.decode(Bool.self, forKey: .write)
-            } catch {
-                LogManager.logError("Decoding error for required property 'write': \(error)")
-                throw error
-            }
-        }
-
-        public func encode(to encoder: Encoder) throws {
-            var container = encoder.container(keyedBy: CodingKeys.self)
-            try container.encode(Self.typeIdentifier, forKey: .typeIdentifier)
-            try container.encode(did, forKey: .did)
-            try container.encode(read, forKey: .read)
-            try container.encode(write, forKey: .write)
-        }
-
-        public func hash(into hasher: inout Hasher) {
-            hasher.combine(did)
-            hasher.combine(read)
-            hasher.combine(write)
-        }
-
-        public func isEqual(to other: any ATProtocolValue) -> Bool {
-            guard let other = other as? Self else { return false }
-            if did != other.did {
-                return false
-            }
-            if read != other.read {
-                return false
-            }
-            if write != other.write {
-                return false
-            }
-            return true
-        }
-
-        public static func == (lhs: Self, rhs: Self) -> Bool {
-            return lhs.isEqual(to: rhs)
-        }
-
-        public func toCBORValue() throws -> Any {
-            var map = OrderedCBORMap()
-            map = map.adding(key: "$type", value: Self.typeIdentifier)
-            let didValue = try did.toCBORValue()
-            map = map.adding(key: "did", value: didValue)
-            let readValue = try read.toCBORValue()
-            map = map.adding(key: "read", value: readValue)
-            let writeValue = try write.toCBORValue()
-            map = map.adding(key: "write", value: writeValue)
-            return map
-        }
-
-        private enum CodingKeys: String, CodingKey {
-            case typeIdentifier = "$type"
-            case did
-            case read
-            case write
-        }
-    }
-
     public struct Parameters: Parametrizable {
         public let space: SpaceRef
         public let limit: Int?
@@ -113,13 +24,13 @@ public enum ComAtprotoMemberspaceListMembers {
     public struct Output: ATProtocolCodable {
         public let cursor: String?
 
-        public let members: [Member]
+        public let members: [ComAtprotoMemberspaceDefs.Member]
 
         /// Standard public initializer
         public init(
             cursor: String? = nil,
 
-            members: [Member]
+            members: [ComAtprotoMemberspaceDefs.Member]
 
         ) {
             self.cursor = cursor
@@ -138,7 +49,7 @@ public enum ComAtprotoMemberspaceListMembers {
                 cursor = nil
             }
 
-            members = try container.decode([Member].self, forKey: .members)
+            members = try container.decode([ComAtprotoMemberspaceDefs.Member].self, forKey: .members)
         }
 
         public func encode(to encoder: Encoder) throws {
@@ -173,8 +84,10 @@ public enum ComAtprotoMemberspaceListMembers {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        /// The space is not governed by the memberspace policy.
+        case notAuthorized = "NotAuthorized"
+        /// The space does not have a memberspace policy.
         case policyMismatch = "PolicyMismatch"
+        case invalidCursor = "InvalidCursor"
         public var description: String {
             return rawValue
         }
@@ -195,7 +108,7 @@ public enum ComAtprotoMemberspaceListMembers {
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.memberspace.listMembers", kind: "query",
         inputEncoding: nil, outputEncoding: "application/json",
-        declaredErrors: ["SpaceNotFound", "PolicyMismatch"]
+        declaredErrors: ["SpaceNotFound", "NotAuthorized", "PolicyMismatch", "InvalidCursor"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -209,7 +122,7 @@ public enum ComAtprotoMemberspaceListMembers {
 public extension ATProtoClient.Com.Atproto.Memberspace {
     // MARK: - listMembers
 
-    /// List the members of a space governed by the memberspace policy, and their read and write access. Must be called on the space authority's PDS. Requires OAuth with a covering read_self grant; a space credential is not sufficient, so members hosted elsewhere cannot enumerate the list. To make the list visible to readers, set the policy's publishMembers.
+    /// List the members of a space with a memberspace policy. Requires auth as the space authority, implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     ///

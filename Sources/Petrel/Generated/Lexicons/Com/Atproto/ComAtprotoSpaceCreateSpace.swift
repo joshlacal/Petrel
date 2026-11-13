@@ -65,46 +65,44 @@ public enum ComAtprotoSpaceCreateSpace {
     }
 
     public struct Output: ATProtocolCodable {
-        public let uri: SpaceRef
+        public let space: SpaceRef
 
         /// Standard public initializer
         public init(
-            uri: SpaceRef
+            space: SpaceRef
 
         ) {
-            self.uri = uri
+            self.space = space
         }
 
         public init(from decoder: Decoder) throws {
             let container = try decoder.container(keyedBy: CodingKeys.self)
 
-            uri = try container.decode(SpaceRef.self, forKey: .uri)
+            space = try container.decode(SpaceRef.self, forKey: .space)
         }
 
         public func encode(to encoder: Encoder) throws {
             var container = encoder.container(keyedBy: CodingKeys.self)
 
-            try container.encode(uri, forKey: .uri)
+            try container.encode(space, forKey: .space)
         }
 
         public func toCBORValue() throws -> Any {
             var map = OrderedCBORMap()
 
-            let uriValue = try uri.toCBORValue()
-            map = map.adding(key: "uri", value: uriValue)
+            let spaceValue = try space.toCBORValue()
+            map = map.adding(key: "space", value: spaceValue)
 
             return map
         }
 
         private enum CodingKeys: String, CodingKey {
-            case uri
+            case space
         }
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        /// A space with this owner, type, and skey already exists. A space that was previously deleted may be created again.
         case spaceAlreadyExists = "SpaceAlreadyExists"
-        /// The requested policy is not one the host implements.
         case unsupportedPolicy = "UnsupportedPolicy"
         public var description: String {
             return rawValue
@@ -308,7 +306,7 @@ public enum ComAtprotoSpaceCreateSpace {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - createSpace
 
-    // Create a new space governed by the given policy. The space is anchored on the authenticated user's DID, who becomes the space owner. Requires auth, implemented by PDS.
+    // Create a new space, with the authenticated account as its authority. Requires auth, implemented by PDS.
     //
     // - Parameter input: The input parameters for the request
 

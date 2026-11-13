@@ -575,9 +575,7 @@ public enum ComAtprotoSpaceApplyWrites {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        /// An update or delete targeted a record that does not exist.
         case recordNotFound = "RecordNotFound"
-        /// A create targeted a collection and rkey that already holds a record.
         case recordAlreadyExists = "RecordAlreadyExists"
         public var description: String {
             return rawValue
@@ -949,7 +947,7 @@ public enum ComAtprotoSpaceApplyWrites {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - applyWrites
 
-    // Apply a batch transaction of creates, updates, and deletes in a permissioned space. Requires auth, implemented by PDS.
+    // Apply a batch transaction of creates, updates, and deletes to a space repo. Requires auth, implemented by PDS.
     //
     // - Parameter input: The input parameters for the request
 

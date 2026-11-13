@@ -36,8 +36,12 @@ public enum ComAtprotoSpaceImportRepo {
     }
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
-        /// The account is the space's authority, and the space has not been imported.
+        /// The account is the space's authority, and the space has not been imported yet.
         case spaceNotFound = "SpaceNotFound"
+        /// The STAR file is malformed or fails verification.
+        case invalidRepoFile = "InvalidRepoFile"
+        /// The repo in the STAR file does not belong to the authenticated account.
+        case repoMismatch = "RepoMismatch"
         public var description: String {
             return rawValue
         }
@@ -57,8 +61,8 @@ public enum ComAtprotoSpaceImportRepo {
 
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.importRepo", kind: "procedure",
-        inputEncoding: "application/octet-stream", outputEncoding: nil,
-        declaredErrors: ["SpaceNotFound"]
+        inputEncoding: "application/vnd.dasl.star", outputEncoding: nil,
+        declaredErrors: ["SpaceNotFound", "InvalidRepoFile", "RepoMismatch"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -72,7 +76,7 @@ public enum ComAtprotoSpaceImportRepo {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - importRepo
 
-    // Import the authenticated account's repo in a space from a STAR file, as served by getRepo, during account migration, replacing whatever this host holds for that repo. The archive's commit names the space and must name the account as its repo. If the account is the space's authority, the space must first be imported with importSpaceMeta. Blobs are not included and are uploaded separately. Requires OAuth with a create grant for every collection in the archive, implemented by PDS.
+    // Import the authenticated account's space repo from a STAR file, for account migration. If the account is the space's authority, the space must first be imported with importSpaceMeta. Requires auth, implemented by PDS.
     //
     // - Parameter data: The binary data to upload
 
@@ -87,7 +91,7 @@ public extension ATProtoClient.Com.Atproto.Space {
 
         let dataToUpload = data
         let headers: [String: String] = [
-            "Content-Type": "application/octet-stream",
+            "Content-Type": "application/vnd.dasl.star",
             "Content-Length": "\(dataToUpload.count)",
         ]
 

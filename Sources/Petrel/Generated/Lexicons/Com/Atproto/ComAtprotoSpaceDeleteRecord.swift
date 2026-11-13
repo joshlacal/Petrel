@@ -114,7 +114,7 @@ public enum ComAtprotoSpaceDeleteRecord {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - deleteRecord
 
-    // Delete a record from a permissioned space, or ensure it doesn't exist. Succeeds whether or not the record was present. Requires auth, implemented by PDS.
+    // Delete a record from a space repo, or ensure it doesn't exist. Requires auth, implemented by PDS.
     //
     // - Parameter input: The input parameters for the request
 

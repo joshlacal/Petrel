@@ -54,7 +54,7 @@ public enum ComAtprotoSpaceExportSpaceMeta {
 
     public enum Error: String, Swift.Error, ATProtoErrorType, CustomStringConvertible {
         case spaceNotFound = "SpaceNotFound"
-        case notSpaceOwner = "NotSpaceOwner"
+        case notAuthorized = "NotAuthorized"
         public var description: String {
             return rawValue
         }
@@ -74,8 +74,8 @@ public enum ComAtprotoSpaceExportSpaceMeta {
 
     public static let endpointDescriptor = XRPCMethodDescriptor(
         nsid: "com.atproto.space.exportSpaceMeta", kind: "query",
-        inputEncoding: nil, outputEncoding: "application/octet-stream",
-        declaredErrors: ["SpaceNotFound", "NotSpaceOwner"]
+        inputEncoding: nil, outputEncoding: "application/vnd.dasl.star",
+        declaredErrors: ["SpaceNotFound", "NotAuthorized"]
     )
 
     public protocol ServerHandler: Sendable {
@@ -89,7 +89,7 @@ public enum ComAtprotoSpaceExportSpaceMeta {
 public extension ATProtoClient.Com.Atproto.Space {
     // MARK: - exportSpaceMeta
 
-    /// Download a space's host-side state as a space meta archive, for account migration: a STAR file with the atproto-space-meta profile. The archive's metadata is the space. Its body is the space's policy, then any state the policy keeps (such as a memberspace member list), then the writer set. Served by the space host. Requires OAuth as the space owner with a covering read_self grant.
+    /// Export a space's state, such as its policy and member list, as a STAR file for account migration. Requires auth as the space authority, implemented by PDS.
     ///
     /// - Parameter input: The input parameters for the request
     ///
@@ -103,7 +103,7 @@ public extension ATProtoClient.Com.Atproto.Space {
         let urlRequest = try await networkService.createURLRequest(
             endpoint: endpoint,
             method: "GET",
-            headers: ["Accept": "application/octet-stream"],
+            headers: ["Accept": "application/vnd.dasl.star"],
             body: nil,
             queryItems: queryItems
         )
@@ -119,11 +119,11 @@ public extension ATProtoClient.Com.Atproto.Space {
         // are handled via the status code / structured error parser below.
         if (200 ... 299).contains(responseCode) {
             guard let contentType = response.allHeaderFields["Content-Type"] as? String else {
-                throw NetworkError.invalidContentType(expected: "application/octet-stream", actual: "nil")
+                throw NetworkError.invalidContentType(expected: "application/vnd.dasl.star", actual: "nil")
             }
 
-            if !contentType.lowercased().contains("application/octet-stream") {
-                throw NetworkError.invalidContentType(expected: "application/octet-stream", actual: contentType)
+            if !contentType.lowercased().contains("application/vnd.dasl.star") {
+                throw NetworkError.invalidContentType(expected: "application/vnd.dasl.star", actual: contentType)
             }
 
             let decodedData = ComAtprotoSpaceExportSpaceMeta.Output(data: responseData)
